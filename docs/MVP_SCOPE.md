@@ -79,6 +79,6 @@ If that loop is not satisfying, do not scale content yet.
 - full quest library;
 - complex boss rotation;
 - Premium store;
-- five-character party;
+- the Character Roster, character unlocks and multi-character Active Party;
 - complete content import;
 - C++/WASM optimization.

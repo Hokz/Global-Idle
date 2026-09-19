@@ -51,6 +51,21 @@ only approved offline progression. Only that training's limits and rates remain 
 - elemental penetration/resistance;
 - exact supply-consumption rules.
 
+## Party and roster
+
+Roster maximum (5), Active Party maximum (4) and the one-character-per-vocation rule are
+locked in `docs/DECISIONS.md` and are **not** open.
+
+- exact Gold price for Roster Slots 2-5;
+- whether unlock costs scale linearly, exponentially or by milestones;
+- whether prerequisites besides Gold exist;
+- XP behavior when a multi-character formation is not Shared-XP eligible;
+- exact adopted Tibia Global Shared XP bonus and distribution values;
+- combat consequences of Party ordering beyond Slot 1 being the Frontline;
+- whether the formation can be changed during an active combat/activity;
+- final name for the "Origin Character" concept;
+- final Skill Point state granted to a newly unlocked Level 8 character.
+
 ## Vocation balance
 
 - Druid support/damage ceiling;
@@ -85,6 +100,7 @@ only approved offline progression. Only that training's limits and rates remain 
 ## Premium
 
 - Premium duration/price;
+- Premium Party-management benefit, now that the fifth active Party slot is superseded;
 - premium-currency package pricing;
 - exact XP bonus if any;
 - maximum offline Skill Training duration;

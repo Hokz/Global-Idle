@@ -61,8 +61,11 @@ No full gameplay yet.
 ## Phase 4 — Skills + Party + Vocations
 
 - final skill progression model;
-- additional characters;
-- party formation;
+- character roster with unique vocations;
+- Gold-based character/roster unlocks;
+- Active Party formation (1-4);
+- Party positioning / Frontline;
+- Shared XP eligibility;
 - role logic;
 - all five vocation identities;
 - configurable combat behavior;
@@ -103,7 +106,7 @@ No full gameplay yet.
 ## Phase 8 — Premium
 
 - entitlements;
-- fifth party slot;
+- Party-management benefits (OPEN; no fifth active Party slot);
 - automation;
 - remote services;
 - loot automation;

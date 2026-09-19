@@ -24,6 +24,13 @@ documents exist, what each one covers and how far each one has been approved.
   - status: `DESIGN BASELINE / PARTIALLY OPEN`
   - scope: Base Level, Skills, Exercise Weapons, Training Dummies, vocation aptitude, Canary formula research and layered Combat System architecture.
 
+### Party / Roster
+
+- **Party & Character Roster System Foundation**
+  - path: `docs/design/party/PARTY_SYSTEM_FOUNDATION.md`
+  - status: `DESIGN BASELINE / PARTIALLY OPEN`
+  - scope: unique-vocation roster, Gold unlocks, 1–4 Active Party formation, Frontline, Shared XP eligibility, reconnect behavior.
+
 ---
 
 ## Documentation lifecycle

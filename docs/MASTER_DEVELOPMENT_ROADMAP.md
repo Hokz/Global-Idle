@@ -329,15 +329,20 @@ Premium should be highly valuable without making Free non-competitive.
 
 Direction:
 
+Party capacity is **not** a Premium lever. The account Character Roster holds up to five
+unique-vocation characters, the Active Party holds at most four of them, and every roster slot
+past the first is unlocked with in-game Gold by Free and Premium players alike. A fifth
+simultaneous Active Party member does not exist. See
+[`docs/design/party/PARTY_SYSTEM_FOUNDATION.md`](design/party/PARTY_SYSTEM_FOUNDATION.md).
+
 ### Free
-- starts with one character/party slot;
-- can purchase additional slots up to four;
+- starts with the Origin Character;
+- unlocks further roster characters with Gold (costs OPEN);
 - navigates to services/NPCs;
 - standard storage;
 - standard automation.
 
 ### Premium
-- can unlock the fifth party slot;
 - advanced automation;
 - remote selling/refill/services after appropriate content unlock;
 - stronger loot management;
@@ -455,8 +460,11 @@ a disconnected character.
 - loot storage.
 
 ### Phase 4 — Party/vocations
-- multiple characters;
+- character roster and Gold-based character unlocks;
+- unique vocations;
+- Active Party formation (1-4) and Frontline positioning;
 - all vocation identities;
+- Shared XP eligibility;
 - party rules;
 - combat behavior.
 
@@ -481,8 +489,8 @@ a disconnected character.
 
 ### Phase 8 — Premium/automation
 - automation;
-- party capacity;
-- advanced convenience.
+- advanced convenience;
+- Party-management Premium benefits (OPEN - roster capacity is a Gold sink, not a Premium one).
 
 ### Phase 9 — Content expansion
 - region-by-region content;
@@ -520,6 +528,7 @@ Current detailed design documents:
 
 - [`docs/design/tutorial/TUTORIAL_ROOKGAARD_ROADMAP.md`](design/tutorial/TUTORIAL_ROOKGAARD_ROADMAP.md) — Level 1–8 Rookgaard onboarding through vocation selection.
 - [`docs/design/combat/COMBAT_LEVEL_SKILLS_FOUNDATION.md`](design/combat/COMBAT_LEVEL_SKILLS_FOUNDATION.md) — Base Level, Skills, training systems and the layered Combat System architecture.
+- [`docs/design/party/PARTY_SYSTEM_FOUNDATION.md`](design/party/PARTY_SYSTEM_FOUNDATION.md) — character roster, unique vocations, Gold unlocks, the 1-4 Active Party, Frontline and Shared XP eligibility.
 
 Each design document carries its own status marker and its own list of open decisions. Those
 open items are not resolved by this roadmap.
