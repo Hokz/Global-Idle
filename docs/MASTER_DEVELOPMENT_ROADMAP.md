@@ -488,3 +488,18 @@ character
 ```
 
 That loop is the foundation of the product.
+
+## 22. Detailed design documents
+
+This roadmap stays at product level. Detailed, domain-specific game design lives under
+`docs/design/`, indexed by:
+
+- [`docs/DESIGN_INDEX.md`](DESIGN_INDEX.md) — navigation page and status lifecycle for all design documents.
+
+Current detailed design documents:
+
+- [`docs/design/tutorial/TUTORIAL_ROOKGAARD_ROADMAP.md`](design/tutorial/TUTORIAL_ROOKGAARD_ROADMAP.md) — Level 1–8 Rookgaard onboarding through vocation selection.
+- [`docs/design/combat/COMBAT_LEVEL_SKILLS_FOUNDATION.md`](design/combat/COMBAT_LEVEL_SKILLS_FOUNDATION.md) — Base Level, Skills, training systems and the layered Combat System architecture.
+
+Each design document carries its own status marker and its own list of open decisions. Those
+open items are not resolved by this roadmap.

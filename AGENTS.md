@@ -29,14 +29,15 @@ The project depends on:
 Before meaningful work, read:
 
 1. `README.md`
-2. `docs/MASTER_DEVELOPMENT_ROADMAP.md`
-3. `docs/PRODUCT_VISION.md`
-4. `docs/GAME_SYSTEMS.md`
-5. `docs/ARCHITECTURE.md`
-6. `docs/MVP_SCOPE.md`
-7. `docs/DECISIONS.md`
-8. `docs/OPEN_QUESTIONS.md`
-9. any task-specific design document.
+2. `docs/DESIGN_INDEX.md`
+3. `docs/MASTER_DEVELOPMENT_ROADMAP.md`
+4. `docs/PRODUCT_VISION.md`
+5. `docs/GAME_SYSTEMS.md`
+6. `docs/ARCHITECTURE.md`
+7. `docs/MVP_SCOPE.md`
+8. `docs/DECISIONS.md`
+9. `docs/OPEN_QUESTIONS.md`
+10. any task-specific design document.
 
 ## 3. Agent workflow
 
