@@ -1,0 +1,22 @@
+{
+  "package": "Global Idle Project Foundation",
+  "version": "0.1",
+  "phase": "Phase 0",
+  "files": [
+    "AGENTS.md",
+    "CLAUDE_BOOTSTRAP.md",
+    "CODEX_BOOTSTRAP.md",
+    "README.md",
+    "docs/ARCHITECTURE.md",
+    "docs/DECISIONS.md",
+    "docs/ECONOMY.md",
+    "docs/GAME_SYSTEMS.md",
+    "docs/MASTER_DEVELOPMENT_ROADMAP.md",
+    "docs/MVP_SCOPE.md",
+    "docs/OPEN_QUESTIONS.md",
+    "docs/PRODUCT_VISION.md",
+    "docs/REFERENCES.md",
+    "docs/ROADMAP.md"
+  ],
+  "note": "Documentation foundation prepared for GitHub/Codex/Claude workflow."
+}
