@@ -426,7 +426,10 @@ The character may be able to train:
 - online;
 - offline.
 
-Exact offline restrictions and durations are open.
+Dedicated Skill Training is the only approved form of offline progression. It never grants
+Base XP, and it is separate from Hunt/Dungeon simulation, which is online-only.
+
+Exact offline restrictions, rates and durations are open.
 
 ---
 
@@ -950,8 +953,12 @@ Open questions include:
 - attack speed;
 - spell cooldowns;
 - GCD/shared cooldown concepts;
-- offline simulation batching;
+- how a paused activity resumes mid-tick after a reconnect;
 - deterministic/reproducible RNG needs.
+
+Combat simulation is **online-only**. The 5-minute reconnect grace *pauses* combat; it does not
+simulate it offline, and nothing progresses while paused. Dedicated Skill Training is the only
+approved disconnected progression, and its exact limits and rates remain open.
 
 These must be discussed before the Combat Engine implementation phase.
 
@@ -1054,7 +1061,7 @@ Define:
 - ticks;
 - attack cadence;
 - cooldowns;
-- offline simulation relationship.
+- pause/resume behavior across the reconnect grace period.
 
 ## Combat 2 — Character Stats
 
@@ -1281,7 +1288,7 @@ Must still be designed explicitly:
 - exact Exercise Weapon charges/costs;
 - exact public Dummy rate;
 - exact Premium Dummy advantage;
-- exact online/offline training rules;
+- exact online/offline Skill Training rules;
 - exact Canary formulas to preserve;
 - combat tick rate;
 - attack speed;

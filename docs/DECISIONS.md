@@ -10,6 +10,33 @@ This document records decisions that agents should not silently reverse.
 - Interactive surface world map.
 - Combat automated by the server.
 
+## Online / offline activity
+
+Global Idle is an **online** idle RPG.
+
+- Hunts and Dungeons progress only while the player's session is connected to the server;
+- the browser/client never calculates combat; simulation stays server-authoritative;
+- a background, minimized or inactive tab continues normally while the server still considers
+  the session connected;
+- there is no offline Hunt or Dungeon combat, Base XP, gold, creature loot or room progression;
+- Skill Training with Exercise Weapons and Training Dummies is the only approved offline
+  progression, and it never grants Base XP.
+
+### Reconnect grace period
+
+Unexpected connection loss uses a **5-minute** reconnect grace period.
+
+- the active combat/activity simulation pauses immediately on connection loss;
+- the activity session is preserved for up to 5 minutes;
+- nothing progresses while paused: no XP, loot, gold, room progression or supply consumption;
+- reconnecting within 5 minutes restores the preserved session and resumes it from that state;
+- when the grace period expires the active Hunt/Dungeon session terminates and normal re-entry
+  rules apply later - for a Hunt Area, a later re-entry starts again at Room 1;
+- explicit player actions bypass the grace period: manual Leave Hunt, and explicit
+  logout/leave where the server receives that intent, end the session immediately;
+- when the server can only observe transport/session loss - browser or tab closure included -
+  it applies the same 5-minute grace period.
+
 ## Hunts
 
 - rooms 1-10 escalate;

@@ -42,8 +42,10 @@ No full gameplay yet.
 - death;
 - XP;
 - gold;
-- persistent activity;
-- browser-close continuity.
+- server-side activity state, persisted across reloads and the grace period;
+- connection/session lifecycle;
+- background/minimized online continuity;
+- 5-minute reconnect grace.
 
 ## Phase 3 — Loot + Itemization
 
@@ -63,7 +65,8 @@ No full gameplay yet.
 - party formation;
 - role logic;
 - all five vocation identities;
-- configurable combat behavior.
+- configurable combat behavior;
+- dedicated offline Skill Training settlement.
 
 ## Phase 5 — Quest/Dungeon/Boss Framework
 

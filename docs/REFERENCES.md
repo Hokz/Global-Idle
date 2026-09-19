@@ -51,7 +51,8 @@ Use CrystalServer as a reference implementation, not authority.
 
 Use Baiak Idle as a product/game-loop reference for:
 - idle hunt UX;
-- offline progression;
+- offline Skill Training;
+- connection/reconnect/session-state handling;
 - loot handling;
 - party management;
 - quality-of-life;

@@ -94,7 +94,7 @@ Pure or mostly-pure game rules:
 - progression;
 - supply consumption;
 - activity simulation;
-- offline catch-up.
+- offline Skill Training settlement.
 
 Design this package so implementation language can change later without rewriting the whole application.
 
@@ -132,22 +132,46 @@ or a tick-based equivalent.
 
 Do not bind the rest of the application directly to TypeScript-specific combat internals.
 
-## Online vs offline
+## Online activity and session lifecycle
 
-Both must use the same core rules.
+Hunt and Dungeon simulation is **online-only**. The server advances an activity only while it
+considers that session connected.
 
-Avoid having:
-- one algorithm while browser is open;
-- a mathematically unrelated algorithm offline.
+- the server tracks connection liveness for each active session through a heartbeat or
+  equivalent mechanism; the exact mechanism and interval belong to the implementation
+  specification, not to this document;
+- a backgrounded or minimized client keeps progressing while its connection stays alive;
+- an unexpected disconnect moves the activity to a paused reconnect-grace state for
+  **5 minutes**;
+- nothing is simulated while paused - no combat, XP, loot, gold, room progression or supply
+  consumption;
+- reconnecting within the grace period restores the preserved active-session state and resumes
+  simulation from it;
+- when the grace period times out, the activity is terminated;
+- explicit logout or manual exit bypasses the grace period and ends the activity immediately.
 
-Optimized offline batching may be introduced later, but results must remain acceptably equivalent.
+Conceptually:
+
+```text
+ONLINE_ACTIVE
+→ RECONNECT_GRACE_PAUSED
+→ ONLINE_ACTIVE            (reconnect within 5 minutes)
+
+ONLINE_ACTIVE
+→ RECONNECT_GRACE_PAUSED
+→ ACTIVITY_ENDED           (grace period expires)
+```
+
+Offline computation is reserved for one case only: settling dedicated Skill Training
+(Exercise Weapon + Training Dummy) progress. There is no offline combat simulation and no
+offline batching of Hunt or Dungeon progression.
 
 ## Jobs
 
 Redis-backed workers can manage:
 
-- long-running hunts;
-- offline catch-up;
+- long-running online hunts;
+- offline Skill Training settlement;
 - boss rotations;
 - timers;
 - scheduled activity;

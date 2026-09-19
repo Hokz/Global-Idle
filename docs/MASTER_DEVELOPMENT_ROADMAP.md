@@ -404,7 +404,20 @@ tick
 → room transition
 ```
 
-Offline progression must use the same authoritative rules.
+### Online-only activity simulation
+
+Activity simulation is online-only. The server advances a Hunt or Dungeon only while it
+considers the session connected; a background or minimized client keeps progressing while its
+connection stays alive.
+
+An unexpected disconnect pauses the activity and preserves it for 5 minutes. Nothing
+progresses while paused - no XP, gold, loot, room progression or supply consumption.
+Reconnecting within the window resumes the same session; letting it expire terminates the
+activity. Manual exit and explicit logout end it immediately, without grace.
+
+Offline progression exists only for dedicated **Skill Training** (Exercise Weapon + Training
+Dummy), which never grants Base XP. That settlement is the one computation allowed to run for
+a disconnected character.
 
 ## 20. Production roadmap
 
@@ -431,7 +444,7 @@ Offline progression must use the same authoritative rules.
 - supplies;
 - death;
 - XP/gold;
-- persistence/offline.
+- session persistence, connection lifecycle and the 5-minute reconnect grace.
 
 ### Phase 3 — Itemization
 - BaseItem;

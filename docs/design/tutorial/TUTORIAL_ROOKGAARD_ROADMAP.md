@@ -694,6 +694,21 @@ Start again at Room 1
 
 Room progress is **not persistent** between separate Hunt sessions.
 
+## Staying online
+
+Hunts require the character to remain online. The server simulates combat only while the
+session is connected.
+
+- a background or minimized browser may keep hunting while the connection stays alive;
+- losing the connection pauses the Hunt and holds it for 5 minutes; reconnecting in time
+  resumes the same Hunt exactly where it stopped;
+- if the player does not return in time the Hunt ends, and a later re-entry starts again at
+  Room 1, as above;
+- offline progression is limited to Skill Training.
+
+The tutorial only needs to convey the gameplay implication: the character hunts while you are
+connected, and a short disconnection is forgiven.
+
 ---
 
 # 25. XP Tutorial

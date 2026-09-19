@@ -1,5 +1,19 @@
 # Game Systems
 
+## Online activity / connection
+
+Global Idle is an online idle RPG.
+
+- server-authoritative Hunt/Dungeon simulation runs only for connected sessions;
+- a background or minimized client keeps progressing while the connection stays alive;
+- offline Hunt/Dungeon combat does not exist - no XP, gold, loot or room progression accrues
+  while disconnected;
+- Skill Training (Exercise Weapon + Training Dummy) is the only approved offline progression;
+- an unexpected disconnect pauses the activity and preserves it for 5 minutes; reconnecting
+  within that window resumes the same session, and letting it expire terminates the activity;
+- nothing progresses during the paused grace period;
+- manual Leave Hunt and explicit logout end the session immediately, without grace.
+
 ## Hunts
 
 - rooms 1-10 escalate;

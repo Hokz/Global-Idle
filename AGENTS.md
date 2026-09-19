@@ -115,7 +115,7 @@ Before calling work complete:
 - review rounding and RNG;
 - review item/currency duplication paths;
 - review transaction boundaries;
-- review offline vs online consistency;
+- review reconnect-grace and offline Skill Training consistency;
 - review market races;
 - review rollback behavior;
 - review Premium/Free implications;

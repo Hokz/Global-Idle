@@ -4,6 +4,10 @@ These are intentionally unresolved.
 
 Agents should not silently invent permanent answers.
 
+The existence of offline Hunt/Dungeon progression is **not** an open question. It is locked in
+`docs/DECISIONS.md`: activity simulation is online-only, and dedicated Skill Training is the
+only approved offline progression. Only that training's limits and rates remain open.
+
 ## Progression
 
 - exact XP curve;
@@ -83,7 +87,9 @@ Agents should not silently invent permanent answers.
 - Premium duration/price;
 - premium-currency package pricing;
 - exact XP bonus if any;
-- offline duration;
+- maximum offline Skill Training duration;
+- Exercise Weapon charge settlement while offline;
+- offline training-rate rules;
 - automation entitlements;
 - storage/loot limits;
 - regional pricing.
