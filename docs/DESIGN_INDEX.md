@@ -21,7 +21,7 @@ documents exist, what each one covers and how far each one has been approved.
 
 - **Combat, Base Level & Skills Foundation**
   - path: `docs/design/combat/COMBAT_LEVEL_SKILLS_FOUNDATION.md`
-  - status: `DESIGN FOUNDATION / PARTIALLY OPEN`
+  - status: `DESIGN BASELINE / PARTIALLY OPEN`
   - scope: Base Level, Skills, Exercise Weapons, Training Dummies, vocation aptitude, Canary formula research and layered Combat System architecture.
 
 ---

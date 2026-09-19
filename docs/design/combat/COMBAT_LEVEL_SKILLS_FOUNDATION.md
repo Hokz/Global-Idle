@@ -1,6 +1,6 @@
 # Global Idle — Combat, Base Level & Skills Foundation
 
-**Document status:** DESIGN FOUNDATION / PARTIALLY OPEN  
+**Document status:** DESIGN BASELINE / PARTIALLY OPEN  
 **Scope:** Base Level, Skills, skill training, vocation aptitudes, baseline combat power, and how later systems modify combat.  
 **Purpose:** Establish a clean technical model before exact formulas are implemented.
 

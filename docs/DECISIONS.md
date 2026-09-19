@@ -14,7 +14,12 @@ This document records decisions that agents should not silently reverse.
 
 - rooms 1-10 escalate;
 - room 10 repeats indefinitely;
-- stop on death, supplies, manual exit or configured stop condition.
+- the Hunt ends on death, manual exit, or a player-configured stop condition;
+- supply exhaustion does not force exit by default;
+- full Loot Capacity does not force exit by default;
+- when supplies are exhausted, the game warns the player and combat may continue;
+- when Loot Capacity is full, the game warns the player and combat may continue, but
+  additional loot is no longer collected.
 
 ## Death
 

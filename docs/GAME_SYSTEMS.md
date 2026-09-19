@@ -4,7 +4,8 @@
 
 - rooms 1-10 escalate;
 - room 10 loops indefinitely;
-- party stops on death, supply exhaustion, manual exit or configured condition;
+- the Hunt ends on death, manual exit, or a player-configured stop condition;
+- supply exhaustion and full Loot Capacity warn the player but do not end the Hunt by default;
 - combat is server simulated;
 - hunt UI can show expected efficiency and risk.
 
@@ -18,6 +19,14 @@ Examples:
 - ammunition;
 - consumables;
 - hunt-specific resources.
+
+Exhaustion behavior:
+
+- supplies remain real combat constraints;
+- exhaustion increases risk;
+- exhaustion does not force the Hunt to stop by default;
+- the game warns the player and the character may continue;
+- a player-configured automation may choose to stop based on remaining supplies.
 
 Exact consumption rules belong to combat design.
 

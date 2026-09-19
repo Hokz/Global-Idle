@@ -7,15 +7,16 @@ Use this as the first project instruction when opening the Global Idle repositor
 Read, in order:
 
 1. `AGENTS.md`
-2. `docs/MASTER_DEVELOPMENT_ROADMAP.md`
-3. `docs/PRODUCT_VISION.md`
-4. `docs/GAME_SYSTEMS.md`
-5. `docs/ARCHITECTURE.md`
-6. `docs/MVP_SCOPE.md`
-7. `docs/ROADMAP.md`
-8. `docs/DECISIONS.md`
-9. `docs/OPEN_QUESTIONS.md`
-10. `docs/REFERENCES.md`
+2. `docs/DESIGN_INDEX.md`
+3. `docs/MASTER_DEVELOPMENT_ROADMAP.md`
+4. `docs/PRODUCT_VISION.md`
+5. `docs/GAME_SYSTEMS.md`
+6. `docs/ARCHITECTURE.md`
+7. `docs/MVP_SCOPE.md`
+8. `docs/ROADMAP.md`
+9. `docs/DECISIONS.md`
+10. `docs/OPEN_QUESTIONS.md`
+11. `docs/REFERENCES.md`
 
 Then inspect the repository and report:
 

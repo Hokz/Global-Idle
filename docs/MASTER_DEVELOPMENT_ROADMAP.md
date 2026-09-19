@@ -37,10 +37,17 @@ Hunts are endless idle loops.
 - room 10 is the stable end-loop;
 - after clearing room 10, the party repeats room 10 indefinitely;
 - the hunt ends when:
-  - the party dies;
-  - supplies run out;
-  - a configured stop condition triggers;
-  - the player exits.
+  - the party/character dies;
+  - the player exits;
+  - a configured stop condition triggers.
+
+### Supplies and Loot Capacity
+
+By default, neither state ends the hunt:
+
+- supply exhaustion only warns the player and raises the risk of death;
+- full Loot Capacity stops further loot collection, but combat continues;
+- player-configured automation may use either state as a stop condition.
 
 ### Hunt information
 

@@ -9,6 +9,7 @@ Read the repository documentation completely before changing code.
 Start with:
 
 - `AGENTS.md`
+- `docs/DESIGN_INDEX.md`
 - `docs/MASTER_DEVELOPMENT_ROADMAP.md`
 - `docs/ARCHITECTURE.md`
 - `docs/MVP_SCOPE.md`
