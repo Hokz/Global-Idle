@@ -1,5 +1,24 @@
 {
   "// ": "Solution file (§4.4). It compiles nothing itself; it names the composite projects `tsc -b` builds, in dependency order. apps/web is deliberately absent: Next.js sets noEmit, and TypeScript refuses a referenced project that disables emit (TS6310). It is typechecked by its own `tsc --noEmit` and again by `next build`. Test W13 proves all seven workspaces are covered.",
   "files": [],
-  "references": []
+  "references": [
+    {
+      "path": "packages/shared"
+    },
+    {
+      "path": "packages/game-data"
+    },
+    {
+      "path": "packages/game-engine"
+    },
+    {
+      "path": "packages/domain"
+    },
+    {
+      "path": "apps/api"
+    },
+    {
+      "path": "apps/worker"
+    }
+  ]
 }

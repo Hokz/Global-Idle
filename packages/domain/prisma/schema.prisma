@@ -1,0 +1,42 @@
+// Phase 0B schema. §4.3 fixes the generator; §6.3 fixes the models.
+//
+// 0B.2 carries the generator, the datasource and exactly one model:
+// ContentBundle, the leaf every later reference points at, with no foreign
+// keys of its own. That is what makes 0B.2's clean-build proof (W12)
+// executable at the end of 0B.2 rather than depending on 0B.3.
+// Every other model, and every migration, belongs to 0B.3.
+
+generator client {
+  // The current Prisma 7 generator. prisma-client-js is not used (§3.8, §19).
+  // Every field is written explicitly even where the generator could infer it:
+  // moduleFormat would be inferred from the nearest package.json and
+  // importFileExtension from tsconfig, and inference is correct today and
+  // silently wrong the day someone edits a tsconfig.
+  provider               = "prisma-client"
+  output                 = "../src/generated/prisma"
+  runtime                = "nodejs"
+  moduleFormat           = "esm"
+  generatedFileExtension = "ts"
+  importFileExtension    = "js"
+  previewFeatures        = ["partialIndexes"]
+}
+
+datasource db {
+  // No url here. Prisma 7 refuses one: "The datasource property `url` is no
+  // longer supported in schema files." It lives in prisma.config.ts, and the
+  // client is constructed with a driver adapter (§4.3).
+  provider = "postgresql"
+}
+
+/// Bundle metadata, and nothing more (§7.7). It carries NO reference count and
+/// NO pinned flag: a counter is a mutable side channel that can drift from
+/// reality, and a drifted counter is how a referenced bundle gets deleted.
+/// The pinned set is a query over real references (§7.7, test C6).
+model ContentBundle {
+  version     String   @id
+  checksum    String
+  publishedAt DateTime
+  location    String
+
+  @@map("ContentBundle")
+}

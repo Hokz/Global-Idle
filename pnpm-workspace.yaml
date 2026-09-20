@@ -20,8 +20,15 @@ engineStrict: true
 # Every entry carries the reason it exists. Nothing is allowed wholesale,
 # and dangerouslyAllowAllBuilds is never used.
 allowBuilds:
+  # pnpm 12 refuses dependency install scripts unless they are allowed here.
+  # Every entry carries the reason it exists. Nothing is allowed wholesale, and
+  # dangerouslyAllowAllBuilds is never used. A new entry appears only when
+  # `pnpm install` reports an ignored build, and is added with its reason.
   prisma: true # preinstall entry script of the pinned CLI
   '@prisma/engines': true # postinstall: fetches the schema engine the pinned CLI uses
-  esbuild: true # postinstall: verifies its platform binary (Vite / Vitest)
+  msgpackr-extract:
+    true # postinstall: msgpackr's optional native accelerator, reached
+    # through bullmq -> msgpackr in apps/worker
 minimumReleaseAgeExclude:
   - dependency-cruiser@18.4.0
+  - '@nestjs/terminus@12.1.0'

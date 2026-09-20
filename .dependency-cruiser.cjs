@@ -42,6 +42,23 @@ const IO_CORE = [
   '^(node:)?tls$',
 ];
 
+/**
+ * Boundary analysis resolves workspace packages to their SOURCE.
+ *
+ * WITHOUT THIS THE GATE IS THEATRE. `@global-idle/domain` resolves through
+ * pnpm's symlink and the package's `exports` map to dist/index.js, which
+ * `doNotFollow`/`exclude` then drop — so a cruise of the workspace saw ZERO
+ * cross-package edges and rules W6, W7 and W10 could never fire. Measured:
+ * `apps/worker/src/main.ts -> @global-idle/domain` was absent from the graph.
+ *
+ * The fix is the inert `source` field on each workspace package.json plus
+ * `exportsFields: []` in options below. Node and TypeScript ignore `source`
+ * and still resolve through `exports` to dist (§3.3); only this cruise reads
+ * it. That makes the rules STRICTER, not looser: the boundary question is
+ * about the source module graph, and the rules are written against source
+ * paths.
+ */
+
 module.exports = {
   forbidden: [
     // ---------------------------------------------------------------- the rule ADR-012 exists for
@@ -206,6 +223,18 @@ module.exports = {
 
     // ---------------------------------------------------------------- hygiene
     {
+      name: 'not-to-unresolvable',
+      comment:
+        'An import that does not resolve is either a typo or an UNDECLARED dependency that ' +
+        "pnpm's isolated linker is refusing to hoist into existence (§3.1). Both are errors. " +
+        'This is also what makes test W7 bite: apps/web importing @global-idle/domain cannot ' +
+        'resolve, because domain is not one of its declared dependencies — without this rule ' +
+        'the violation would simply produce no edge and no finding.',
+      severity: 'error',
+      from: {},
+      to: { couldNotResolve: true },
+    },
+    {
       name: 'no-circular',
       comment: 'A cycle makes ownership unanswerable (ADR-001).',
       severity: 'error',
@@ -223,6 +252,13 @@ module.exports = {
           '(^|/)\\.[^/]+\\.(js|cjs|mjs|ts|json)$',
           '(^|/)(eslint|vitest|next|prettier)\\.config\\.(js|cjs|mjs|ts)$',
           '(^|/)prisma\\.config\\.ts$',
+          // Entry points are legitimately unimported within the cruise:
+          // a package's public surface and an app's process entry.
+          '^packages/[^/]+/src/index\\.ts$',
+          '^apps/(api|worker)/src/main\\.ts$',
+          // Next.js routes the app/ directory by convention; nothing imports them.
+          '^apps/web/app/',
+          '^apps/web/next\\.config\\.ts$',
         ],
       },
       to: {},
@@ -238,6 +274,11 @@ module.exports = {
         '(^|/)coverage/',
         '(^|/)\\.next/',
         '(^|/)src/generated/',
+        // Declaration files are not source. This repository authors none —
+        // every .d.ts here is generated (next-env.d.ts, Prisma's emitted
+        // types) — and the boundary rules are about the source module graph.
+        // Cruising them only reports the framework's own subpath exports.
+        '\\.d\\.ts$',
         '\\.test\\.ts$',
         '\\.spec\\.ts$',
         '(^|/)tests?/',
@@ -249,9 +290,16 @@ module.exports = {
     tsPreCompilationDeps: true,
     combinedDependencies: true,
     enhancedResolveOptions: {
-      exportsFields: ['exports'],
+      // exportsFields is EMPTY on purpose. With the `exports` map in play,
+      // `@global-idle/domain` resolves to packages/domain/dist/index.js, which
+      // carries no source structure for the rules to match. Ignoring it lets
+      // mainFields pick the `source` field instead, so the cruise sees
+      // packages/domain/src/index.ts — source to source.
+      exportsFields: [],
+      mainFields: ['source', 'module', 'main'],
       conditionNames: ['import', 'require', 'node', 'default', 'types'],
-      extensions: ['.js', '.mjs', '.cjs', '.ts', '.mts', '.cts', '.tsx', '.json'],
+      extensions: ['.ts', '.tsx', '.mts', '.cts', '.js', '.mjs', '.cjs', '.json'],
+      mainFiles: ['index'],
     },
     reporterOptions: {
       text: { highlightFocused: true },

@@ -17,6 +17,17 @@ export default defineConfig({
           name: 'unit',
           include: ['{packages,apps}/*/src/**/*.test.ts', 'tests/unit/**/*.test.ts'],
           environment: 'node',
+          // The §14.1 cases drive the real commands — depcruise, eslint, tsc -b —
+          // because a boundary test that reasons about the rules instead of
+          // running them proves nothing about the gate CI uses. That costs
+          // seconds per case, so the default 5s timeout does not apply here.
+          testTimeout: 180_000,
+          hookTimeout: 180_000,
+          // These cases write a real violation into the working tree and then
+          // run the real command. Two such files in parallel see each other's
+          // violations, so a case can fail on a finding that belongs to another
+          // test. They are sequential by necessity, not by preference.
+          fileParallelism: false,
         },
       },
       {

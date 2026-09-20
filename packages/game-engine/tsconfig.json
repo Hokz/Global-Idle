@@ -1,0 +1,8 @@
+{
+  // No "types": ["node"]. ADR-010: the engine has no ambient environment, so it
+  // must not even see Node's globals. lib is ES2023 and nothing more (§9.2).
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": { "composite": true, "rootDir": "src", "outDir": "dist", "types": [] },
+  "include": ["src/**/*.ts"],
+  "references": [{ "path": "../shared" }]
+}
