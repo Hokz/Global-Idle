@@ -56,10 +56,15 @@ export const migrationVersionMismatch = (details: Record<string, unknown> = {}) 
     details,
   );
 
-export const activityIntegrityViolation = (details: Record<string, unknown> = {}) =>
+export const activityIntegrityViolation = (
+  details: Record<string, unknown> = {},
+  because?: string,
+) =>
   new DomainError(
     'ActivityIntegrityViolation',
-    'Durable Activity structure is invalid; refusing to serve.',
+    because
+      ? `Durable Activity structure is invalid; refusing to serve. ${because}`
+      : 'Durable Activity structure is invalid; refusing to serve.',
     details,
   );
 

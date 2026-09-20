@@ -116,6 +116,16 @@ export default tseslint.config(
     },
   },
 
+  // ------------------------------------------------------------------ the one legitimate ambient read
+  {
+    // SystemClock IS the implementation of §7.1's Clock port: it is the single
+    // place the ambient wall clock may be read, which is exactly why every
+    // other file must take the injected Clock instead. Confining the read to
+    // one file is the rule's purpose, not an exception to it.
+    files: ['packages/domain/src/platform/clock/index.ts'],
+    rules: { 'no-restricted-syntax': 'off', 'no-restricted-properties': 'off' },
+  },
+
   // ------------------------------------------------------------------ in-editor mirrors of §5.2
   {
     files: ['packages/**/*.ts'],

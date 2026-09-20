@@ -39,5 +39,17 @@ export type {
   IdempotentOutcome,
 } from './platform/idempotency/index.js';
 
+export {
+  SystemClock,
+  FakeClock,
+  ProcessMonotonicSource,
+  reportRegression,
+  CLOCK_REGRESSION_TOLERANCE,
+} from './platform/clock/index.js';
+export type { Clock, ClockRegressionObserver } from './platform/clock/index.js';
+
+export { createTimerPort, remainingAt } from './platform/timer/index.js';
+export type { ActiveUseTimerState, TimerPort } from './platform/timer/index.js';
+
 export { DomainError } from './platform/errors/index.js';
 export type { DomainErrorCode } from './platform/errors/index.js';
