@@ -138,3 +138,21 @@ export async function seedClaim(
 ) {
   await prisma.occupancyClaim.create({ data: { characterId, activityId, acquiredAt: at } });
 }
+
+/**
+ * Assert a DomainError by its CODE (§8.4), not by matching its prose. A test
+ * that greps the message breaks when the message improves, and passes when a
+ * different error happens to share a word.
+ */
+export async function expectDomainError(promise: Promise<unknown>, code: string): Promise<void> {
+  try {
+    await promise;
+  } catch (error) {
+    const actual = error as { code?: string; name?: string };
+    if (actual.code === code || actual.name === code) return;
+    throw new Error(`expected DomainError ${code}, got ${actual.name ?? 'unknown'}`, {
+      cause: error,
+    });
+  }
+  throw new Error(`expected DomainError ${code}, but the call resolved`);
+}

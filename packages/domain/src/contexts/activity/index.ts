@@ -15,6 +15,29 @@ export {
   validateRegistry,
 } from './types/registry.js';
 export { assertRegistryMatchesDatabase } from './types/reconciliation.js';
+
+export { assertActivityIntegrity, findIntegrityViolations } from './integrity.js';
+export type { IntegrityFinding } from './integrity.js';
+
+export {
+  acquire,
+  isSessionBoundLive,
+  isSkillTrainingLive,
+  reconcileStranded,
+  release,
+  reserveForGrace,
+} from './occupancy.js';
+export type { ReleasedClaim, SessionBoundState, SkillTrainingStatus } from './occupancy.js';
+
+export { endActivity, pauseForGrace, startSessionBound, startSkillTraining } from './lifecycle.js';
+export type {
+  EndResult,
+  SkillTrainingTerminal,
+  StartSessionBoundInput,
+  StartSkillTrainingInput,
+} from './lifecycle.js';
+
+export { currentHolder, findExpiredGrace, isGraceExpired, transferClaim } from './claim.js';
 export type {
   ActivityFamily,
   ActivityTypeDescriptor,
