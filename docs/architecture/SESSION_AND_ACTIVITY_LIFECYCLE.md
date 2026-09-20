@@ -177,7 +177,12 @@ above**.
 started ──► accruing (independent of session) ──► claimed / exhausted
 ```
 
-- no pause, no grace, no claim;
+- **no account/session Activity claim**, no pause, no reconnect grace, no session dependency;
+- **but it does hold the trained Character's occupancy claim** (`ADR-013`), acquired atomically
+  on `startSkillTraining`, held for as long as the training exists, and released when the
+  training ends, exhausts or is cancelled. That claim is what prevents the same Character from
+  hunting, entering a dungeon, or starting a second training. After a restart it is reconciled
+  against durable training state by the same sweeper that recovers stranded activity claims;
 - accrual is computed from **server-persisted timestamps only** — never a client-supplied
   duration;
 - settlement occurs on claim or on a read that needs current values;

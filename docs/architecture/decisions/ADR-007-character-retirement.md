@@ -83,7 +83,7 @@ asks for.
 ## Product constraints requiring this architecture
 
 - The deletion scenario in `TUTORIAL_ROOKGAARD_ROADMAP.md` §2
-- Roster max 5, one character per vocation, Gold-purchased slots — `docs/DECISIONS.md`
+- Roster max 5, one **playable** character per vocation, Gold-purchased slots — `docs/DECISIONS.md`
 - Account-level tutorial completion, *"Do not determine tutorial eligibility only by counting
   existing characters"* — `TUTORIAL_ROOKGAARD_ROADMAP.md` §2
 - *"Economy operations must be transactional and auditable."* — `AGENTS.md` §5

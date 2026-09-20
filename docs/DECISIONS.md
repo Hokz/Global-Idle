@@ -131,8 +131,12 @@ Two distinct build systems:
 - the account **Character Roster** holds at most **5** characters;
 - the **Active Party** holds at most **4** characters, minimum 1;
 - five simultaneous active characters do not exist;
-- at most one character per vocation - duplicate vocations are prohibited account-wide;
-- a vocation the account already owns is never offered again as a future unlock;
+- at most **one playable (non-retired) roster Character per vocation** per account;
+- while a playable Knight exists, Knight is unavailable as a new vocation choice. If that Knight
+  is **retired**, Knight becomes available again;
+- a **retired** Character is historical and audit state, not a roster member: it does not count
+  against roster size, does not reserve its vocation, and therefore does not violate playable
+  vocation uniqueness. A retired Knight and a new playable Knight may coexist in persistence;
 - additional roster slots are unlocked with in-game Gold; exact costs remain OPEN;
 - later unlocked characters start at Base Level 8, skip Rookgaard, and receive no catch-up
   levels;

@@ -96,7 +96,9 @@ One player account controls every character. There is no multi-human party.
 
 - all vocation characters the account has unlocked;
 - maximum **5**;
-- maximum one character per vocation - duplicates are prohibited account-wide;
+- maximum **one playable (non-retired) Character per vocation** per account. Retiring a
+  Character frees its vocation for a new one; the retired Character remains as history and does
+  not count against the roster;
 - an owned vocation is removed from future unlock choices;
 - additional roster slots are unlocked with in-game Gold (costs OPEN);
 - later unlocked characters start at Base Level 8, skip Rookgaard, get no catch-up levels.

@@ -84,11 +84,17 @@ If all five vocation characters are unlocked, at least one character must remain
 
 ---
 
-# 3. One Character Per Vocation — LOCKED
+# 3. One Playable Character Per Vocation — LOCKED
 
 An account may own **at most one character of each vocation**.
 
-Duplicate vocations are prohibited.
+Duplicate **playable** vocations are prohibited.
+
+> **Refined by Phase 0A architecture (`ADR-007`).** Uniqueness applies to *playable*
+> (non-retired) roster Characters. A retired Character is historical and audit state: it is not a
+> roster member, does not count against roster size, and does not reserve its vocation. Retiring
+> a Knight frees Knight for a new one, and the retired Knight remains in persistence.
+> See `docs/DECISIONS.md`.
 
 Examples:
 
@@ -963,8 +969,8 @@ The following are LOCKED unless the Product Owner explicitly changes them.
 - one player controls the entire Party;
 - maximum roster = 5 characters;
 - the roster supports the five vocations: Knight, Druid, Sorcerer, Paladin, Monk;
-- maximum one character per vocation per account;
-- duplicate vocation characters are prohibited;
+- maximum one **playable (non-retired)** character per vocation per account (`ADR-007`);
+- duplicate **playable** vocation characters are prohibited; a retired Character is history and does not reserve its vocation (`ADR-007`);
 - additional character slots/unlocks use in-game Gold;
 - exact unlock costs remain OPEN.
 

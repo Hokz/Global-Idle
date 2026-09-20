@@ -149,15 +149,24 @@ through the ledger. Content is written only by deployment.
 
 | Family | Form | Properties |
 |---|---|---|
-| **State entities** | opaque surrogate | globally unique, immutable, never reused, never guessable, never encodes meaning |
+| **State entities** | **UUIDv7** | globally unique, immutable, never reused, carries no business meaning |
 | **Content definitions** | canonical key, e.g. `creature.rookgaard.rat` | human-readable, stable across versions, namespaced by domain, greppable in content files |
 
-`DEFERRED` to 0A.3: the concrete encoding (UUIDv7 / ULID / snowflake), key format rules, and
-whether content keys carry a numeric alias for compactness on the wire.
+State entity ids are **UUIDv7** (`DATA_ARCHITECTURE.md` §2), chosen for uniqueness without
+coordination and for time ordering, which keeps index locality reasonable as tables grow.
 
-Rationale: opaque ids for state prevent enumeration and stop business meaning leaking into
-identifiers; readable keys for content make the content set reviewable in a pull request,
-which is the whole point of separating it.
+**An identifier is not a secret and not an authorization control.** UUIDv7 embeds an observable
+creation timestamp, and that is acceptable: nothing in the system relies on an id being
+unguessable, unordered or unknown. The security boundary is **authorization plus
+ownership-scoped loading plus rate limiting** (`CLIENT_SERVER_BOUNDARIES.md` §7) — every entity
+is loaded scoped to the authenticated principal, so knowing an id, however obtained, grants
+nothing.
+
+"Opaque" here means **opaque to the domain**: the id encodes no business meaning, so nothing
+parses one to learn what it refers to. It does not mean secret.
+
+Readable keys for content make the content set reviewable in a pull request, which is the whole
+point of separating it.
 
 An imported reference to an external source (e.g. a Canary creature or item) is recorded as a
 **source alias** on the content definition, never as the canonical key. `DEFERRED` to 0A.6.
@@ -268,7 +277,7 @@ character, not a temporary combat companion."*
   prohibition. Architecture needs an answer now because vocation determines skill aptitude,
   roster uniqueness and every combat profile, so it is decided here: vocation does not change
   through ordinary play. Should a respec ever be designed, it is an explicit, audited
-  operation — never a field update — and it must re-validate roster vocation uniqueness.
+  operation — never a field update — and it must re-validate playable roster vocation uniqueness.
 - an unlocked (non-origin) character starts at Base Level 8, never enters Rookgaard, and
   receives no catch-up levels — `LOCKED BY PRODUCT`
 - `DECIDED IN PHASE 0A` — the uniqueness of vocation per account must be enforced by a
@@ -331,7 +340,8 @@ single-owner rule of `ADR-001`; that split is removed.
 - `1 ≤ rosterCapacity ≤ 5` — `LOCKED BY PRODUCT`
 - capacity is **monotonic** — `DECIDED IN PHASE 0A`. Retiring a character frees its vocation
   and a roster place, but never reduces or refunds purchased capacity.
-- a vocation already owned is never offered as an unlock choice — `LOCKED BY PRODUCT`
+- a vocation held by a **playable** Character is not offered as an unlock choice — `LOCKED BY
+  PRODUCT`. Retiring that Character frees the vocation again (`ADR-007`)
 
 ---
 
