@@ -12,3 +12,32 @@ export * as economy from './contexts/economy/index.js';
 
 export { createPrismaClient } from './platform/prisma/client.js';
 export type { PrismaClient, PrismaClientOptions } from './platform/prisma/client.js';
+
+export {
+  withTransaction,
+  isRetryable,
+  lockAccount,
+  lockBalance,
+  lockCharactersInOrder,
+} from './platform/transaction/index.js';
+export type {
+  UnitOfWork,
+  IsolationLevel,
+  TransactionOptions,
+} from './platform/transaction/index.js';
+
+export {
+  createIdempotencyPort,
+  fingerprintOf,
+  settlementOperationId,
+  claimSettlement,
+} from './platform/idempotency/index.js';
+export type {
+  Fingerprint,
+  IdempotencyKeyIdentity,
+  IdempotencyPort,
+  IdempotentOutcome,
+} from './platform/idempotency/index.js';
+
+export { DomainError } from './platform/errors/index.js';
+export type { DomainErrorCode } from './platform/errors/index.js';
