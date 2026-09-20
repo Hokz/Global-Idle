@@ -42,8 +42,10 @@ No full gameplay yet.
 - death;
 - XP;
 - gold;
-- persistent activity;
-- browser-close continuity.
+- server-side activity state, persisted across reloads and the grace period;
+- connection/session lifecycle;
+- background/minimized online continuity;
+- 5-minute reconnect grace.
 
 ## Phase 3 — Loot + Itemization
 
@@ -59,11 +61,15 @@ No full gameplay yet.
 ## Phase 4 — Skills + Party + Vocations
 
 - final skill progression model;
-- additional characters;
-- party formation;
+- character roster with unique vocations;
+- Gold-based character/roster unlocks;
+- Active Party formation (1-4);
+- Party positioning / Frontline;
+- Shared XP eligibility;
 - role logic;
 - all five vocation identities;
-- configurable combat behavior.
+- configurable combat behavior;
+- dedicated offline Skill Training settlement.
 
 ## Phase 5 — Quest/Dungeon/Boss Framework
 
@@ -100,7 +106,7 @@ No full gameplay yet.
 ## Phase 8 — Premium
 
 - entitlements;
-- fifth party slot;
+- Party-management benefits (OPEN; no fifth active Party slot);
 - automation;
 - remote services;
 - loot automation;

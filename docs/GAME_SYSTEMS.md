@@ -1,10 +1,25 @@
 # Game Systems
 
+## Online activity / connection
+
+Global Idle is an online idle RPG.
+
+- server-authoritative Hunt/Dungeon simulation runs only for connected sessions;
+- a background or minimized client keeps progressing while the connection stays alive;
+- offline Hunt/Dungeon combat does not exist - no XP, gold, loot or room progression accrues
+  while disconnected;
+- Skill Training (Exercise Weapon + Training Dummy) is the only approved offline progression;
+- an unexpected disconnect pauses the activity and preserves it for 5 minutes; reconnecting
+  within that window resumes the same session, and letting it expire terminates the activity;
+- nothing progresses during the paused grace period;
+- manual Leave Hunt and explicit logout end the session immediately, without grace.
+
 ## Hunts
 
 - rooms 1-10 escalate;
 - room 10 loops indefinitely;
-- party stops on death, supply exhaustion, manual exit or configured condition;
+- the Hunt ends on death, manual exit, or a player-configured stop condition;
+- supply exhaustion and full Loot Capacity warn the player but do not end the Hunt by default;
 - combat is server simulated;
 - hunt UI can show expected efficiency and risk.
 
@@ -18,6 +33,14 @@ Examples:
 - ammunition;
 - consumables;
 - hunt-specific resources.
+
+Exhaustion behavior:
+
+- supplies remain real combat constraints;
+- exhaustion increases risk;
+- exhaustion does not force the Hunt to stop by default;
+- the game warns the player and the character may continue;
+- a player-configured automation may choose to stop based on remaining supplies.
 
 Exact consumption rules belong to combat design.
 
@@ -43,6 +66,52 @@ Preferred design:
 - vocation-specific efficiencies/costs.
 
 Final choice remains open.
+
+## Character roster and Active Party
+
+One player account controls every character. There is no multi-human party.
+
+### Character Roster
+
+- all vocation characters the account has unlocked;
+- maximum **5**;
+- maximum one character per vocation - duplicates are prohibited account-wide;
+- an owned vocation is removed from future unlock choices;
+- additional roster slots are unlocked with in-game Gold (costs OPEN);
+- later unlocked characters start at Base Level 8, skip Rookgaard, get no catch-up levels.
+
+### Active Party
+
+- the characters currently fighting, chosen from the roster;
+- minimum **1**, maximum **4**;
+- a fifth simultaneous active character does not exist, so with all five vocations unlocked at
+  least one always sits out;
+- unlocked does not mean active - the player chooses the formation;
+- inactive roster characters neither fight nor receive Shared XP.
+
+### Frontline
+
+- Active Party Slot 1 is the Frontline;
+- any vocation may hold it, and the Origin Character is not required to;
+- combat effects of the remaining positions belong to Combat/Party design.
+
+### Shared XP eligibility
+
+```text
+minimumShareLevel = ceil(highestLevel × 2 / 3)
+
+level-eligible when   lowestLevel >= minimumShareLevel
+```
+
+Evaluated across the whole Active Party from the highest and lowest active Base Levels. One
+out-of-range member fails the whole formation, and newly unlocked Level 8 characters get no
+exception. Exact bonus/distribution values follow Tibia Global as a reference and must be
+verified before implementation.
+
+### Connection
+
+One account/session owns the Active Party, so an unexpected disconnect pauses the entire Party
+under the global 5-minute reconnect grace.
 
 ## Vocation systems
 
@@ -160,12 +229,13 @@ Direction:
 - automation;
 - convenience;
 - capacity;
-- fifth party slot;
 - remote services after unlock;
 - advanced loot management;
 - advanced boss rotation.
 
+Premium does **not** grant a fifth simultaneous Active Party member. Roster expansion is a Gold
+sink available to every player. Party-related Premium benefits are OPEN.
+
 Free:
-- begins with one slot;
-- can expand up to four;
+- unlocks roster characters with Gold like everyone else;
 - remains competitively viable.

@@ -22,6 +22,7 @@ Candidates:
 - Market fees;
 - respecs;
 - progression unlocks;
+- additional character/roster slot unlocks;
 - repair/maintenance only if it adds meaningful strategy.
 
 ## Item sinks

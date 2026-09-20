@@ -2,7 +2,20 @@
 
 ## One-sentence definition
 
-A browser-based idle strategy RPG where players manage characters, parties, equipment and progression across a large interactive world rather than manually controlling every combat action.
+A browser-based, online idle strategy RPG where players manage characters, parties, equipment and progression across a large interactive world rather than manually controlling every combat action.
+
+## An online idle RPG
+
+Global Idle is an **online** game.
+
+- combat is automated and simulated by the server, never by the browser;
+- Hunts and Dungeons progress only while the player's session is connected - a background or
+  minimized tab still counts as connected;
+- an unexpected disconnect pauses the activity for 5 minutes before ending it, and nothing
+  progresses while it is paused;
+- offline progression is limited to dedicated Skill Training.
+
+"Idle" describes how combat is played, not the absence of a session.
 
 ## What makes the game different
 

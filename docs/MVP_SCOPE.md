@@ -29,7 +29,11 @@ The MVP should include:
 19. return-to-town;
 20. sell-loot flow;
 21. persistence;
-22. server-side simulation that survives browser closure.
+22. server-side simulation that runs while the session is connected, including background and
+    minimized tabs;
+23. a 5-minute paused reconnect grace period, with no progression while paused;
+24. no offline Hunt or Dungeon continuation; offline Skill Training may be represented, but
+    without inventing detailed balance.
 
 ## Suggested vertical slice
 
@@ -75,6 +79,6 @@ If that loop is not satisfying, do not scale content yet.
 - full quest library;
 - complex boss rotation;
 - Premium store;
-- five-character party;
+- the Character Roster, character unlocks and multi-character Active Party;
 - complete content import;
 - C++/WASM optimization.

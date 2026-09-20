@@ -1,6 +1,6 @@
 # Global Idle
 
-**Working title.** Browser-based idle strategy RPG built around a large navigable world, endless hunts, dungeon-style quests, boss progression, party management, equipment strategy, player economy and long-term progression.
+**Working title.** Browser-based, online idle strategy RPG built around a large navigable world, endless hunts, dungeon-style quests, boss progression, party management, equipment strategy, player economy and long-term progression.
 
 This repository is the product/engineering home for the project.
 
@@ -29,6 +29,7 @@ The strategic layer replaces much of the manual execution layer.
 - **Party identity matters:** each vocation has a clear role.
 - **Progression must have friction:** death, supplies, unlocks and resource sinks create consequences.
 - **Server authoritative:** damage, loot, rarity, Forge, currencies and market transactions are resolved on the server.
+- **Online by design:** Hunts and Dungeons progress only while the session is connected; a background or minimized tab keeps playing, a disconnect gets a 5-minute grace period, and offline progression is limited to Skill Training.
 - **Free remains competitive:** Premium should be valuable mainly through convenience, automation and capacity.
 
 ## Read first
@@ -36,15 +37,17 @@ The strategic layer replaces much of the manual execution layer.
 Development agents must read:
 
 1. `AGENTS.md`
-2. `docs/MASTER_DEVELOPMENT_ROADMAP.md`
-3. `docs/PRODUCT_VISION.md`
-4. `docs/GAME_SYSTEMS.md`
-5. `docs/ARCHITECTURE.md`
-6. `docs/MVP_SCOPE.md`
-7. `docs/ROADMAP.md`
-8. `docs/DECISIONS.md`
-9. `docs/OPEN_QUESTIONS.md`
-10. `docs/REFERENCES.md`
+2. `docs/DESIGN_INDEX.md`
+3. `docs/MASTER_DEVELOPMENT_ROADMAP.md`
+4. `docs/PRODUCT_VISION.md`
+5. `docs/GAME_SYSTEMS.md`
+6. `docs/ECONOMY.md`
+7. `docs/ARCHITECTURE.md`
+8. `docs/MVP_SCOPE.md`
+9. `docs/ROADMAP.md`
+10. `docs/DECISIONS.md`
+11. `docs/OPEN_QUESTIONS.md`
+12. `docs/REFERENCES.md`
 
 ## Current phase
 

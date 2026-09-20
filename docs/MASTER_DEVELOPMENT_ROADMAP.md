@@ -37,10 +37,17 @@ Hunts are endless idle loops.
 - room 10 is the stable end-loop;
 - after clearing room 10, the party repeats room 10 indefinitely;
 - the hunt ends when:
-  - the party dies;
-  - supplies run out;
-  - a configured stop condition triggers;
-  - the player exits.
+  - the party/character dies;
+  - the player exits;
+  - a configured stop condition triggers.
+
+### Supplies and Loot Capacity
+
+By default, neither state ends the hunt:
+
+- supply exhaustion only warns the player and raises the risk of death;
+- full Loot Capacity stops further loot collection, but combat continues;
+- player-configured automation may use either state as a stop condition.
 
 ### Hunt information
 
@@ -322,15 +329,20 @@ Premium should be highly valuable without making Free non-competitive.
 
 Direction:
 
+Party capacity is **not** a Premium lever. The account Character Roster holds up to five
+unique-vocation characters, the Active Party holds at most four of them, and every roster slot
+past the first is unlocked with in-game Gold by Free and Premium players alike. A fifth
+simultaneous Active Party member does not exist. See
+[`docs/design/party/PARTY_SYSTEM_FOUNDATION.md`](design/party/PARTY_SYSTEM_FOUNDATION.md).
+
 ### Free
-- starts with one character/party slot;
-- can purchase additional slots up to four;
+- starts with the Origin Character;
+- unlocks further roster characters with Gold (costs OPEN);
 - navigates to services/NPCs;
 - standard storage;
 - standard automation.
 
 ### Premium
-- can unlock the fifth party slot;
 - advanced automation;
 - remote selling/refill/services after appropriate content unlock;
 - stronger loot management;
@@ -397,7 +409,20 @@ tick
 → room transition
 ```
 
-Offline progression must use the same authoritative rules.
+### Online-only activity simulation
+
+Activity simulation is online-only. The server advances a Hunt or Dungeon only while it
+considers the session connected; a background or minimized client keeps progressing while its
+connection stays alive.
+
+An unexpected disconnect pauses the activity and preserves it for 5 minutes. Nothing
+progresses while paused - no XP, gold, loot, room progression or supply consumption.
+Reconnecting within the window resumes the same session; letting it expire terminates the
+activity. Manual exit and explicit logout end it immediately, without grace.
+
+Offline progression exists only for dedicated **Skill Training** (Exercise Weapon + Training
+Dummy), which never grants Base XP. That settlement is the one computation allowed to run for
+a disconnected character.
 
 ## 20. Production roadmap
 
@@ -424,7 +449,7 @@ Offline progression must use the same authoritative rules.
 - supplies;
 - death;
 - XP/gold;
-- persistence/offline.
+- session persistence, connection lifecycle and the 5-minute reconnect grace.
 
 ### Phase 3 — Itemization
 - BaseItem;
@@ -435,8 +460,11 @@ Offline progression must use the same authoritative rules.
 - loot storage.
 
 ### Phase 4 — Party/vocations
-- multiple characters;
+- character roster and Gold-based character unlocks;
+- unique vocations;
+- Active Party formation (1-4) and Frontline positioning;
 - all vocation identities;
+- Shared XP eligibility;
 - party rules;
 - combat behavior.
 
@@ -461,8 +489,8 @@ Offline progression must use the same authoritative rules.
 
 ### Phase 8 — Premium/automation
 - automation;
-- party capacity;
-- advanced convenience.
+- advanced convenience;
+- Party-management Premium benefits (OPEN - roster capacity is a Gold sink, not a Premium one).
 
 ### Phase 9 — Content expansion
 - region-by-region content;
@@ -488,3 +516,19 @@ character
 ```
 
 That loop is the foundation of the product.
+
+## 22. Detailed design documents
+
+This roadmap stays at product level. Detailed, domain-specific game design lives under
+`docs/design/`, indexed by:
+
+- [`docs/DESIGN_INDEX.md`](DESIGN_INDEX.md) — navigation page and status lifecycle for all design documents.
+
+Current detailed design documents:
+
+- [`docs/design/tutorial/TUTORIAL_ROOKGAARD_ROADMAP.md`](design/tutorial/TUTORIAL_ROOKGAARD_ROADMAP.md) — Level 1–8 Rookgaard onboarding through vocation selection.
+- [`docs/design/combat/COMBAT_LEVEL_SKILLS_FOUNDATION.md`](design/combat/COMBAT_LEVEL_SKILLS_FOUNDATION.md) — Base Level, Skills, training systems and the layered Combat System architecture.
+- [`docs/design/party/PARTY_SYSTEM_FOUNDATION.md`](design/party/PARTY_SYSTEM_FOUNDATION.md) — character roster, unique vocations, Gold unlocks, the 1-4 Active Party, Frontline and Shared XP eligibility.
+
+Each design document carries its own status marker and its own list of open decisions. Those
+open items are not resolved by this roadmap.
