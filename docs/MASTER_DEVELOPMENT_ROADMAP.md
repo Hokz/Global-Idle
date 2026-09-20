@@ -438,7 +438,7 @@ a disconnected character.
 
 ## 20. Production roadmap
 
-### Phase 0A — Architecture
+### Phase 0A — Architecture — `ARCHITECTURE_APPROVED`
 - the complete architecture package, entry point
   [`docs/architecture/ARCHITECTURE_OVERVIEW.md`](architecture/ARCHITECTURE_OVERVIEW.md);
 - Character activity occupancy, per-Character Stamina, Premium account-wide entitlement,
@@ -446,6 +446,9 @@ a disconnected character.
   server-authoritative time.
 
 ### Phase 0B — Foundation
+- implementation specification:
+  [`docs/specs/phase-0b/PHASE_0B_TECHNICAL_FOUNDATION_SPEC.md`](specs/phase-0b/PHASE_0B_TECHNICAL_FOUNDATION_SPEC.md)
+  (**`IMPLEMENTATION_SPEC_READY`** — approved after independent review);
 - documentation;
 - architecture;
 - Character occupancy primitive; Stamina durable state; generic `ActiveUseTimer` contract;
