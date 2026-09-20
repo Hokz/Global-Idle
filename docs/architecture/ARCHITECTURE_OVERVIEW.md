@@ -43,6 +43,7 @@
 | [015](decisions/ADR-015-active-use-duration-timers.md) | Active-use timers settle at checkpoints, never by wall clock | `ACCEPTED` |
 | [016](decisions/ADR-016-content-bundle-retention.md) | Content bundles retained while referenced, never GC'd | `ACCEPTED` |
 | [017](decisions/ADR-017-idempotency-key-contract.md) | Idempotency keys are account-scoped and fingerprinted | `ACCEPTED` |
+| [018](decisions/ADR-018-domain-package-source-layout.md) | Bounded contexts live in `packages/domain` — amends `ADR-012`'s source layout | `PROPOSED` |
 
 ---
 
