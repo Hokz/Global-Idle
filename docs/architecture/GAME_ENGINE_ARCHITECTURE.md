@@ -1,6 +1,6 @@
 # Game Engine / Simulation Architecture
 
-**Document status:** `PHASE_0A_COMPLETE` / PENDING INDEPENDENT REVIEW
+**Document status:** `PHASE_0A_COMPLETE` / `ARCHITECTURE_APPROVED`
 **Phase:** 0A.5
 **Depends on:** `ADR-002`, `ADR-006`, `ADR-010`, `ADR-011`
 

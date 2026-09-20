@@ -1,6 +1,6 @@
 # Infrastructure, Observability and Operations Architecture
 
-**Document status:** `PHASE_0A_COMPLETE` / PENDING INDEPENDENT REVIEW
+**Document status:** `PHASE_0A_COMPLETE` / `ARCHITECTURE_APPROVED`
 **Phase:** 0A.8
 **Depends on:** `ADR-009`, `ADR-011`, `ADR-012`
 

@@ -1,6 +1,6 @@
 # ADR-005 — Active Party is ordered configuration, not an entity
 
-**Status:** `PROPOSED`
+**Status:** `ACCEPTED`
 **Phase:** 0A.1
 **Date:** 2026-09-20
 

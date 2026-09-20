@@ -1,6 +1,6 @@
 # ADR-014 — Stamina is per-Character, activated by first qualifying XP, sustained by activity state
 
-**Status:** `PROPOSED`
+**Status:** `ACCEPTED`
 **Phase:** 0A
 **Date:** 2026-09-20
 

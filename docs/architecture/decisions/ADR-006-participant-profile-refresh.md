@@ -1,6 +1,6 @@
 # ADR-006 — Composition is frozen for a run; power refreshes at settlement checkpoints
 
-**Status:** `PROPOSED`
+**Status:** `ACCEPTED`
 **Phase:** 0A (supersedes the participant-snapshot wording in ADR-002)
 **Date:** 2026-09-20
 

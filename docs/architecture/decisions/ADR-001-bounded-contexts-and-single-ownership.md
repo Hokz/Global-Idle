@@ -1,6 +1,6 @@
 # ADR-001 — Bounded contexts and single ownership of state
 
-**Status:** `PROPOSED`
+**Status:** `ACCEPTED`
 **Phase:** 0A.1
 **Date:** 2026-09-20
 

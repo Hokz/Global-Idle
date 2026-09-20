@@ -1,6 +1,6 @@
 # ADR-007 — Character deletion is retirement, not erasure
 
-**Status:** `PROPOSED`
+**Status:** `ACCEPTED`
 **Phase:** 0A
 **Date:** 2026-09-20
 

@@ -1,6 +1,6 @@
 # ADR-013 — One primary action per Character, atomically enforced
 
-**Status:** `PROPOSED`
+**Status:** `ACCEPTED`
 **Phase:** 0A
 **Date:** 2026-09-20
 

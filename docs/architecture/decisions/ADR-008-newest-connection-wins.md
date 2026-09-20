@@ -1,6 +1,6 @@
 # ADR-008 — The newest authenticated connection evicts the previous one
 
-**Status:** `PROPOSED`
+**Status:** `ACCEPTED`
 **Phase:** 0A
 **Date:** 2026-09-20
 

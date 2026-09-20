@@ -1,6 +1,6 @@
 # ADR-011 — Content is a versioned build artifact, and activities pin their version
 
-**Status:** `PROPOSED`
+**Status:** `ACCEPTED`
 **Phase:** 0A.6
 **Date:** 2026-09-20
 

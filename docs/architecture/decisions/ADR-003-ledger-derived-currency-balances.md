@@ -1,6 +1,6 @@
 # ADR-003 — Currency balances are ledger-derived projections
 
-**Status:** `PROPOSED`
+**Status:** `ACCEPTED`
 **Phase:** 0A.1
 **Date:** 2026-09-20
 

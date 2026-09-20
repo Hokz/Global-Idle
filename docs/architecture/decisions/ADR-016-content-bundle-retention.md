@@ -1,6 +1,6 @@
 # ADR-016 — Versioned content bundles are retained while referenced, and never garbage-collected
 
-**Status:** `PROPOSED`
+**Status:** `ACCEPTED`
 **Phase:** 0A (corrects a claim in `CONTENT_DATA_ARCHITECTURE.md`)
 **Date:** 2026-09-20
 

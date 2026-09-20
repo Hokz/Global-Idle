@@ -1,6 +1,6 @@
 # Content / Game-Data Architecture
 
-**Document status:** `PHASE_0A_COMPLETE` / PENDING INDEPENDENT REVIEW
+**Document status:** `PHASE_0A_COMPLETE` / `ARCHITECTURE_APPROVED`
 **Phase:** 0A.6
 **Depends on:** `ADR-011`, `ADR-010`, `ADR-012`
 

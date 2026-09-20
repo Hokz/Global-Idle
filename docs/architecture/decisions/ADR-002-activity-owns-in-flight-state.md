@@ -1,6 +1,6 @@
 # ADR-002 — Activity owns in-flight state; durable progression changes only at settlement
 
-**Status:** `PROPOSED`
+**Status:** `ACCEPTED`
 **Phase:** 0A.1
 **Date:** 2026-09-20
 

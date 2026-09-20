@@ -1,6 +1,6 @@
 # ADR-012 — One deployable modular monolith for Phase 0B
 
-**Status:** `PROPOSED`
+**Status:** `ACCEPTED`
 **Phase:** 0A.8
 **Date:** 2026-09-20
 

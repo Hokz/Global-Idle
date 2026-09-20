@@ -1,6 +1,6 @@
 # ADR-009 — PostgreSQL is the sole durable truth; Redis holds nothing that cannot be rebuilt
 
-**Status:** `PROPOSED`
+**Status:** `ACCEPTED`
 **Phase:** 0A.3
 **Date:** 2026-09-20
 

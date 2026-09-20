@@ -1,6 +1,6 @@
 # Data and Persistence Architecture
 
-**Document status:** `PHASE_0A_COMPLETE` / PENDING INDEPENDENT REVIEW
+**Document status:** `PHASE_0A_COMPLETE` / `ARCHITECTURE_APPROVED`
 **Phase:** 0A.3
 **Depends on:** `ADR-001`, `ADR-003`, `ADR-004`, `ADR-009`
 

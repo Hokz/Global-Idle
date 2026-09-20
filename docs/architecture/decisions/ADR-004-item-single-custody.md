@@ -1,6 +1,6 @@
 # ADR-004 — An ItemInstance has exactly one custody scope
 
-**Status:** `PROPOSED`
+**Status:** `ACCEPTED`
 **Phase:** 0A.1
 **Date:** 2026-09-20
 

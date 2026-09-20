@@ -1,6 +1,6 @@
 # Client / Server Boundaries
 
-**Document status:** `PHASE_0A_COMPLETE` / PENDING INDEPENDENT REVIEW
+**Document status:** `PHASE_0A_COMPLETE` / `ARCHITECTURE_APPROVED`
 **Phase:** 0A.2
 **Depends on:** [`DOMAIN_MODEL.md`](DOMAIN_MODEL.md), `ADR-001`, `ADR-010`
 

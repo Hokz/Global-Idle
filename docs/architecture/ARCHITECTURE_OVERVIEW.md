@@ -1,6 +1,6 @@
 # Global Idle — Architecture Overview
 
-**Document status:** `PHASE_0A_COMPLETE` / PENDING INDEPENDENT REVIEW
+**Document status:** `PHASE_0A_COMPLETE` / `ARCHITECTURE_APPROVED`
 **Phase:** 0A.9 — Integration Review
 **Authority:** This is the **entry point** for Global Idle's technical architecture. The root
 [`../ARCHITECTURE.md`](../ARCHITECTURE.md) is a pointer to this set, not a competing source.
@@ -26,23 +26,23 @@
 
 | ADR | Title | Status |
 |---|---|---|
-| [001](decisions/ADR-001-bounded-contexts-and-single-ownership.md) | Bounded contexts and single ownership of state | `PROPOSED` |
-| [002](decisions/ADR-002-activity-owns-in-flight-state.md) | Activity owns in-flight state; progression changes at settlement | `PROPOSED` |
-| [003](decisions/ADR-003-ledger-derived-currency-balances.md) | Currency balances are ledger-derived projections | `PROPOSED` |
-| [004](decisions/ADR-004-item-single-custody.md) | An ItemInstance has exactly one custody scope | `PROPOSED` |
-| [005](decisions/ADR-005-active-party-as-configuration.md) | Active Party is ordered configuration, not an entity | `PROPOSED` |
-| [006](decisions/ADR-006-participant-profile-refresh.md) | Composition frozen for a run; power refreshes at checkpoints | `PROPOSED` |
-| [007](decisions/ADR-007-character-retirement.md) | Character deletion is retirement, not erasure | `PROPOSED` |
-| [008](decisions/ADR-008-newest-connection-wins.md) | The newest authenticated connection evicts the previous | `PROPOSED` |
-| [009](decisions/ADR-009-postgres-sole-durable-truth.md) | PostgreSQL is the sole durable truth | `PROPOSED` |
-| [010](decisions/ADR-010-pure-engine-injected-clock-and-rng.md) | Pure engine, injected clock and RNG | `PROPOSED` |
-| [011](decisions/ADR-011-content-as-versioned-artifact.md) | Content is a versioned build artifact | `PROPOSED` |
-| [012](decisions/ADR-012-modular-monolith.md) | One deployable modular monolith for Phase 0B | `PROPOSED` |
-| [013](decisions/ADR-013-character-activity-occupancy.md) | One primary action per Character, atomically enforced | `PROPOSED` |
-| [014](decisions/ADR-014-per-character-stamina.md) | Stamina per Character, activated by first qualifying XP | `PROPOSED` |
-| [015](decisions/ADR-015-active-use-duration-timers.md) | Active-use timers settle at checkpoints, never by wall clock | `PROPOSED` |
-| [016](decisions/ADR-016-content-bundle-retention.md) | Content bundles retained while referenced, never GC'd | `PROPOSED` |
-| [017](decisions/ADR-017-idempotency-key-contract.md) | Idempotency keys are account-scoped and fingerprinted | `PROPOSED` |
+| [001](decisions/ADR-001-bounded-contexts-and-single-ownership.md) | Bounded contexts and single ownership of state | `ACCEPTED` |
+| [002](decisions/ADR-002-activity-owns-in-flight-state.md) | Activity owns in-flight state; progression changes at settlement | `ACCEPTED` |
+| [003](decisions/ADR-003-ledger-derived-currency-balances.md) | Currency balances are ledger-derived projections | `ACCEPTED` |
+| [004](decisions/ADR-004-item-single-custody.md) | An ItemInstance has exactly one custody scope | `ACCEPTED` |
+| [005](decisions/ADR-005-active-party-as-configuration.md) | Active Party is ordered configuration, not an entity | `ACCEPTED` |
+| [006](decisions/ADR-006-participant-profile-refresh.md) | Composition frozen for a run; power refreshes at checkpoints | `ACCEPTED` |
+| [007](decisions/ADR-007-character-retirement.md) | Character deletion is retirement, not erasure | `ACCEPTED` |
+| [008](decisions/ADR-008-newest-connection-wins.md) | The newest authenticated connection evicts the previous | `ACCEPTED` |
+| [009](decisions/ADR-009-postgres-sole-durable-truth.md) | PostgreSQL is the sole durable truth | `ACCEPTED` |
+| [010](decisions/ADR-010-pure-engine-injected-clock-and-rng.md) | Pure engine, injected clock and RNG | `ACCEPTED` |
+| [011](decisions/ADR-011-content-as-versioned-artifact.md) | Content is a versioned build artifact | `ACCEPTED` |
+| [012](decisions/ADR-012-modular-monolith.md) | One deployable modular monolith for Phase 0B | `ACCEPTED` |
+| [013](decisions/ADR-013-character-activity-occupancy.md) | One primary action per Character, atomically enforced | `ACCEPTED` |
+| [014](decisions/ADR-014-per-character-stamina.md) | Stamina per Character, activated by first qualifying XP | `ACCEPTED` |
+| [015](decisions/ADR-015-active-use-duration-timers.md) | Active-use timers settle at checkpoints, never by wall clock | `ACCEPTED` |
+| [016](decisions/ADR-016-content-bundle-retention.md) | Content bundles retained while referenced, never GC'd | `ACCEPTED` |
+| [017](decisions/ADR-017-idempotency-key-contract.md) | Idempotency keys are account-scoped and fingerprinted | `ACCEPTED` |
 
 ---
 
@@ -276,8 +276,15 @@ or ledger invariants.
 
 ## 9. Status
 
-Architecture documents: `PHASE_0A_COMPLETE` / PENDING INDEPENDENT REVIEW.
-ADRs: all `PROPOSED`.
+Architecture documents: `PHASE_0A_COMPLETE` / `ARCHITECTURE_APPROVED`.
+ADRs: all 17 `ACCEPTED`.
 
-Per the governance model, the architect does not mark this `ARCHITECTURE_APPROVED`. That is the
-independent reviewer's call, and `IMPLEMENTATION_SPEC_READY` follows approval.
+The Product Owner approved the Phase 0A package after independent review. Per the governance
+model the architect does not self-approve; this status records the reviewer's and Product
+Owner's decision, not the author's.
+
+`IMPLEMENTATION_SPEC_READY` is the next stage and is **not** claimed here. It belongs to Phase
+0B planning, once the approved architecture has been turned into concrete implementation specs.
+
+Accepted decisions may still be revised, but a revision is a **new ADR that supersedes the old
+one** — the accepted record is not edited in place.

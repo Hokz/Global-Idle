@@ -1,6 +1,6 @@
 # Character Activity Occupancy, Stamina and Active-Use Timers
 
-**Document status:** `PHASE_0A_COMPLETE` / PENDING INDEPENDENT REVIEW
+**Document status:** `PHASE_0A_COMPLETE` / `ARCHITECTURE_APPROVED`
 **Phase:** 0A (extends 0A.1 and 0A.4)
 **Depends on:** `ADR-002`, `ADR-006`, `ADR-013`, `ADR-014`, `ADR-015`
 

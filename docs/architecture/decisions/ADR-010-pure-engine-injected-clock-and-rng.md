@@ -1,6 +1,6 @@
 # ADR-010 — The engine is a pure function over explicit inputs, with injected clock and RNG
 
-**Status:** `PROPOSED`
+**Status:** `ACCEPTED`
 **Phase:** 0A.5
 **Date:** 2026-09-20
 

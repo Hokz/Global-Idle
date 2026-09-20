@@ -1,6 +1,6 @@
 # Global Idle — Domain Model
 
-**Document status:** `PHASE_0A_COMPLETE` / PENDING INDEPENDENT REVIEW
+**Document status:** `PHASE_0A_COMPLETE` / `ARCHITECTURE_APPROVED`
 **Phase:** 0A.1 — Domain Architecture
 **Scope:** Core domain concepts, ownership boundaries, lifecycles and invariants.
 **Non-scope:** Database tables, ORM schemas, API shapes, service decomposition, transport. Those belong to 0A.2–0A.8 and to Phase 0B.
@@ -980,23 +980,23 @@ All other questions previously deferred from 0A.1 are answered in the completed 
 
 | ADR | Title | Status |
 |---|---|---|
-| [ADR-001](decisions/ADR-001-bounded-contexts-and-single-ownership.md) | Bounded contexts and single ownership of state | `PROPOSED` |
-| [ADR-002](decisions/ADR-002-activity-owns-in-flight-state.md) | Activity owns in-flight state; durable progression changes only at settlement | `PROPOSED` |
-| [ADR-003](decisions/ADR-003-ledger-derived-currency-balances.md) | Currency balances are ledger-derived projections | `PROPOSED` |
-| [ADR-004](decisions/ADR-004-item-single-custody.md) | ItemInstance has exactly one custody scope | `PROPOSED` |
-| [ADR-005](decisions/ADR-005-active-party-as-configuration.md) | Active Party is ordered configuration, not an entity | `PROPOSED` |
-| [ADR-006](decisions/ADR-006-participant-profile-refresh.md) | Composition is frozen for a run; power refreshes at settlement checkpoints | `PROPOSED` |
-| [ADR-007](decisions/ADR-007-character-retirement.md) | Character deletion is retirement, not erasure | `PROPOSED` |
-| [ADR-008](decisions/ADR-008-newest-connection-wins.md) | The newest authenticated connection evicts the previous one | `PROPOSED` |
-| [ADR-009](decisions/ADR-009-postgres-sole-durable-truth.md) | PostgreSQL is the sole durable truth; Redis holds nothing that cannot be rebuilt | `PROPOSED` |
-| [ADR-010](decisions/ADR-010-pure-engine-injected-clock-and-rng.md) | The engine is a pure function over explicit inputs, with injected clock and RNG | `PROPOSED` |
-| [ADR-011](decisions/ADR-011-content-as-versioned-artifact.md) | Content is a versioned build artifact, and activities pin their version | `PROPOSED` |
-| [ADR-012](decisions/ADR-012-modular-monolith.md) | One deployable modular monolith for Phase 0B | `PROPOSED` |
-| [ADR-013](decisions/ADR-013-character-activity-occupancy.md) | One primary action per Character, atomically enforced | `PROPOSED` |
-| [ADR-014](decisions/ADR-014-per-character-stamina.md) | Stamina per Character, activated by first qualifying XP | `PROPOSED` |
-| [ADR-015](decisions/ADR-015-active-use-duration-timers.md) | Active-use timers settle at checkpoints | `PROPOSED` |
-| [ADR-016](decisions/ADR-016-content-bundle-retention.md) | Content bundles retained while referenced | `PROPOSED` |
-| [ADR-017](decisions/ADR-017-idempotency-key-contract.md) | Idempotency keys account-scoped and fingerprinted | `PROPOSED` |
+| [ADR-001](decisions/ADR-001-bounded-contexts-and-single-ownership.md) | Bounded contexts and single ownership of state | `ACCEPTED` |
+| [ADR-002](decisions/ADR-002-activity-owns-in-flight-state.md) | Activity owns in-flight state; durable progression changes only at settlement | `ACCEPTED` |
+| [ADR-003](decisions/ADR-003-ledger-derived-currency-balances.md) | Currency balances are ledger-derived projections | `ACCEPTED` |
+| [ADR-004](decisions/ADR-004-item-single-custody.md) | ItemInstance has exactly one custody scope | `ACCEPTED` |
+| [ADR-005](decisions/ADR-005-active-party-as-configuration.md) | Active Party is ordered configuration, not an entity | `ACCEPTED` |
+| [ADR-006](decisions/ADR-006-participant-profile-refresh.md) | Composition is frozen for a run; power refreshes at settlement checkpoints | `ACCEPTED` |
+| [ADR-007](decisions/ADR-007-character-retirement.md) | Character deletion is retirement, not erasure | `ACCEPTED` |
+| [ADR-008](decisions/ADR-008-newest-connection-wins.md) | The newest authenticated connection evicts the previous one | `ACCEPTED` |
+| [ADR-009](decisions/ADR-009-postgres-sole-durable-truth.md) | PostgreSQL is the sole durable truth; Redis holds nothing that cannot be rebuilt | `ACCEPTED` |
+| [ADR-010](decisions/ADR-010-pure-engine-injected-clock-and-rng.md) | The engine is a pure function over explicit inputs, with injected clock and RNG | `ACCEPTED` |
+| [ADR-011](decisions/ADR-011-content-as-versioned-artifact.md) | Content is a versioned build artifact, and activities pin their version | `ACCEPTED` |
+| [ADR-012](decisions/ADR-012-modular-monolith.md) | One deployable modular monolith for Phase 0B | `ACCEPTED` |
+| [ADR-013](decisions/ADR-013-character-activity-occupancy.md) | One primary action per Character, atomically enforced | `ACCEPTED` |
+| [ADR-014](decisions/ADR-014-per-character-stamina.md) | Stamina per Character, activated by first qualifying XP | `ACCEPTED` |
+| [ADR-015](decisions/ADR-015-active-use-duration-timers.md) | Active-use timers settle at checkpoints | `ACCEPTED` |
+| [ADR-016](decisions/ADR-016-content-bundle-retention.md) | Content bundles retained while referenced | `ACCEPTED` |
+| [ADR-017](decisions/ADR-017-idempotency-key-contract.md) | Idempotency keys account-scoped and fingerprinted | `ACCEPTED` |
 
 ---
 

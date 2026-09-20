@@ -1,6 +1,6 @@
 # Economy Integrity and Security Architecture
 
-**Document status:** `PHASE_0A_COMPLETE` / PENDING INDEPENDENT REVIEW
+**Document status:** `PHASE_0A_COMPLETE` / `ARCHITECTURE_APPROVED`
 **Phase:** 0A.7
 **Depends on:** `ADR-003`, `ADR-004`, `ADR-009`, `DATA_ARCHITECTURE.md`
 

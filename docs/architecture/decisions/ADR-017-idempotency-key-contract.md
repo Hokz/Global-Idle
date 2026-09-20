@@ -1,6 +1,6 @@
 # ADR-017 — Idempotency keys are account-scoped and bound to a request fingerprint
 
-**Status:** `PROPOSED`
+**Status:** `ACCEPTED`
 **Phase:** 0A (tightens `CLIENT_SERVER_BOUNDARIES.md` §3)
 **Date:** 2026-09-20
 

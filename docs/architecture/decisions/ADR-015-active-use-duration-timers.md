@@ -1,6 +1,6 @@
 # ADR-015 — Active-use duration timers settle at checkpoints, never by wall clock
 
-**Status:** `PROPOSED`
+**Status:** `ACCEPTED`
 **Phase:** 0A
 **Date:** 2026-09-20
 
