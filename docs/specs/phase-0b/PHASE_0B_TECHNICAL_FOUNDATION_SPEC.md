@@ -134,13 +134,16 @@ Each internal package:
   "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } } }
 ```
 
-- the root `tsconfig.json` carries `references` to every package; each app references the
-  packages it uses;
-- `pnpm build` generates the Prisma client, runs **`tsc -b`** at the root — which builds
-  referenced projects in dependency order — and then each app's own build (`next build`,
-  `nest build`). **§4.3 is the authoritative script list**; this bullet is the shape, not a second
-  definition;
-- `pnpm dev` runs `pnpm generate` once, then `tsc -b --watch` alongside the app dev servers;
+- the root `tsconfig.json` is a **solution file** — `"files": []` plus `references` to **six**
+  composite projects: the four packages **and `apps/api` and `apps/worker`**. Each project
+  references what it imports. `apps/web` is the deliberate exception, explained in §4.4;
+- `pnpm build` generates the Prisma client, runs **`tsc -b`** at the root — which builds the six
+  referenced projects in dependency order, emitting `apps/api/dist` and `apps/worker/dist` too —
+  and then `next build` for `apps/web`. **`tsc -b` is the only compiler for `api` and `worker`;
+  `nest build` is not used** (§4.4). **§4.3 is the authoritative script list**; this bullet is
+  the shape, not a second definition;
+- `pnpm dev` runs `pnpm generate` once, then `tsc -b --watch` alongside `node --watch` for the two
+  Node apps and `next dev` for the web app;
 - **Vitest resolves packages through their `exports` map**, i.e. the built output, so tests and
   production agree. There is no source alias that could let tests pass against code the build
   would reject.
@@ -156,19 +159,46 @@ small packages is the cheaper side of that trade.
 `prisma generate` must run before both. That ordering is specified end to end in **§4.3** and
 asserted by **W12** (§15, 0B.2) rather than left as folklore.
 
-### 3.4 TypeScript — **strict, shared base config**
+### 3.4 TypeScript — **`~6.0.3`, ESM everywhere, one shared base config**
 
-`tsconfig.base.json` at the root, extended per workspace. Non-negotiable options:
+**Version: `typescript@~6.0.3`**, not the `latest` tag. Researched, September 2026: npm `latest`
+is **7.0.2** (2026‑07‑08) — the native compiler line — while **NestJS 12's own CLI pins
+`typescript ~6.0.2`** and its generated project template declares `^6.0.2`. A foundation phase
+does not put its API framework on a compiler its framework's toolchain has not adopted. TypeScript
+6.0 is the last JavaScript-based line and already errors on the options 7.0 removes, so **nothing
+in the configuration below is on that removal list** — no `baseUrl`, no `node10` resolution, no
+`outFile`. TypeScript 7 is the designated upgrade, triggered when the NestJS CLI moves (§18).
+
+**Module format: ESM, in every workspace.** This is not a preference; three pinned dependencies
+decide it. `@nestjs/core@12` and `@nestjs/common@12` ship as **`"type": "module"` with no
+CommonJS entry point**, so a CommonJS API is not available at all; `uuid@14` and `zod@4` are
+ESM-only packages; Vitest 5 and the `prisma-client` generator (§3.8) are ESM-native. Every
+workspace `package.json` therefore declares `"type": "module"`, relative imports carry the `.js`
+extension `nodenext` requires, and the Prisma generator emits ESM (§4.3). The one place where
+"choose" was still possible — the generated client's `moduleFormat` — is set explicitly rather
+than inferred, so the decision is visible in the schema file.
+
+`tsconfig.base.json` at the root, extended by every workspace:
 
 ```jsonc
 {
-  "strict": true,
-  "noUncheckedIndexedAccess": true,
-  "exactOptionalPropertyTypes": true,
-  "noImplicitOverride": true,
-  "noFallthroughCasesInSwitch": true,
-  "isolatedModules": true,
-  "skipLibCheck": true
+  "compilerOptions": {
+    "target": "ES2023",                       // NestJS 12's template target; Node 24 covers it fully
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "resolvePackageJsonExports": true,
+    "esModuleInterop": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "isolatedModules": true,
+    "skipLibCheck": true
+  }
 }
 ```
 
@@ -176,7 +206,17 @@ asserted by **W12** (§15, 0B.2) rather than left as folklore.
 content maps constantly, and it is the option that turns a whole class of runtime `undefined`
 into a compile error.
 
-`apps/api` additionally needs `experimentalDecorators` and `emitDecoratorMetadata` for NestJS.
+Per workspace:
+
+| Workspace | Adds | Why |
+|---|---|---|
+| `packages/*` | `composite: true`, `rootDir: "src"`, `outDir: "dist"` | project-reference targets (§3.3) |
+| `apps/api`, `apps/worker` | `composite: true`, `rootDir: "src"`, `outDir: "dist"`, **`experimentalDecorators`, `emitDecoratorMetadata`** | referenced projects built by `tsc -b`; NestJS 12 still uses legacy decorators with metadata — both options are present in TypeScript 6.0 |
+| `apps/web` | Next.js's own managed options (`noEmit`, `jsx`, `bundler` resolution, the `next` plugin) over the base's strictness block | Next.js writes these itself; the app extends the base for **strictness only** — see §4.4 for why it is not a project reference |
+
+`verbatimModuleSyntax` is deliberately **not** set: with `isolatedModules` it adds nothing this
+graph needs, and it forbids the `import x = require()` interop that a CJS-only dependency such as
+`pino` occasionally needs.
 
 ### 3.5 Lint and format — **ESLint (flat config) + Prettier**
 
@@ -194,9 +234,15 @@ DX, not the gate.
 
 ### 3.7 Test framework — **Vitest**
 
-Chosen over Jest for this repository specifically: its workspace mode maps onto pnpm workspaces,
-and its fake-timer control — including moving a clock **backwards** — is what §7.1.1 and §14.5
-need. NestJS's Jest default is not a strong enough reason to take on a second transform pipeline.
+**Vitest 5** (`^5.0.1`, 2026‑09‑15). Chosen over Jest for this repository specifically: its
+`projects` configuration maps onto pnpm workspaces, and its fake-timer control — including moving
+a clock **backwards** — is what §7.1.1 and §14.5 need. NestJS 12's own project template now ships
+Vitest rather than Jest, so this is no longer even a divergence from the API framework.
+
+**One config file, four projects.** `vitest.config.ts` at the root declares `test.projects` —
+`unit`, `fixtures`, `integration`, `invariants` — and §13 selects them with `--project`. An
+earlier draft named a `vitest.workspace.ts`; **that file format was removed in Vitest 4**, and
+naming it would have sent the builder to a mechanism the pinned version does not have.
 
 **Resolution matches production.** Vitest resolves internal packages through their `exports`
 maps, i.e. the **built output** of §3.3, so there is no source alias that could let a test pass
@@ -219,8 +265,13 @@ two invariants in §6.4 depend on a capability whose availability changed recent
 | **Prisma 8** (August 2026) promotes expression, partial and unique indexes to **direct schema authoring**, no preview flag | Prisma changelog 2026‑08‑02 |
 | `@prisma/client` npm **`latest` = 7.10.0** | npm dist-tags |
 | `prisma` CLI npm **`latest` = 8.0.0-rc.15**, `prev` = 7.10.0 | npm dist-tags |
-| Prisma engines require **Node >= 22.18.0** | package `engines` |
-| On the **Node 24 line**, Prisma's `engines` range admits only **24.11.0 and above** | package `engines`, per the independent review — see §3.10 |
+| **`prisma@7.10.0` and `@prisma/client@7.10.0` `engines`: `^20.19 \|\| ^22.12 \|\| >=24.0`** | the pinned packages' own `package.json`, read from the registry |
+| `prisma@8.0.0-rc.15` `engines`: `>=22.18.0` | **Prisma 8's** requirement — recorded so it is not mistaken for the pinned toolchain's (§3.10) |
+| `@prisma/config@7.10.0`: `defineConfig({ schema, datasource: { url }, migrations: { path, seed } })`; `env(name)` reads `process.env` **eagerly** and throws `PrismaConfigEnvError` when unset; the package does **not** load `.env` itself | the package's published typings and source |
+| Prisma 7 schema validation: *"The datasource property `url` is no longer supported in schema files. Move connection URLs for Migrate to `prisma.config.ts` and pass either `adapter` for a direct database connection or `accelerateUrl` … to the `PrismaClient` constructor."* | the pinned schema engine's own diagnostic text |
+| `@prisma/client@7.10.0`: *"A driver adapter is required to connect to your database."* | the pinned client runtime's own diagnostic text |
+| `prisma-client` generator (`@prisma/client-generator-ts@7.10.0`): `output` **required**; `runtime` ∈ `nodejs`, `deno`, `bun`, `workerd`, `cloudflare`, `vercel-edge`, `edge-light`; `moduleFormat` ∈ `esm`, `cjs` (inferred from `tsconfig`/`package.json` when omitted); `generatedFileExtension` ∈ `ts`, `mts`, `cts` (default `ts`); `importFileExtension` ∈ `""`, `ts`, `mts`, `cts`, `js`, `mjs`, `cjs` (inferred when omitted) | the generator package's source |
+| Partial-index `where`: **an object literal or `raw("…")`**. The object form accepts `true`, `false`, `null`, a string, a number, or exactly one of `{ not: … }`; anything else is refused with *"cannot be used in the object syntax of a where clause. Use raw() instead."* | the pinned schema engine's own diagnostic text |
 
 **Decision: pin `prisma` and `@prisma/client` to `7.10.x` and enable the `partialIndexes`
 preview feature.**
@@ -230,12 +281,33 @@ Rationale: Prisma 8 is a **release candidate**, not generally available — the 
 phase should not pin a project to a pre-release. Prisma 7.4+ already provides the capability
 this specification needs; the only cost is a preview flag.
 
-```prisma
-generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["partialIndexes"]
-}
-```
+**Generator: `prisma-client`, not `prisma-client-js`.** An earlier draft used
+`prisma-client-js`. The independent review is right that a greenfield Prisma 7 project has no
+reason to start on the legacy generator: `prisma-client` is the generator Prisma 7 documents as
+current, and — verifiably, from its source — it is the one that carries the **`runtime`,
+`moduleFormat`, `generatedFileExtension` and `importFileExtension`** controls this build model
+needs to make the generated code agree with §3.4's ESM decision. The full generator block, the
+config file and the adapter wiring are in §4.3.
+
+**Partial-index predicates: object form where it fits, `raw()` where it does not.** An earlier
+draft wrote I9 as `where: { state: { in: [ONLINE_ACTIVE, RECONNECT_GRACE_PAUSED] } }`. **That is
+not valid in the pinned version** — the object form has no `in`, as the schema engine's own
+diagnostic states — and the review was right to block. The corrected declarations:
+
+| Invariant | Declaration in `schema.prisma` | Form |
+|---|---|---|
+| I1 — one playable Character per vocation per account | `@@unique([accountId, vocation], where: { retiredAt: null })` | object — `null` equality is supported |
+| I9 — one non-terminal session-bound Activity per account | `@@unique([accountId], where: raw("state IN ('ONLINE_ACTIVE', 'RECONNECT_GRACE_PAUSED')"))` | `raw()` — an `IN` list has no object form |
+| Skill Training has exactly one participant (§6.3.1) | `@@unique([activityId], where: raw("family = 'WALL_CLOCK'"))` | `raw()` — an enum comparison is kept in `raw()` rather than relying on string coercion |
+
+Column names in the `raw()` predicates are all-lowercase identifiers, so they need no quoting in
+PostgreSQL; a camel-case column would.
+
+> **A `raw()` predicate is not hand-written migration SQL.** It is a declaration in
+> `schema.prisma` from which **Prisma Migrate generates** the `CREATE UNIQUE INDEX … WHERE (…)`
+> statement. The rule that custom migration SQL is authorized only where genuinely needed
+> (currently the ledger role grants) is unchanged, and **D13** proves the generated SQL — not
+> the schema file — carries each predicate.
 
 > **The earlier claim that "Prisma cannot express a partial unique index declaratively" is
 > withdrawn.** It was true of older Prisma and is not true of the pinned version. **Invariants
@@ -256,73 +328,113 @@ more, that is a finding to report, not a decision to take quietly.
 
 ### 3.9 Supporting libraries
 
-| Concern | Choice | Note |
-|---|---|---|
-| Config validation | **zod** | validated at boot; the process refuses to start on invalid config |
-| Logging | **pino** | structured JSON; `nestjs-pino` for request context |
-| Metrics | **prom-client** | `/metrics` endpoint |
-| Health | **@nestjs/terminus** | backs `/health/live` and `/health/ready` |
-| Redis client | **ioredis** | mature, cluster-capable later |
-| Job queue | **BullMQ** | Redis-backed; 0B proves the wiring with one trivial job |
-| UUIDv7 | **`uuid@14.x`** — `import { v7 as uuidv7 } from 'uuid'` | generated in application code — see §6.2 |
-| Node runtime | **Node `>=24.11.0 <25`** | the full runtime and package-manager contract is §3.10, not a row in this table |
+Versions are the **`latest` npm dist-tag as of 2026‑09‑20**, read from the registry, and are
+recorded as caret ranges within the major named here. The lockfile pins the exact resolution.
+
+| Concern | Choice | Pinned line | Note |
+|---|---|---|---|
+| API framework | **NestJS** | `@nestjs/{core,common,platform-express,testing}@^12.0.3` | pure ESM (§3.4); `reflect-metadata@^0.2.2` |
+| Web framework | **Next.js** | `next@^16.3.5` | manages its own `tsconfig` (§4.4) |
+| ORM | **Prisma** | `prisma@7.10.0`, `@prisma/client@7.10.0`, **`@prisma/adapter-pg@7.10.0`**, `pg@^8.23.0` | exact on the Prisma packages (§3.8); the adapter is **required** by the Prisma 7 client (§4.3) |
+| Config validation | **zod** | `zod@^4.6.5` | validated at boot; the process refuses to start on invalid config |
+| Logging | **pino** | `pino@^10.3.1`, `nestjs-pino@^5.2.0` | structured JSON; `nestjs-pino` supports NestJS 12 (`peerDependencies: @nestjs/core ^11.0.8 \|\| ^12.0.2`) |
+| Metrics | **prom-client** | `prom-client@^15.1.3` | `/metrics` endpoint |
+| Health | **@nestjs/terminus** | `@nestjs/terminus@^12.1.0` | backs `/health/live` and `/health/ready`; supports NestJS 12 |
+| Redis client | **ioredis** | `ioredis@^6.0.0` | mature, cluster-capable later |
+| Job queue | **BullMQ** | `bullmq@^6.3.8` | Redis-backed; 0B proves the wiring with one trivial job |
+| UUIDv7 | **uuid** — `import { v7 as uuidv7 } from 'uuid'` | `uuid@^14.0.2` | ESM-only; generated in application code — see §6.2 |
+| Tests | **Vitest** | `vitest@^5.0.1`, `@testcontainers/postgresql@^12.1.0` | §3.7 |
+| Boundaries | **dependency-cruiser** | `dependency-cruiser@^18.4.0` | §3.6 |
+| Lint / format | **ESLint** (flat config, `eslint.config.js`) / **Prettier** | `eslint@^10.11.0`, `prettier@^3.9.8` | ESLint 10 has no `.eslintrc` at all |
+| Compiler | **TypeScript** | `typescript@~6.0.3` | §3.4 — tilde, not caret |
+| Node runtime | **Node 24** | `.nvmrc` = `24.21.0`; `engines.node` = `>=24.21.0 <25` | the full runtime and package-manager contract is §3.10 |
 
 ### 3.10 Runtime and package-manager contract
 
 §3.1's rationale — *an undeclared dependency fails at module resolution* — is only true while the
 linker keeps it true. That makes the runtime and the package manager part of the **boundary
 contract**, not environment trivia, and all of it is pinned in files rather than described in a
-README.
+README. An earlier draft left the pins as placeholders (`pnpm@<exact.version>`, "e.g. `24.11.0`");
+the review is right that a placeholder is not a pin. **The values below are the values.**
 
-#### Node — `>=24.11.0 <25`
+#### Node — `.nvmrc` = `24.21.0`; `engines.node` = `>=24.21.0 <25`
+
+Researched 2026‑09‑20 from the Node release index and the pinned packages' own `engines`:
 
 | Fact | Source |
 |---|---|
-| On the Node 24 line, Prisma's `engines` range admits only **24.11.0 and above** | Prisma package `engines`, per the independent review |
-| Prisma engines require **Node >= 22.18.0** on earlier lines | Prisma package `engines` (§3.8) |
-| Node 24 is the **Active LTS** line; Node 26 becomes LTS in October 2026 | Node release schedule |
+| Node **24.21.0** is the current release on the 24 line (2026‑09‑07), LTS codename Krypton | `nodejs.org/dist/index.json` |
+| `prisma@7.10.0`, `@prisma/client@7.10.0`: `^20.19 \|\| ^22.12 \|\| >=24.0` — the Node 24 line satisfies the **pinned** Prisma from **24.0** | package `engines` |
+| **`@nestjs/schematics@12.0.3`: `^22.22.3 \|\| ^24.15.0 \|\| >=26.0.0`** — the tightest floor on the 24 line in this toolchain, and it is NestJS's, not Prisma's | package `engines` |
+| `vitest@5.0.1`: `^22.12.0 \|\| ^24.0.0 \|\| >=26.0.0`; `dependency-cruiser@18.4.0`: `^22 \|\| ^24 \|\| >=26`; `eslint@10.11.0`: `>=24`; `@nestjs/terminus@12.1.0`: `>=24.0.0` | package `engines` |
+| `prisma@8.0.0-rc.15`: `>=22.18.0` | **Prisma 8's** requirement, listed only so it is not conflated with the pinned toolchain's |
+| Corepack ships with the Node 24 line and **is absent from the Node 26 line** | the `corepack` API document exists in the v24 docs and does not in the v26 docs |
 
-Pinning `>=24.11.0 <25` satisfies both readings of the Prisma requirement, so the pin does not
-depend on resolving which is the tighter bound.
+An earlier draft attributed a "24.11+" floor to Prisma. That figure belongs to no package in
+this toolchain; the correction is recorded rather than quietly overwritten.
 
 | File | Content | Effect |
 |---|---|---|
-| root `package.json` → `engines.node` | `">=24.11.0 <25"` | the declared contract |
-| `.npmrc` → `engine-strict=true` | | a wrong Node **fails `pnpm install`** rather than printing a warning nobody reads |
-| `.nvmrc` | the exact version, e.g. `24.11.0` | one source of truth for developers and CI |
+| `.nvmrc` | `24.21.0` | the one place the exact version lives; developers and CI read it |
+| root `package.json` → `engines.node` | `">=24.21.0 <25"` | floor = the `.nvmrc` version, ceiling = the line. A developer may run a **newer** 24.x patch than CI, never an older one; moving `.nvmrc` moves the floor in the same change |
+| `pnpm-workspace.yaml` → `engineStrict: true` | | a Node outside the range **fails `pnpm install`** rather than printing a warning nobody reads |
 | CI | `actions/setup-node` with `node-version-file: .nvmrc` | CI cannot drift from `.nvmrc`, because it reads it |
 
-#### pnpm — pinned by `packageManager`, installed only by Corepack
+#### pnpm — `packageManager` = `pnpm@12.5.1`, installed only by Corepack
 
 ```jsonc
 // root package.json
-{ "packageManager": "pnpm@<exact.version>+sha512.<integrity>" }
+{ "packageManager": "pnpm@12.5.1" }
 ```
 
-- an **exact** version with its integrity hash, never a range;
+- **12.5.1** is npm `latest` as of 2026‑09‑20 (published 2026‑09‑18). The version is exact, never
+  a range. Corepack records the integrity hash after the version on first use (`corepack use
+  pnpm@12.5.1`); that hash is **whatever Corepack writes, never hand-typed**, so the field above
+  is shown without it;
 - **Corepack is the only installation path.** CI runs `corepack enable` before any `pnpm`
   command, and never `npm i -g pnpm`. A globally installed pnpm can disagree with
-  `packageManager`; Corepack cannot, because it reads it;
+  `packageManager`; Corepack cannot, because it reads it. pnpm itself refuses to self-update
+  when run through Corepack, which is the behaviour wanted here;
 - CI installs with **`pnpm install --frozen-lockfile`**, so a lockfile that disagrees with
   `package.json` fails the build instead of being silently rewritten;
-- Corepack ships with the Node 24 line, so the `<25` bound keeps this self-contained. **Moving the
-  Node line in a later phase must revisit the Corepack policy in the same change** — recorded in
-  §18 rather than assumed.
+- Corepack ships with Node 24 and **not with Node 26**. Moving the Node line in a later phase
+  therefore changes the pnpm installation path in the same change — recorded in §18 rather than
+  assumed.
 
-#### Linker behaviour is locked, because a boundary layer depends on it
+#### Settings live in `pnpm-workspace.yaml`, and the linker is locked
 
-```ini
-# .npmrc
-node-linker=isolated
-shamefully-hoist=false
-engine-strict=true
+pnpm 12 reads its settings from **`pnpm-workspace.yaml`**, in camel case — its own diagnostics
+say *"add … to pnpm-workspace.yaml"*. An earlier draft put them in `.npmrc`; that file is not
+where the pinned version looks.
+
+```yaml
+# pnpm-workspace.yaml
+packages:
+  - "apps/*"
+  - "packages/*"
+
+nodeLinker: isolated          # pnpm's default — written down anyway; see below
+shamefullyHoist: false
+engineStrict: true
+
+# pnpm 10+ refuses to run dependency install scripts unless they are allowed here.
+# Every entry carries the reason it exists. Nothing is allowed wholesale.
+allowBuilds:
+  "@prisma/engines": true     # postinstall: fetches the schema engine the pinned CLI uses
+  prisma: true                # preinstall entry script of the pinned CLI
+  esbuild: true               # postinstall: verifies its platform binary (Vite / Vitest)
 ```
 
-`node-linker=isolated` is pnpm's default and is written down **anyway**, because a default that is
-never stated is a default someone changes at 2am to unblock a build. Setting `node-linker=hoisted`
-or `shamefully-hoist=true`, or adding `public-hoist-pattern` entries beyond pnpm's defaults,
-re-creates the hoisting that lets an **undeclared** dependency resolve — silently deleting one of
-the two enforcement layers this specification claims to have (§3.1, §5.3).
+The three `allowBuilds` entries are the three packages in this dependency set that declare an
+install script — read from their published `package.json`, not guessed. A fourth appears only
+when `pnpm install` reports an ignored build, and it is added with its reason, never by
+`dangerouslyAllowAllBuilds`.
+
+`nodeLinker: isolated` is pnpm's default and is written down **anyway**, because a default that is
+never stated is a default someone changes at 2am to unblock a build. Setting `nodeLinker:
+hoisted` or `shamefullyHoist: true`, or adding `publicHoistPattern` entries beyond pnpm's
+defaults, re-creates the hoisting that lets an **undeclared** dependency resolve — silently
+deleting one of the two enforcement layers this specification claims to have (§3.1, §5.3).
 
 Any change to those three lines is therefore an **architecture change**, not a build fix, and
 belongs in a review. This is checked rather than trusted: §16 criterion 5b.
@@ -340,15 +452,19 @@ global-idle/
 ├─ packages/
 │  ├─ shared/         contracts, types, ids, result types — no I/O
 │  ├─ domain/         bounded contexts, ORM, transactions — the application core
-│  ├─ game-data/      content schemas, validation, bundle build + resolver contract
+│  ├─ game-data/      the Content bounded context — schemas, validation, bundle build + resolver
 │  └─ game-engine/    pure simulation — no I/O, no framework
 ├─ infra/
 │  └─ docker-compose.yml
 ├─ docs/
 ├─ .dependency-cruiser.cjs
-├─ pnpm-workspace.yaml
+├─ .nvmrc
+├─ eslint.config.js
+├─ pnpm-workspace.yaml      workspace list AND pnpm settings (§3.10)
 ├─ tsconfig.base.json
-└─ package.json
+├─ tsconfig.json            solution file: references to the six composite projects (§4.4)
+├─ vitest.config.ts         test.projects (§3.7)
+└─ package.json             engines, packageManager, scripts (§4.3)
 ```
 
 `packages/shared` is named **`shared`**, not `shared-types`, per `OPERATIONS_ARCHITECTURE.md` §1.
@@ -384,10 +500,27 @@ packages/domain/src/
 │  ├─ character/       Character, roster capacity, Stamina
 │  ├─ party/           Active Party configuration
 │  ├─ activity/        Activity root, claims, occupancy, settlement orchestration
-│  └─ economy/         ledger, balances
+│  ├─ economy/         ledger, balances
+│  └─ items/           (Phase 3 — the directory exists only when ItemInstance does; §6.6)
 ├─ platform/           clock, ids, idempotency, transactions, Prisma client
+├─ generated/prisma/   the generated Prisma client — git-ignored, produced by `pnpm generate` (§4.3)
 └─ index.ts            the only legal entry point
 ```
+
+**All seven `ADR-001` contexts, and where each one lives.** `ADR-018` moves the *runtime
+application* contexts; it does not collapse, remove or relocate any context `ADR-001` defines.
+
+| `ADR-001` context | Lives in | Phase 0B status |
+|---|---|---|
+| Identity & Access | `packages/domain/src/contexts/identity` | built (foundations) |
+| Character | `packages/domain/src/contexts/character` | built |
+| Party | `packages/domain/src/contexts/party` | contract only |
+| Activity | `packages/domain/src/contexts/activity` | built |
+| **Items** | `packages/domain/src/contexts/items` | **deferred to Phase 3 with `ItemInstance`** — still an accepted context, with its owner and its invariant (I4) recorded in §6.6 |
+| Economy | `packages/domain/src/contexts/economy` | built (minimal ledger) |
+| **Content** | **`packages/game-data`** | built — this context is build-time, versioned and read-only at runtime (`ADR-011`), which is exactly why it is a separate package rather than a directory under `domain` |
+
+Five directories in `domain` plus one deferred plus one in `game-data` is seven.
 
 The earlier rationale — "extracting them would drag Prisma into `packages/`" — was simply
 wrong. The forbidden edge is **package → app**. A package depending on Prisma or on npm
@@ -434,52 +567,98 @@ Enforced by dependency-cruiser (§5.3) and tested by W6, W8 and W10.
 
 `packages/domain` depends on **generated** Prisma artifacts, and §16 criterion 1 requires
 `pnpm install && pnpm build && pnpm test` to succeed from a **clean checkout**. Those two facts
-only coexist if the specification says exactly where generation happens. An earlier draft did not,
-and the review was right to block: *"it builds here because the client was generated last week"*
-is not a pipeline.
+only coexist if the specification says exactly where generation happens, what it produces and how
+the compiler sees it. An earlier draft answered with a deprecated generator and a subpath-import
+plan built around it; the review is right that a greenfield project does not organise itself
+around a legacy generator. This section replaces that plan.
 
-#### Where the generated client lives
+#### The Prisma 7 model, exactly
+
+Prisma 7 changed three things at once, and each is verified against the pinned packages (§3.8):
+
+1. **the connection URL left the schema file** — `schema.prisma` declares only the provider; the
+   URL lives in `prisma.config.ts`;
+2. **the client needs a driver adapter** — `new PrismaClient()` without one throws *"A driver
+   adapter is required to connect to your database"*; for PostgreSQL that is `@prisma/adapter-pg`
+   over `pg`;
+3. **the current generator is `prisma-client`**, which emits **TypeScript**, requires an explicit
+   `output`, and takes the runtime and module-format decisions as fields rather than guesses.
+
+```prisma
+// packages/domain/prisma/schema.prisma
+generator client {
+  provider               = "prisma-client"
+  output                 = "../src/generated/prisma"   // relative to the schema directory
+  runtime                = "nodejs"
+  moduleFormat           = "esm"                       // §3.4 — stated, not inferred
+  generatedFileExtension = "ts"
+  importFileExtension    = "js"                        // nodenext: emitted imports carry .js
+  previewFeatures        = ["partialIndexes"]
+}
+
+datasource db {
+  provider = "postgresql"                              // no url — Prisma 7 refuses one here
+}
+```
+
+```ts
+// packages/domain/prisma.config.ts
+import 'dotenv/config';                                // @prisma/config does not load .env itself
+import { defineConfig, env } from 'prisma/config';
+
+export default defineConfig({
+  schema:     'prisma/schema.prisma',
+  migrations: { path: 'prisma/migrations' },
+  datasource: { url: env('DATABASE_URL') },           // eager: a missing variable fails loudly, by name
+});
+```
+
+```ts
+// packages/domain/src/platform/prisma/client.ts
+import { PrismaPg } from '@prisma/adapter-pg';
+import { PrismaClient } from '../../generated/prisma/client.js';
+
+export function createPrismaClient(connectionString: string): PrismaClient {
+  return new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
+}
+```
+
+Every generator field is **written explicitly** even where the generator could infer it.
+`moduleFormat` would otherwise be inferred from the nearest `package.json`; `importFileExtension`
+from `tsconfig`. Inference is correct today and silently wrong the day someone edits a
+`tsconfig`. Four lines make the decision reviewable.
+
+`env()` is deliberately eager. The alternative — a lazily-read URL — would let `pnpm generate`
+succeed on a machine where `pnpm migrate` is about to fail with a less useful error. `DATABASE_URL`
+is exported for every CI step (below) and documented in `.env.example` for local use.
+
+#### Where the generated client lives, and why `tsc` compiles it
 
 | | |
 |---|---|
 | Schema | `packages/domain/prisma/schema.prisma` |
-| Generator `output` | **declared explicitly** — `../generated/prisma`, i.e. `packages/domain/generated/prisma` |
-| Committed to git | **no** — `packages/domain/generated/` is ignored |
-| Compiled by `tsc` | **no** — outside `rootDir: "src"` and in the package's `exclude` |
-| Imported as | `#prisma-client` — a Node **subpath import** declared by `packages/domain` |
+| Config | `packages/domain/prisma.config.ts` — found by the CLI in the package directory, which is where every `prisma` script runs |
+| Generator `output` | **`packages/domain/src/generated/prisma/`** — *inside* `rootDir: "src"` |
+| Emitted as | TypeScript (`client.ts`, `enums.ts`, `models.ts`, …) — the generator's `generatedFileExtension = "ts"` |
+| Compiled by `tsc -b` | **yes** — into `dist/generated/prisma/`, exactly like hand-written source |
+| Committed to git | **no** — `packages/domain/src/generated/` is ignored |
+| Imported as | a relative path with the `.js` extension: `'../../generated/prisma/client.js'` |
 
-```prisma
-generator client {
-  provider        = "prisma-client-js"
-  output          = "../generated/prisma"
-  previewFeatures = ["partialIndexes"]
-}
-```
+**Why inside `src`.** The `prisma-client` generator emits TypeScript, not JavaScript. TypeScript
+inside `rootDir` is compiled and emitted by the same `tsc -b` invocation as everything else, so
+`dist/` mirrors `src/` and a relative import resolves to the same file in the editor, in the built
+output, in Vitest and in production. The earlier subpath-import indirection existed to make a
+JavaScript artifact *outside* `rootDir` reachable without a `paths` alias; a TypeScript artifact
+*inside* `rootDir` needs no indirection at all. Relative imports are the plainest resolution
+mechanism there is, and `tsc` rewrites nothing.
 
-```jsonc
-// packages/domain/package.json
-{ "imports": { "#prisma-client": "./generated/prisma/index.js" } }
-```
+**Why not outside `src`.** A generated `.ts` tree outside `rootDir` cannot be compiled by a
+composite project without either a second `tsc` invocation or a `paths` alias — the two things
+§3.3 rejects.
 
-> The target path names the pinned generator's entry file. If the pinned generator emits a
-> differently-named entry, **the target changes and the specifier does not** — every importer
-> keeps writing `#prisma-client`. That indirection is the point.
-
-**Why `output` is declared rather than defaulted.** A defaulted output lands inside
-`node_modules`, whose layout is precisely what §3.10 locks down; making the artifact's location
-depend on that layout couples the build to it. An explicit path is stable across Prisma versions
-and pnpm linker settings alike.
-
-**Why a subpath import and not a `paths` alias.** §3.3 already rejects `paths` for internal
-resolution: `tsc` does not rewrite `paths` in emitted JavaScript, so the output would need a
-runtime resolver. `#prisma-client` has no such problem — **Node itself resolves it**, from the
-nearest `package.json`, which is `packages/domain/package.json` whether the importing file is
-`src/platform/prisma/client.ts` in the editor or `dist/platform/prisma/client.js` in production.
-One specifier, four contexts — editor, `tsc -b`, Vitest, production — and no rewriting step.
-TypeScript resolves `imports` natively under the configured `moduleResolution`.
-
-`@prisma/client` stays a declared runtime dependency of `packages/domain` — the generated code
-imports from it — and of **no other workspace** (§5.2).
+`@prisma/client` and `@prisma/adapter-pg` are declared runtime dependencies of `packages/domain`
+— the generated code imports the former — and of **no other workspace** (§5.2). `dotenv` and
+`prisma` are its dev dependencies.
 
 #### Scripts, exactly
 
@@ -487,52 +666,66 @@ imports from it — and of **no other workspace** (§5.2).
 // root package.json
 {
   "scripts": {
-    "generate":     "pnpm --filter @global-idle/domain run prisma:generate",
-    "typecheck":    "tsc -b",
-    "build":        "pnpm run generate && pnpm run typecheck && pnpm -r --filter \"./apps/*\" run build",
-    "test":         "vitest run",
-    "lint":         "eslint .",
-    "format:check": "prettier --check .",
-    "boundaries":   "depcruise --config .dependency-cruiser.cjs apps packages"
+    "generate":         "pnpm --filter @global-idle/domain run prisma:generate",
+    "typecheck":        "tsc -b && pnpm --filter @global-idle/web run typecheck",
+    "build":            "pnpm run generate && tsc -b && pnpm --filter @global-idle/web run build",
+    "test":             "vitest run",
+    "test:unit":        "vitest run --project unit",
+    "test:fixtures":    "vitest run --project fixtures",
+    "test:integration": "vitest run --project integration",
+    "test:invariants":  "vitest run --project invariants",
+    "lint":             "eslint .",
+    "format:check":     "prettier --check .",
+    "boundaries":       "depcruise --config .dependency-cruiser.cjs apps packages"
   }
 }
 ```
 
 ```jsonc
 // packages/domain/package.json
-{ "scripts": { "prisma:generate": "prisma generate", "prisma:migrate": "prisma migrate deploy" } }
+{ "scripts": {
+    "prisma:generate": "prisma generate",
+    "prisma:migrate":  "prisma migrate deploy",
+    "migrate:check":   "node ./scripts/migrate-check.js" } }
+
+// apps/web/package.json
+{ "scripts": { "typecheck": "tsc --noEmit", "build": "next build" } }
 ```
 
 **The order, and why each step sits where it does:**
 
-1. **`generate` first.** `tsc` cannot resolve `#prisma-client` before the client exists, so
-   generation precedes every typecheck, build and test. It is idempotent and cheap on a warm
-   checkout, so running it every time costs nothing and removes a whole class of "works here".
-2. **`typecheck` is `tsc -b`, not `tsc --noEmit`.** §13 previously said `--noEmit`, which
-   contradicts §3.3: project references resolve against **emitted declarations**, so a no-emit
-   pass has nothing to check the graph against. `tsc -b` is incremental, so using the build as the
-   typecheck is nearly free after the first run. The reviewer was right that the two statements
-   could not both stand.
-3. **`build` then the apps.** `tsc -b` produces every package's `dist`; `next build` and
-   `nest build` consume it.
+1. **`generate` first.** `tsc` cannot compile `src/platform/prisma/client.ts` before
+   `src/generated/prisma/client.ts` exists, so generation precedes every typecheck, build and
+   test. It is idempotent and cheap on a warm checkout, so running it every time costs nothing
+   and removes a whole class of "works here".
+2. **`typecheck` is `tsc -b` plus the web app's own `tsc --noEmit`** — never `tsc --noEmit` at
+   the root. Project references resolve against **emitted declarations**, so a root no-emit
+   pass has nothing to check the graph against. `tsc -b` is incremental, so using the build as
+   the typecheck is nearly free after the first run. §4.4 explains why `apps/web` is checked
+   separately and how W13 proves all seven workspaces are covered.
+3. **`build` = `tsc -b` then `next build`.** `tsc -b` emits every package's `dist` **and**
+   `apps/api/dist` and `apps/worker/dist`; `next build` consumes `packages/shared`'s `dist`.
+   There is no `nest build` step (§4.4).
 4. **`test` last.** Vitest resolves internal packages through their `exports`, i.e. `dist` (§3.7),
    so `pnpm build` must already have run. **W12** asserts exactly this sequence from a clean
    checkout.
 
 **Generation is explicit, never a lifecycle hook.** No `postinstall` runs `prisma generate`.
-Lifecycle-script behaviour varies across package-manager versions and settings, and a step that
-*sometimes* runs is the opposite of a deterministic pipeline. `pnpm build` runs it, visibly, every
-time.
+Lifecycle-script behaviour varies across package-manager versions and settings — pnpm 12 refuses
+dependency install scripts outright unless allowed (§3.10) — and a step that *sometimes* runs is
+the opposite of a deterministic pipeline. `pnpm build` runs it, visibly, every time.
 
-**Nothing generated is committed.** `packages/domain/generated/`, every `dist/`, `*.tsbuildinfo`
-and `node_modules/` are ignored. No part of this specification requires a generated artifact in
-git, so nothing justifies the drift that committing one would cause.
+**Nothing generated is committed.** `packages/domain/src/generated/`, every `dist/`,
+`*.tsbuildinfo` and `node_modules/` are ignored. No part of this specification requires a
+generated artifact in git, so nothing justifies the drift that committing one would cause.
 
 #### Migrations are not part of the build
 
 `prisma migrate deploy` touches a **database**; `pnpm build` must succeed with no database
 reachable. Migrations are applied by the integration-test global setup against the Testcontainers
-instance (§3.7) and by the deployment path — never by a build script.
+instance (§3.7) and by the deployment path — never by a build script. `migrate:check` (§13 check
+9) applies them from empty and from the previous state, and asserts the generated SQL of every
+partial index (**D13**).
 
 #### CI runs this same path
 
@@ -541,11 +734,66 @@ exists only in the workflow file (§13). Two environment details make that true 
 aspirational:
 
 - **`DATABASE_URL` is exported for every step** — a placeholder for the static steps, the
-  Testcontainers URL for the integration steps. `prisma generate` does not connect, but the
-  datasource block must resolve, and a variable that is unset only in CI is the classic
-  divergence;
-- **the pnpm store and the Prisma engine download are cached**, keyed on the lockfile, so a cold
-  CI run and a warm one differ in wall time only, never in outcome.
+  Testcontainers URL for the integration steps. `prisma generate` does not connect, but
+  `prisma.config.ts` reads the variable **eagerly**, and a variable that is unset only in CI is
+  the classic divergence;
+- **the pnpm store is cached**, keyed on the lockfile, so a cold CI run and a warm one differ in
+  wall time only, never in outcome.
+
+### 4.4 The typecheck graph — all seven workspaces, one compiler
+
+An earlier draft said the root references "every package", that `pnpm typecheck` is `tsc -b`, and
+that CI typechecks "all workspaces". The review is right that those three statements do not add
+up to the apps being checked. This section makes the graph explicit.
+
+```jsonc
+// tsconfig.json — a solution file, nothing else
+{
+  "files": [],
+  "references": [
+    { "path": "packages/shared" },
+    { "path": "packages/game-data" },
+    { "path": "packages/game-engine" },
+    { "path": "packages/domain" },
+    { "path": "apps/api" },
+    { "path": "apps/worker" }
+  ]
+}
+```
+
+| Workspace | Composite | In the root graph | Typechecked by |
+|---|---|---|---|
+| `packages/shared`, `game-data`, `game-engine`, `domain` | yes | yes | `tsc -b` |
+| `apps/api`, `apps/worker` | **yes** | **yes** | `tsc -b` — the same invocation that builds them |
+| `apps/web` | **no** | **no** | its own `tsc --noEmit` (`pnpm typecheck`, second half) **and** `next build` (§13 check 12) |
+
+**Why the two Node apps are composite projects.** They are ordinary TypeScript programs that emit
+to `dist/` and are started with `node dist/main.js`. Making them reference targets means one
+`tsc -b` checks and builds the whole Node graph in dependency order, with one set of options, and
+a type error in `apps/worker` fails the same command as one in `packages/domain`.
+
+**Why `apps/web` is not.** Next.js manages its own `tsconfig.json` and sets `noEmit: true`. A
+project that disables emit **cannot be a reference target** — TypeScript refuses it
+(`TS6310: Referenced project … may not disable emit`) — and forcing emit on a Next.js app fights
+its toolchain for no gain. So `apps/web` sits outside the solution graph and is checked twice:
+by `tsc --noEmit` in the second half of `pnpm typecheck`, after `tsc -b` has built the
+`packages/shared` declarations it consumes, and again by `next build`, which typechecks by
+default. It *does* reference `packages/shared` in its own `tsconfig`; a `noEmit` project may
+consume references, it just cannot be one.
+
+**One compiler for `api` and `worker`: `tsc -b`. `nest build` is not used.** The NestJS CLI's
+build wraps `tsc` with its own `tsconfig.build.json` handling and has no `--build` mode, so
+adding it means two compilers over one project graph — two sources of truth for what a type error
+is. `tsc -b` already emits everything the apps need, and `node --watch dist/main.js` alongside
+`tsc -b --watch` is the development loop. The Nest CLI remains a dev dependency for schematics
+only.
+
+**Proof, not description.** Test **W13** introduces a type error into each of the **seven**
+workspaces in turn and asserts that `pnpm typecheck` fails every time. A graph description can
+drift; a test that fails when a workspace drops out of the graph cannot.
+
+**TypeScript is pinned** to `~6.0.3` (§3.4); the version is a devDependency of the root, and
+every workspace resolves the same copy through the isolated linker.
 
 ---
 
@@ -629,12 +877,11 @@ The minimum needed to build and prove the 0B primitives. **Do not add gameplay t
 | `Entitlement` | Premium, account-wide | permanent **or** time-bounded; `validFrom`, nullable `validUntil` |
 | `Character` | the avatar | vocation, `retiredAt` nullable |
 | `CharacterStamina` | Stamina state | `remaining`, `mode`, `modeSince`, `updatedAt` |
-| `OccupancyClaim` | one per Character | `characterId` unique; FK to `Activity.id`; `ADR-013` |
-| `Activity` | **shared root** for both families | `id`, `accountId`, `activityTypeKey`, `family`, `createdAt`, `UNIQUE(id, accountId)` |
-| `ActivityType` | validated type registry | `key` PK, `family`, `stamina` classification (§7.3.1) |
-| `ActivityParticipant` | per-Character membership | `(activityId, characterId)` PK, `slotIndex`, `staminaActivatedAt` |
-| `SessionBoundActivity` | Hunt / Dungeon subtype | `accountId` (composite FK), `state`, `claimHolderSessionId`, `graceExpiresAt`, `contentVersion` FK, `rngSeed` |
-| `SkillTrainingActivity` | wall-clock subtype | `characterId`, status ∈ {ACCRUING, ENDED, EXHAUSTED, CANCELLED}, `startedAt`, `lastSettledAt`, `endedAt` |
+| `OccupancyClaim` | one per Character | `characterId` PK; `activityId`; composite FK `(activityId, characterId) → ActivityParticipant` — a claim can only name a participant of the activity it claims; `ADR-013` |
+| `Activity` | **shared root** for both families | `id`, `accountId`, `activityTypeKey`, `family`, **`contentVersion` FK `ON DELETE RESTRICT`, NOT NULL** (`ADR-011` — *every* Activity pins), `createdAt`; `UNIQUE(id, accountId)`, `UNIQUE(id, family)` |
+| `ActivityParticipant` | per-Character membership — the **durable roster snapshot**, retained after the Activity ends | `(activityId, characterId)` PK, `family` (projection, composite FK to `Activity`), `slotIndex`, `staminaActivatedAt` |
+| `SessionBoundActivity` | Hunt / Dungeon subtype | `accountId` (composite FK), `state`, `claimHolderSessionId`, `graceExpiresAt`, `rngSeed` |
+| `SkillTrainingActivity` | wall-clock subtype | status ∈ {ACCRUING, ENDED, EXHAUSTED, CANCELLED}, `startedAt`, `lastSettledAt`, `endedAt` — **no Character column**: the trainee is the activity's single participant row |
 | `ActiveUseTimer` | reusable duration state | `remainingDuration`, `qualifyingSince` |
 | `IdempotencyRecord` | client command keys | scope, fingerprint, result reference |
 | `SettlementOperation` | deterministic settlement ids | uniqueness target |
@@ -642,8 +889,11 @@ The minimum needed to build and prove the 0B primitives. **Do not add gameplay t
 | `ContentBundle` | **bundle metadata** — `version` (PK), `checksum`, `publishedAt`, `location` | one row per published bundle; **not** a reference count |
 | `_prisma_migrations` | migration metadata | Prisma-managed |
 
+`ActivityType` is **not** in this table, and an earlier draft's listing of it there was the
+ambiguity the review flagged: the activity-type registry is **code**, not a table — §7.3.2.
+
 **Deliberately absent from 0B:** `ItemInstance`, custody scopes, `MarketListing`, Skills,
-Progression, Wheel, Skill Tree, Hunt/Room/Creature tables. They belong to the phases that use
+Progression, Wheel, Skill Tree, Hunt/Room/Creature tables, and any `ActivityType` table. They belong to the phases that use
 them. `ItemInstance` in particular is Phase 3 — `ADR-004`'s custody invariant is specified but
 not yet built, and §6.6 traces that honestly.
 
@@ -656,33 +906,47 @@ the lifecycles are not collapsed into one behaviour.
 ```text
 Activity            id  PK
                     accountId              FK → Account
-                    activityTypeKey        FK → ActivityType.key      ← resolves the descriptor
-                    family ∈ {SESSION_BOUND, WALL_CLOCK}              ← derived from the type,
-                                                                        stored for cheap filtering
+                    activityTypeKey        String — validated against the code registry (§7.3.2)
+                    family ∈ {SESSION_BOUND, WALL_CLOCK}              ← projection of the descriptor
+                    contentVersion         FK → ContentBundle.version  ON DELETE RESTRICT, NOT NULL
+                                                                      ← ADR-011: EVERY Activity pins
                     createdAt
                     UNIQUE (id, accountId)                            ← composite FK target
+                    UNIQUE (id, family)                               ← composite FK target
 
    ├── SessionBoundActivity   activityId  PK, FK → Activity.id
    │                          accountId                               ← see "no drift" below
    │                          state ∈ {ONLINE_ACTIVE, RECONNECT_GRACE_PAUSED, ACTIVITY_ENDED}
    │                          claimHolderSessionId, graceExpiresAt, rngSeed
-   │                          contentVersion  FK → ContentBundle.version  ON DELETE RESTRICT
    │                          FOREIGN KEY (activityId, accountId) → Activity(id, accountId)
    │
    └── SkillTrainingActivity  activityId  PK, FK → Activity.id
-                              characterId FK → Character
                               status ∈ {ACCRUING, ENDED, EXHAUSTED, CANCELLED}
                               startedAt, lastSettledAt, endedAt
+                              (no characterId — the trainee is the single participant row)
 
 ActivityParticipant  activityId  FK → Activity.id
                      characterId FK → Character
+                     family                                 ← projection; kept honest by the FK below
                      slotIndex
-                     staminaActivatedAt  Instant | null    ← per-Character, ADR-014
+                     staminaActivatedAt  Instant | null     ← per-Character, ADR-014
                      PRIMARY KEY (activityId, characterId)
+                     FOREIGN KEY (activityId, family) → Activity(id, family)
+                     UNIQUE (activityId) WHERE family = 'WALL_CLOCK'   ← exactly one trainee
+                     — retained after the Activity ends: the durable roster snapshot
 
 OccupancyClaim       characterId  PK, UNIQUE                ← I13, one per Character
                      activityId   FK → Activity.id
+                     FOREIGN KEY (activityId, characterId) → ActivityParticipant(activityId, characterId)
+                                                            ← a claim names a participant, or nothing
+                     — released (deleted) when the Activity ends
 ```
+
+**Three composite foreign keys, one pattern.** Wherever this model stores a projection of another
+row's fact — `accountId` and `family` on the subtype and participant rows — it is chained back to
+the source row by a composite foreign key, so the projection cannot be written with a value the
+source does not have. The alternative, a plain duplicated column kept honest by discipline, is how
+projections drift.
 
 #### Why `accountId` is on both, and why it cannot drift
 
@@ -701,34 +965,60 @@ A row whose `accountId` differs from its root's cannot be inserted or updated in
 the database rejects it. The duplication is a projection the database itself keeps honest, not a
 denormalisation someone has to remember to maintain.
 
-In Prisma 7.10:
+In Prisma 7.10, with the `partialIndexes` preview feature (§3.8):
 
 ```prisma
 model Activity {
-  id              String   @id
+  id              String         @id
   accountId       String
-  activityTypeKey String
+  activityTypeKey String                       // validated against the code registry, §7.3.2
   family          ActivityFamily
+  contentVersion  String                       // NOT NULL — every Activity pins (ADR-011)
   createdAt       DateTime
+  bundle          ContentBundle  @relation(fields: [contentVersion], references: [version], onDelete: Restrict)
   sessionBound    SessionBoundActivity?
-  @@unique([id, accountId])          // composite FK target
+  skillTraining   SkillTrainingActivity?
+  participants    ActivityParticipant[]
+  @@unique([id, accountId])                    // composite FK target
+  @@unique([id, family])                       // composite FK target
+  @@index([activityTypeKey, family])           // §7.3.2 startup reconciliation
 }
 
 model SessionBoundActivity {
-  activityId  String  @id
+  activityId  String            @id
   accountId   String
   state       SessionBoundState
   // …
   activity Activity @relation(fields: [activityId, accountId], references: [id, accountId])
 
-  @@unique([accountId], where: { state: { in: [ONLINE_ACTIVE, RECONNECT_GRACE_PAUSED] } })
-  //  ^ partial unique index — I9. Requires the partialIndexes preview feature (§3.8)
+  @@unique([accountId], where: raw("state IN ('ONLINE_ACTIVE', 'RECONNECT_GRACE_PAUSED')"))
+  //  ^ partial unique index — I9. raw(): the object form has no IN (§3.8)
+}
+
+model ActivityParticipant {
+  activityId         String
+  characterId        String
+  family             ActivityFamily
+  slotIndex          Int
+  staminaActivatedAt DateTime?
+  activity  Activity  @relation(fields: [activityId, family], references: [id, family])
+  claim     OccupancyClaim?
+  @@id([activityId, characterId])
+  @@unique([activityId], where: raw("family = 'WALL_CLOCK'"))
+  //  ^ a wall-clock activity has exactly one participant — the trainee
+}
+
+model OccupancyClaim {
+  characterId String  @id
+  activityId  String
+  participant ActivityParticipant @relation(fields: [activityId, characterId], references: [activityId, characterId])
 }
 ```
 
-The predicate names the **non-terminal states explicitly** rather than negating a terminal one,
-so adding a future terminal state cannot silently widen it. **Test D10** fails if two
-non-terminal session-bound activities for one account can coexist.
+The I9 predicate names the **non-terminal states explicitly** rather than negating a terminal
+one, so adding a future terminal state cannot silently widen it. **Test D10** fails if two
+non-terminal session-bound activities for one account can coexist, and **test D13** asserts that
+the **generated migration SQL** — not the schema file — carries each `WHERE` clause.
 
 #### `activityTypeKey` — family is not a substitute for type
 
@@ -737,8 +1027,11 @@ from a future session-bound type, and §7.3.1's stamina classification is a prop
 **type**, not the family.
 
 So `Activity.activityTypeKey` is the canonical key resolving to a validated
-`ActivityTypeDescriptor`. `family` is stored alongside as a derived, cheap filter — the
-descriptor remains the source of truth, and a mismatch between them fails registry validation.
+`ActivityTypeDescriptor` in the **code registry** of §7.3.2 — there is no `ActivityType` table.
+`family` is stored alongside as a projection of the descriptor, written in the creating
+transaction and used as a cheap filter and as a composite-FK target; the descriptor remains the
+source of truth, and §7.3.2's startup reconciliation (**T16**) refuses to start the process if
+any persisted key is unknown to the registry or carries a family the registry disagrees with.
 
 #### `ActivityParticipant` — per-Character stamina activation
 
@@ -754,19 +1047,50 @@ row, which is not a model.
 - nothing else. **Phase 0B stores and reads the flag; Phase 2 decides what raises it**, because
   that requires the qualifying-XP rule and its reward loop.
 
-**Relationship to occupancy claims.** They are different things at different grains:
+**Relationship to occupancy claims.** They are different things at different grains, with
+different lifetimes:
 
 | | `ActivityParticipant` | `OccupancyClaim` |
 |---|---|---|
 | Grain | one row per Character **per activity** | one row per Character, **globally** |
-| Answers | "who is in this activity, and are they activated?" | "is this Character busy, and with what?" |
-| Cardinality | many per activity | **exactly one per Character** (I13) |
+| Answers | "who was in this activity, in which slot, and were they activated?" | "is this Character busy right now, and with what?" |
+| Cardinality | many per activity (exactly one for a wall-clock activity) | **exactly one per Character** (I13) |
+| Lifetime | **as long as the Activity row exists** — it is the durable roster snapshot | **while the Activity is live** |
 
 Starting an activity writes both, in the same transaction: a participant row per Character and a
-claim per Character. Ending it deletes both. A Character can never have two claims, so it can
-never be a participant in two live activities.
+claim per Character. **Ending it releases the claims and keeps the participant rows.** An earlier
+draft said ending "deletes both", which contradicted the accepted persistence model — `ADR-002`
+and `DATA_ARCHITECTURE.md` §7 have the Activity persist its **roster snapshot** for history,
+replay and support, and a snapshot that vanishes at the end of the thing it snapshots is not one.
+The review was right to block.
 
-**Test T15** proves two Characters in one activity hold **independent** activation state.
+The claim is the *occupancy* fact and is gone the instant the Character is free; the participant
+row is the *history* fact and stays for as long as the Activity itself is retained. Any later
+removal of participant rows is part of the **retention or archive operation** that removes the
+Activity — the same operation §7.7 names for content references — and no such operation is
+authorized by this specification. A Character can never have two claims, so it can never be a
+participant in two *live* activities; it can, of course, appear in the snapshots of many *ended*
+ones.
+
+**Test O14** proves that ending an activity releases every claim and preserves every participant
+row. **Test T15** proves two Characters in one activity hold **independent** activation state.
+
+**The Skill Training trainee is the participant row — there is no second Character column.** An
+earlier draft carried both `SkillTrainingActivity.characterId` and `ActivityParticipant.characterId`
+with nothing relating them: two unconstrained ids that could disagree. The review was right.
+This model keeps **one** representation and makes the rest structural:
+
+- `SkillTrainingActivity` has no Character column at all; *who is training* is answered by the
+  activity's participant row;
+- a wall-clock activity has **exactly one** participant, enforced by the partial unique index
+  `UNIQUE (activityId) WHERE family = 'WALL_CLOCK'` — a second trainee is unrepresentable;
+- an `OccupancyClaim` carries a composite foreign key to `ActivityParticipant(activityId,
+  characterId)`, so a claim can only name a Character who is a participant of the activity it
+  claims. The reconciliation sweeper therefore reads the trainee **through** the claim and the
+  participant row, never from a column that could have drifted.
+
+**Test D11** proves a claim naming a non-participant is refused by the database; **test D12**
+proves a second participant on a wall-clock activity is refused by the index.
 
 #### Skill Training lifecycle — every status classified
 
@@ -796,10 +1120,12 @@ must be durable for the reconciliation contract of §7.2 to mean anything.
 **What 0B's Skill Training state does *not* need:** training rates, Exercise Weapon economy,
 skill progression formulas, or any balance value. Those are Phase 4.
 
-**What it does need:** durable identity, Character owner, lifecycle status, start/end/exhaust/
-cancel transitions sufficient for reconciliation, server timestamps proving the wall-clock
-lifecycle, occupancy acquire/release semantics, and **no Base-XP capability** (invariant I10 —
-the training settlement port has no progression method).
+**What it does need:** durable identity, its single participant row (the trainee), a pinned
+`contentVersion` on the Activity root so the training it started remains reproducible against
+the content it started with (`ADR-011`, **C9**), lifecycle status, start/end/exhaust/cancel
+transitions sufficient for reconciliation, server timestamps proving the wall-clock lifecycle,
+occupancy acquire/release semantics, and **no Base-XP capability** (invariant I10 — the training
+settlement port has no progression method).
 
 ### 6.3.2 The account activity claim holder
 
@@ -842,8 +1168,10 @@ for anything that can be raced.
 | I1 | One **playable (non-retired)** Character per vocation per account | **partial unique index** on `(accountId, vocation)` with the predicate `WHERE "retiredAt" IS NULL` — declared in `schema.prisma` via Prisma's `where` argument (§3.8), no raw SQL |
 | I2 | `count(playable characters) ≤ rosterCapacity ≤ 5` | transaction + `CHECK (rosterCapacity BETWEEN 1 AND 5)`; the count is verified inside the creating transaction |
 | I7 | Settlement idempotent under its operation id | **unique constraint** on `SettlementOperation.operationId` |
-| I9 | One Session holds an account's Activity claim | **partial unique index** on `SessionBoundActivity(accountId)` with the predicate `WHERE state IN ('ONLINE_ACTIVE', 'RECONNECT_GRACE_PAUSED')` — declared with Prisma's `where` argument (§3.8) + compare-and-swap transfer |
-| I13 | One occupancy claim per Character | **unique constraint** on `OccupancyClaim.characterId` |
+| I9 | One Session holds an account's Activity claim | **partial unique index** on `SessionBoundActivity(accountId)` with the predicate `WHERE state IN ('ONLINE_ACTIVE', 'RECONNECT_GRACE_PAUSED')` — declared as `where: raw(…)` in `schema.prisma` (§3.8), generated into the migration by Prisma Migrate (D13) + compare-and-swap transfer |
+| I13 | One occupancy claim per Character | **unique constraint** on `OccupancyClaim.characterId`; the claim's composite FK to `ActivityParticipant` makes it name a participant or nothing (D11) |
+| — | A wall-clock activity has exactly one participant (§6.3.1) | **partial unique index** on `ActivityParticipant(activityId)` `WHERE family = 'WALL_CLOCK'` — `raw()` form (D12) |
+| — | Every Activity pins a content version (`ADR-011`) | `Activity.contentVersion` **NOT NULL** + FK `ON DELETE RESTRICT` (C9) |
 | I15 | Duration never consumed outside a qualifying state | **interface capability** — only a state transition writes `qualifyingSince` |
 | I16 | A **referenced** content bundle is never deleted | **FK `ON DELETE RESTRICT`** from every durable reference — the database refuses. An **un**referenced bundle may be removed through the explicit audited cleanup path (§7.7) |
 | I5 | Balance projection reconciles to the ledger | transaction + **reconciliation job** |
@@ -862,9 +1190,13 @@ has not read `ADR-003`.
   state** — both are CI checks (§13).
 - Migrations run as a **separate step before** the application starts, never at boot.
 - `/health/ready` fails on a migration-version mismatch (§10).
-- **Raw SQL is authorized for the ledger role grants only** (§3.8). Partial indexes are
-  declarative in `schema.prisma` and are **not** hand-written. The one raw-SQL migration carries
-  a comment naming the invariant it enforces (I6).
+- **Hand-written migration SQL is authorized for the ledger role grants only** (§3.8). Partial
+  indexes are declared in `schema.prisma` — in the object form where it fits and as `raw("…")`
+  predicates where it does not — and **Prisma Migrate generates their SQL**. A `raw()` predicate
+  in the schema is a declaration, not a hand-edited migration, and the distinction is what D13
+  checks: the migration-check script asserts the generated `CREATE UNIQUE INDEX … WHERE (…)`
+  statements exist with the declared predicates. The one hand-written migration carries a comment
+  naming the invariant it enforces (I6).
 
 ### 6.6 Invariant trace — what 0B proves and what it defers
 
@@ -881,9 +1213,9 @@ governs. Stating that honestly is more useful than a checklist that overclaims.
 | I9 one account activity claim | **proven** — A1–A3, **D10** (the index itself refuses the second non-terminal activity) |
 | I10 Skill Training cannot write Base XP | **proven structurally** — the port has no such method |
 | I12 no hard delete of a Character | **proven** — no delete path exists |
-| I13 one occupancy claim per Character | **proven** — O1–O13, the last of which proves the reconciliation rule is total over every persisted Skill Training status |
+| I13 one occupancy claim per Character | **proven** — O1–O14 and D11: O13 proves the reconciliation rule is total over every persisted Skill Training status, O14 that ending releases claims while keeping the roster snapshot, D11 that a claim can only name a participant |
 | I15 duration only consumed while qualifying | **proven** — T1–T11 |
-| I16 referenced bundle never deleted | **proven** — C4 for the refusal, **C7 and C8** for the crash window and the reconciliation asymmetry |
+| I16 referenced bundle never deleted | **proven** — C4 for the refusal, **C7 and C8** for the crash window and the reconciliation asymmetry, **C9** that both activity families pin (`ADR-011`) so the refusal covers Skill Training too |
 | **I4 an ItemInstance is in exactly one custody scope** | **ACCEPTED ARCHITECTURE — DEFERRED IMPLEMENTATION.** `ADR-004` is accepted and binding, but `ItemInstance` and custody scopes do not exist in 0B. The invariant is proven by the phase that introduces the item model (Phase 3). **Phase 0B claims no item-duplication coverage.** |
 | I3 Active Party membership rules | deferred to the phase that builds Active Party configuration |
 | **I14 an exhausted Character receives no Hunt reward by any path, including Shared XP** | deferred with the reward loop — §19 forbids building one in 0B, so there is no distribution path to filter. What 0B *does* build is the per-Character state that rule will read: `ActivityParticipant.staminaActivatedAt`, proven independent per participant by **T15** |
@@ -960,7 +1292,9 @@ Semantics:
   thing back, leaving no partial claims;
 - ids are locked in **ascending `characterId` order** so two concurrent party starts touching the
   same Characters cannot deadlock (§8.5);
-- release happens **in the same transaction as the lifecycle transition**, never as a follow-up;
+- release happens **in the same transaction as the lifecycle transition**, never as a follow-up,
+  and releases **claims only** — the activity's `ActivityParticipant` rows are its durable roster
+  snapshot and survive the end of the activity (§6.3.1, O14);
 - reconnect grace **reserves** rather than releases — the activity still exists;
 - `reconcileStranded` releases only claims whose named activity is absent or terminal. Because a
   claim names its activity, this is reconciliation against durable state, not a heuristic.
@@ -1071,7 +1405,31 @@ activity per participant. Phase 0B stores and reads it; **Phase 2 decides what r
 **Registry validation.** Activity type descriptors are validated at startup and in CI. A
 descriptor missing `stamina` **fails validation and the process refuses to start** — the
 fail-fast rule of §11.3 applied to a domain registry. A new activity type cannot be added by
-forgetting to classify it.
+forgetting to classify it. Where the registry lives, and why it is code, is §7.3.2.
+
+### 7.3.2 The activity-type registry — code, with one source of truth
+
+An earlier draft listed `ActivityType` among the persistent concepts *and* described a validated
+runtime registry whose descriptor was "the source of truth". Two writable sources, and the review
+was right to refuse it. **Decision: the registry is code.** There is no `ActivityType` table, no
+`ActivityType` content entry, and `Activity.activityTypeKey` is a plain string column validated
+against the registry.
+
+| Question | Answer |
+|---|---|
+| What is it? | A frozen module, `packages/domain/src/contexts/activity/types/registry.ts`, exporting `ReadonlyMap<ActivityTypeKey, ActivityTypeDescriptor>` |
+| Why code and not a table? | A descriptor's `family` selects **which lifecycle code path runs** and its `stamina` selects **which mode derivation applies**. Those are behaviour, and behaviour is versioned with the code that implements it. A table would let a `UPDATE` change which code path an existing row takes, with no review and no deploy — a second, mutable source of truth for something the code has to agree with anyway |
+| Why code and not versioned content? | `ADR-011` governs **content**: the definitions a type *consumes* — creatures, loot, encounter tables, a Dungeon's floors. Which *kind* of activity exists, and how it occupies and consumes, is not content; it is the shape of the system. A future Dungeon's floors are content; the Dungeon *type* is a descriptor |
+| Does this violate `ADR-011`? | No — it satisfies its spirit. The ADR's rule is that runtime definitions are immutable and versioned rather than mutable database content. A code registry is immutable per deployment and versioned with the repository; a table is precisely the mutable database content the ADR rejects |
+| How is `activityTypeKey` validated on write? | The activity-start transaction resolves the key in the registry **before** writing; an unknown key is a domain error, never a row |
+| How is it validated at startup? | Every descriptor is schema-checked (`family`, `stamina`, `occupiesCharacter` all present and well-formed) — **T12** — and then **reconciled against the database**: `SELECT DISTINCT "activityTypeKey", "family" FROM "Activity"` must yield only keys the registry contains with the same `family`. A persisted key the registry no longer knows, or a family the registry disagrees with, makes **the process refuse to start** — the same fail-fast rule as T12 and §11.3, so `/health/ready`'s four conditions (§12.1) are unchanged and readiness is simply never reached — **T16**. Removing or reclassifying a type that has persisted rows is therefore a fail-fast event, not a silent drift |
+| How can `family` on the row and in the descriptor not drift? | The row's `family` is written from the descriptor in the creating transaction, chained by composite FK to every projection of it (§6.3.1), and reconciled against the registry at every startup. One source, two checks |
+| How is it versioned? | With the code. The key set is **append-only** and a key's `family` is **immutable**: a change of lifecycle is a new key, never an edit. A snapshot test pins the `key → family` table and fails on any change that is not an addition |
+| How is it initialised? | It is a module; importing it is initialising it. Nothing is loaded, seeded or migrated |
+
+**What Phase 0B registers:** Hunt (`SESSION_BOUND`, `STAMINA_CONSUMING`) and Skill Training
+(`WALL_CLOCK`, `STAMINA_RECOVERY_ELIGIBLE`) — the two types whose classification the accepted
+documents state (§7.3.1). Nothing else, and nothing with a default.
 
 ### 7.4 Stamina
 
@@ -1187,12 +1545,16 @@ It carries **no reference count and no pinned flag**. A counter would be a mutab
 that can drift from reality, and a drifted counter is how a referenced bundle gets deleted.
 
 Durable entities **reference a bundle version directly** — in 0B that is
-`SessionBoundActivity.contentVersion`. The pinned set is therefore a **query over those real
-references**:
+**`Activity.contentVersion`**, on the shared root, so that **every** Activity of **either**
+family pins. An earlier draft placed the column on `SessionBoundActivity` only, which left Skill
+Training — an Activity, per `ADR-002` — pinning nothing. `ADR-011` says *"Every Activity pins the
+content version it started with"*, and "every" is not "session-bound". The review was right to
+block; the column moved to the root, `NOT NULL`, `ON DELETE RESTRICT` (§6.3.1), and **C9** proves
+both families pin. The pinned set is therefore a **query over those real references**:
 
 ```sql
-SELECT DISTINCT "contentVersion" FROM "SessionBoundActivity"
--- no lifecycle filter. Future referencing tables UNION into this derivation.
+SELECT DISTINCT "contentVersion" FROM "Activity"
+-- no lifecycle filter. Every durable reference added by a later phase UNIONs into this derivation.
 ```
 
 **No lifecycle filter, deliberately.** An earlier draft restricted the query to non-terminal
@@ -1201,6 +1563,8 @@ contradicting `ADR-016` (*"never garbage-collected while referenced by any persi
 other durable row"*) and breaking the replay and support debugging that pinning exists for.
 
 **Pinned means referenced by any durable row that still exists**, whatever its lifecycle state.
+An `ACTIVITY_ENDED` Hunt and an `EXHAUSTED` Skill Training both keep pinning for as long as their
+`Activity` row — and with it their roster snapshot (§6.3.1) — is retained.
 
 If an ended Activity should stop pinning its bundle, the way to achieve that is a **separately
 defined retention or archive operation that deliberately clears the reference** — not a filter
@@ -1526,33 +1890,36 @@ starts proving something other than what developers run.
 
 | # | Check | Command | Fails on |
 |---|---|---|---|
-| 0 | **Toolchain and install** | `corepack enable`; `actions/setup-node` with `node-version-file: .nvmrc`; `pnpm install --frozen-lockfile` | a Node outside `engines.node` (via `engine-strict`), a pnpm other than `packageManager`, or a lockfile that disagrees with `package.json` |
+| 0 | **Toolchain and install** | `corepack enable`; `actions/setup-node` with `node-version-file: .nvmrc`; `pnpm install --frozen-lockfile` | a Node outside `engines.node` (via `engineStrict`), a pnpm other than `packageManager`, a lockfile that disagrees with `package.json`, or a dependency install script not listed under `allowBuilds` |
 | 1 | Format check | `pnpm format:check` | unformatted files |
 | 2 | Lint | `pnpm lint` | lint errors |
 | 3 | **Dependency boundaries** | `pnpm boundaries` | any forbidden edge in §5.2 |
 | 4 | **Prisma client generation** | `pnpm generate` | a schema that cannot generate a client |
-| 5 | Typecheck — all workspaces | **`pnpm typecheck`** (= `tsc -b`) | type errors anywhere in the composite graph |
+| 5 | Typecheck — **all seven workspaces** | **`pnpm typecheck`** (= `tsc -b` over the six composite projects, then `apps/web`'s `tsc --noEmit`; §4.4) | a type error in any workspace — W13 proves each of the seven is covered |
 | 6 | Unit tests | `pnpm test` — unit project | failures |
 | 7 | **Deterministic engine fixtures** | `pnpm test` — fixtures project | non-reproducible output for the same seed |
 | 8 | **Content validation** | `pnpm --filter @global-idle/game-data run validate` | invalid content bundle |
-| 9 | **Migration validation** | `pnpm --filter @global-idle/domain run migrate:check` | migrations failing from empty **or** from the previous state |
+| 9 | **Migration validation** | `pnpm --filter @global-idle/domain run migrate:check` | migrations failing from empty **or** from the previous state, or generated SQL missing any declared partial-index predicate (D13) |
 | 10 | Integration tests (Testcontainers: PostgreSQL + Redis) | `pnpm test:integration` | failures |
 | 11 | **Economy invariant tests** | `pnpm test:invariants` | currency double-spend under concurrency, non-idempotent replay, ledger mutation, reconciliation drift |
-| 12 | App builds (`web`, `api`, `worker`) | `pnpm build` | build errors |
+| 12 | App builds (`web`, `api`, `worker`) | `pnpm build` (= `generate`, `tsc -b`, `next build`) | build errors — `next build` typechecks `apps/web` a second time |
 
 Thirteen checks, numbered 0–12.
 
-**Check 5 is `tsc -b`, not `tsc --noEmit`.** An earlier draft of this table said `--noEmit`, which
-contradicted §3.3: project references resolve against **emitted declarations**, so a no-emit pass
-has nothing to typecheck the graph against. The review was right that the two claims could not
-both stand; §4.3 records the correction and the script that replaces it.
+**Check 5 is `tsc -b` plus the web app's own check, not `tsc --noEmit` at the root.** An
+earlier draft of this table said `--noEmit`, which contradicted §3.3: project references resolve
+against **emitted declarations**, so a root no-emit pass has nothing to typecheck the graph
+against. A later draft said `tsc -b` alone, which left the apps' membership in the graph unstated.
+§4.4 records both corrections: six composite projects in the solution file, `apps/web` checked by
+its own `tsc --noEmit` because a `noEmit` project cannot be a reference target, and **W13** as the
+proof that all seven are covered.
 
 **Check 4 is a check, not a hidden setup step.** Generation is listed on its own line so a schema
 that cannot generate fails *there*, plainly, instead of surfacing as a confusing unresolved-module
 error inside check 5.
 
-**Check 0 is a check too.** `engine-strict`, `packageManager` and `--frozen-lockfile` turn the
-§3.10 contract into three ways for the build to stop, rather than three sentences in a document.
+**Check 0 is a check too.** `engineStrict`, `packageManager`, `allowBuilds` and `--frozen-lockfile` turn the
+§3.10 contract into four ways for the build to stop, rather than four sentences in a document.
 
 Check 11 is a **category of its own**, not ordinary unit tests. `AGENTS.md` §6 warns that green
 CI does not prove game correctness; these are the part of correctness CI genuinely can prove, and
@@ -1566,23 +1933,23 @@ deliberately absent from 0B (§6.3), so there is no item to duplicate. See §6.6
 
 ---
 
-## 14. Test matrix — **79 cases**
+## 14. Test matrix — **86 cases**
 
 Every row is required. `§` references the contract it proves.
 
 | Group | Cases | Count |
 |---|---|---|
-| 14.1 Workspace and boundaries | W1–W12 | 12 |
-| 14.2 Database | D1–D10 | 10 |
-| 14.3 Occupancy | O1–O13 | 13 |
+| 14.1 Workspace and boundaries | W1–W13 | 13 |
+| 14.2 Database | D1–D13 | 13 |
+| 14.3 Occupancy | O1–O14 | 14 |
 | 14.4 Activity claim | A1–A6 | 6 |
-| 14.5 Timers and Stamina | T1–T15 | 15 |
+| 14.5 Timers and Stamina | T1–T16 | 16 |
 | 14.6 Idempotency | I1–I4 | 4 |
 | 14.7 Redis | R1–R3 | 3 |
-| 14.8 Content | C1–C8 | 8 |
+| 14.8 Content | C1–C9 | 9 |
 | 14.9 Health | H1–H5 | 5 |
 | 14.10 Engine | E1–E3 | 3 |
-| | **Total** | **79** |
+| | **Total** | **86** |
 
 The table is not decoration: §16 criterion 18 and the pull request both state a number, and a
 number nobody can re-derive is a number that drifts.
@@ -1609,6 +1976,7 @@ number nobody can re-derive is a number that drifts.
 | W10 | `apps/worker` importing anything under `apps/api` fails, and vice versa |
 | W11 | Importing a `domain` context internal rather than its `index.ts` fails |
 | W12 | **From a clean checkout**, `pnpm install && pnpm build && pnpm test` succeeds; tests resolve packages through their built `exports` |
+| W13 | **All seven workspaces are typechecked**: a type error introduced into each of `packages/{shared,game-data,game-engine,domain}` and `apps/{api,worker,web}` in turn makes `pnpm typecheck` fail — the six through `tsc -b`, `apps/web` through its own `tsc --noEmit` (§4.4) |
 
 ### 14.2 Database
 
@@ -1624,6 +1992,9 @@ number nobody can re-derive is a number that drifts.
 | D8 | `count(playable) ≤ rosterCapacity` holds under concurrent creation |
 | D9 | The application role cannot `UPDATE` or `DELETE` a ledger row |
 | D10 | Two **non-terminal** session-bound activities on one account cannot coexist — the second insert is rejected by the partial unique index, not by application code (invariant I9, §6.3.1). A row moved to `ACTIVITY_ENDED` frees the account for a new one |
+| D11 | An `OccupancyClaim` naming a Character who is **not** an `ActivityParticipant` of the claimed activity is refused by the composite foreign key (§6.3.1). The Skill Training trainee therefore has one representation, and a claim cannot drift from it |
+| D12 | A **second participant row on a wall-clock activity** is refused by the partial unique index `UNIQUE (activityId) WHERE family = 'WALL_CLOCK'`; a session-bound activity accepts several (§6.3.1) |
+| D13 | **Migration-generation validation**: the SQL Prisma Migrate generated for the current schema contains a `CREATE UNIQUE INDEX … WHERE` statement for each declared partial index — I1 (`"retiredAt" IS NULL`), I9 (`state IN ('ONLINE_ACTIVE', 'RECONNECT_GRACE_PAUSED')`) and the wall-clock cardinality index (`family = 'WALL_CLOCK'`) — asserted against the migration files, not the schema (§3.8, §6.5). D10 and D12 then prove the generated indexes enforce what they declare |
 
 ### 14.3 Occupancy
 
@@ -1642,6 +2013,7 @@ number nobody can re-derive is a number that drifts.
 | O11 | Restart reconciliation **releases** a claim whose training is `ENDED`, `EXHAUSTED` or `CANCELLED` |
 | O12 | Restart reconciliation **releases** a claim whose named activity row is absent |
 | O13 | The reconciliation rule is **total over every Skill Training status**: the test enumerates `ACCRUING`, `ENDED`, `EXHAUSTED`, `CANCELLED` from the persisted enum itself and asserts a preserve/release outcome for each. A status added to the enum without a reconciliation rule **fails this test** rather than being silently unhandled (§6.3.1) |
+| O14 | **Ending an activity releases occupancy and preserves the roster snapshot**: after a Hunt ends and after a Skill Training reaches each terminal status, every `OccupancyClaim` it held is gone and every `ActivityParticipant` row — slot order and `staminaActivatedAt` included — is still present and unchanged (§6.3.1, §7.2) |
 
 ### 14.4 Activity claim
 
@@ -1673,6 +2045,7 @@ number nobody can re-derive is a number that drifts.
 | T13 | **Knight hunting + Druid training**: the Druid holds an occupancy claim **and** is `RECOVERING`; the Knight is `NEUTRAL` before activation and `CONSUMING` after |
 | T14 | A `STAMINA_CONSUMING` activity in `RECONNECT_GRACE_PAUSED` is `NEUTRAL` |
 | T15 | Two Characters in **one** session-bound activity hold **independent** `staminaActivatedAt` (§6.3.1): activating one leaves the other `NEUTRAL`, each settles from its own marker, and neither participant row is written by the other's activation |
+| T16 | **Registry ↔ database reconciliation** (§7.3.2): with an `Activity` row whose `activityTypeKey` the registry does not contain, or whose stored `family` differs from the registry's descriptor, **the process refuses to start** (the same startup path as T12 — readiness is never reached and its four conditions are untouched); with every persisted key known and agreeing, it starts. A persisted type cannot be silently removed or reclassified |
 
 ### 14.6 Idempotency
 
@@ -1700,9 +2073,10 @@ number nobody can re-derive is a number that drifts.
 | C3 | A **historical pinned** bundle resolves after the current bundle advances **and after a process restart** — not from a warmed in-memory cache |
 | C4 | The cleanup path **refuses to delete a referenced bundle** — refused by the foreign key, with cleanup code removed from the equation; it deletes an unreferenced one and logs what it removed |
 | C5 | An unlock set without exactly five keys fails validation |
-| C6 | The pinned set is derived by querying real references; there is no reference-count column to drift |
+| C6 | The pinned set is derived by querying real references — `SELECT DISTINCT "contentVersion" FROM "Activity"`, both families — and there is no reference-count column to drift |
 | C7 | **The crash window** (§7.7): with the metadata delete committed and the file delete not yet run, the bundle is absent from the pinned derivation, no referenced bundle lost its file, and the next reconciliation pass removes the orphan. Crashing *before* the commit leaves row and file both intact |
 | C8 | **Reconciliation asymmetry** (§7.7): a file with no `ContentBundle` row is removed and logged; a row with no file is **never** deleted — it is reported as an incident. The test fails if reconciliation ever deletes a row to resolve a missing artifact |
+| C9 | **Every Activity pins** (`ADR-011`): an `Activity` of either family cannot be inserted without a `contentVersion`; a Skill Training activity's bundle is refused deletion exactly as a Hunt's is; after the current bundle advances and the process restarts, `resolve(activity.contentVersion)` still succeeds for the Skill Training activity (§7.7, §6.3.1) |
 
 ### 14.9 Health
 
@@ -1730,12 +2104,18 @@ Eleven packages. The ordering differs from the suggested one in exactly two plac
 justified.
 
 ```text
-0B.1 ──► 0B.2 ──┬──► 0B.3 ──► 0B.4 ──┬──► 0B.6
-                │                     └──► 0B.5
-                ├──► 0B.7
+0B.1 ──► 0B.2 ──┬──► 0B.3 ──┬──► 0B.4 ──┬──► 0B.6
+                │           │           └──► 0B.5
+                │           └──► 0B.7
                 └──► 0B.8 ──► 0B.9
                                  └──► 0B.10 ──► 0B.11
 ```
+
+Every package's acceptance tests are **executable at the end of that package** — nothing a
+package accepts depends on a later one. An earlier draft broke this twice (0B.2 proved a
+generated client against a schema that arrived in 0B.3; 0B.7 asserted foreign-key refusals
+against `Activity` rows that did not exist until 0B.3), and the review was right to block. Both
+are fixed by the 0B.2 / 0B.3 / 0B.7 boundaries below.
 
 **Deviation 1 — 0B.10 (CI) starts early, alongside 0B.1.** Standing CI up at the end means all
 thirteen checks light up red at once, against a large diff. The skeleton workflow
@@ -1743,9 +2123,12 @@ thirteen checks light up red at once, against a large diff. The skeleton workflo
 by the package that makes them meaningful. `ADR-012` requires boundary rules in the first commit
 anyway, and a rule nothing runs is a comment.
 
-**Deviation 2 — 0B.7 (content) does not block 0B.4/0B.5/0B.6.** The domain primitives do not
-depend on content; only `/health/ready` does. Running them in parallel shortens the critical
-path with no coupling cost.
+**Deviation 2 — 0B.7 (content) does not block 0B.4/0B.5/0B.6, and follows 0B.3 rather than
+0B.2.** The domain primitives do not depend on content; only `/health/ready` does, so 0B.7 runs in
+parallel with them. It follows **0B.3**, not 0B.2, because C4 and C6–C9 assert the database's
+refusal to delete a *referenced* bundle, and a reference is an `Activity` row — which exists only
+once 0B.3's schema does. Those tests insert `Activity` rows directly; they do not need 0B.6's
+activity service.
 
 ---
 
@@ -1753,12 +2136,14 @@ path with no coupling cost.
 
 **Goal.** A workspace that cannot violate its own boundaries.
 
-**Files.** `pnpm-workspace.yaml`, root `package.json` (with **`engines.node`** and
-**`packageManager`**, §3.10, and the script block of §4.3), `.npmrc` (`node-linker=isolated`,
-`shamefully-hoist=false`, `engine-strict=true`), `.nvmrc`, `tsconfig.base.json`, root
-`tsconfig.json`, flat ESLint config, `.prettierrc`, `.dependency-cruiser.cjs`,
-`vitest.workspace.ts`, `.gitignore` (ignoring `dist/`, `*.tsbuildinfo`,
-`packages/domain/generated/`), `.env.example`.
+**Files.** `pnpm-workspace.yaml` (workspace list **and** the pnpm settings of §3.10:
+`nodeLinker`, `shamefullyHoist`, `engineStrict`, `allowBuilds`), root `package.json` (`"type":
+"module"`, **`engines.node` = `>=24.21.0 <25`**, **`packageManager` = `pnpm@12.5.1`**,
+`typescript@~6.0.3`, and the script block of §4.3), `.nvmrc` (`24.21.0`), `tsconfig.base.json`
+(§3.4), root `tsconfig.json` (the solution file of §4.4), `eslint.config.js`, `.prettierrc`,
+`.dependency-cruiser.cjs`, `vitest.config.ts` (`test.projects`, §3.7), `.gitignore` (ignoring
+`dist/`, `*.tsbuildinfo`, `packages/domain/src/generated/`), `.env.example` (documenting
+`DATABASE_URL`).
 
 **Prerequisites.** None.
 
@@ -1766,7 +2151,7 @@ path with no coupling cost.
 `pnpm boundaries` all run and pass on an otherwise empty workspace.
 
 **Done when.** A deliberately-added forbidden import fails `pnpm boundaries` locally and in CI,
-**and** installing under a Node outside `>=24.11.0 <25` fails rather than warns (§16 criterion 5b).
+**and** installing under a Node outside `>=24.21.0 <25` fails rather than warns (§16 criterion 5b).
 
 ---
 
@@ -1776,20 +2161,27 @@ path with no coupling cost.
 
 **Files.** `apps/web` (Next.js), `apps/api` (NestJS adapters + composition root), `apps/worker`
 (BullMQ consumers + composition root), `packages/shared`, `packages/domain` (context
-directories), `packages/game-data`, `packages/game-engine` — each with `package.json`,
-`tsconfig.json` (`composite: true` for packages), and a trivial entry point. Root `tsconfig.json`
-with `references`.
+directories), `packages/game-data`, `packages/game-engine` — each with `package.json` (`"type":
+"module"`), `tsconfig.json` (`composite: true` for the packages and the two Node apps, §4.4), and
+a trivial entry point. **The Prisma generator and configuration land here**, so the clean-build
+proof is executable at the end of this package: `packages/domain/prisma/schema.prisma` with the
+generator block and datasource of §4.3 and **exactly one model, `ContentBundle`** — the leaf every
+later reference points at, with no foreign keys of its own — plus `packages/domain/prisma.config.ts`
+and `src/platform/prisma/client.ts`. **No migration** is written in 0B.2; migrations are 0B.3's,
+and the first one covers every model.
 
 **Prerequisites.** 0B.1.
 
-**Acceptance.** W6–W8, **W10–W12**, E3. All three apps build and start. Both apps reach the
+**Acceptance.** W6–W8, **W10–W13**, E3. All three apps build and start. Both apps reach the
 domain only through `packages/domain`; neither can import the other.
 
 **Done when.** **W12 passes from a clean checkout** — `pnpm install && pnpm build && pnpm test`,
-with `packages/domain/generated/` absent beforehand — and `tsc -b` builds the packages in
-dependency order. The `#prisma-client` subpath import of §4.3 is wired in this package, even
-though the schema it points at arrives in 0B.3, so the resolution model is proven before anything
-depends on it.
+with `packages/domain/src/generated/` absent beforehand and **no database reachable** — and
+`tsc -b` builds the six composite projects in dependency order, compiling the generated
+`ContentBundle` client along with the hand-written source. **W13 passes**: a type error in any of
+the seven workspaces fails `pnpm typecheck`. An earlier draft proved the generated client here
+against a schema that only arrived in 0B.3; the review was right that that could not be executed
+at the end of 0B.2.
 
 ---
 
@@ -1797,20 +2189,24 @@ depends on it.
 
 **Goal.** A schema whose constraints enforce the load-bearing invariants.
 
-**Files.** `packages/domain/prisma/schema.prisma` with the `partialIndexes` preview feature and
-the explicit `output` of §4.3; the `Activity` root plus `SessionBoundActivity`,
-`SkillTrainingActivity`, `ActivityParticipant` and `OccupancyClaim` (§6.3.1); the account claim
-holder (§6.3.2); initial migrations with **I1 and I9 declared in the schema** and **raw SQL only
-for the ledger role grants** (I6); the `prisma:generate` and `migrate:check` scripts of §4.3.
+**Files.** The rest of `packages/domain/prisma/schema.prisma`: every model of §6.3 beyond
+`ContentBundle` — the `Activity` root with its `contentVersion` FK, `SessionBoundActivity`,
+`SkillTrainingActivity`, `ActivityParticipant` and `OccupancyClaim` with their composite foreign
+keys (§6.3.1); the account claim holder (§6.3.2); the **initial migration** covering every model,
+with **I1, I9 and the wall-clock cardinality index declared in the schema** (object form and
+`raw()`, §3.8) and **hand-written SQL only for the ledger role grants** (I6); the `migrate:check`
+script of §4.3, including its generated-SQL assertion (D13).
 
 **Prerequisites.** 0B.2.
 
-**Acceptance.** D1–D10.
+**Acceptance.** D1–D13.
 
 **Done when.** Migrations apply from empty and from the previous state; D4 and D5 both pass —
-duplicate playable vocation rejected, retired vocation reusable — **D10 passes** with the second
-non-terminal session-bound activity rejected by the index rather than by application code — and D9
-confirms the application role cannot mutate a ledger row.
+duplicate playable vocation rejected, retired vocation reusable; **D10, D11 and D12 pass** — the
+second non-terminal session-bound activity, the claim naming a non-participant, and the second
+wall-clock participant are each rejected by the database rather than by application code; **D13
+passes** — the generated migration SQL carries every declared predicate; and D9 confirms the
+application role cannot mutate a ledger row.
 
 ---
 
@@ -1838,20 +2234,22 @@ isolation, and the ledger reconciles.
 
 **Files.** `packages/domain/src/platform/clock` (`Clock`, `SystemClock`, `FakeClock` with
 backwards support, `MonotonicSource`); `packages/domain/src/contexts/character/stamina` including
-the `ActivityType` registry and `deriveStaminaMode` (§7.3.1);
+the activity-type **code registry** of §7.3.2 with its startup reconciliation, and `deriveStaminaMode` (§7.3.1);
 `packages/domain/src/contexts/identity/entitlement`; a shared `ActiveUseTimer` in
 `packages/domain/src/platform/timer`.
 
 **Prerequisites.** 0B.4.
 
-**Acceptance.** T1–T15.
+**Acceptance.** T1–T16.
 
 **Done when.** T3 passes (restart from the durable marker is identical), T5 passes (a Premium
 transition splits an interval), **T11 passes** (clock regression stalls rather than reverses),
 **T13 passes** — Knight hunting while the Druid trains, with the Druid occupied *and* recovering —
 and **T15 passes**, with two participants in one activity activating independently. The registry
-this package builds classifies **Hunt and Skill Training only**; Dungeon is deliberately absent
-(§7.3.1), and T12 is what keeps that absence safe.
+this package builds is the **code registry of §7.3.2** — no table — and classifies **Hunt and
+Skill Training only**; Dungeon is deliberately absent (§7.3.1), T12 keeps that absence safe, and
+**T16 passes**: a persisted key the registry does not know, or a family it disagrees with, makes
+the process refuse to start.
 
 ---
 
@@ -1865,12 +2263,13 @@ never reaching into `apps/api` (§4.2).
 
 **Prerequisites.** 0B.4.
 
-**Acceptance.** O1–O13, A1–A6.
+**Acceptance.** O1–O14, A1–A6.
 
 **Done when.** O3 and O4 pass (all-or-nothing party acquisition), O9 shows no deadlock, **O10–O13
 pass** — reconciliation preserves a live training claim, releases only a terminal or orphaned one,
-and O13 proves the rule is total over every persisted status — and **A4–A6 pass** for the durable
-claim holder.
+and O13 proves the rule is total over every persisted status — **O14 passes** — ending releases
+every claim and leaves every participant row untouched — and **A4–A6 pass** for the durable claim
+holder.
 
 ---
 
@@ -1879,14 +2278,21 @@ claim holder.
 **Goal.** Build, validate, version and resolve content bundles.
 
 **Files.** `packages/game-data/src/schema`, `.../validate`, `.../build`, `.../resolver`; a
-minimal placeholder bundle; the CI validation script.
+minimal placeholder bundle; the CI validation script; the audited cleanup path and the
+reconciliation job of §7.7 in `packages/domain` (they touch `ContentBundle` rows and are called
+through the Content context's public surface).
 
-**Prerequisites.** 0B.2.
+**Prerequisites.** **0B.3** — C4 and C6–C9 need `Activity` rows to reference a bundle, and
+`Activity` exists only once 0B.3's schema does. They insert those rows directly and do not need
+0B.6.
 
-**Acceptance.** C1–C8.
+**Acceptance.** C1–C9.
 
 **Done when.** C3 passes — a historical pinned bundle still resolves after the current bundle
-advances **and a process restart**; C4 confirms the database refuses to delete a referenced bundle; C7 and C8 confirm the crash window leaves an orphaned file rather than a missing one.
+advances **and a process restart**; C4 confirms the database refuses to delete a referenced bundle;
+C7 and C8 confirm the crash window leaves an orphaned file rather than a missing one; **C9
+confirms both activity families pin** and that a Skill Training activity's bundle is protected
+exactly as a Hunt's is.
 
 ---
 
@@ -1928,9 +2334,9 @@ of the four conditions independently.
 **Goal.** Every rule in this document enforced by a machine.
 
 **Files.** `.github/workflows/ci.yml` (Corepack, `node-version-file: .nvmrc`,
-`--frozen-lockfile`, `DATABASE_URL` exported for every step, pnpm-store and Prisma-engine caching
-— §4.3), Testcontainers setup, the engine determinism fixtures, `vitest.workspace.ts` integration
-project.
+`--frozen-lockfile`, `DATABASE_URL` exported for every step, pnpm-store caching — §4.3),
+Testcontainers setup, the engine determinism fixtures, the `integration` and `invariants` entries
+of `vitest.config.ts`'s `test.projects`.
 
 **Prerequisites.** 0B.1 for the skeleton; each later package adds its own checks.
 
@@ -1964,13 +2370,13 @@ Objective and checkable. Every line needs evidence, not a claim.
 | # | Criterion |
 |---|---|
 | 1 | `pnpm install` then `pnpm build` then `pnpm test` succeeds from a **clean checkout**, in that order |
-| 1a | That clean checkout has **no generated artifact in it** — `packages/domain/generated/`, `dist/` and `*.tsbuildinfo` are absent and git-ignored. `prisma generate` runs as the first step of `pnpm build` (§4.3), never as a lifecycle hook |
+| 1a | That clean checkout has **no generated artifact in it** — `packages/domain/src/generated/`, `dist/` and `*.tsbuildinfo` are absent and git-ignored. `prisma generate` runs as the first step of `pnpm build` (§4.3), never as a lifecycle hook, and succeeds with no database reachable |
 | 2 | `pnpm format:check` passes |
 | 3 | `pnpm lint` passes |
-| 4 | `pnpm typecheck` passes across all workspaces |
+| 4 | `pnpm typecheck` passes across **all seven** workspaces, and W13 shows each one is actually in the check (§4.4) |
 | 5 | `pnpm boundaries` passes, and a deliberately-added forbidden import fails it |
 | 5a | `apps/worker` cannot import `apps/api`, and no app reaches a `domain` context internal |
-| 5b | The §3.10 contract holds **mechanically**: `engines.node` is `>=24.11.0 <25`, `.nvmrc` carries the exact version, `packageManager` pins an exact pnpm, and `.npmrc` sets `node-linker=isolated`, `shamefully-hoist=false`, `engine-strict=true`. Installing under a Node outside the range **fails**, and CI reads `.nvmrc` rather than restating a version |
+| 5b | The §3.10 contract holds **mechanically**: `.nvmrc` is `24.21.0`, `engines.node` is `>=24.21.0 <25`, `packageManager` is `pnpm@12.5.1`, and `pnpm-workspace.yaml` sets `nodeLinker: isolated`, `shamefullyHoist: false`, `engineStrict: true` and an explicit `allowBuilds` list. Installing under a Node outside the range **fails**, an unlisted install script **fails**, and CI reads `.nvmrc` rather than restating a version |
 | 6 | Unit tests pass |
 | 7 | Integration tests pass against ephemeral PostgreSQL and Redis |
 | 8 | Deterministic engine fixtures pass, including across a process restart |
@@ -1983,11 +2389,15 @@ Objective and checkable. Every line needs evidence, not a claim.
 | 15 | Redis connects; a full flush loses no durable state |
 | 16 | `/health/live` returns healthy with PostgreSQL down |
 | 17 | `/health/ready` fails independently on each of its four conditions |
-| 18 | The complete §14 test matrix passes — **all 79 cases**, matching the group table at the head of §14 |
+| 18 | The complete §14 test matrix passes — **all 86 cases**, matching the group table at the head of §14 |
 | 19 | CI is green, with all **thirteen** checks of §13 (0–12) present, each running the same script a developer runs |
 | 20 | **No accepted architecture invariant is contradicted** — traced ADR by ADR, with §6.6's deferrals stated rather than overclaimed |
 | 21 | **No Hunt balance or gameplay loop was implemented** — no XP curve, damage formula, loot table or reward multiplier exists |
 | 22 | **No product rule was created by this phase.** The activity-type registry classifies **Hunt and Skill Training only**; Dungeon and every other future type remain unclassified, and T12 proves an unclassified type cannot reach production (§7.3.1) |
+| 23 | **Every Activity pins a content version** — `Activity.contentVersion` is `NOT NULL` with `ON DELETE RESTRICT`, and C9 shows a Skill Training activity's bundle is protected exactly as a Hunt's (`ADR-011`) |
+| 24 | **Ending an activity releases occupancy and keeps the roster snapshot** — O14 shows every claim gone and every `ActivityParticipant` row intact; the Skill Training trainee has one representation (D11, D12) |
+| 25 | **The activity-type registry has one source of truth** — no `ActivityType` table or content entry exists; T16 shows a persisted key the code registry does not know makes the process refuse to start (§7.3.2) |
+| 26 | **The generated Prisma client is the `prisma-client` generator's output**, in `packages/domain/src/generated/`, compiled by `tsc -b`, wired through `@prisma/adapter-pg`, configured by `prisma.config.ts` — no `prisma-client-js` block exists (§4.3) |
 
 Criterion 21 deserves its own review question: *did anything in this phase require a balance
 number to be correct?* If yes, scope leaked.
@@ -2022,13 +2432,23 @@ Made under the project's autonomous execution model (`AGENTS.md` §3), recorded 
 | 17 | **`StaminaClassification` is a required field with no default** | an unclassified activity type failing at startup is the only way "undeclared is rejected" is true in practice | low |
 | 18 | **`ContentBundle` is metadata; the pinned set is a query** | a reference count is a mutable side channel that can drift, and a drifted count deletes a referenced bundle | low |
 | 19 | **Elapsed is `max(0, now − qualifyingSince)`**; a backward clock stalls a timer | never negative, never mints or restores value; the regression is an operational signal, not a silent correction | low |
-| 20′ | **Node pinned to `>=24.11.0 <25`, `engine-strict`, pnpm via `packageManager` + Corepack, `.npmrc` linker settings locked** — *narrows* the earlier "Node 24 (Active LTS)" | the Node 24 line satisfies Prisma only from 24.11.0, and §3.1's boundary claim is false the moment the linker hoists. A contract that can only be violated deliberately | low — a range widens in one file |
-| 21 | **Prisma's generator `output` is declared explicitly and consumed through a `#prisma-client` subpath import** | keeps the artifact's location independent of `node_modules` layout, and gives one specifier that resolves identically in the editor, `tsc -b` output, Vitest and production — without the `paths`-not-rewritten footgun §3.3 already rejects | low — one field and one `imports` entry |
+| 20″ | **Exact pins: `.nvmrc` = `24.21.0`, `engines.node` = `>=24.21.0 <25`, `packageManager` = `pnpm@12.5.1`; Corepack the only pnpm path; pnpm settings (`nodeLinker: isolated`, `shamefullyHoist: false`, `engineStrict: true`, explicit `allowBuilds`) in `pnpm-workspace.yaml`** — *replaces* the earlier placeholders and the `.npmrc` location, and *corrects* the "24.11" attribution | placeholders are not pins; pnpm 12 reads `pnpm-workspace.yaml`, not `.npmrc`; the 24-line floor in this toolchain is NestJS 12's (`^24.15.0`), not Prisma's (`>=24.0`), and 24.21.0 is the current release. §3.1's boundary claim is false the moment the linker hoists | low — values in three files |
+| 21′ | **`prisma-client` generator, `output` inside `src/`, every generator field explicit, compiled by `tsc -b`, imported relatively** — *replaces* the `prisma-client-js` + subpath-import plan | the current generator emits TypeScript; inside `rootDir` it is compiled like any source and resolves by relative path in every context, with no indirection. Its `runtime`/`moduleFormat`/extension fields are set rather than inferred so a `tsconfig` edit cannot silently change the output | low — decided before code exists |
 | 22 | **`prisma generate` is an explicit first step of `pnpm build`, never a `postinstall` hook** | lifecycle-script behaviour varies by package-manager version and settings; a step that *sometimes* runs cannot produce a deterministic clean build | low |
 | 23 | **Dungeon is deliberately left unclassified for Stamina** | no accepted document classifies it, and a technical specification is not where a product rule should be born. The registry's fail-fast rule makes the omission safe rather than merely pending | none — the decision is to *not* decide |
+| 24 | **ESM in every workspace; TypeScript `~6.0.3`, not the `7.0` `latest`** | NestJS 12 ships with no CommonJS entry point and its CLI pins TypeScript `~6.0`; `uuid@14` and `zod@4` are ESM-only. The framework's own toolchain decides both, and the decision is written into `package.json`, `tsconfig.base.json` and the generator block rather than inferred | medium — a module-format change touches every import |
+| 25 | **`tsc -b` is the only compiler for `apps/api` and `apps/worker`; `nest build` is not used; both are composite reference targets** | one compiler over one graph is one definition of a type error; the Nest CLI's build has no `--build` mode and would be a second one | low |
+| 26 | **`apps/web` is typechecked by its own `tsc --noEmit` and by `next build`, outside the solution graph** | a `noEmit` project cannot be a project-reference target, and forcing emit on a Next.js app fights its toolchain. W13 proves coverage instead of asserting it | low |
+| 27 | **`contentVersion` lives on the `Activity` root, `NOT NULL`, `ON DELETE RESTRICT`** — *moves* it off `SessionBoundActivity` | `ADR-011` says *every* Activity pins; Skill Training is an Activity. The pinned-set derivation now reads one table for both families | low — one column moves |
+| 28 | **Ending an activity releases occupancy claims and retains `ActivityParticipant` rows** — *corrects* "deletes both" | the participant rows are the durable roster snapshot `ADR-002` and `DATA_ARCHITECTURE.md` §7 require for history, replay and support; removal belongs to a retention operation this specification does not authorize | low |
+| 29 | **The Skill Training trainee is the activity's single participant row; `SkillTrainingActivity` has no Character column; claims carry a composite FK to participants; wall-clock cardinality is a partial unique index** | one representation cannot disagree with itself, and the two foreign keys make a claim name a participant or nothing | low |
+| 30 | **The activity-type registry is a frozen code module with startup reconciliation against persisted rows; no `ActivityType` table** | behaviour classification is code, versioned with the code that switches on it; a table is the mutable second source `ADR-011`'s spirit rejects; T16 turns removal or reclassification of a persisted type into a fail-fast event | low |
+| 31 | **0B.2 carries the generator, `prisma.config.ts` and the `ContentBundle` model; 0B.3 carries every other model and every migration; 0B.7 follows 0B.3** | each package's acceptance must be executable when that package ends. `ContentBundle` is the leaf every reference points at and has no foreign keys of its own, so it is the one model that can exist before the graph does | low |
 
-None contradicts an accepted ADR or a LOCKED product rule. Decisions 3′, 6′, 8′ and 20′
-**correct or narrow** earlier ones in this same document, at the independent reviewer's direction.
+None contradicts an accepted ADR or a LOCKED product rule. Decisions 3′, 6′, 8′, 20″ and 21′
+**correct, narrow or replace** earlier ones in this same document, at the independent reviewer's
+direction; decisions 27–31 correct model statements the third review found to contradict
+`ADR-011`, `ADR-002` or the accepted persistence model.
 
 Decision 23 is the only one that is a decision **not to decide**, and it is recorded here
 precisely because the previous draft made the opposite decision silently, in a code comment.
@@ -2037,8 +2457,8 @@ precisely because the previous draft made the opposite decision silently, in a c
 
 ## 18. Deferred parameters
 
-Genuinely non-blocking for Phase 0B. Most are configuration inputs; two — Node 26 adoption and
-Dungeon's Stamina classification — are decisions for a later phase. **No boundary, interface or
+Genuinely non-blocking for Phase 0B. Most are configuration inputs; three — Node 26 adoption,
+TypeScript 7 adoption and Dungeon's Stamina classification — are decisions for a later phase. **No boundary, interface or
 invariant in this specification depends on any of them**, which is what makes deferring them
 honest rather than convenient.
 
@@ -2048,7 +2468,8 @@ honest rather than convenient.
 | Idempotency record **retention window** | long enough to cover any plausible retry |
 | Serialization-failure **backoff curve** | attempt cap is fixed at 3; the curve is tuning |
 | Redis **cache TTLs** | every key family has a rebuild path regardless |
-| **Node 26 adoption** (LTS from October 2026) | *not* the Node version itself — that is pinned to `>=24.11.0 <25` in §3.10. What is deferred is **when** to move the line, and moving it must revisit the Corepack policy in the same change |
+| **Node 26 adoption** (LTS from October 2026) | *not* the Node version itself — that is pinned to `24.21.0` / `>=24.21.0 <25` in §3.10. What is deferred is **when** to move the line. Node 26 does not ship Corepack, so moving the line **replaces the pnpm installation path** in the same change |
+| **TypeScript 7 adoption** | pinned to `~6.0.3` (§3.4) because NestJS 12's CLI pins `~6.0`. Moving to the native compiler is a decision taken when the Nest toolchain takes it; nothing in the configuration is on TypeScript 7's removal list, so the move should be a version bump |
 | **Dungeon's Stamina classification** | a product decision for the phase that introduces the Dungeon activity type; 0B registers no Dungeon descriptor and T12 prevents one appearing unclassified (§7.3.1) |
 | Metric **histogram buckets** | tuning |
 | Settlement **checkpoint interval** | Phase 2; the cost model is recorded in `ADR-006` |
@@ -2070,9 +2491,14 @@ Stated plainly so scope cannot drift during implementation:
 - no `ItemInstance` or custody implementation — Phase 3;
 - **no Dungeon activity type, and no Dungeon descriptor** — its Stamina classification is a
   product decision this specification deliberately does not make (§7.3.1);
-- no change to `.npmrc`, `engines.node` or `packageManager` beyond the values §3.10 fixes —
-  those are architecture, not build configuration;
-- no committed generated artifact of any kind (§4.3).
+- no change to `pnpm-workspace.yaml`'s linker settings, `engines.node`, `.nvmrc` or
+  `packageManager` beyond the values §3.10 fixes — those are architecture, not build
+  configuration;
+- no committed generated artifact of any kind (§4.3);
+- no `ActivityType` table, seed or content entry — the registry is code (§7.3.2);
+- no retention or archive operation that removes `Activity`, `ActivityParticipant` or
+  `ContentBundle` rows (§6.3.1, §7.7);
+- no `prisma-client-js` generator block and no `nest build` step (§4.3, §4.4).
 
 ---
 

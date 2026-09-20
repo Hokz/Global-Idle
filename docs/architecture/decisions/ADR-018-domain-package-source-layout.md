@@ -31,8 +31,12 @@ the rule that packages must not depend on apps."* That is a non-sequitur: the fo
 
 ## Decision
 
-**The bounded contexts move to `packages/domain`.** Both applications depend on it; neither
-depends on the other.
+**The bounded contexts whose implementations form the runtime application core move to
+`packages/domain`.** Both applications depend on it; neither depends on the other.
+
+This is a **source-layout** decision about where five of `ADR-001`'s seven contexts are
+implemented. It does not collapse, remove, merge or silently relocate any context `ADR-001`
+defines, and it does not change who owns what.
 
 ```text
 apps/
@@ -46,12 +50,29 @@ packages/
   game-engine/    pure simulation
 ```
 
-- `packages/domain` holds `contexts/{identity,character,party,activity,economy}` and
+- `packages/domain` holds `contexts/{identity,character,party,activity,economy}` now, gains
+  `contexts/items` when the item model is implemented, and holds
   `platform/{clock,ids,idempotency,transactions,prisma}`;
 - each context exposes a public surface at `contexts/<name>/index.ts`, and reaching past it is a
   boundary violation — **the rule `ADR-012` states, now enforced inside the package too**;
 - `apps/api` and `apps/worker` are thin: adapters and wiring, no domain logic;
 - `apps/api ↔ apps/worker` in either direction is **forbidden**, enforced by dependency-cruiser.
+
+### All seven `ADR-001` contexts are preserved
+
+| `ADR-001` context | Owner of | Where it is implemented | Note |
+|---|---|---|---|
+| Identity & Access | Account, Session, Entitlement | `packages/domain/src/contexts/identity` | |
+| Character | Character, roster capacity, Progression, Skills | `packages/domain/src/contexts/character` | |
+| Party | Active Party composition and order | `packages/domain/src/contexts/party` | |
+| Activity | Hunt / Dungeon / Skill Training runs and in-flight state | `packages/domain/src/contexts/activity` | |
+| **Items** | ItemInstance, Inventory and Equipment custody | `packages/domain/src/contexts/items` | **an accepted context whose implementation is deferred** to the phase that introduces `ItemInstance` (Phase 3). Its ownership and its invariant (`ADR-004`, I4) are unchanged; only the directory does not exist yet |
+| Economy | Ledger, balance projections, Market listings, escrow | `packages/domain/src/contexts/economy` | |
+| **Content** | BaseItem, Creature, Loot Table, World Location, Hunt and Dungeon definitions | **`packages/game-data`** | **not** moved into `domain`, and not a gap: the Content context is build-time, versioned and read-only at runtime (`ADR-011`), which is exactly why it is its own package with its own stricter rules. `packages/game-data` *is* the Content bounded context |
+
+Five contexts implemented in `domain`, one deferred with its directory reserved, one in
+`game-data`: seven. The phrase "the bounded contexts live in `packages/domain`" in this ADR's
+title is shorthand for the runtime-application contexts; this table is the precise statement.
 
 ### Exactly what is superseded
 
@@ -66,6 +87,7 @@ packages/
 | `web` may not import `game-engine` or a persistence package | **stands** |
 | `packages/shared` is named `shared` | **stands** |
 | Microservices rejected as premature | **stands** |
+| `ADR-001`'s seven contexts and their ownership (referenced by `ADR-012`) | **stands** — see the table above |
 
 `ADR-012` is **not edited**. This ADR records the amendment; accepted history stays intact.
 
