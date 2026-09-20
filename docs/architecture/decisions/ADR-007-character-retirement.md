@@ -32,9 +32,15 @@ through the audit trail, and an audit trail with holes in it is not an audit tra
 
 Consequences for other rules:
 
-- The vocation-uniqueness constraint applies to **active** characters only. This is the concrete
-  shape of the persistence-level constraint required by `DOMAIN_MODEL.md` §5.3.
-- `count(active characters) ≤ rosterCapacity` — retirement frees a place, not capacity.
+- The vocation-uniqueness constraint applies to **playable (non-retired)** Characters only, as a
+  partial unique index over non-retired rows. This is the concrete shape of the
+  persistence-level constraint required by `DOMAIN_MODEL.md` §5.3, and Phase 0B must build it
+  that way: a retired historical Character never blocks creating or unlocking a new Character of
+  its vocation.
+
+  The word *playable* is used deliberately instead of *active*, which in this project already
+  means membership of the **Active Party** — a different and narrower thing.
+- `count(playable characters) ≤ rosterCapacity` — retirement frees a place, not capacity.
 - The Origin Character may be retired. The account's tutorial-completion flag is unaffected,
   which is exactly the edge case the tutorial document raises.
 - Retirement is an audited operation. Whether it is reversible is a `DEFERRED PARAMETER`; the
@@ -60,8 +66,8 @@ Consequences for other rules:
 
 **Constraints created.**
 - No code may hard-delete a Character.
-- Vocation uniqueness is enforced over active characters, and the constraint must be written
-  that way from the first migration.
+- Vocation uniqueness is enforced over **playable (non-retired)** Characters, and the constraint
+  must be written that way from the first migration.
 
 ## Alternatives considered
 

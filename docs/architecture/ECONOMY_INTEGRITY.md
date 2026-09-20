@@ -153,7 +153,7 @@ audit trail decorative.
 | Market self-dealing / wash trading | buyer ≠ seller enforced; fees make round-trips lossy; price history retained for analysis |
 | Listing spam | listing fees, rate limits |
 | Enumeration of accounts or items | ownership-scoped queries and rate limiting are the control; non-sequential UUIDv7 ids raise the cost but are **not** the security boundary (`DATA_ARCHITECTURE.md` §2) |
-| Race on roster vocation uniqueness | persistence-level constraint over active characters (`ADR-007`) |
+| Race on roster vocation uniqueness | persistence-level constraint over **playable (non-retired)** Characters (`ADR-007`) |
 
 `DEFERRED PARAMETER` — fee percentages, listing limits, rate-limit thresholds. They are tuning
 values; the mechanisms are architectural.

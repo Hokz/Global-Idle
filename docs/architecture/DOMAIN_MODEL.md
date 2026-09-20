@@ -198,8 +198,8 @@ touching the ownership model.
 | Transaction / audit | required for currency, entitlement and roster-capacity changes |
 
 **Invariants.**
-- `count(active characters) ≤ rosterCapacity ≤ 5` — `LOCKED BY PRODUCT`
-- active character vocations are **distinct** within the account — `LOCKED BY PRODUCT`
+- `count(playable characters) ≤ rosterCapacity ≤ 5` — `LOCKED BY PRODUCT`
+- **playable (non-retired)** Character vocations are **distinct** within the account — `LOCKED BY PRODUCT`
 - tutorial completion is tracked at account level, not inferred from character count —
   `LOCKED BY PRODUCT` (`TUTORIAL_ROOKGAARD_ROADMAP.md` §2)
 
@@ -312,7 +312,7 @@ completion flag is unaffected, which is exactly the edge case
 
 | Aspect | What it actually is |
 |---|---|
-| The *membership* | a **derived collection** — every active Character whose owner is this Account. Nothing to store. |
+| The *membership* | a **derived collection** — every playable (non-retired) Character whose owner is this Account. Nothing to store. |
 | The *capacity* | **durable state owned by the Character context** — an integer, because it is bought with Gold and must be auditable |
 
 Modelling the roster as its own entity would create a second place where membership could
@@ -322,7 +322,7 @@ disagree with reality. Deriving membership makes divergence impossible.
 The capacity value physically lives on the Account row, but storage location does not decide
 ownership. Capacity is a constraint on how many Characters may exist; it is bought with Gold
 through ordinary gameplay progression, and every invariant it participates in
-(`count(active characters) ≤ rosterCapacity`) is a Character-context invariant. Identity &
+(`count(playable characters) ≤ rosterCapacity`) is a Character-context invariant. Identity &
 Access owns authentication, authorization and entitlements — none of which capacity is. An
 earlier draft split membership and capacity across two contexts, which violated the
 single-owner rule of `ADR-001`; that split is removed.
@@ -373,7 +373,7 @@ already says, and the two could disagree.
 - every entry is a Character of the same Account — `LOCKED BY PRODUCT`
 - no entry appears twice; order is significant — `DECIDED IN PHASE 0A`
 - five simultaneous active characters cannot be represented — `LOCKED BY PRODUCT`
-- every entry references an **active** (non-retired) Character — `DECIDED IN PHASE 0A`
+- every entry references a **playable** (non-retired) Character — `DECIDED IN PHASE 0A`
 
 `DECIDED IN PHASE 0A` — **formation editing is rejected while an Activity is running.** An
 earlier draft allowed the configuration to be edited with the running Activity simply ignoring
@@ -879,9 +879,9 @@ application-only check loses a race.
 
 | # | Invariant | Enforced by |
 |---|---|---|
-| I1 | One **active** character per vocation per account | partial unique constraint over active rows (`ADR-007`) |
-| I2 | `count(active characters) ≤ rosterCapacity ≤ 5` | persistence constraint + transaction |
-| I3 | Active Party size 1–4, entries distinct, all **active** and owned by the account | transaction |
+| I1 | One **playable (non-retired)** roster Character per vocation per account | partial unique constraint over non-retired rows (`ADR-007`) |
+| I2 | `count(playable characters) ≤ rosterCapacity ≤ 5` | persistence constraint + transaction |
+| I3 | Active Party size 1–4, entries distinct, all **playable** and owned by the account | transaction |
 | I4 | An ItemInstance is in exactly one custody scope | persistence constraint |
 | I5 | Balance projection reconciles to the ledger | transaction + reconciliation job |
 | I6 | Ledger entries are append-only | persistence permission |

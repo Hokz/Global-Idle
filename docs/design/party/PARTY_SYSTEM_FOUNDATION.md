@@ -86,7 +86,7 @@ If all five vocation characters are unlocked, at least one character must remain
 
 # 3. One Playable Character Per Vocation — LOCKED
 
-An account may own **at most one character of each vocation**.
+An account may own **at most one playable (non-retired) roster Character of each vocation**.
 
 Duplicate **playable** vocations are prohibited.
 
@@ -140,9 +140,11 @@ Paladin
 Monk
 ```
 
-The same vocation cannot be purchased/unlocked twice even if multiple roster slots are available.
+A vocation already held by a **playable** Character cannot be purchased or unlocked again, even
+if roster slots are free. Retiring that Character releases the vocation, and it becomes
+selectable once more (`ADR-007`).
 
-This uniqueness rule is account-wide, not merely an Active Party restriction.
+This uniqueness rule spans the whole **playable roster**, not merely the Active Party.
 
 ---
 
