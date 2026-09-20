@@ -12,7 +12,7 @@ Start with:
 - `docs/DESIGN_INDEX.md`
 - `docs/MASTER_DEVELOPMENT_ROADMAP.md`
 - `docs/ECONOMY.md`
-- `docs/ARCHITECTURE.md`
+- `docs/architecture/ARCHITECTURE_OVERVIEW.md`
 - `docs/MVP_SCOPE.md`
 - `docs/DECISIONS.md`
 - `docs/OPEN_QUESTIONS.md`

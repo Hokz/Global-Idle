@@ -66,11 +66,21 @@ Do not change a document's status marker without the Product Owner's approval.
 >
 > **Implementation specs define HOW a specific approved design is to be implemented.**
 >
-> **Builders must not silently convert OPEN design questions into permanent product decisions.**
+> **Builders must not *silently* convert OPEN design questions into permanent product
+> decisions.**
 
-When a design document marks something as open, unresolved, `TBD`, "not yet locked", "not yet
-approved" or "exact ... is OPEN", that item must be raised with the Product Owner before it is
-implemented. Choosing a value in code does not resolve it.
+The operative word is *silently*. Under the project's autonomous execution model
+(`AGENTS.md` §3), a builder or architect **may resolve an ordinary OPEN item** when it is
+necessary to complete the assigned phase — provided the decision does not contradict a LOCKED
+rule, is researched, is recorded with its rationale and alternatives, stays inside the phase's
+scope, is validated, and goes to independent review rather than being merged by its author.
+
+What remains forbidden is deciding one *by accident*: choosing a value in code, leaving no
+record, and letting it harden into product truth unreviewed. A resolved item must be written
+down as a decision — in the design document, in `docs/DECISIONS.md`, or in an ADR — and labelled
+so a reviewer can find and reverse it.
+
+The Product Owner retains final approval and may reverse any autonomous decision during review.
 
 ---
 
@@ -85,7 +95,8 @@ everything under `docs/design/`:
 | `docs/GAME_SYSTEMS.md` | System-by-system overview |
 | `docs/DECISIONS.md` | Locked decisions that must not be silently reversed |
 | `docs/OPEN_QUESTIONS.md` | Project-level unresolved design questions |
-| `docs/ARCHITECTURE.md` | Technical architecture and boundaries |
+| `docs/architecture/ARCHITECTURE_OVERVIEW.md` | **Technical architecture — entry point.** The Phase 0A package: domain model, boundaries, persistence, lifecycle, engine, content, economy integrity, operations, and all ADRs |
+| `docs/ARCHITECTURE.md` | Phase 0 product-level sketch, superseded in detail by the package above |
 | `docs/MVP_SCOPE.md` | First playable vertical slice |
 | `docs/ECONOMY.md` | Economy principles, sinks and transaction rules |
 | `docs/REFERENCES.md` | Research source hierarchy |

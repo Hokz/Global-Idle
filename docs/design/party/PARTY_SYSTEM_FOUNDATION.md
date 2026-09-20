@@ -84,11 +84,17 @@ If all five vocation characters are unlocked, at least one character must remain
 
 ---
 
-# 3. One Character Per Vocation — LOCKED
+# 3. One Playable Character Per Vocation — LOCKED
 
-An account may own **at most one character of each vocation**.
+An account may own **at most one playable (non-retired) roster Character of each vocation**.
 
-Duplicate vocations are prohibited.
+Duplicate **playable** vocations are prohibited.
+
+> **Refined by Phase 0A architecture (`ADR-007`).** Uniqueness applies to *playable*
+> (non-retired) roster Characters. A retired Character is historical and audit state: it is not a
+> roster member, does not count against roster size, and does not reserve its vocation. Retiring
+> a Knight frees Knight for a new one, and the retired Knight remains in persistence.
+> See `docs/DECISIONS.md`.
 
 Examples:
 
@@ -134,9 +140,11 @@ Paladin
 Monk
 ```
 
-The same vocation cannot be purchased/unlocked twice even if multiple roster slots are available.
+A vocation already held by a **playable** Character cannot be purchased or unlocked again, even
+if roster slots are free. Retiring that Character releases the vocation, and it becomes
+selectable once more (`ADR-007`).
 
-This uniqueness rule is account-wide, not merely an Active Party restriction.
+This uniqueness rule spans the whole **playable roster**, not merely the Active Party.
 
 ---
 
@@ -963,8 +971,8 @@ The following are LOCKED unless the Product Owner explicitly changes them.
 - one player controls the entire Party;
 - maximum roster = 5 characters;
 - the roster supports the five vocations: Knight, Druid, Sorcerer, Paladin, Monk;
-- maximum one character per vocation per account;
-- duplicate vocation characters are prohibited;
+- maximum one **playable (non-retired)** character per vocation per account (`ADR-007`);
+- duplicate **playable** vocation characters are prohibited; a retired Character is history and does not reserve its vocation (`ADR-007`);
 - additional character slots/unlocks use in-game Gold;
 - exact unlock costs remain OPEN.
 
@@ -1024,8 +1032,8 @@ The following remain OPEN and must not be silently decided by a builder:
 - exact XP behavior when multiple active characters are not Shared-XP eligible;
 - exact combat consequences of Party ordering beyond Slot 1 being Frontline;
 - targeting/aggro rules between Party positions;
-- character replacement restrictions while an activity is already running;
-- whether formation can be changed only outside combat or under other conditions;
+- (resolved in Phase 0A architecture: formation **and equipment** changes are rejected while an
+  Activity is running - see `docs/architecture/DOMAIN_MODEL.md` §5.5 and §5.12)
 - final Skill Point state granted to a newly unlocked Level 8 character;
 - Premium/convenience benefits related to Party management now that there is no fifth active Party slot.
 

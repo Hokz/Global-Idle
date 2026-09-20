@@ -12,7 +12,7 @@ Read, in order:
 4. `docs/PRODUCT_VISION.md`
 5. `docs/GAME_SYSTEMS.md`
 6. `docs/ECONOMY.md`
-7. `docs/ARCHITECTURE.md`
+7. `docs/architecture/ARCHITECTURE_OVERVIEW.md`
 8. `docs/MVP_SCOPE.md`
 9. `docs/ROADMAP.md`
 10. `docs/DECISIONS.md`
@@ -46,7 +46,10 @@ research
 
 Do not ask the Product Owner about minor implementation choices that can be resolved through research and sound engineering.
 
-Do not silently decide open product questions listed in `docs/OPEN_QUESTIONS.md`.
+You may decide an open item in `docs/OPEN_QUESTIONS.md` when it is necessary to complete the
+assigned phase — but never *silently*. Record the decision, its rationale and the alternatives
+considered, keep it inside the phase's scope, and send it to independent review rather than
+merging it yourself. See `AGENTS.md` §3.
 
 ## Current objective
 

@@ -297,7 +297,19 @@ base item
 + imbuements
 ```
 
-High-tier Imbuements may require quest/boss unlocks.
+Locked product rules:
+
+- exactly **one** playable power tier: **Powerful**. Basic and Intricate are not player
+  progression tiers;
+- duration is **12 hours of active use**, not wall-clock expiry. Active-use timer semantics
+  apply: nothing is consumed while the item is unequipped, the Character is inactive or offline,
+  or the activity is paused in reconnect grace;
+- remaining duration is durable state on the `ItemInstance` and **resumes** on re-equip rather
+  than resetting;
+- access requires completing **exactly five** configured boss completions of the approved
+  quest/progression chain.
+
+The *identities* of those five bosses remain open content design. The count does not.
 
 ## 15. World map
 
@@ -426,9 +438,18 @@ a disconnected character.
 
 ## 20. Production roadmap
 
-### Phase 0 — Foundation
+### Phase 0A — Architecture
+- the complete architecture package, entry point
+  [`docs/architecture/ARCHITECTURE_OVERVIEW.md`](architecture/ARCHITECTURE_OVERVIEW.md);
+- Character activity occupancy, per-Character Stamina, Premium account-wide entitlement,
+  active-use timers, `ItemImbuement` timer ownership, Party mixed-Stamina behaviour,
+  server-authoritative time.
+
+### Phase 0B — Foundation
 - documentation;
 - architecture;
+- Character occupancy primitive; Stamina durable state; generic `ActiveUseTimer` contract;
+  Account entitlement contract; server time service; idempotent duration settlement;
 - repository structure;
 - web/API/database/Redis skeleton;
 - data model;
@@ -444,6 +465,9 @@ a disconnected character.
 - one hunt entry.
 
 ### Phase 2 — Hunt simulator
+- Hunt Stamina: first-qualifying-XP activation, `ONLINE_ACTIVE` consumption, pause on grace,
+  42:00 cap, Premium 42→39 at 1.5× XP, zero-Stamina reward ineligibility without forced exit,
+  per-Character behaviour in a Party, Premium 1:1 / Free 1:2 recovery;
 - room 1-10;
 - room 10 endless loop;
 - supplies;
@@ -460,6 +484,7 @@ a disconnected character.
 - loot storage.
 
 ### Phase 4 — Party/vocations
+- occupancy integration with dedicated Skill Training, and Stamina recovery while training;
 - character roster and Gold-based character unlocks;
 - unique vocations;
 - Active Party formation (1-4) and Frontline positioning;
@@ -483,11 +508,14 @@ a disconnected character.
 - audit.
 
 ### Phase 7 — Forge / Imbuement / Wheel / Skill Tree
+- Imbuements: Powerful only, 12h active-use duration on the item, boss-progression unlock gate;
 - item sinks;
 - progression;
 - unlock dependencies.
 
 ### Phase 8 — Premium/automation
+- Premium purchase, renewal, expiry and entitlement transitions;
+- future boost products use `ActiveUseTimer`, never wall-clock countdowns;
 - automation;
 - advanced convenience;
 - Party-management Premium benefits (OPEN - roster capacity is a Gold sink, not a Premium one).

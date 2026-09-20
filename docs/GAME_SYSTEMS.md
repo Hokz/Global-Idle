@@ -23,6 +23,27 @@ Global Idle is an online idle RPG.
 - combat is server simulated;
 - hunt UI can show expected efficiency and risk.
 
+## Stamina and activity occupancy
+
+A Character may perform only **one** primary action at a time - it cannot Hunt and Skill Train
+at once. Different Characters on the account may act concurrently.
+
+**Stamina is per Character**, maximum 42:00 hours, with no shared account pool.
+
+- consumption **activates** on the first qualifying Hunt XP and then tracks the Hunt's
+  `ONLINE_ACTIVE` state, including time between kills;
+- it stops immediately on pause, exit or activity end;
+- Premium accounts get **1.5× Hunt Base XP from 42:00 to 39:00**, then normal. Free is normal
+  throughout. There is no low-stamina penalty band;
+- at exactly 0 the Character earns **no Hunt reward of any kind** but keeps fighting - zero
+  stamina never forces an exit;
+- eligibility is per Character, and is a separate predicate from Shared XP level eligibility;
+- recovery happens whenever the Character is **not reserved in a Stamina-consuming Hunt
+  lifecycle** - including Dummy / Exercise Weapon Skill Training, which does **not** block it.
+  Premium recovers 1:1, Free 1:2, capped at 42:00;
+- **reconnect grace is neutral**: a paused Hunt neither consumes nor recovers, so a deliberate
+  disconnect cycle cannot be used to regenerate Stamina.
+
 ## Supplies
 
 Supplies should be real constraints.
@@ -75,7 +96,9 @@ One player account controls every character. There is no multi-human party.
 
 - all vocation characters the account has unlocked;
 - maximum **5**;
-- maximum one character per vocation - duplicates are prohibited account-wide;
+- maximum **one playable (non-retired) Character per vocation** per account. Retiring a
+  Character frees its vocation for a new one; the retired Character remains as history and does
+  not count against the roster;
 - an owned vocation is removed from future unlock choices;
 - additional roster slots are unlocked with in-game Gold (costs OPEN);
 - later unlocked characters start at Base Level 8, skip Rookgaard, get no catch-up levels.
@@ -211,7 +234,16 @@ Structure locked:
 
 Independent layer.
 
-Powerful Imbuements may require progression unlocks.
+Exactly **one** playable power tier: **Powerful**. Basic and Intricate are not player
+progression tiers.
+
+Duration is **12 hours of active use**, not wall-clock expiry. Nothing is consumed while the
+item is unequipped, the Character is inactive or offline, or the activity is paused in reconnect
+grace. Remaining duration lives on the item and **resumes** on re-equip rather than resetting.
+
+Powerful Imbuements require completing **exactly five** configured boss completions of the
+approved quest/progression chain. The identities of those five bosses are open content design;
+the count is not.
 
 ## Market
 
@@ -233,8 +265,12 @@ Direction:
 - advanced loot management;
 - advanced boss rotation.
 
-Premium does **not** grant a fifth simultaneous Active Party member. Roster expansion is a Gold
-sink available to every player. Party-related Premium benefits are OPEN.
+**Premium is Account-wide** - every Character on the account receives applicable benefits. It
+grants the 42:00→39:00 Hunt XP band and 1:1 Stamina recovery.
+
+Premium does **not** grant a fifth simultaneous Active Party member, and does not raise the
+42:00 Stamina maximum. Roster expansion is a Gold sink available to every player. Party-related
+Premium *convenience* benefits remain to be designed.
 
 Free:
 - unlocks roster characters with Gold like everyone else;

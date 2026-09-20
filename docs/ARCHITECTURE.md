@@ -1,4 +1,18 @@
-# Technical Architecture
+# Technical Architecture — Phase 0 overview
+
+> **This is not the authoritative architecture.**
+>
+> The authoritative technical architecture is the Phase 0A package, and its entry point is
+> [`docs/architecture/ARCHITECTURE_OVERVIEW.md`](architecture/ARCHITECTURE_OVERVIEW.md).
+>
+> This file is the original Phase 0 product-level sketch. It is kept because it records the
+> approved stack, the entity inventory and the security baseline that the Phase 0A package was
+> built to satisfy, and several ADRs cite it. **Where this file and the Phase 0A package
+> differ, the Phase 0A package wins** — it is more specific and it resolves questions this
+> sketch left open (`prisma/ or database/`, the exact role of Redis, what "offline" means).
+>
+> Do not add new architecture decisions here. They belong in
+> [`docs/architecture/`](architecture/) with an ADR.
 
 ## Objective
 
