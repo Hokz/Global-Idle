@@ -1,8 +1,11 @@
 # ADR-018 — The bounded contexts live in `packages/domain`
 
-**Status:** `PROPOSED`
+**Status:** `ACCEPTED`
 **Phase:** 0B specification
 **Date:** 2026-09-20
+**Accepted:** 2026-09-20 — by the Product Owner, on independent approval of the Phase 0B
+technical foundation specification. Per the governance model the author does not self-accept;
+this ADR stood `PROPOSED` through five review rounds until that decision.
 **Amends:** `ADR-012` — its **source layout only**. Everything else in `ADR-012` stands.
 
 ## Context

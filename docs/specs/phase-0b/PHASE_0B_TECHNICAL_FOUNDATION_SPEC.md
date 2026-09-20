@@ -1,16 +1,19 @@
 # Phase 0B — Technical Foundation: Implementation Specification
 
-**Document status:** `DRAFT` / PENDING INDEPENDENT REVIEW
+**Document status:** **`IMPLEMENTATION_SPEC_READY`**
+**Approved:** 2026-09-20 — by the Product Owner, after five rounds of independent review
 **Phase:** 0B — Technical Foundation
-**Baseline:** Phase 0A, `ARCHITECTURE_APPROVED`, 17 ADRs `ACCEPTED`
+**Baseline:** Phase 0A, `ARCHITECTURE_APPROVED`, `ADR-001`–`ADR-017` `ACCEPTED`; `ADR-018`
+`ACCEPTED` with this specification
 **Entry point for the architecture it implements:** [`../../architecture/ARCHITECTURE_OVERVIEW.md`](../../architecture/ARCHITECTURE_OVERVIEW.md)
 
 > This document is a **specification**. It contains no implementation. Its job is to make the
 > implementing phase unambiguous: exact tooling, exact boundaries, exact contracts, exact tests,
 > and an objective Definition of Done.
 >
-> On independent approval this document becomes `IMPLEMENTATION_SPEC_READY`. Implementation
-> happens on a separate branch and pull request.
+> It is now `IMPLEMENTATION_SPEC_READY`. Implementation happens on a separate branch and pull
+> request, and **nothing in this document is re-opened by the implementing phase**: a primitive
+> that genuinely cannot be built within it is a new superseding ADR, never a quiet deviation.
 
 ---
 
@@ -80,6 +83,12 @@ architecture wins and this document is wrong.
 | Active-use timers settle at checkpoints | `ADR-015` | §7 |
 | Referenced content bundles never removed | `ADR-016` | §11 |
 | Account-scoped, fingerprinted idempotency keys | `ADR-017` | §7, §8 |
+| Bounded contexts live in `packages/domain` — amends `ADR-012`'s source layout only | `ADR-018` | §4, §5 |
+
+`ADR-018` was raised by this specification and stood `PROPOSED` until the Product Owner accepted
+it alongside this document. It is listed here because it is now binding on implementation exactly
+as the other seventeen are — and because §4.1 records precisely which two clauses of `ADR-012` it
+supersedes and which stand.
 
 **If implementation discovers that a primitive genuinely cannot be built within an accepted
 boundary, the answer is a new superseding ADR — never an edit to accepted history, and never a
@@ -480,10 +489,10 @@ api's domain code". That left the worker with no **legal** way to call a context
 > **⚠ This amends an ACCEPTED ADR, and is governed accordingly.** `ADR-012` records the Phase 0B
 > layout with contexts *"inside `api`"* and three packages. Moving them is an architecture
 > decision, not an implementation detail, so it is recorded in
-> **[`ADR-018`](../../architecture/decisions/ADR-018-domain-package-source-layout.md)** —
-> `PROPOSED`, not self-accepted, and remaining so until the independent review of this
-> specification approves it. `ADR-012`'s own text is **not edited**; it carries a link to the
-> amendment.
+> **[`ADR-018`](../../architecture/decisions/ADR-018-domain-package-source-layout.md)** — raised
+> as `PROPOSED`, never self-accepted, and held there through five review rounds until the Product
+> Owner accepted it with this specification. It is now **`ACCEPTED`**. `ADR-012`'s own text is
+> **not edited**; it carries a link to the amendment.
 >
 > `ADR-018` supersedes exactly two things: the **package listing** and the phrase *"context
 > modules inside `api`"*. Everything else in `ADR-012` stands — one deployable modular monolith,
@@ -2719,11 +2728,20 @@ Stated plainly so scope cannot drift during implementation:
 
 ## 20. Status and next step
 
-This document is `DRAFT` / PENDING INDEPENDENT REVIEW.
+This document is **`IMPLEMENTATION_SPEC_READY`**, approved by the Product Owner on 2026-09-20
+after five rounds of independent review. `ADR-018`, which it raised, is `ACCEPTED` with it.
 
-On independent approval it becomes **`IMPLEMENTATION_SPEC_READY`**, and implementation proceeds
-on a separate branch and pull request under the execution model of `AGENTS.md` §3: the builder
-works autonomously within the accepted architecture, runs the full matrix, self-reviews, opens a
-pull request, and does not merge its own work.
+**What that means for the implementing phase.** Implementation proceeds on a separate branch and
+pull request under the execution model of `AGENTS.md` §3: the builder works autonomously within
+the accepted architecture, runs the full matrix, self-reviews, opens a pull request, and does not
+merge its own work. The order is §15's: 0B.1 → 0B.2 → 0B.3, with 0B.7 after 0B.3 and 0B.10
+alongside 0B.1 from the first commit.
+
+**What is now fixed, and what is not.** Every tooling pin (§3), boundary (§5), schema constraint
+(§6), contract (§7) and test (§14) in this document is binding. The eight entries in §18 are the
+only parameters left open, and §19 is the list of things implementation may **not** build. A
+primitive that genuinely cannot be built within these boundaries is a **new superseding ADR**,
+raised before the code — never an edit to this document and never a quiet deviation.
 
 Phase 0B is `VERIFIED` only when §16 is satisfied line by line with evidence and CI is green.
+`IMPLEMENTATION_SPEC_READY` is permission to build, not a claim that anything is built.

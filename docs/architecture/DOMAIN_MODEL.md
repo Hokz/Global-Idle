@@ -997,7 +997,7 @@ All other questions previously deferred from 0A.1 are answered in the completed 
 | [ADR-015](decisions/ADR-015-active-use-duration-timers.md) | Active-use timers settle at checkpoints | `ACCEPTED` |
 | [ADR-016](decisions/ADR-016-content-bundle-retention.md) | Content bundles retained while referenced | `ACCEPTED` |
 | [ADR-017](decisions/ADR-017-idempotency-key-contract.md) | Idempotency keys account-scoped and fingerprinted | `ACCEPTED` |
-| [ADR-018](decisions/ADR-018-domain-package-source-layout.md) | Bounded contexts in `packages/domain` — amends `ADR-012`'s layout | `PROPOSED` |
+| [ADR-018](decisions/ADR-018-domain-package-source-layout.md) | Bounded contexts in `packages/domain` — amends `ADR-012`'s layout | `ACCEPTED` |
 
 ---
 

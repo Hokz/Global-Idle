@@ -5,7 +5,7 @@
 Goal: convert approved design into an explicit technical architecture.
 
 Entry point: [`docs/architecture/ARCHITECTURE_OVERVIEW.md`](architecture/ARCHITECTURE_OVERVIEW.md).
-All 17 ADRs are `ACCEPTED`.
+All 18 ADRs are `ACCEPTED` — `ADR-001`–`ADR-017` from Phase 0A, and `ADR-018` with the Phase 0B specification.
 
 Documented, not implemented:
 - Character activity occupancy;
@@ -23,8 +23,8 @@ Documented, not implemented:
 
 **Specification:**
 [`docs/specs/phase-0b/PHASE_0B_TECHNICAL_FOUNDATION_SPEC.md`](specs/phase-0b/PHASE_0B_TECHNICAL_FOUNDATION_SPEC.md)
-— currently `DRAFT` / PENDING INDEPENDENT REVIEW. It becomes `IMPLEMENTATION_SPEC_READY` on
-independent approval, and implementation follows on its own branch and pull request.
+— **`IMPLEMENTATION_SPEC_READY`**, approved by the Product Owner after independent review.
+Implementation follows on its own branch and pull request.
 
 Goal: prepare the project so implementation does not begin on ambiguous foundations.
 

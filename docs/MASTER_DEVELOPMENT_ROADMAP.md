@@ -448,7 +448,7 @@ a disconnected character.
 ### Phase 0B — Foundation
 - implementation specification:
   [`docs/specs/phase-0b/PHASE_0B_TECHNICAL_FOUNDATION_SPEC.md`](specs/phase-0b/PHASE_0B_TECHNICAL_FOUNDATION_SPEC.md)
-  (`DRAFT` / pending independent review);
+  (**`IMPLEMENTATION_SPEC_READY`** — approved after independent review);
 - documentation;
 - architecture;
 - Character occupancy primitive; Stamina durable state; generic `ActiveUseTimer` contract;

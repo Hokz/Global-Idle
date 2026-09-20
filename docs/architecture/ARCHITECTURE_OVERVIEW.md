@@ -43,7 +43,7 @@
 | [015](decisions/ADR-015-active-use-duration-timers.md) | Active-use timers settle at checkpoints, never by wall clock | `ACCEPTED` |
 | [016](decisions/ADR-016-content-bundle-retention.md) | Content bundles retained while referenced, never GC'd | `ACCEPTED` |
 | [017](decisions/ADR-017-idempotency-key-contract.md) | Idempotency keys are account-scoped and fingerprinted | `ACCEPTED` |
-| [018](decisions/ADR-018-domain-package-source-layout.md) | Bounded contexts live in `packages/domain` — amends `ADR-012`'s source layout | `PROPOSED` |
+| [018](decisions/ADR-018-domain-package-source-layout.md) | Bounded contexts live in `packages/domain` — amends `ADR-012`'s source layout | `ACCEPTED` |
 
 ---
 
@@ -278,14 +278,16 @@ or ledger invariants.
 ## 9. Status
 
 Architecture documents: `PHASE_0A_COMPLETE` / `ARCHITECTURE_APPROVED`.
-ADRs: all 17 `ACCEPTED`.
+ADRs: **all 18 `ACCEPTED`** — `ADR-001`–`ADR-017` with the Phase 0A package, and `ADR-018` on
+approval of the Phase 0B specification that raised it.
 
 The Product Owner approved the Phase 0A package after independent review. Per the governance
 model the architect does not self-approve; this status records the reviewer's and Product
 Owner's decision, not the author's.
 
-`IMPLEMENTATION_SPEC_READY` is the next stage and is **not** claimed here. It belongs to Phase
-0B planning, once the approved architecture has been turned into concrete implementation specs.
+`IMPLEMENTATION_SPEC_READY` belonged to Phase 0B planning, and has been **reached**: the
+[Phase 0B technical foundation specification](../specs/phase-0b/PHASE_0B_TECHNICAL_FOUNDATION_SPEC.md)
+carries that status. Implementation proceeds on its own branch and pull request.
 
 Accepted decisions may still be revised, but a revision is a **new ADR that supersedes the old
 one** — the accepted record is not edited in place.

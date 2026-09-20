@@ -1,7 +1,7 @@
 # ADR-012 — One deployable modular monolith for Phase 0B
 
 **Status:** `ACCEPTED`
-**Amended by:** [`ADR-018`](ADR-018-domain-package-source-layout.md) (`PROPOSED`) — the **source
+**Amended by:** [`ADR-018`](ADR-018-domain-package-source-layout.md) (`ACCEPTED`) — the **source
 layout only**. `ADR-018` moves the bounded contexts from `apps/api` into `packages/domain` so the
 worker has a legal call path. Every other decision below stands, including one deployable, the
 build-enforced boundaries, and the rule that context modules expose an explicit surface. **This
