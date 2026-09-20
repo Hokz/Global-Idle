@@ -28,8 +28,11 @@ sharing one word.
 **An Activity owns its in-flight state.** Concretely it owns four things:
 
 1. **Run state** — room or floor index, supplies remaining, encounter state.
-2. **A participant snapshot** — the Active Party composition, order and starting character
-   stats, frozen at activity start.
+2. **A roster snapshot** — the Active Party composition and slot order, frozen at activity
+   start.
+2b. **A participant profile** — the effective combat values in use, **refreshed at each
+   settlement checkpoint** rather than frozen. See `ADR-006`, which supersedes this ADR's
+   original wording on the point.
 3. **An unsettled accumulator** — XP, gold, resolved loot records and consumption produced but
    not yet made permanent.
 4. **A lifecycle state** — `ONLINE_ACTIVE`, `RECONNECT_GRACE_PAUSED`, `ENDED`.

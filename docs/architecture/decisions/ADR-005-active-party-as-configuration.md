@@ -29,8 +29,9 @@ outlives a composition change.
   separate `isFrontline` field.
 - **Shared XP eligibility is a derived predicate**, computed from the composition's highest and
   lowest active Base Levels. It is never stored.
-- **A running Activity holds an immutable participant snapshot**, so editing the configuration
-  never disturbs a run in progress.
+- **A running Activity holds an immutable roster snapshot**, and **formation editing is
+  rejected while an Activity is running**. The command fails with a clear reason; it does not
+  silently succeed-and-do-nothing.
 
 ## Consequences
 
@@ -51,14 +52,17 @@ outlives a composition change.
 - There is no natural place to hang party-level history, should the product later want named
   saved formations or per-party statistics. That would be a new concept, not a change to this
   one — and it is not in any current design document.
-- The snapshot means a player who changes formation expecting it to affect the current hunt will
-  see no effect. That matches the design intent, and *whether* mid-activity changes are allowed
-  at all is an open product question.
+- A player must end the current activity to change formation. The cost is bounded and known:
+  Hunt room progress never persisted between sessions anyway, so stopping loses nothing that
+  would otherwise have survived.
 
 **Constraints created.**
 - Nothing may attach durable state to "the party" as such. Anything durable belongs to the
   Account or to a Character.
-- Activity start must snapshot composition, order and starting stats.
+- Activity start snapshots composition and order. Combat values are not snapshotted — they are
+  refreshed per settlement checkpoint (`ADR-006`).
+- The application layer must reject formation changes during a running activity rather than
+  accepting and discarding them.
 
 ## Alternatives considered
 

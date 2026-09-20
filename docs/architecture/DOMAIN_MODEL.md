@@ -1,6 +1,6 @@
 # Global Idle — Domain Model
 
-**Document status:** `DRAFT` / PARTIALLY OPEN
+**Document status:** `PHASE_0A_COMPLETE` / PENDING INDEPENDENT REVIEW
 **Phase:** 0A.1 — Domain Architecture
 **Scope:** Core domain concepts, ownership boundaries, lifecycles and invariants.
 **Non-scope:** Database tables, ORM schemas, API shapes, service decomposition, transport. Those belong to 0A.2–0A.8 and to Phase 0B.
@@ -115,7 +115,7 @@ identifiers, never through reaching into another context's internals.
        ┌───────▼────────────┐                     │
        │  CHARACTER         │                     │
        │   Character        │◄────────────────────┤
-       │   Roster capacity  │                     │
+       │   Roster + capacity│                     │
        │   Progression      │                     │
        │   Skills           │                     │
        └───────┬────────────┘                     │
@@ -168,8 +168,15 @@ An imported reference to an external source (e.g. a Canary creature or item) is 
 
 ### 5.1 Account
 
-**Purpose.** The ownership root. One human, one login, one wallet, one roster, one party. Every
-question of the form *"who is allowed to do this?"* resolves to an Account.
+**Purpose.** The **ownership and security principal**. Every question of the form *"who is
+allowed to do this?"* resolves to an Account, and every durable player-owned thing — characters,
+currency, items, entitlements, market listings — hangs off one.
+
+`DECIDED IN PHASE 0A` — Account is deliberately **not** defined as "one human" or "one login".
+Nothing in the design set locks a human to a single account, and nothing locks an account to a
+single credential. Authentication identifiers are a **separate concept** (§5.18), so an account
+can later gain a second sign-in method, or an operator can support account recovery, without
+touching the ownership model.
 
 | | |
 |---|---|
@@ -182,13 +189,16 @@ question of the form *"who is allowed to do this?"* resolves to an Account.
 | Transaction / audit | required for currency, entitlement and roster-capacity changes |
 
 **Invariants.**
-- `count(characters) ≤ rosterCapacity ≤ 5` — `LOCKED BY PRODUCT`
-- character vocations are **distinct** within the account — `LOCKED BY PRODUCT`
+- `count(active characters) ≤ rosterCapacity ≤ 5` — `LOCKED BY PRODUCT`
+- active character vocations are **distinct** within the account — `LOCKED BY PRODUCT`
 - tutorial completion is tracked at account level, not inferred from character count —
   `LOCKED BY PRODUCT` (`TUTORIAL_ROOKGAARD_ROADMAP.md` §2)
 
-**Relationships.** Owns Characters, roster capacity, currency balances, entitlements, market
-listings. Is the subject of every ledger entry.
+Roster capacity is stored against the Account row but is **owned by the Character context** —
+see §5.4. Physical location does not determine the bounded context.
+
+**Relationships.** Owns Characters, currency balances, entitlements, market listings. Is the
+subject of every ledger entry.
 
 **Depended on by.** Everything. This is the authorization root.
 
@@ -221,8 +231,13 @@ on.
 
 **Relationships.** Belongs to Account. Holds at most one Activity claim.
 
-`OPEN — PRODUCT` — whether a second connection is refused, queued, or takes over and evicts
-the first. §9.3. The single-claim invariant above holds under all three.
+`DECIDED IN PHASE 0A` — **the newest authenticated connection wins and evicts the previous
+one.** See `ADR-008`. Refusing the second connection would lock a player out of their own
+account for up to five minutes every time they close a laptop and pick up a phone, which is
+hostile behaviour caused by a safety mechanism meant to protect them. Queuing has the same
+effect with extra machinery. Eviction is safe because the Activity claim transfers atomically:
+the evicted session is told why it was closed, and at no instant do two sessions hold the
+claim.
 
 `DEFERRED` to 0A.4 — liveness mechanism, timeout detection, reconnect identity, and the exact
 transport. Explicitly **not** choosing a heartbeat interval here.
@@ -246,7 +261,14 @@ character, not a temporary combat companion."*
 | Transaction / audit | settlement is transactional and carries an operation id |
 
 **Invariants.**
-- vocation is **immutable** once chosen at Level 8 — `LOCKED BY PRODUCT` (no respec rule exists)
+- `DECIDED IN PHASE 0A` — vocation is **immutable** once confirmed at Level 8. This is *not*
+  locked by product: `TUTORIAL_ROOKGAARD_ROADMAP.md` §36 says only that the vocation is
+  *"permanently applied"* after confirmation, and explicitly records that *"exact
+  respec/change-vocation rules are future design"*. Absence of a respec design is not a
+  prohibition. Architecture needs an answer now because vocation determines skill aptitude,
+  roster uniqueness and every combat profile, so it is decided here: vocation does not change
+  through ordinary play. Should a respec ever be designed, it is an explicit, audited
+  operation — never a field update — and it must re-validate roster vocation uniqueness.
 - an unlocked (non-origin) character starts at Base Level 8, never enters Rookgaard, and
   receives no catch-up levels — `LOCKED BY PRODUCT`
 - `DECIDED IN PHASE 0A` — the uniqueness of vocation per account must be enforced by a
@@ -257,8 +279,13 @@ character, not a temporary combat companion."*
 **Relationships.** Belongs to Account. Owns Progression, Skills, Inventory, Equipment. May
 appear in the Active Party. Is a participant in an Activity snapshot.
 
-`OPEN — PRODUCT` — character deletion. §9.1. This is a live gap, not a hypothetical: the
-tutorial document already describes a player deleting their first character.
+`DECIDED IN PHASE 0A` — **character deletion is retirement, not erasure.** See `ADR-007`.
+A retired character is excluded from the roster, frees its vocation for a future unlock, and
+keeps its identity so ledger and market history stay referentially intact. Roster capacity is
+**not** refunded. Items held by a retired character move to an account-level recovery custody
+scope rather than being destroyed. The Origin Character may be retired; the account's tutorial
+completion flag is unaffected, which is exactly the edge case
+`TUTORIAL_ROOKGAARD_ROADMAP.md` §2 describes.
 
 ---
 
@@ -270,16 +297,25 @@ tutorial document already describes a player deleting their first character.
 
 | Aspect | What it actually is |
 |---|---|
-| The *membership* | a **derived collection** — every Character whose owner is this Account. Nothing to store. |
-| The *capacity* | **durable Account state** — an integer, because it is bought with Gold and must be auditable |
+| The *membership* | a **derived collection** — every active Character whose owner is this Account. Nothing to store. |
+| The *capacity* | **durable state owned by the Character context** — an integer, because it is bought with Gold and must be auditable |
 
 Modelling the roster as its own entity would create a second place where membership could
 disagree with reality. Deriving membership makes divergence impossible.
 
+`DECIDED IN PHASE 0A` — **the Character context owns roster capacity**, not Identity & Access.
+The capacity value physically lives on the Account row, but storage location does not decide
+ownership. Capacity is a constraint on how many Characters may exist; it is bought with Gold
+through ordinary gameplay progression, and every invariant it participates in
+(`count(active characters) ≤ rosterCapacity`) is a Character-context invariant. Identity &
+Access owns authentication, authorization and entitlements — none of which capacity is. An
+earlier draft split membership and capacity across two contexts, which violated the
+single-owner rule of `ADR-001`; that split is removed.
+
 | | |
 |---|---|
 | Identity | none of its own — addressed through the Account |
-| Owner | Character context (membership) / Identity & Access (capacity) |
+| Owner | **Character context** — both membership and capacity |
 | State | membership derived; capacity durable |
 | Lifecycle | capacity starts at 1 and only ever increases |
 | Mutable during an Activity | capacity yes; membership yes — but neither affects a running Activity, which holds a snapshot |
@@ -287,7 +323,8 @@ disagree with reality. Deriving membership makes divergence impossible.
 
 **Invariants.**
 - `1 ≤ rosterCapacity ≤ 5` — `LOCKED BY PRODUCT`
-- capacity is monotonic — `DECIDED IN PHASE 0A`, pending the deletion question in §9.1
+- capacity is **monotonic** — `DECIDED IN PHASE 0A`. Retiring a character frees its vocation
+  and a roster place, but never reduces or refunds purchased capacity.
 - a vocation already owned is never offered as an unlock choice — `LOCKED BY PRODUCT`
 
 ---
@@ -312,7 +349,7 @@ already says, and the two could disagree.
 | Authoritative system | API/application layer |
 | State | durable configuration |
 | Lifecycle | exists from the first character onward; edited freely between activities |
-| Mutable during an Activity | **the configuration may be edited; the running Activity is unaffected**, because it holds an immutable participant snapshot |
+| Mutable during an Activity | **no — formation editing is locked while an Activity is running** (`DECIDED IN PHASE 0A`, see below) |
 | Transaction / audit | ordinary write, no ledger |
 
 **Invariants.**
@@ -320,6 +357,16 @@ already says, and the two could disagree.
 - every entry is a Character of the same Account — `LOCKED BY PRODUCT`
 - no entry appears twice; order is significant — `DECIDED IN PHASE 0A`
 - five simultaneous active characters cannot be represented — `LOCKED BY PRODUCT`
+- every entry references an **active** (non-retired) Character — `DECIDED IN PHASE 0A`
+
+`DECIDED IN PHASE 0A` — **formation editing is rejected while an Activity is running.** An
+earlier draft allowed the configuration to be edited with the running Activity simply ignoring
+it. That is worse than it sounds: because the participant profile refreshes at each settlement
+checkpoint (§5.6), an "ignored" edit would either silently take effect at the next checkpoint —
+a mid-run power swap — or produce a UI that accepts a change and visibly does nothing. Both are
+bad. The application layer rejects the command with a clear reason, and the client surfaces
+*"stop the current activity to change your party"*. The player loses nothing: ending a Hunt is
+always available and costs only the room progress, which never persisted anyway.
 
 **Shared XP eligibility** is a **derived predicate**, never stored as truth:
 
@@ -333,9 +380,12 @@ flag that could drift from the levels it describes. The UI preview in the party 
 (*"Highest 250 / Lowest 166 / Required 167 / NOT ELIGIBLE"*) is the same computation rendered,
 not a second stored value.
 
-`OPEN — PRODUCT` — *when* eligibility is evaluated: snapshotted at activity start, or
-re-evaluated continuously as members level up mid-hunt. §9.2. The domain model supports both
-and does not choose.
+`DECIDED IN PHASE 0A` — **eligibility is re-evaluated at each settlement checkpoint**, on the
+same cadence as the participant profile refresh (§5.6). Continuous per-tick evaluation would
+make a mid-tick level-up change the rules of the tick that produced it; evaluating only once at
+activity start would freeze a party out of Shared XP for an endless Hunt even after its lowest
+member crossed the threshold. The checkpoint is the boundary at which progression becomes
+durable, so it is the natural and only place where the party's derived properties change.
 
 ---
 
@@ -346,12 +396,38 @@ game actually happens.
 
 `DECIDED IN PHASE 0A` — see `ADR-002`. An Activity owns:
 
-1. **Run state** — where the party is in the activity (room index, floor, supplies remaining).
-2. **A participant snapshot** — the party composition and the character stats the run started
-   with, frozen.
-3. **An unsettled accumulator** — XP, gold, loot and consumption produced but not yet folded
+1. **Run state** — where the party is in the activity (room index, supplies remaining,
+   encounter state).
+2. **A roster snapshot** — *which* characters are participating and in what order. Immutable
+   for the life of the Activity.
+3. **A participant profile** — the effective combat values the engine is currently using for
+   each participant. **Refreshed at every settlement checkpoint**, not frozen at start.
+4. **An unsettled accumulator** — XP, gold, loot and consumption produced but not yet folded
    into durable state.
-4. **A lifecycle state** — see 0A.4.
+5. **A lifecycle state** — see 0A.4.
+
+`DECIDED IN PHASE 0A` — **composition is frozen; power is not.** See `ADR-006`.
+
+An earlier draft froze both together, which produced a serious gameplay consequence in the
+game's central loop. A Hunt is *endless by design* — room 10 repeats indefinitely — so a
+character who levelled up after three hours would keep fighting with the stats it had at minute
+zero, forever. The longer a player committed to the loop the more stale their own power became,
+which inverts the intent of the progression system the loop exists to feed.
+
+The two concerns are therefore separated:
+
+| | **Roster snapshot** | **Participant profile** |
+|---|---|---|
+| Holds | character ids and slot order | effective levels, skills, derived combat values |
+| Changes during the run | **never** | at each settlement checkpoint |
+| Why | a mid-run swap would be a power exploit and breaks the fairness of a run | progression earned in the run must apply to the run |
+
+**Refresh at the checkpoint, not per tick.** Per-tick re-derivation would mean reading durable
+Character state on every tick, which destroys engine purity and the accumulator model in one
+move. The settlement checkpoint is already the transactional boundary where progression becomes
+durable; making it also the boundary where the engine's view of the party refreshes keeps one
+boundary instead of two, and gives a player a bounded, explainable delay between "I levelled"
+and "I hit harder".
 
 **Settlement** is the transactional fold of (3) into Character progression, Inventory and the
 Economy ledger. It is idempotent, carries an operation id, and is the *only* path by which an
@@ -405,8 +481,23 @@ settlement makes item creation share the transaction with the XP and gold it was
 alongside. Loot Capacity is therefore computed from committed inventory **plus** the pending
 accumulator, and that combined figure is an engine input.
 
-`OPEN — PRODUCT` — whose death ends the hunt in a multi-character party, and whether Loot
-Capacity is per-character or pooled. §9.4, §9.5.
+`DECIDED IN PHASE 0A` — **Loot Capacity is pooled across the Active Party for the duration of
+an activity.** The pool is the sum of the participating characters' individual capacities, so
+`TUTORIAL_ROOKGAARD_ROADMAP.md` §28's *"Characters have a maximum Loot Capacity"* still holds
+per character — the activity simply spends them as one budget. Per-character capacity would
+force the player to decide which character picks up which drop, which is precisely the
+tile-by-tile busywork the product exists to remove, and it would make a full Knight stop
+collecting while a Druid with room stood next to the same corpse.
+
+`DECIDED IN PHASE 0A` — **a Hunt ends on full party wipe, not on the first death.** A downed
+character stops contributing to combat and stops accruing Shared XP from that point; survivors
+continue; the activity ends when no participant is standing. Ending the run on the first death
+would make a four-character party strictly more fragile than a solo character, since it would
+have four independent chances to trigger the same ending — the opposite of what forming a party
+is for. For a solo player the two readings are identical, so `docs/DECISIONS.md`'s *"the Hunt
+ends on death"* remains true as written for the MVP's single-character slice. Death remains
+punitive; what a wipe costs each participant is a `DEFERRED PARAMETER` of the death-penalty
+design, not an architectural question.
 
 ---
 
@@ -427,10 +518,17 @@ domain model:
 `DEFERRED` to 0A.6 — where unlock state lives (a per-account unlock set vs. flags) and how
 puzzle/lever interaction state is represented.
 
-**Terminology conflict, unresolved.** Dungeons use *floors*, Hunt Areas use *rooms*, and
-`MASTER_DEVELOPMENT_ROADMAP.md` §9 describes a boss hall as *"10 encounter rooms"*. Three
-structures, two words. This document uses the design documents' own terms and does not
-unify them. §9.6.
+**Terminology, resolved.** `DECIDED IN PHASE 0A` — the domain and the engine use **Room** as
+the single generic unit of activity progression. *Floor* survives only as a dungeon-flavoured
+**display label** for the same concept, and boss halls are rooms too.
+
+The design set used three words for one structure: Dungeons progress through *floors*, Hunt
+Areas through *rooms*, and `MASTER_DEVELOPMENT_ROADMAP.md` §9 calls a boss hall *"10 encounter
+rooms"*. `TUTORIAL_ROOKGAARD_ROADMAP.md` §16 requires a **generic** dungeon engine — *"Do not
+implement each Dungeon as a custom combat engine"* — and a generic engine cannot have two
+incompatible names for its own progression unit. Player-facing text keeps saying "floor" in
+dungeons where that reads better; the domain model, the engine and the content schema say
+`room`. `docs/DECISIONS.md` carries the same note so there is one source of truth.
 
 ---
 
@@ -548,7 +646,12 @@ six static copies.
 **Invariants.**
 - exactly one custody scope at any instant — `DECIDED IN PHASE 0A`, `ADR-004`
 - base item key + content version is immutable for the life of the instance
-- rarity is rolled once at creation and never rerolled — `LOCKED BY PRODUCT`
+- `DECIDED IN PHASE 0A` — rarity is rolled once at creation and is not rerolled by any
+  currently designed system. What *is* locked is narrower: the Forge preserves the target's
+  rarity and affixes (`docs/DECISIONS.md`). No source forbids a future reroll mechanic, so this
+  is recorded as an architectural decision rather than a product prohibition. Should a reroll
+  system ever be designed, it is a new audited economy operation producing a new rolled state
+  on the same instance — never an in-place edit outside a transaction.
 - forge tier changes never alter rarity or affixes — `LOCKED BY PRODUCT`
 - affixes, forge tier and imbuements are **independent layers** — `LOCKED BY PRODUCT`
 - a consumed instance is terminal: it never returns to circulation
@@ -637,12 +740,18 @@ my gold go" answerable and "there are two of this sword" detectable.
 
 **Purpose.** Premium and other account-level grants.
 
+`DECIDED IN PHASE 0A` — **an entitlement may be permanent or time-bounded.** An earlier draft
+defined all entitlements as time-bounded, which would have baked "everything expires" into the
+model. Premium time does expire; a cosmetic unlock, a one-off convenience purchase or a
+founder grant plausibly does not, and none of that is decided yet. Expiry is therefore an
+optional property, not part of the definition.
+
 | | |
 |---|---|
 | Identity | opaque surrogate |
 | Owner | Identity & Access |
-| State | durable, time-bounded |
-| Lifecycle | granted → active → expired/revoked |
+| State | durable; **permanent or time-bounded** |
+| Lifecycle | granted → active → (expired \| revoked). An entitlement with no expiry simply never leaves `active`. |
 | Mutable during an Activity | yes — but see the invariant below |
 | Transaction / audit | required; purchase is an economy operation |
 
@@ -656,6 +765,36 @@ my gold go" answerable and "there are two of this sword" detectable.
 
 `OPEN — PRODUCT` — what Premium *does* offer for party management now that the fifth slot is
 superseded. Already recorded in `docs/OPEN_QUESTIONS.md`.
+
+---
+
+### 5.18 Authentication Identity
+
+**Purpose.** A way of proving you are the holder of an Account. Kept deliberately separate from
+the Account itself.
+
+`DECIDED IN PHASE 0A` — **credentials are not the Account.** Modelling them as one field on the
+Account would hard-code "exactly one sign-in method, forever", which nothing in the design set
+requires and which is painful to undo once accounts exist. Separating them costs one indirection
+now and leaves room for a second sign-in method, an operator-assisted recovery flow, or a
+migration between providers, none of which need to be designed today.
+
+| | |
+|---|---|
+| Identity | opaque surrogate |
+| Owner | Identity & Access |
+| Authoritative system | API/application layer |
+| State | durable |
+| Lifecycle | registered → active → revoked |
+| Mutable during an Activity | yes; it has no bearing on a running Activity |
+| Transaction / audit | authentication events must be observable for support and abuse handling |
+
+**Invariants.**
+- every identity resolves to exactly one Account
+- an Account may have one or more identities — the cardinality is deliberately not fixed
+- credential material is never returned to a client and never logged
+
+`DEFERRED` to 0A.7 — credential storage, hashing, rotation and session-token mechanics.
 
 ---
 
@@ -731,59 +870,48 @@ exposed here: a client that can say how long it trained can mint skill progress.
 
 ---
 
-## 9. Unresolved ownership and lifecycle questions
+## 9. Decisions taken under the Phase 0A delegation
 
-These are genuine gaps found by cross-reading the design set. They are **not** answered here.
-Items 9.1, 9.4, 9.5 and 9.6 are new findings from this pass.
+The 0A.1 draft left six questions open. Under the delegated authority they are now **decided**
+and applied consistently across the architecture set. Each is recorded where it belongs in §5;
+this section is the index, with the reasoning compressed.
 
-### 9.1 Character deletion — `OPEN — PRODUCT` — **new finding**
+| # | Question | Decision | Where |
+|---|---|---|---|
+| 9.1 | Character deletion | **Retirement, not erasure.** Vocation freed, capacity not refunded, identity kept so ledger history stays intact, items moved to an account recovery scope. | §5.3, `ADR-007` |
+| 9.2 | Shared XP eligibility timing | **Re-evaluated at each settlement checkpoint**, on the same cadence as the participant profile. | §5.5, `ADR-006` |
+| 9.3 | Concurrent session policy | **Newest connection wins and evicts the previous.** The activity claim transfers atomically. | §5.2, `ADR-008` |
+| 9.4 | Loot Capacity scope in a party | **Pooled for the activity**, as the sum of participating characters' capacities. | §5.7 |
+| 9.5 | Whose death ends a Hunt | **Full party wipe**, not first death. Downed members stop contributing and stop accruing. | §5.7 |
+| 9.6 | "Floors" vs "rooms" | **Room** is the generic unit in domain, engine and content. *Floor* is a display label. | §5.8, §6 |
+| 9.7 | Gold scope | **Account-scoped.** | §5.14, `ADR-003` |
+| 9.8 | Vocation mutability | **Immutable through ordinary play** — decided here, not locked by product. | §5.3 |
+| 9.9 | Party editing during an activity | **Rejected while an Activity runs**, with a clear reason to the client. | §5.5, `ADR-005` |
 
-`TUTORIAL_ROOKGAARD_ROADMAP.md` §2 explicitly contemplates it: *"Player completes tutorial →
-deletes first character → creates another character."* But `PARTY_SYSTEM_FOUNDATION.md` defines
-a roster built on permanent, Gold-purchased, vocation-unique slots and never mentions deletion.
+None of these is left to a builder to invent. Where a decision also changes a project-level
+design rule — 9.6 in particular — `docs/DECISIONS.md` carries the same statement, so there is
+one source of truth rather than an architecture document quietly disagreeing with the design
+set.
 
-Unanswered: does deleting a Knight make Knight unlockable again? Is the Gold refunded? Is the
-roster slot freed, or consumed forever? What happens to that character's items, and to ledger
-entries naming it? Can the Origin Character be deleted at all?
+### What remains genuinely undecided
 
-This blocks the Character lifecycle. Architecture can implement any answer; it cannot pick one.
+Only **deferred parameters** — balance values that do not change any boundary, interface or
+invariant:
 
-### 9.2 Shared XP eligibility evaluation timing — `OPEN — PRODUCT`
+- exact death penalty magnitudes (level/XP/skill loss, blessing effects);
+- Gold prices for roster slots 2–5;
+- Shared XP bonus and distribution percentages;
+- Skill Point award trigger and cost curves;
+- rarity probabilities, affix pools and value bands;
+- Forge success curves and costs;
+- Exercise Weapon charges, dummy rates, offline training limits;
+- combat tick duration and settlement checkpoint interval.
 
-Snapshot at activity start, or continuous re-evaluation as members level? A party that starts
-ineligible and crosses the threshold mid-hunt behaves differently under each. The model
-supports both.
-
-### 9.3 Concurrent session policy — `OPEN — PRODUCT`
-
-Refuse the second connection, queue it, or evict the first? Recorded as open by the task scope
-itself. Invariant I9 holds regardless.
-
-### 9.4 Loot Capacity scope in a party — `OPEN — PRODUCT` — **new finding**
-
-The tutorial document says *"Characters have a maximum Loot Capacity"* — per character. But a
-party of four hunts as one unit against one loot stream. Is capacity per-character, or pooled
-across the Active Party? Does a full Knight stop collecting while the Druid continues? This
-changes both the engine's collection rule and the warning UX.
-
-### 9.5 Whose death ends a Hunt — `OPEN — PRODUCT` — **new finding**
-
-`docs/DECISIONS.md` says a Hunt *"ends on death"*, written before the party model existed. With
-four active characters: does the first death end the run, or a full wipe? Do dead members stop
-earning while survivors continue? Death is punitive and affects progression, so this is not
-cosmetic.
-
-### 9.6 "Floors" vs "rooms" — `OPEN — PRODUCT` — terminology
-
-Dungeons use floors, Hunt Areas use rooms, and the master roadmap calls a boss hall "10
-encounter rooms". Worth unifying before the dungeon engine is specified. Already raised on
-PR #1.
-
-### 9.7 Gold scope — `DECIDED IN PHASE 0A`, flagged for review
-
-Decided account-scoped in §5.14 with rationale. Recorded here because it is product-adjacent
-and the Product Owner may want it per-character. Reversible cheaply now, expensively after the
-ledger ships.
+Each is consumed by the architecture as a **configuration input**, not as a structural
+assumption. Changing any of them later is a content or config change, not a redesign. The
+settlement checkpoint interval in particular is a tuning knob with a stated cost model: a
+shorter interval bounds crash loss and shortens the level-up-to-power delay, a longer one
+reduces write volume.
 
 ---
 
@@ -791,14 +919,13 @@ ledger ships.
 
 | Question | Belongs to |
 |---|---|
-| Database tables, columns, indexes, Prisma schema | 0A.3 / Phase 0B |
-| API endpoints, command shapes, event payloads | 0A.2 |
-| Session liveness mechanism, heartbeat interval, transport | 0A.4 |
-| Engine interface signatures, tick model, RNG seeding | 0A.5 |
-| Content file format, validation, versioning mechanics, source aliasing | 0A.6 |
-| Ledger entry schema, escrow mechanics, reconciliation cadence | 0A.7 |
-| Monorepo layout, CI, observability, deployment | 0A.8 |
-| Every `OPEN — PRODUCT` item in §9 and in `docs/OPEN_QUESTIONS.md` | the Product Owner |
+| Every deferred parameter listed in §9 | balance design, not architecture |
+| Credential storage, hashing, rotation, token mechanics | 0A.7 |
+
+All other questions previously deferred from 0A.1 are answered in the completed package:
+`CLIENT_SERVER_BOUNDARIES.md`, `DATA_ARCHITECTURE.md`, `SESSION_AND_ACTIVITY_LIFECYCLE.md`,
+`GAME_ENGINE_ARCHITECTURE.md`, `CONTENT_DATA_ARCHITECTURE.md`, `ECONOMY_INTEGRITY.md` and
+`OPERATIONS_ARCHITECTURE.md`. `ARCHITECTURE_OVERVIEW.md` is the entry point.
 
 ---
 
@@ -811,3 +938,25 @@ ledger ships.
 | [ADR-003](decisions/ADR-003-ledger-derived-currency-balances.md) | Currency balances are ledger-derived projections | `PROPOSED` |
 | [ADR-004](decisions/ADR-004-item-single-custody.md) | ItemInstance has exactly one custody scope | `PROPOSED` |
 | [ADR-005](decisions/ADR-005-active-party-as-configuration.md) | Active Party is ordered configuration, not an entity | `PROPOSED` |
+| [ADR-006](decisions/ADR-006-participant-profile-refresh.md) | Composition is frozen for a run; power refreshes at settlement checkpoints | `PROPOSED` |
+| [ADR-007](decisions/ADR-007-character-retirement.md) | Character deletion is retirement, not erasure | `PROPOSED` |
+| [ADR-008](decisions/ADR-008-newest-connection-wins.md) | The newest authenticated connection evicts the previous one | `PROPOSED` |
+| [ADR-009](decisions/ADR-009-postgres-sole-durable-truth.md) | PostgreSQL is the sole durable truth; Redis holds nothing that cannot be rebuilt | `PROPOSED` |
+| [ADR-010](decisions/ADR-010-pure-engine-injected-clock-and-rng.md) | The engine is a pure function over explicit inputs, with injected clock and RNG | `PROPOSED` |
+| [ADR-011](decisions/ADR-011-content-as-versioned-artifact.md) | Content is a versioned build artifact, and activities pin their version | `PROPOSED` |
+| [ADR-012](decisions/ADR-012-modular-monolith.md) | One deployable modular monolith for Phase 0B | `PROPOSED` |
+
+---
+
+## 12. The rest of the Phase 0A package
+
+| Work package | Document |
+|---|---|
+| 0A.2 Client / server boundaries | [`CLIENT_SERVER_BOUNDARIES.md`](CLIENT_SERVER_BOUNDARIES.md) |
+| 0A.3 Data and persistence | [`DATA_ARCHITECTURE.md`](DATA_ARCHITECTURE.md) |
+| 0A.4 Session, presence and activity lifecycle | [`SESSION_AND_ACTIVITY_LIFECYCLE.md`](SESSION_AND_ACTIVITY_LIFECYCLE.md) |
+| 0A.5 Game engine / simulation | [`GAME_ENGINE_ARCHITECTURE.md`](GAME_ENGINE_ARCHITECTURE.md) |
+| 0A.6 Content / game data | [`CONTENT_DATA_ARCHITECTURE.md`](CONTENT_DATA_ARCHITECTURE.md) |
+| 0A.7 Economy integrity and security | [`ECONOMY_INTEGRITY.md`](ECONOMY_INTEGRITY.md) |
+| 0A.8 Infrastructure, observability, operations | [`OPERATIONS_ARCHITECTURE.md`](OPERATIONS_ARCHITECTURE.md) |
+| 0A.9 Integration review | [`ARCHITECTURE_OVERVIEW.md`](ARCHITECTURE_OVERVIEW.md) |
