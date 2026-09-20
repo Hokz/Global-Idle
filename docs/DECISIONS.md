@@ -162,8 +162,99 @@ level-eligible when   lowestLevel >= minimumShareLevel
   implementation, never invented;
 - how XP is allocated when a multi-character formation is *not* Shared-XP eligible is OPEN.
 
+## Character activity occupancy
+
+- a Character may perform only **one** primary gameplay/progression action at a time;
+- the same Character cannot Hunt and Skill Train simultaneously, and cannot be in two
+  activities;
+- **different** Characters on the same account may act concurrently;
+- the restriction is on Character action occupancy, not on UI navigation - the player may browse
+  hubs, Market, Atlas, inventory and skills freely.
+
+## Stamina
+
+Stamina belongs to **each Character independently**. There is no shared account pool.
+
+- maximum **42:00 hours** per Character;
+- Premium does not raise the maximum.
+
+### Consumption
+
+- entering a Hunt consumes nothing;
+- consumption **activates** when that Character receives its **first qualifying Hunt XP reward**
+  in that Hunt;
+- once activated, consumption continues while that Character's Hunt is in authoritative
+  `ONLINE_ACTIVE` state, **including the time between kills and rooms**;
+- consumption stops immediately on reconnect grace, manual exit, activity end, or the Character
+  leaving the party;
+- "N minutes without XP" is **not** the source of truth: XP activates, the activity lifecycle
+  sustains;
+- server time is authoritative; client elapsed time is never accepted.
+
+### Premium XP band
+
+| Stamina | Hunt Base XP |
+|---|---|
+| Premium, 42:00 → 39:00 | **1.5×** (exactly +50%) |
+| Premium, 39:00 → >0 | 1.0× |
+| Free, 42:00 → >0 | 1.0× |
+
+There is **no** low-stamina reduced-XP band. An interval crossing 39:00 is split at the boundary
+and each segment settles at its own rate.
+
+### Zero stamina
+
+At exactly 0 the Character is **Hunt-reward-ineligible**: no Base XP, no Hunt skill progress, no
+gold, no loot, no other Hunt reward value.
+
+- it does **not** force a Hunt exit - the Character keeps attacking, taking damage, consuming
+  supplies and being able to die;
+- eligibility is per Character: one exhausted member does not exhaust the others;
+- an exhausted Character must not receive reward indirectly through Shared XP or any other
+  distribution path;
+- stamina eligibility and Shared XP level eligibility are **separate predicates**.
+
+### Recovery
+
+The distinction is *participating in a Stamina-consuming activity* vs *not participating in one*
+- not "doing something vs doing nothing".
+
+- **Dummy / Exercise Weapon Skill Training recovers Stamina.** An earlier assumption that it
+  blocked recovery is superseded;
+- offline, idle, menus, hubs, Market and Atlas all recover while the Character is not hunting;
+- **Premium: 1 minute of eligible time = +1 minute** (1:1);
+- **Free: 2 minutes of eligible time = +1 minute** (1:2);
+- capped at 42:00; there is no mandatory waiting period;
+- every activity type must declare whether it consumes Stamina.
+
+## Active-use timers
+
+Timed effects - XP boosts, status boosts, loot boosts, Imbuements - measure **active use**, not
+wall-clock time.
+
+- duration decreases only while the effect is in a qualifying state where it can operate;
+- offline, idle and menu time do not burn duration;
+- reconnect grace **pauses** every active-use timer;
+- duration is never decremented every second; it is settled from durable state at checkpoints;
+- settlement is idempotent, restart-safe and server-clock based.
+
+## Imbuements
+
+- exactly **one** playable power tier: **Powerful**. Basic and Intricate are not player
+  progression tiers;
+- duration is **12 hours of active use**, not wall-clock expiry;
+- no duration is consumed while the item is unequipped, the Character is inactive or offline, or
+  the activity is paused in reconnect grace;
+- remaining duration is durable state on the `ItemInstance`, and travels with the item;
+- re-equipping **resumes** the remaining duration; it never resets it;
+- Powerful Imbuements require the approved quest/boss progression unlock.
+
 ## Free/Premium
 
+- **Premium is an Account-wide entitlement**, not a Character one. Every Character on the account
+  receives applicable benefits;
+- a Premium transition splits an unsettled interval at the transition boundary; already-settled
+  time is never retroactively rewritten;
 - additional roster characters are unlocked with in-game **Gold**, not with Premium;
 - Premium must not create a fifth simultaneous Active Party member;
 - Party-related Premium benefits are OPEN and require separate product design;

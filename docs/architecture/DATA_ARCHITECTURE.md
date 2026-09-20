@@ -42,11 +42,19 @@ Two families (`DOMAIN_MODEL.md` §4):
   no business meaning.
 - **Content definitions** — readable canonical keys, `creature.rookgaard.rat`.
 
-`DECIDED IN PHASE 0A` — **state entity ids are UUIDv7.** Reasons: globally unique without
-coordination, non-enumerable (unlike sequential integers, which leak volume and enable
-scraping), and time-ordered, so index locality stays reasonable as tables grow — the property
-plain UUIDv4 costs you. Where a compact join key later proves necessary, an internal surrogate
-may be added **behind** the public id; the public id never becomes sequential.
+`DECIDED IN PHASE 0A` — **state entity ids are UUIDv7**, chosen for uniqueness without
+coordination and for time-ordering, which keeps index locality reasonable as tables grow — the
+property plain UUIDv4 costs you. Sequential integers are avoided because they leak volume and
+invite scraping.
+
+**An identifier is not an authorization mechanism.** Being hard to guess is a marginal
+convenience, never a control. The security boundary is authorization plus ownership-scoped
+queries plus rate limiting (`CLIENT_SERVER_BOUNDARIES.md` §7): every entity is loaded scoped to
+the authenticated principal, so knowing an id — guessed, leaked or shared — grants nothing.
+Nothing in the system may rely on an id being secret.
+
+Where a compact join key later proves necessary, an internal surrogate may be added **behind**
+the public id; the public id never becomes sequential.
 
 ---
 

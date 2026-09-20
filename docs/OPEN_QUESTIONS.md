@@ -61,8 +61,9 @@ locked in `docs/DECISIONS.md` and are **not** open.
 - whether prerequisites besides Gold exist;
 - XP behavior when a multi-character formation is not Shared-XP eligible;
 - exact adopted Tibia Global Shared XP bonus and distribution values;
+- exact definition of a "qualifying Hunt XP reward" for Stamina activation;
+- which bosses make up the Powerful Imbuement unlock set, and how many;
 - combat consequences of Party ordering beyond Slot 1 being the Frontline;
-- whether the formation can be changed during an active combat/activity;
 - final name for the "Origin Character" concept;
 - final Skill Point state granted to a newly unlocked Level 8 character.
 
@@ -100,9 +101,9 @@ locked in `docs/DECISIONS.md` and are **not** open.
 ## Premium
 
 - Premium duration/price;
+- Gold and premium-currency costs of Imbuement materials;
 - Premium Party-management benefit, now that the fifth active Party slot is superseded;
 - premium-currency package pricing;
-- exact XP bonus if any;
 - maximum offline Skill Training duration;
 - Exercise Weapon charge settlement while offline;
 - offline training-rate rules;

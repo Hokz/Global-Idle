@@ -276,8 +276,14 @@ character, not a temporary combat companion."*
   loses to a concurrent double-unlock; this invariant is load-bearing for the entire roster
   model and deserves the database's guarantee.
 
-**Relationships.** Belongs to Account. Owns Progression, Skills, Inventory, Equipment. May
-appear in the Active Party. Is a participant in an Activity snapshot.
+**Relationships.** Belongs to Account. Owns Progression, Skills, Inventory, Equipment,
+**Stamina** and at most one **occupancy claim**. May appear in the Active Party. Is a participant
+in an Activity snapshot.
+
+`DECIDED IN PHASE 0A` — a Character holds at most one occupancy claim, so it can perform only one
+primary action at a time, and **Stamina is per-Character durable state** with a 42:00 maximum.
+Both are specified in
+[`ACTIVITY_OCCUPANCY_AND_TIMERS.md`](ACTIVITY_OCCUPANCY_AND_TIMERS.md) (`ADR-013`, `ADR-014`).
 
 `DECIDED IN PHASE 0A` — **character deletion is retirement, not erasure.** See `ADR-007`.
 A retired character is excluded from the roster, frees its vocation for a future unlock, and
@@ -869,6 +875,10 @@ application-only check loses a race.
 | I10 | Skill Training cannot write Base XP | interface capability, not runtime check |
 | I11 | Formation and equipment cannot change for a running activity's participants | command rejected at the application layer |
 | I12 | A Character is never hard-deleted | no delete path exists (`ADR-007`) |
+| I13 | At most one occupancy claim per Character | persistence constraint (`ADR-013`) |
+| I14 | An exhausted Character receives no Hunt reward by any path, including Shared XP | reward distribution filters recipients after computing the pool (`ADR-014`) |
+| I15 | Active-use duration is never consumed outside a qualifying state | timers settle from `qualifyingSince`, which only a state transition writes (`ADR-015`) |
+| I16 | A referenced content bundle is never deleted | no automatic GC exists (`ADR-016`) |
 
 I8 and I10 are stated as *structural* rather than *validated*. A check that can be forgotten is
 weaker than a path that does not exist.
@@ -966,6 +976,11 @@ All other questions previously deferred from 0A.1 are answered in the completed 
 | [ADR-010](decisions/ADR-010-pure-engine-injected-clock-and-rng.md) | The engine is a pure function over explicit inputs, with injected clock and RNG | `PROPOSED` |
 | [ADR-011](decisions/ADR-011-content-as-versioned-artifact.md) | Content is a versioned build artifact, and activities pin their version | `PROPOSED` |
 | [ADR-012](decisions/ADR-012-modular-monolith.md) | One deployable modular monolith for Phase 0B | `PROPOSED` |
+| [ADR-013](decisions/ADR-013-character-activity-occupancy.md) | One primary action per Character, atomically enforced | `PROPOSED` |
+| [ADR-014](decisions/ADR-014-per-character-stamina.md) | Stamina per Character, activated by first qualifying XP | `PROPOSED` |
+| [ADR-015](decisions/ADR-015-active-use-duration-timers.md) | Active-use timers settle at checkpoints | `PROPOSED` |
+| [ADR-016](decisions/ADR-016-content-bundle-retention.md) | Content bundles retained while referenced | `PROPOSED` |
+| [ADR-017](decisions/ADR-017-idempotency-key-contract.md) | Idempotency keys account-scoped and fingerprinted | `PROPOSED` |
 
 ---
 
@@ -981,3 +996,4 @@ All other questions previously deferred from 0A.1 are answered in the completed 
 | 0A.7 Economy integrity and security | [`ECONOMY_INTEGRITY.md`](ECONOMY_INTEGRITY.md) |
 | 0A.8 Infrastructure, observability, operations | [`OPERATIONS_ARCHITECTURE.md`](OPERATIONS_ARCHITECTURE.md) |
 | 0A.9 Integration review | [`ARCHITECTURE_OVERVIEW.md`](ARCHITECTURE_OVERVIEW.md) |
+| Occupancy, Stamina, active-use timers, Imbuements | [`ACTIVITY_OCCUPANCY_AND_TIMERS.md`](ACTIVITY_OCCUPANCY_AND_TIMERS.md) |

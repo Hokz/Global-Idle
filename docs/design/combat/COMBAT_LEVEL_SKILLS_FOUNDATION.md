@@ -429,6 +429,12 @@ The character may be able to train:
 Dedicated Skill Training is the only approved form of offline progression. It never grants
 Base XP, and it is separate from Hunt/Dungeon simulation, which is online-only.
 
+A Character may not Hunt and Skill Train at the same time - one primary action per Character -
+but different Characters on the account may do both concurrently. For Stamina purposes a
+Character at a Dummy counts as **recovering**: Skill Training does not block Stamina recovery.
+See `docs/DECISIONS.md` and
+`docs/architecture/ACTIVITY_OCCUPANCY_AND_TIMERS.md`.
+
 Exact offline restrictions, rates and durations are open.
 
 ---

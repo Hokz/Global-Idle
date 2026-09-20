@@ -1024,8 +1024,8 @@ The following remain OPEN and must not be silently decided by a builder:
 - exact XP behavior when multiple active characters are not Shared-XP eligible;
 - exact combat consequences of Party ordering beyond Slot 1 being Frontline;
 - targeting/aggro rules between Party positions;
-- character replacement restrictions while an activity is already running;
-- whether formation can be changed only outside combat or under other conditions;
+- (resolved in Phase 0A architecture: formation **and equipment** changes are rejected while an
+  Activity is running - see `docs/architecture/DOMAIN_MODEL.md` §5.5 and §5.12)
 - final Skill Point state granted to a newly unlocked Level 8 character;
 - Premium/convenience benefits related to Party management now that there is no fifth active Party slot.
 

@@ -144,7 +144,7 @@ audit trail decorative.
 | Fabricated offline training time | elapsed time computed from persisted server timestamps only |
 | Market self-dealing / wash trading | buyer ≠ seller enforced; fees make round-trips lossy; price history retained for analysis |
 | Listing spam | listing fees, rate limits |
-| Enumeration of accounts or items | UUIDv7 ids, non-sequential (`DATA_ARCHITECTURE.md` §2) |
+| Enumeration of accounts or items | ownership-scoped queries and rate limiting are the control; non-sequential UUIDv7 ids raise the cost but are **not** the security boundary (`DATA_ARCHITECTURE.md` §2) |
 | Race on roster vocation uniqueness | persistence-level constraint over active characters (`ADR-007`) |
 
 `DEFERRED PARAMETER` — fee percentages, listing limits, rate-limit thresholds. They are tuning

@@ -125,10 +125,21 @@ fighting.
 
 ### Retention
 
-A superseded version must remain loadable while any persisted activity references it. Since
-session-bound activities end within hours, the practical retention window is short. The exact
-policy is `DEFERRED` to operations; the requirement is that a version is never removed while
-referenced.
+`DECIDED IN PHASE 0A` — see `ADR-016`. **A referenced bundle is never garbage-collected.**
+
+Each published version is an immutable, addressable bundle. The running server can load **any
+referenced bundle**, not only the one it shipped with, so a persisted Activity pinned to version
+N stays recoverable after a deploy to N+1 **by construction**.
+
+An earlier draft justified a short retention window by claiming session-bound activities end
+within hours. That is false: **Hunts are endless by design** — room 10 repeats indefinitely and
+the reconnect grace preserves an activity across disconnects. There is no upper bound on how long
+a pinned version may be referenced, and the failure mode of getting it wrong is silent and total:
+the activity does not degrade, it fails to load.
+
+The set of referenced versions is **derived from durable state**, so it cannot drift from
+reality. Removing a genuinely unreferenced bundle is an explicit, audited operational action,
+never an automatic sweep.
 
 ---
 
@@ -203,7 +214,7 @@ The test: **if two players could see different values, it is state.**
 |---|---|
 | YAML vs JSON | Phase 0B; structurally irrelevant |
 | Generated accessor mechanics | Phase 0B |
-| Content retention policy specifics | operations |
+| Storage backend for published bundles | Phase 0B; the retention rule is fixed by `ADR-016` |
 | Authoring tooling beyond a text editor and CI | not needed at this stage |
 | Every balance number in every table | `DEFERRED PARAMETER` — they are the content |
 

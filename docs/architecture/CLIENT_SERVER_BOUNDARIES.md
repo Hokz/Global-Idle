@@ -59,11 +59,31 @@ does not own is rejected before any domain logic runs — not filtered afterward
 ### Idempotency
 
 Commands that move value — `unlockRosterSlot`, `buyListing`, `forgeAttempt`, `sellItem`,
-`claimSkillTraining` — carry a **client-supplied idempotency key**. A repeat of the same key
-returns the original result rather than performing the operation again. Read-only and
-configuration commands do not need one.
+`claimSkillTraining` — carry a **client-supplied idempotency key**. Read-only and configuration
+commands do not need one.
+
+`DECIDED IN PHASE 0A` — see `ADR-017`. The key is **scoped and fingerprinted**:
+
+```text
+key identity  =  (authenticated account/principal, command namespace, client key)
+stored with   =  canonical fingerprint of the request payload
+```
+
+| Case | Behaviour |
+|---|---|
+| Key unseen | execute, store `(fingerprint, result)`, return result |
+| Key seen, fingerprint **matches** | return the original result; do not execute |
+| Key seen, fingerprint **differs** | **reject explicitly**; do not execute, do not overwrite |
+| Key belonging to another account | not visible — it is a different key identity |
+
+Scoping by principal means account A can neither collide with nor observe account B's result.
+Fingerprinting means a retry carrying a *different* payload fails loudly instead of silently
+returning a result for an operation the caller did not request.
 
 This is what makes a flaky mobile connection safe: a retried purchase cannot double-charge.
+
+Settlement operation ids are a separate mechanism — server-generated and deterministic, not
+client keys (`DATA_ARCHITECTURE.md` §5).
 
 ---
 

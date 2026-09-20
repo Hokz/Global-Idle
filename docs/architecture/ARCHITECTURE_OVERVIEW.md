@@ -20,6 +20,7 @@
 | 0A.7 | Economy integrity and security | [`ECONOMY_INTEGRITY.md`](ECONOMY_INTEGRITY.md) |
 | 0A.8 | Infrastructure, observability, operations | [`OPERATIONS_ARCHITECTURE.md`](OPERATIONS_ARCHITECTURE.md) |
 | 0A.9 | Integration review | this document |
+| 0A+ | Occupancy, Stamina, active-use timers, Imbuements | [`ACTIVITY_OCCUPANCY_AND_TIMERS.md`](ACTIVITY_OCCUPANCY_AND_TIMERS.md) |
 
 ### Decisions
 
@@ -37,6 +38,11 @@
 | [010](decisions/ADR-010-pure-engine-injected-clock-and-rng.md) | Pure engine, injected clock and RNG | `PROPOSED` |
 | [011](decisions/ADR-011-content-as-versioned-artifact.md) | Content is a versioned build artifact | `PROPOSED` |
 | [012](decisions/ADR-012-modular-monolith.md) | One deployable modular monolith for Phase 0B | `PROPOSED` |
+| [013](decisions/ADR-013-character-activity-occupancy.md) | One primary action per Character, atomically enforced | `PROPOSED` |
+| [014](decisions/ADR-014-per-character-stamina.md) | Stamina per Character, activated by first qualifying XP | `PROPOSED` |
+| [015](decisions/ADR-015-active-use-duration-timers.md) | Active-use timers settle at checkpoints, never by wall clock | `PROPOSED` |
+| [016](decisions/ADR-016-content-bundle-retention.md) | Content bundles retained while referenced, never GC'd | `PROPOSED` |
+| [017](decisions/ADR-017-idempotency-key-contract.md) | Idempotency keys are account-scoped and fingerprinted | `PROPOSED` |
 
 ---
 
@@ -257,7 +263,7 @@ or ledger invariants.
 | Pessimistic locking contends under load | market throughput | deterministic lock order prevents deadlock; contention is measurable before it is a problem, and no load exists yet |
 | Ledger growth | storage and query cost over years | append-only by design; partitioning and retention deferred as a scale concern, not a correctness one |
 | Single deployable | scales as one unit | the engine — the plausible hotspot — is already isolated behind a replaceable boundary (`ADR-010`) |
-| Content retention vs long activities | a pinned version must stay loadable | activities are session-bound and end within hours; validator prevents removing referenced definitions |
+| Content retention vs long activities | a pinned version must stay loadable, and Hunts are endless | referenced bundles are never garbage-collected and any referenced version is loadable (`ADR-016`); no document assumes an activity finishes within any particular time |
 | Eviction churn on flaky networks | repeated session evictions | atomic transfer keeps each one consistent; metric surfaces the pattern |
 
 ---
