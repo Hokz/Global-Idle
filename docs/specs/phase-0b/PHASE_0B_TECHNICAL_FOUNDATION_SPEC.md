@@ -298,7 +298,7 @@ diagnostic states — and the review was right to block. The corrected declarati
 |---|---|---|
 | I1 — one playable Character per vocation per account | `@@unique([accountId, vocation], where: { retiredAt: null })` | object — `null` equality is supported |
 | I9 — one non-terminal session-bound Activity per account | `@@unique([accountId], where: raw("state IN ('ONLINE_ACTIVE', 'RECONNECT_GRACE_PAUSED')"))` | `raw()` — an `IN` list has no object form |
-| Skill Training has exactly one participant (§6.3.1) | `@@unique([activityId], where: raw("family = 'WALL_CLOCK'"))` | `raw()` — an enum comparison is kept in `raw()` rather than relying on string coercion |
+| A wall-clock activity has **at most one** participant (§6.3.1) | `@@unique([activityId], where: raw("family = 'WALL_CLOCK'"))` | `raw()` — an enum comparison is kept in `raw()` rather than relying on string coercion |
 
 Column names in the `raw()` predicates are all-lowercase identifiers, so they need no quoting in
 PostgreSQL; a camel-case column would.
@@ -317,11 +317,12 @@ PostgreSQL; a camel-case column would.
 in this specification changes at that point — the `where` syntax is the same; it merely stops
 being a preview.
 
-**Raw SQL is still used, for exactly one thing**, justified individually:
+**Hand-written SQL is used for exactly two things**, justified individually:
 
-| Raw SQL | Why no ORM can express it |
+| Hand-written SQL | Why no ORM can express it |
 |---|---|
 | Ledger role grants — `REVOKE UPDATE, DELETE ON "LedgerEntry" FROM <app role>` | A database **permission**, not a schema object. No ORM models it, and this is what makes invariant I6 (`ADR-003`, append-only ledger) true for a developer who has not read the ADR. |
+| Two `CHECK` constraints pinning each activity subtype to its family — `CHECK ("family" = 'SESSION_BOUND')` on `SessionBoundActivity` and `CHECK ("family" = 'WALL_CLOCK')` on `SkillTrainingActivity` | Prisma has no declarative `CHECK`. These two lines, together with the composite foreign keys already present, make **two** of §6.3.3's three invalid subtype states unrepresentable rather than merely detectable — see §6.3.3 for the full argument and for the reviewer instruction they are weighed against |
 
 No other hand-written SQL is authorized by this specification. If implementation finds it needs
 more, that is a finding to report, not a decision to take quietly.
@@ -363,7 +364,7 @@ Researched 2026‑09‑20 from the Node release index and the pinned packages' o
 
 | Fact | Source |
 |---|---|
-| Node **24.21.0** is the current release on the 24 line (2026‑09‑07), LTS codename Krypton | `nodejs.org/dist/index.json` |
+| Node **24.21.0** is the current release on the 24 line, LTS codename Krypton, released **2026‑09‑08** | the release announcement heading, `doc/changelogs/CHANGELOG_V24.md`, and the `dist/v24.21.0/` file timestamps — all three agree. `dist/index.json` carries `2026-09-07` for the same release; that field is the cut date, not the publication date, and an earlier draft of this table quoted it as the release date |
 | `prisma@7.10.0`, `@prisma/client@7.10.0`: `^20.19 \|\| ^22.12 \|\| >=24.0` — the Node 24 line satisfies the **pinned** Prisma from **24.0** | package `engines` |
 | **`@nestjs/schematics@12.0.3`: `^22.22.3 \|\| ^24.15.0 \|\| >=26.0.0`** — the tightest floor on the 24 line in this toolchain, and it is NestJS's, not Prisma's | package `engines` |
 | `vitest@5.0.1`: `^22.12.0 \|\| ^24.0.0 \|\| >=26.0.0`; `dependency-cruiser@18.4.0`: `^22 \|\| ^24 \|\| >=26`; `eslint@10.11.0`: `>=24`; `@nestjs/terminus@12.1.0`: `>=24.0.0` | package `engines` |
@@ -878,10 +879,10 @@ The minimum needed to build and prove the 0B primitives. **Do not add gameplay t
 | `Character` | the avatar | vocation, `retiredAt` nullable |
 | `CharacterStamina` | Stamina state | `remaining`, `mode`, `modeSince`, `updatedAt` |
 | `OccupancyClaim` | one per Character | `characterId` PK; `activityId`; composite FK `(activityId, characterId) → ActivityParticipant` — a claim can only name a participant of the activity it claims; `ADR-013` |
-| `Activity` | **shared root** for both families | `id`, `accountId`, `activityTypeKey`, `family`, **`contentVersion` FK `ON DELETE RESTRICT`, NOT NULL** (`ADR-011` — *every* Activity pins), `createdAt`; `UNIQUE(id, accountId)`, `UNIQUE(id, family)` |
+| `Activity` | **shared root** for both families | `id`, `accountId`, `activityTypeKey`, `family`, **`contentVersion` FK `ON DELETE RESTRICT`, NOT NULL** (`ADR-011` — *every* Activity pins), `createdAt`; `UNIQUE(id, family)` and `UNIQUE(id, accountId, family)` as composite FK targets |
 | `ActivityParticipant` | per-Character membership — the **durable roster snapshot**, retained after the Activity ends | `(activityId, characterId)` PK, `family` (projection, composite FK to `Activity`), `slotIndex`, `staminaActivatedAt` |
-| `SessionBoundActivity` | Hunt / Dungeon subtype | `accountId` (composite FK), `state`, `claimHolderSessionId`, `graceExpiresAt`, `rngSeed` |
-| `SkillTrainingActivity` | wall-clock subtype | status ∈ {ACCRUING, ENDED, EXHAUSTED, CANCELLED}, `startedAt`, `lastSettledAt`, `endedAt` — **no Character column**: the trainee is the activity's single participant row |
+| `SessionBoundActivity` | Hunt / Dungeon subtype | `accountId` and `family` (one composite FK carries both), `CHECK (family = 'SESSION_BOUND')`, `state`, `claimHolderSessionId`, `graceExpiresAt`, `rngSeed` |
+| `SkillTrainingActivity` | wall-clock subtype | `family` + `CHECK (family = 'WALL_CLOCK')`, **`traineeCharacterId`** — a composite FK into `ActivityParticipant`, which is what makes the trainee row **mandatory** (§6.3.1) — status ∈ {ACCRUING, ENDED, EXHAUSTED, CANCELLED}, `startedAt`, `lastSettledAt`, `endedAt` |
 | `ActiveUseTimer` | reusable duration state | `remainingDuration`, `qualifyingSince` |
 | `IdempotencyRecord` | client command keys | scope, fingerprint, result reference |
 | `SettlementOperation` | deterministic settlement ids | uniqueness target |
@@ -911,19 +912,27 @@ Activity            id  PK
                     contentVersion         FK → ContentBundle.version  ON DELETE RESTRICT, NOT NULL
                                                                       ← ADR-011: EVERY Activity pins
                     createdAt
-                    UNIQUE (id, accountId)                            ← composite FK target
                     UNIQUE (id, family)                               ← composite FK target
+                    UNIQUE (id, accountId, family)                    ← composite FK target
 
    ├── SessionBoundActivity   activityId  PK, FK → Activity.id
-   │                          accountId                               ← see "no drift" below
+   │                          accountId, family                       ← see "no drift" below
+   │                          CHECK (family = 'SESSION_BOUND')        ← §6.3.3
    │                          state ∈ {ONLINE_ACTIVE, RECONNECT_GRACE_PAUSED, ACTIVITY_ENDED}
    │                          claimHolderSessionId, graceExpiresAt, rngSeed
-   │                          FOREIGN KEY (activityId, accountId) → Activity(id, accountId)
+   │                          FOREIGN KEY (activityId, accountId, family)
+   │                                        → Activity(id, accountId, family)
    │
    └── SkillTrainingActivity  activityId  PK, FK → Activity.id
+                              family
+                              CHECK (family = 'WALL_CLOCK')           ← §6.3.3
+                              traineeCharacterId                      ← NOT a second source of truth:
                               status ∈ {ACCRUING, ENDED, EXHAUSTED, CANCELLED}
                               startedAt, lastSettledAt, endedAt
-                              (no characterId — the trainee is the single participant row)
+                              FOREIGN KEY (activityId, family) → Activity(id, family)
+                              FOREIGN KEY (activityId, traineeCharacterId)
+                                        → ActivityParticipant(activityId, characterId)
+                                                            ← the trainee row must EXIST to be named
 
 ActivityParticipant  activityId  FK → Activity.id
                      characterId FK → Character
@@ -932,21 +941,29 @@ ActivityParticipant  activityId  FK → Activity.id
                      staminaActivatedAt  Instant | null     ← per-Character, ADR-014
                      PRIMARY KEY (activityId, characterId)
                      FOREIGN KEY (activityId, family) → Activity(id, family)
-                     UNIQUE (activityId) WHERE family = 'WALL_CLOCK'   ← exactly one trainee
+                     UNIQUE (activityId) WHERE family = 'WALL_CLOCK'   ← AT MOST one trainee
                      — retained after the Activity ends: the durable roster snapshot
 
 OccupancyClaim       characterId  PK, UNIQUE                ← I13, one per Character
-                     activityId   FK → Activity.id
+                     activityId
                      FOREIGN KEY (activityId, characterId) → ActivityParticipant(activityId, characterId)
                                                             ← a claim names a participant, or nothing
                      — released (deleted) when the Activity ends
 ```
 
-**Three composite foreign keys, one pattern.** Wherever this model stores a projection of another
-row's fact — `accountId` and `family` on the subtype and participant rows — it is chained back to
-the source row by a composite foreign key, so the projection cannot be written with a value the
-source does not have. The alternative, a plain duplicated column kept honest by discipline, is how
-projections drift.
+**Every projection is chained, and the chain has no cycle.** Wherever this model stores a
+projection of another row's fact — `accountId` and `family` on the subtype and participant rows —
+it is chained back to the source row by a composite foreign key, so the projection cannot be
+written with a value the source does not have. The alternative, a plain duplicated column kept
+honest by discipline, is how projections drift.
+
+The foreign keys impose a **total insert order** with no cycle, which is what lets §8.1's start
+transaction use ordinary immediate constraint checking rather than deferred constraints:
+
+```text
+ContentBundle → Activity → ActivityParticipant → SkillTrainingActivity  ┐
+                        └→ SessionBoundActivity                          ├→ OccupancyClaim
+```
 
 #### Why `accountId` is on both, and why it cannot drift
 
@@ -979,20 +996,36 @@ model Activity {
   sessionBound    SessionBoundActivity?
   skillTraining   SkillTrainingActivity?
   participants    ActivityParticipant[]
-  @@unique([id, accountId])                    // composite FK target
   @@unique([id, family])                       // composite FK target
+  @@unique([id, accountId, family])            // composite FK target
   @@index([activityTypeKey, family])           // §7.3.2 startup reconciliation
 }
 
 model SessionBoundActivity {
   activityId  String            @id
   accountId   String
+  family      ActivityFamily
   state       SessionBoundState
   // …
-  activity Activity @relation(fields: [activityId, accountId], references: [id, accountId])
+  activity Activity @relation(fields: [activityId, accountId, family],
+                               references: [id, accountId, family])
 
   @@unique([accountId], where: raw("state IN ('ONLINE_ACTIVE', 'RECONNECT_GRACE_PAUSED')"))
   //  ^ partial unique index — I9. raw(): the object form has no IN (§3.8)
+  //  + CHECK ("family" = 'SESSION_BOUND') — hand-written, §3.8 / §6.3.3
+}
+
+model SkillTrainingActivity {
+  activityId         String              @id
+  family             ActivityFamily
+  traineeCharacterId String
+  status             SkillTrainingStatus
+  // …
+  activity Activity            @relation(fields: [activityId, family], references: [id, family])
+  trainee  ActivityParticipant @relation(fields: [activityId, traineeCharacterId],
+                                         references: [activityId, characterId])
+  //  ^ the trainee participant row must EXIST — this is the "at least one" half (§6.3.3)
+  //  + CHECK ("family" = 'WALL_CLOCK') — hand-written, §3.8 / §6.3.3
 }
 
 model ActivityParticipant {
@@ -1003,9 +1036,10 @@ model ActivityParticipant {
   staminaActivatedAt DateTime?
   activity  Activity  @relation(fields: [activityId, family], references: [id, family])
   claim     OccupancyClaim?
+  training  SkillTrainingActivity?
   @@id([activityId, characterId])
   @@unique([activityId], where: raw("family = 'WALL_CLOCK'"))
-  //  ^ a wall-clock activity has exactly one participant — the trainee
+  //  ^ AT MOST one participant on a wall-clock activity — the "at most one" half (§6.3.3)
 }
 
 model OccupancyClaim {
@@ -1054,7 +1088,7 @@ different lifetimes:
 |---|---|---|
 | Grain | one row per Character **per activity** | one row per Character, **globally** |
 | Answers | "who was in this activity, in which slot, and were they activated?" | "is this Character busy right now, and with what?" |
-| Cardinality | many per activity (exactly one for a wall-clock activity) | **exactly one per Character** (I13) |
+| Cardinality | many per activity; **exactly one** for a wall-clock activity — at most one by the partial unique index, at least one by `SkillTrainingActivity`'s foreign key (§6.3.3) | **exactly one per Character** (I13) |
 | Lifetime | **as long as the Activity row exists** — it is the durable roster snapshot | **while the Activity is live** |
 
 Starting an activity writes both, in the same transaction: a participant row per Character and a
@@ -1075,22 +1109,37 @@ ones.
 **Test O14** proves that ending an activity releases every claim and preserves every participant
 row. **Test T15** proves two Characters in one activity hold **independent** activation state.
 
-**The Skill Training trainee is the participant row — there is no second Character column.** An
-earlier draft carried both `SkillTrainingActivity.characterId` and `ActivityParticipant.characterId`
-with nothing relating them: two unconstrained ids that could disagree. The review was right.
-This model keeps **one** representation and makes the rest structural:
+**The Skill Training trainee is the participant row, named by a foreign key into it.** Two
+drafts have now been wrong here in opposite directions, and both corrections are kept visible:
 
-- `SkillTrainingActivity` has no Character column at all; *who is training* is answered by the
-  activity's participant row;
-- a wall-clock activity has **exactly one** participant, enforced by the partial unique index
-  `UNIQUE (activityId) WHERE family = 'WALL_CLOCK'` — a second trainee is unrepresentable;
-- an `OccupancyClaim` carries a composite foreign key to `ActivityParticipant(activityId,
-  characterId)`, so a claim can only name a Character who is a participant of the activity it
-  claims. The reconciliation sweeper therefore reads the trainee **through** the claim and the
-  participant row, never from a column that could have drifted.
+| Draft | Model | What was wrong |
+|---|---|---|
+| second review | `SkillTrainingActivity.characterId` **and** `ActivityParticipant.characterId`, unrelated | two unconstrained ids that could disagree |
+| third review | **no** Character column on the subtype; cardinality left to `UNIQUE (activityId) WHERE family = 'WALL_CLOCK'` | that index is **at most one**. It does not stop a `SkillTrainingActivity` existing with **zero** participants |
+| **this draft** | `SkillTrainingActivity.traineeCharacterId` with a **composite foreign key** to `ActivityParticipant(activityId, characterId)` | — |
+
+The column is back, but it is **not a second source of truth**: it is a foreign key *into* the
+participant row, so it cannot name a Character who is not a participant of that activity, and
+with at most one participant it cannot name anyone but the trainee. That is precisely the
+*"database relationship that makes mismatch impossible"* the third review asked for — and it
+closes the fourth review's gap at the same time, because a foreign key requires its target to
+**exist**:
+
+- **at most one** participant on a wall-clock activity — the partial unique index
+  `UNIQUE (activityId) WHERE family = 'WALL_CLOCK'`;
+- **at least one** — `SkillTrainingActivity` cannot be inserted at all unless the participant row
+  it names is already there;
+- therefore **exactly one**, structurally, with no sweep and no trigger. §6.3.3 works through
+  every remaining subtype state.
+
+An `OccupancyClaim` carries the same composite foreign key to `ActivityParticipant(activityId,
+characterId)`, so a claim can only name a Character who is a participant of the activity it
+claims. The reconciliation sweeper reads the trainee **through** the participant row, never from
+a column that could have drifted.
 
 **Test D11** proves a claim naming a non-participant is refused by the database; **test D12**
-proves a second participant on a wall-clock activity is refused by the index.
+proves a second participant on a wall-clock activity is refused by the index; **test D14** proves
+a `SkillTrainingActivity` with no participant row cannot be inserted at all.
 
 #### Skill Training lifecycle — every status classified
 
@@ -1158,6 +1207,71 @@ re-establishes.
 stale — that is exactly what reconnect grace is for. Staleness is decided from
 `graceExpiresAt` against `Clock.now()`, never from presence being absent (§11.2).
 
+### 6.3.3 Activity root ↔ subtype integrity
+
+`ADR-002`'s two families mean every `Activity` root must have **exactly one** subtype row, and
+the right one. Three states would break that, and an earlier draft closed none of them:
+
+| Invalid state | Closed by | When |
+|---|---|---|
+| **Wrong-family subtype** — a `WALL_CLOCK` root with a `SessionBoundActivity` row, or the reverse | `CHECK (family = …)` on each subtype **+** the composite FK chaining that column to the root's | **write time** — unrepresentable |
+| **Both subtypes present** on one root | the same two constraints, with nothing extra | **write time** — unrepresentable |
+| **Missing subtype** — a root with neither | the start transaction (§8.1) **+** the startup integrity sweep below | **start time**, then **startup** |
+
+**Why the first two fall to the same two lines.** Each subtype carries a `family` column chained
+to `Activity(id, family)` by a composite foreign key, so it can never disagree with its root; the
+`CHECK` pins it to the one constant that subtype is for. A `SESSION_BOUND` root therefore cannot
+carry a `SkillTrainingActivity` row — that row's `CHECK` demands `WALL_CLOCK`, its foreign key
+demands the root agree, and both cannot hold. Both-subtypes-present is the same contradiction
+seen from the other side: it would need the root's `family` to be two values at once. One pair of
+`CHECK` constraints, two invalid states gone.
+
+**Why the third does not.** *"Every parent has at least one child"* is a participation constraint
+in the parent's direction, and PostgreSQL can only enforce it with a deferred circular foreign key
+or a trigger. `SkillTrainingActivity` escapes this because a wall-clock activity has exactly one
+participant, so a single column can name it (§6.3.1); an `Activity` root cannot name its subtype
+the same way without a nullable pointer per family, which reintroduces exactly the drift the
+composite keys exist to prevent. So a missing subtype is **prevented transactionally and detected
+structurally**, not made unrepresentable — and the specification says so rather than claiming a
+guarantee it does not have.
+
+> **On the hand-written SQL.** The review instruction was *"do not add unnecessary custom
+> migration SQL if fail-fast reconciliation is cleaner."* These two `CHECK` lines are weighed
+> against that and kept, for one reason: the startup sweep below has to exist regardless (for the
+> missing-subtype case), so the `CHECK`s add **no** code — they only move two of the three states
+> from *detected after the bad row exists* to *the bad row cannot be written*. That is the same
+> trade §3.8 already makes for the ledger role grant, and it is the specification's stated
+> preference throughout. If the reviewer disagrees, deleting them costs nothing: the sweep
+> already covers all three states, and only the timing changes.
+
+#### The startup integrity sweep
+
+Run at startup in the same fail-fast path as §7.3.2's registry reconciliation, and by the restart
+reconciliation job of §7.2. It is **one query**, and a non-empty result makes the process refuse
+to start:
+
+```sql
+SELECT a.id, a.family,
+       (sb."activityId" IS NOT NULL) AS has_session_bound,
+       (st."activityId" IS NOT NULL) AS has_skill_training,
+       (SELECT count(*) FROM "ActivityParticipant" p WHERE p."activityId" = a.id) AS participants
+  FROM "Activity" a
+  LEFT JOIN "SessionBoundActivity"  sb ON sb."activityId" = a.id
+  LEFT JOIN "SkillTrainingActivity" st ON st."activityId" = a.id
+ WHERE (sb."activityId" IS NULL AND st."activityId" IS NULL)   -- missing subtype
+    OR (sb."activityId" IS NOT NULL AND st."activityId" IS NOT NULL)  -- belt and braces
+    OR NOT EXISTS (SELECT 1 FROM "ActivityParticipant" p WHERE p."activityId" = a.id);
+```
+
+The second predicate is redundant while the `CHECK` constraints stand; it is kept so that
+removing them degrades the guarantee's **timing** rather than its **coverage**. The third catches
+a participant-less activity of **either** family — the wall-clock case is already unrepresentable,
+but a session-bound Hunt with no roster is not, since 1–4 participants cannot be named by one
+column.
+
+**Test O15** exercises the sweep: a root with no subtype, and a session-bound root with no
+participants, each make it refuse to start; a database with only valid activities passes.
+
 ### 6.4 Invariant enforcement plan
 
 For each invariant, **where** it is enforced. "Application validation" alone is never acceptable
@@ -1170,7 +1284,8 @@ for anything that can be raced.
 | I7 | Settlement idempotent under its operation id | **unique constraint** on `SettlementOperation.operationId` |
 | I9 | One Session holds an account's Activity claim | **partial unique index** on `SessionBoundActivity(accountId)` with the predicate `WHERE state IN ('ONLINE_ACTIVE', 'RECONNECT_GRACE_PAUSED')` — declared as `where: raw(…)` in `schema.prisma` (§3.8), generated into the migration by Prisma Migrate (D13) + compare-and-swap transfer |
 | I13 | One occupancy claim per Character | **unique constraint** on `OccupancyClaim.characterId`; the claim's composite FK to `ActivityParticipant` makes it name a participant or nothing (D11) |
-| — | A wall-clock activity has exactly one participant (§6.3.1) | **partial unique index** on `ActivityParticipant(activityId)` `WHERE family = 'WALL_CLOCK'` — `raw()` form (D12) |
+| — | A wall-clock activity has **exactly one** participant (§6.3.1) | **two constraints, not one**: the partial unique index on `ActivityParticipant(activityId)` `WHERE family = 'WALL_CLOCK'` gives *at most one* (D12), and `SkillTrainingActivity`'s composite FK to `ActivityParticipant` gives *at least one* (D14) |
+| — | Every Activity root has exactly one subtype, of the right family (§6.3.3) | wrong-family and both-present: `CHECK (family = …)` + composite FK — **unrepresentable** (D15, D16). Missing subtype: the atomic start transaction (§8.1) + the startup integrity sweep, which refuses to start (O15) |
 | — | Every Activity pins a content version (`ADR-011`) | `Activity.contentVersion` **NOT NULL** + FK `ON DELETE RESTRICT` (C9) |
 | I15 | Duration never consumed outside a qualifying state | **interface capability** — only a state transition writes `qualifyingSince` |
 | I16 | A **referenced** content bundle is never deleted | **FK `ON DELETE RESTRICT`** from every durable reference — the database refuses. An **un**referenced bundle may be removed through the explicit audited cleanup path (§7.7) |
@@ -1190,13 +1305,14 @@ has not read `ADR-003`.
   state** — both are CI checks (§13).
 - Migrations run as a **separate step before** the application starts, never at boot.
 - `/health/ready` fails on a migration-version mismatch (§10).
-- **Hand-written migration SQL is authorized for the ledger role grants only** (§3.8). Partial
-  indexes are declared in `schema.prisma` — in the object form where it fits and as `raw("…")`
-  predicates where it does not — and **Prisma Migrate generates their SQL**. A `raw()` predicate
-  in the schema is a declaration, not a hand-edited migration, and the distinction is what D13
+- **Hand-written migration SQL is authorized for exactly two things** (§3.8): the ledger role
+  grants (I6) and the two subtype `CHECK` constraints (§6.3.3). Partial indexes are **not** among
+  them — they are declared in `schema.prisma`, in the object form where it fits and as `raw("…")`
+  predicates where it does not, and **Prisma Migrate generates their SQL**. A `raw()` predicate in
+  the schema is a declaration, not a hand-edited migration, and the distinction is what D13
   checks: the migration-check script asserts the generated `CREATE UNIQUE INDEX … WHERE (…)`
-  statements exist with the declared predicates. The one hand-written migration carries a comment
-  naming the invariant it enforces (I6).
+  statements exist with the declared predicates, **and** that the two `CHECK` constraints are
+  present. Each hand-written statement carries a comment naming the invariant it enforces.
 
 ### 6.6 Invariant trace — what 0B proves and what it defers
 
@@ -1213,7 +1329,7 @@ governs. Stating that honestly is more useful than a checklist that overclaims.
 | I9 one account activity claim | **proven** — A1–A3, **D10** (the index itself refuses the second non-terminal activity) |
 | I10 Skill Training cannot write Base XP | **proven structurally** — the port has no such method |
 | I12 no hard delete of a Character | **proven** — no delete path exists |
-| I13 one occupancy claim per Character | **proven** — O1–O14 and D11: O13 proves the reconciliation rule is total over every persisted Skill Training status, O14 that ending releases claims while keeping the roster snapshot, D11 that a claim can only name a participant |
+| I13 one occupancy claim per Character | **proven** — O1–O15 and D11: O13 proves the reconciliation rule is total over every persisted Skill Training status, O14 that ending releases claims while keeping the roster snapshot, O15 that no Activity reaches runtime without a subtype and a roster, D11 that a claim can only name a participant |
 | I15 duration only consumed while qualifying | **proven** — T1–T11 |
 | I16 referenced bundle never deleted | **proven** — C4 for the refusal, **C7 and C8** for the crash window and the reconciliation asymmetry, **C9** that both activity families pin (`ADR-011`) so the refusal covers Skill Training too |
 | **I4 an ItemInstance is in exactly one custody scope** | **ACCEPTED ARCHITECTURE — DEFERRED IMPLEMENTATION.** `ADR-004` is accepted and binding, but `ItemInstance` and custody scopes do not exist in 0B. The invariant is proven by the phase that introduces the item model (Phase 3). **Phase 0B claims no item-duplication coverage.** |
@@ -1282,6 +1398,7 @@ interface OccupancyPort {
   release(tx, activityRef): Promise<void>;
   reserveForGrace(tx, activityRef): Promise<void>;
   reconcileStranded(tx): Promise<ReleasedClaim[]>;
+  assertActivityIntegrity(tx): Promise<void>;   // §6.3.3 — throws; never repairs
 }
 ```
 
@@ -1297,7 +1414,11 @@ Semantics:
   snapshot and survive the end of the activity (§6.3.1, O14);
 - reconnect grace **reserves** rather than releases — the activity still exists;
 - `reconcileStranded` releases only claims whose named activity is absent or terminal. Because a
-  claim names its activity, this is reconciliation against durable state, not a heuristic.
+  claim names its activity, this is reconciliation against durable state, not a heuristic;
+- `assertActivityIntegrity` runs the §6.3.3 sweep at startup and before reconciliation. It
+  **throws and never repairs**: an Activity with no subtype or no roster is a bug in the start
+  transaction, and guessing which subtype it should have had is exactly the kind of repair that
+  turns one bad row into a silently wrong one.
 
 ### 7.3 `ActiveUseTimer`
 
@@ -1659,11 +1780,47 @@ interface; object storage is a later swap that changes no caller.
 
 Each of these is exactly one transaction. Partial application must be impossible.
 
+An earlier draft wrote "Activity start → activity row, account activity claim, one occupancy
+claim per participant", which named neither the subtype nor the participant rows — so nothing in
+§8 said that the atomic unit is what §6.3.3 depends on it being. The two start transactions are
+now written out in full, in the insert order the foreign keys of §6.3.1 impose.
+
+**Session-bound Activity start** — one transaction, in this order:
+
+| # | Write | Note |
+|---|---|---|
+| 1 | `Activity` root | `accountId`, `activityTypeKey` resolved through the code registry (§7.3.2), `family = SESSION_BOUND`, **`contentVersion` pinned** to the bundle resolved at start (`ADR-011`), `createdAt` from `Clock.now()` |
+| 2 | `SessionBoundActivity` | `state = ONLINE_ACTIVE`, `claimHolderSessionId` = the starting session, `graceExpiresAt = null`, `rngSeed`; `accountId` and `family` written from the root and chained to it by composite FK |
+| 3 | `ActivityParticipant` × N | one row per Active Party member, `slotIndex` preserving party order — the **roster snapshot**, frozen here (`ADR-002`); `staminaActivatedAt` written **`null`**, the durable "not yet activated" marker §7.3.1 reads as `NEUTRAL` (`ADR-014`; Phase 2 decides what raises it) |
+| 4 | `OccupancyClaim` × N | one per participant, acquired in ascending `characterId` order (§8.5). Any conflict rolls the **whole** transaction back — no partial roster, no partial claims |
+
+**Skill Training start** — one transaction, in this order:
+
+| # | Write | Note |
+|---|---|---|
+| 1 | `Activity` root | `family = WALL_CLOCK`, **`contentVersion` pinned** exactly as above — a wall-clock Activity pins too (`ADR-011`, C9) |
+| 2 | `ActivityParticipant` × **1** | the trainee. `slotIndex = 0`, `staminaActivatedAt = null`. It is written **before** the subtype, because the subtype's foreign key requires it to exist |
+| 3 | `SkillTrainingActivity` | `status = ACCRUING`, `startedAt = lastSettledAt = Clock.now()`, `endedAt = null`, `traineeCharacterId` naming the row from step 2 |
+| 4 | `OccupancyClaim` × **1** | the trainee's |
+
+Steps 2 and 3 in that order are what make "exactly one participant" structural (§6.3.1): the
+subtype cannot be inserted first, so a participant-less training cannot be committed even by a
+buggy caller.
+
+**Activity end** — one transaction:
+
+| Does | Does not |
+|---|---|
+| transitions the subtype to its terminal state (`ACTIVITY_ENDED`, or `ENDED`/`EXHAUSTED`/`CANCELLED`) | delete the `Activity` root |
+| performs the final settlement where the family has one, carrying its operation id | delete `ActivityParticipant` rows — they are the durable roster snapshot (§6.3.1, O14) |
+| **deletes every `OccupancyClaim`** the activity held | clear `contentVersion` — the Activity keeps pinning its bundle (§7.7, `ADR-016`) |
+
+Removing any retained row is the job of a **separate retention or archive operation**, which this
+specification does not authorize (§19).
+
 | Operation | Touches |
 |---|---|
-| Activity start | activity row, account activity claim, **one occupancy claim per participant** |
 | Activity pause | lifecycle state, `graceExpiresAt`, settlement checkpoint, claim reservation |
-| Activity end / expiry | lifecycle state, final settlement, **release of all claims** |
 | Occupancy acquire / release | claims only, inside the owning lifecycle transaction |
 | Account claim acquire / transfer | conditional write on the activity claim |
 | Idempotent command | the command's own writes **plus** the idempotency record |
@@ -1702,9 +1859,14 @@ error — it never blocks combat).
 **One global order, documented once and obeyed everywhere:**
 
 ```text
-Account → Character (ascending id) → Activity → OccupancyClaim (ascending characterId)
+Account → Character (ascending id) → Activity → ActivityParticipant (ascending characterId)
+        → OccupancyClaim (ascending characterId)
         → CurrencyBalance (ascending accountId) → LedgerEntry
 ```
+
+`ActivityParticipant` sits where it does because §8.1's start transactions write it between the
+Activity root and the claims; the order is the insert order the foreign keys already impose
+(§6.3.1), so obeying one satisfies the other.
 
 A party start locking Characters in id order cannot deadlock against another party start doing
 the same. This rule is why it is written down rather than left to each call site.
@@ -1933,15 +2095,15 @@ deliberately absent from 0B (§6.3), so there is no item to duplicate. See §6.6
 
 ---
 
-## 14. Test matrix — **86 cases**
+## 14. Test matrix — **92 cases**
 
 Every row is required. `§` references the contract it proves.
 
 | Group | Cases | Count |
 |---|---|---|
 | 14.1 Workspace and boundaries | W1–W13 | 13 |
-| 14.2 Database | D1–D13 | 13 |
-| 14.3 Occupancy | O1–O14 | 14 |
+| 14.2 Database | D1–D18 | 18 |
+| 14.3 Occupancy | O1–O15 | 15 |
 | 14.4 Activity claim | A1–A6 | 6 |
 | 14.5 Timers and Stamina | T1–T16 | 16 |
 | 14.6 Idempotency | I1–I4 | 4 |
@@ -1949,7 +2111,7 @@ Every row is required. `§` references the contract it proves.
 | 14.8 Content | C1–C9 | 9 |
 | 14.9 Health | H1–H5 | 5 |
 | 14.10 Engine | E1–E3 | 3 |
-| | **Total** | **86** |
+| | **Total** | **92** |
 
 The table is not decoration: §16 criterion 18 and the pull request both state a number, and a
 number nobody can re-derive is a number that drifts.
@@ -1993,8 +2155,13 @@ number nobody can re-derive is a number that drifts.
 | D9 | The application role cannot `UPDATE` or `DELETE` a ledger row |
 | D10 | Two **non-terminal** session-bound activities on one account cannot coexist — the second insert is rejected by the partial unique index, not by application code (invariant I9, §6.3.1). A row moved to `ACTIVITY_ENDED` frees the account for a new one |
 | D11 | An `OccupancyClaim` naming a Character who is **not** an `ActivityParticipant` of the claimed activity is refused by the composite foreign key (§6.3.1). The Skill Training trainee therefore has one representation, and a claim cannot drift from it |
-| D12 | A **second participant row on a wall-clock activity** is refused by the partial unique index `UNIQUE (activityId) WHERE family = 'WALL_CLOCK'`; a session-bound activity accepts several (§6.3.1) |
-| D13 | **Migration-generation validation**: the SQL Prisma Migrate generated for the current schema contains a `CREATE UNIQUE INDEX … WHERE` statement for each declared partial index — I1 (`"retiredAt" IS NULL`), I9 (`state IN ('ONLINE_ACTIVE', 'RECONNECT_GRACE_PAUSED')`) and the wall-clock cardinality index (`family = 'WALL_CLOCK'`) — asserted against the migration files, not the schema (§3.8, §6.5). D10 and D12 then prove the generated indexes enforce what they declare |
+| D12 | **At most one participant on a wall-clock activity**: a second participant row is refused by the partial unique index `UNIQUE (activityId) WHERE family = 'WALL_CLOCK'`; a session-bound activity accepts several (§6.3.1) |
+| D13 | **Migration-generation validation**: the SQL Prisma Migrate generated for the current schema contains a `CREATE UNIQUE INDEX … WHERE` statement for each declared partial index — I1 (`"retiredAt" IS NULL`), I9 (`state IN ('ONLINE_ACTIVE', 'RECONNECT_GRACE_PAUSED')`) and the wall-clock cardinality index (`family = 'WALL_CLOCK'`) — **and** that the two hand-written `CHECK` constraints of §6.3.3 are present. Asserted against the migration files, not the schema (§3.8, §6.5). D10, D12, D15 and D16 then prove the generated constraints enforce what they declare |
+| D14 | **At least one participant on a wall-clock activity**: inserting a `SkillTrainingActivity` whose `traineeCharacterId` has no matching `ActivityParticipant` row is refused by the composite foreign key — so a participant-less Skill Training cannot be committed at all. With D12, this is what makes "exactly one" structural rather than "at most one" (§6.3.1, §6.3.3) |
+| D15 | **Wrong-family subtype is unrepresentable**: a `SessionBoundActivity` row on a `WALL_CLOCK` root, and a `SkillTrainingActivity` row on a `SESSION_BOUND` root, are each refused — by the `CHECK` when the projected `family` is set to the subtype's own constant, and by the composite foreign key when it is set to the root's (§6.3.3) |
+| D16 | **Both subtypes on one root is unrepresentable**: after either subtype exists, inserting the other on the same root is refused. The test asserts the refusal from both starting families |
+| D17 | **A valid `SESSION_BOUND` Activity is accepted**: root + `SessionBoundActivity` + N `ActivityParticipant` rows + N `OccupancyClaim` rows commit in one transaction and satisfy the §6.3.3 sweep |
+| D18 | **A valid `WALL_CLOCK` Activity is accepted**: root + one `ActivityParticipant` + `SkillTrainingActivity` naming it + one `OccupancyClaim` commit in one transaction, in §8.1's order, and satisfy the §6.3.3 sweep |
 
 ### 14.3 Occupancy
 
@@ -2014,6 +2181,7 @@ number nobody can re-derive is a number that drifts.
 | O12 | Restart reconciliation **releases** a claim whose named activity row is absent |
 | O13 | The reconciliation rule is **total over every Skill Training status**: the test enumerates `ACCRUING`, `ENDED`, `EXHAUSTED`, `CANCELLED` from the persisted enum itself and asserts a preserve/release outcome for each. A status added to the enum without a reconciliation rule **fails this test** rather than being silently unhandled (§6.3.1) |
 | O14 | **Ending an activity releases occupancy and preserves the roster snapshot**: after a Hunt ends and after a Skill Training reaches each terminal status, every `OccupancyClaim` it held is gone and every `ActivityParticipant` row — slot order and `staminaActivatedAt` included — is still present and unchanged (§6.3.1, §7.2) |
+| O15 | **The startup integrity sweep** (§6.3.3): an `Activity` root with **no subtype row**, and a session-bound root with **no participant rows**, each make `assertActivityIntegrity` throw and the process refuse to start; a database holding only valid activities of both families passes. The sweep **never repairs** — the test fails if any row is written or deleted by it |
 
 ### 14.4 Activity claim
 
@@ -2199,14 +2367,16 @@ script of §4.3, including its generated-SQL assertion (D13).
 
 **Prerequisites.** 0B.2.
 
-**Acceptance.** D1–D13.
+**Acceptance.** D1–D18.
 
 **Done when.** Migrations apply from empty and from the previous state; D4 and D5 both pass —
-duplicate playable vocation rejected, retired vocation reusable; **D10, D11 and D12 pass** — the
-second non-terminal session-bound activity, the claim naming a non-participant, and the second
-wall-clock participant are each rejected by the database rather than by application code; **D13
-passes** — the generated migration SQL carries every declared predicate; and D9 confirms the
-application role cannot mutate a ledger row.
+duplicate playable vocation rejected, retired vocation reusable; **D10–D12 pass** — the second
+non-terminal session-bound activity, the claim naming a non-participant, and the second
+wall-clock participant are each rejected by the database rather than by application code;
+**D14–D16 pass** — a participant-less Skill Training, a wrong-family subtype and a both-subtypes
+root are each unrepresentable (§6.3.3); **D17 and D18 pass** — a valid activity of each family
+commits; **D13 passes** — the generated migration SQL carries every declared predicate and both
+`CHECK` constraints; and D9 confirms the application role cannot mutate a ledger row.
 
 ---
 
@@ -2257,19 +2427,21 @@ the process refuse to start.
 
 **Goal.** One action per Character; one activity per account.
 
-**Files.** `packages/domain/src/contexts/activity/{claim,occupancy,lifecycle,skill-training}`;
-the reconciliation job in `apps/worker`, calling the Activity context's **public surface** —
-never reaching into `apps/api` (§4.2).
+**Files.** `packages/domain/src/contexts/activity/{claim,occupancy,lifecycle,skill-training}`,
+including the **atomic start and end transactions of §8.1** and the **startup integrity sweep of
+§6.3.3** (`assertActivityIntegrity`); the reconciliation job in `apps/worker`, calling the
+Activity context's **public surface** — never reaching into `apps/api` (§4.2).
 
 **Prerequisites.** 0B.4.
 
-**Acceptance.** O1–O14, A1–A6.
+**Acceptance.** O1–O15, A1–A6.
 
 **Done when.** O3 and O4 pass (all-or-nothing party acquisition), O9 shows no deadlock, **O10–O13
 pass** — reconciliation preserves a live training claim, releases only a terminal or orphaned one,
 and O13 proves the rule is total over every persisted status — **O14 passes** — ending releases
-every claim and leaves every participant row untouched — and **A4–A6 pass** for the durable claim
-holder.
+every claim and leaves every participant row untouched — **O15 passes**, with the integrity sweep
+refusing to start on a subtype-less or roster-less Activity and never repairing one — and
+**A4–A6 pass** for the durable claim holder.
 
 ---
 
@@ -2389,13 +2561,16 @@ Objective and checkable. Every line needs evidence, not a claim.
 | 15 | Redis connects; a full flush loses no durable state |
 | 16 | `/health/live` returns healthy with PostgreSQL down |
 | 17 | `/health/ready` fails independently on each of its four conditions |
-| 18 | The complete §14 test matrix passes — **all 86 cases**, matching the group table at the head of §14 |
+| 18 | The complete §14 test matrix passes — **all 92 cases**, matching the group table at the head of §14 |
 | 19 | CI is green, with all **thirteen** checks of §13 (0–12) present, each running the same script a developer runs |
 | 20 | **No accepted architecture invariant is contradicted** — traced ADR by ADR, with §6.6's deferrals stated rather than overclaimed |
 | 21 | **No Hunt balance or gameplay loop was implemented** — no XP curve, damage formula, loot table or reward multiplier exists |
 | 22 | **No product rule was created by this phase.** The activity-type registry classifies **Hunt and Skill Training only**; Dungeon and every other future type remain unclassified, and T12 proves an unclassified type cannot reach production (§7.3.1) |
 | 23 | **Every Activity pins a content version** — `Activity.contentVersion` is `NOT NULL` with `ON DELETE RESTRICT`, and C9 shows a Skill Training activity's bundle is protected exactly as a Hunt's (`ADR-011`) |
-| 24 | **Ending an activity releases occupancy and keeps the roster snapshot** — O14 shows every claim gone and every `ActivityParticipant` row intact; the Skill Training trainee has one representation (D11, D12) |
+| 24 | **Ending an activity releases occupancy and keeps the roster snapshot** — O14 shows every claim gone and every `ActivityParticipant` row intact; the Skill Training trainee has one representation (D11, D12, D14) |
+| 24a | **A wall-clock activity has exactly one participant, structurally** — D12 for at most one, **D14 for at least one**. No statement in the specification attributes "exactly one" to the partial unique index alone (§6.3.1, §6.3.3) |
+| 24b | **Every Activity root has exactly one subtype of the right family** — D15 and D16 show wrong-family and both-present are unrepresentable; O15 shows a missing subtype or an empty roster makes the process refuse to start and is never repaired; D17 and D18 show a valid activity of each family commits (§6.3.3) |
+| 24c | **Activity start is atomic over root + subtype + participants + claims + pinned `contentVersion`**, in §8.1's documented insert order, and Activity end releases claims while retaining participant and history rows |
 | 25 | **The activity-type registry has one source of truth** — no `ActivityType` table or content entry exists; T16 shows a persisted key the code registry does not know makes the process refuse to start (§7.3.2) |
 | 26 | **The generated Prisma client is the `prisma-client` generator's output**, in `packages/domain/src/generated/`, compiled by `tsc -b`, wired through `@prisma/adapter-pg`, configured by `prisma.config.ts` — no `prisma-client-js` block exists (§4.3) |
 
@@ -2441,14 +2616,19 @@ Made under the project's autonomous execution model (`AGENTS.md` §3), recorded 
 | 26 | **`apps/web` is typechecked by its own `tsc --noEmit` and by `next build`, outside the solution graph** | a `noEmit` project cannot be a project-reference target, and forcing emit on a Next.js app fights its toolchain. W13 proves coverage instead of asserting it | low |
 | 27 | **`contentVersion` lives on the `Activity` root, `NOT NULL`, `ON DELETE RESTRICT`** — *moves* it off `SessionBoundActivity` | `ADR-011` says *every* Activity pins; Skill Training is an Activity. The pinned-set derivation now reads one table for both families | low — one column moves |
 | 28 | **Ending an activity releases occupancy claims and retains `ActivityParticipant` rows** — *corrects* "deletes both" | the participant rows are the durable roster snapshot `ADR-002` and `DATA_ARCHITECTURE.md` §7 require for history, replay and support; removal belongs to a retention operation this specification does not authorize | low |
-| 29 | **The Skill Training trainee is the activity's single participant row; `SkillTrainingActivity` has no Character column; claims carry a composite FK to participants; wall-clock cardinality is a partial unique index** | one representation cannot disagree with itself, and the two foreign keys make a claim name a participant or nothing | low |
+| 29′ | **`SkillTrainingActivity.traineeCharacterId` returns, as a composite FK into `ActivityParticipant`** — *corrects* decision 29, which removed the column entirely | decision 29 fixed drift but left cardinality at *at most one*: nothing stopped a training with **zero** participants. A foreign key requires its target to exist, so the column supplies the missing *at least one* while remaining incapable of naming a non-participant — the "relationship that makes mismatch impossible" the third review asked for, now also closing the fourth review's gap | low — one column and one FK |
+| 32 | **Two hand-written `CHECK` constraints pin each subtype to its family** | with the composite FK already chaining subtype `family` to the root's, they make wrong-family **and** both-subtypes-present unrepresentable — two invalid states for two lines, and **no extra code**, since the startup sweep must exist anyway for the missing-subtype case. Weighed explicitly against the reviewer's "no unnecessary custom SQL" instruction in §6.3.3 | **very low — deleting them loses only timing, not coverage** |
+| 33 | **A missing subtype is prevented transactionally and detected by a startup sweep that throws and never repairs** | "every parent has at least one child" needs a deferred circular FK or a trigger; neither is worth it, and the specification says so instead of claiming a guarantee it does not have. Repairing would mean guessing which subtype was intended — one bad row becoming a silently wrong one | low |
+| 34 | **§8.1 writes both start transactions out in full, in foreign-key insert order** | the atomicity §6.3.3 depends on was asserted in §6 and unstated in §8; and the Skill Training order (participant **before** subtype) is what makes "exactly one" hold even for a buggy caller | low |
 | 30 | **The activity-type registry is a frozen code module with startup reconciliation against persisted rows; no `ActivityType` table** | behaviour classification is code, versioned with the code that switches on it; a table is the mutable second source `ADR-011`'s spirit rejects; T16 turns removal or reclassification of a persisted type into a fail-fast event | low |
 | 31 | **0B.2 carries the generator, `prisma.config.ts` and the `ContentBundle` model; 0B.3 carries every other model and every migration; 0B.7 follows 0B.3** | each package's acceptance must be executable when that package ends. `ContentBundle` is the leaf every reference points at and has no foreign keys of its own, so it is the one model that can exist before the graph does | low |
 
-None contradicts an accepted ADR or a LOCKED product rule. Decisions 3′, 6′, 8′, 20″ and 21′
-**correct, narrow or replace** earlier ones in this same document, at the independent reviewer's
-direction; decisions 27–31 correct model statements the third review found to contradict
-`ADR-011`, `ADR-002` or the accepted persistence model.
+None contradicts an accepted ADR or a LOCKED product rule. Decisions 3′, 6′, 8′, 20″, 21′ and
+29′ **correct, narrow or replace** earlier ones in this same document, at the independent
+reviewer's direction; decisions 27–31 correct model statements the third review found to
+contradict `ADR-011`, `ADR-002` or the accepted persistence model; decisions 29′ and 32–34 close
+the relational-integrity gaps the fourth review found — the largest of which was this document
+claiming *"exactly one"* for a constraint that only delivers *at most one*.
 
 Decision 23 is the only one that is a decision **not to decide**, and it is recorded here
 precisely because the previous draft made the opposite decision silently, in a code comment.
@@ -2497,7 +2677,11 @@ Stated plainly so scope cannot drift during implementation:
 - no committed generated artifact of any kind (§4.3);
 - no `ActivityType` table, seed or content entry — the registry is code (§7.3.2);
 - no retention or archive operation that removes `Activity`, `ActivityParticipant` or
-  `ContentBundle` rows (§6.3.1, §7.7);
+  `ContentBundle` rows (§6.3.1, §7.7, §8.1);
+- no repair path in the §6.3.3 integrity sweep — it throws, and inventing a missing subtype is
+  never authorized;
+- no hand-written migration SQL beyond the ledger role grants and the two subtype `CHECK`
+  constraints (§3.8, §6.5);
 - no `prisma-client-js` generator block and no `nest build` step (§4.3, §4.4).
 
 ---
