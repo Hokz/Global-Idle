@@ -24,11 +24,14 @@ allowBuilds:
   # Every entry carries the reason it exists. Nothing is allowed wholesale, and
   # dangerouslyAllowAllBuilds is never used. A new entry appears only when
   # `pnpm install` reports an ignored build, and is added with its reason.
+  # Keep every reason on ONE line: pnpm rewrites this block, and a wrapped
+  # comment gets spliced apart when it inserts a new key.
   prisma: true # preinstall entry script of the pinned CLI
   '@prisma/engines': true # postinstall: fetches the schema engine the pinned CLI uses
-  msgpackr-extract:
-    true # postinstall: msgpackr's optional native accelerator, reached
-    # through bullmq -> msgpackr in apps/worker
+  msgpackr-extract: true # postinstall: native accelerator, via bullmq -> msgpackr in apps/worker
+  cpu-features: true # install: optional native CPU probe, via testcontainers -> ssh2 (test only)
+  ssh2: true # install: optional native crypto binding, via testcontainers (test only)
+  protobufjs: true # postinstall: generates its type registry, via testcontainers (test only)
 minimumReleaseAgeExclude:
   - dependency-cruiser@18.4.0
   - '@nestjs/terminus@12.1.0'

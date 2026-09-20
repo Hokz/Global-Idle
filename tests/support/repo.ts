@@ -3,7 +3,7 @@
 // These tests drive the real commands rather than re-implementing their logic:
 // a boundary test that reasons about the rules instead of running them proves
 // nothing about the gate CI uses.
-import { execFileSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -16,25 +16,60 @@ export interface RunResult {
   readonly stderr: string;
 }
 
+/**
+ * Build an environment that does NOT carry the test runner's own settings.
+ *
+ * Vitest exports NODE_ENV, NODE_OPTIONS, VITEST_* and friends into the
+ * process, and inheriting them into a nested `pnpm build` is not what a clean
+ * checkout looks like — it made `next build` fail while the identical tree
+ * built fine from a shell.
+ */
+export function pristineEnv(extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
+  const keep = ['PATH', 'HOME', 'SHELL', 'LANG', 'TERM', 'TMPDIR', 'USER'];
+  const env: NodeJS.ProcessEnv = { CI: '1', NO_COLOR: '1' };
+  for (const key of keep) {
+    const value = process.env[key];
+    if (value !== undefined) env[key] = value;
+  }
+  return { ...env, ...extra };
+}
+
 export function run(
   command: string,
   args: string[],
   cwd = REPO_ROOT,
   env: NodeJS.ProcessEnv = {},
 ): RunResult {
-  try {
-    const stdout = execFileSync(command, args, {
-      cwd,
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env, CI: '1', NO_COLOR: '1', ...env },
-      maxBuffer: 64 * 1024 * 1024,
-    });
-    return { status: 0, stdout, stderr: '' };
-  } catch (error) {
-    const e = error as { status?: number; stdout?: string; stderr?: string };
-    return { status: e.status ?? 1, stdout: e.stdout ?? '', stderr: e.stderr ?? '' };
-  }
+  // spawnSync rather than execFileSync: execFileSync returns stdout only and
+  // discards stderr unless the command FAILS, so a successful command that
+  // reports on stderr — migrate:check does — came back empty.
+  const result = spawnSync(command, args, {
+    cwd,
+    encoding: 'utf8',
+    env: { ...process.env, CI: '1', NO_COLOR: '1', ...env },
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  return {
+    status: result.status ?? 1,
+    stdout: result.stdout ?? '',
+    stderr: result.stderr ?? '',
+  };
+}
+
+/** Like {@link run}, but with the runner's own environment stripped. */
+export function runClean(
+  command: string,
+  args: string[],
+  cwd: string,
+  extra: NodeJS.ProcessEnv = {},
+): RunResult {
+  const result = spawnSync(command, args, {
+    cwd,
+    encoding: 'utf8',
+    env: pristineEnv(extra),
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  return { status: result.status ?? 1, stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
 }
 
 export function boundaries(): RunResult {

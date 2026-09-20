@@ -12,7 +12,7 @@ import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
-import { REPO_ROOT, run } from '../support/repo.js';
+import { REPO_ROOT, runClean } from '../support/repo.js';
 
 const NESTED = process.env['GLOBAL_IDLE_NESTED_BUILD'] === '1';
 
@@ -58,10 +58,10 @@ describe.skipIf(NESTED)('§14.1 W12 — clean checkout', () => {
     // be exactly the divergence §4.3 exists to prevent.
     const env = { DATABASE_URL: 'postgresql://placeholder:placeholder@127.0.0.1:5432/placeholder' };
 
-    const install = run('pnpm', ['install', '--frozen-lockfile'], workspace, env);
+    const install = runClean('pnpm', ['install', '--frozen-lockfile'], workspace, env);
     expect(install.status, `${install.stdout}\n${install.stderr}`).toBe(0);
 
-    const build = run('pnpm', ['build'], workspace, env);
+    const build = runClean('pnpm', ['build'], workspace, env);
     expect(build.status, `${build.stdout}\n${build.stderr}`).toBe(0);
 
     // The generated client exists only because `pnpm build` produced it.
@@ -71,7 +71,7 @@ describe.skipIf(NESTED)('§14.1 W12 — clean checkout', () => {
 
     // Tests resolve internal packages through their BUILT exports (§3.7), so
     // this only passes because the build ran first.
-    const test = run('bash', ['-c', 'pnpm vitest run --project unit'], workspace, {
+    const test = runClean('bash', ['-c', 'pnpm vitest run --project unit'], workspace, {
       ...env,
       GLOBAL_IDLE_NESTED_BUILD: '1',
     });

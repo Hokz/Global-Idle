@@ -1,0 +1,140 @@
+// Database helpers for the integration and invariants projects.
+//
+// Tests talk to the database through the same generated client the
+// application uses; nothing here re-implements a query the domain owns.
+import { PrismaPg } from '@prisma/adapter-pg';
+import { PrismaClient } from '../../packages/domain/src/generated/prisma/client.js';
+import { newId, type Instant } from '@global-idle/shared';
+
+export function databaseUrl(): string {
+  const url = process.env['DATABASE_URL'];
+  if (!url) throw new Error('DATABASE_URL is not set; the global setup should have provided it.');
+  return url;
+}
+
+export function createClient(url: string = databaseUrl()): PrismaClient {
+  return new PrismaClient({ adapter: new PrismaPg({ connectionString: url }) });
+}
+
+/** A client connected as the least-privileged application role (I6, test D9). */
+export function createAppRoleClient(): PrismaClient {
+  const url = new URL(databaseUrl());
+  url.username = 'globalidle_app';
+  url.password = 'globalidle_app';
+  return createClient(url.toString());
+}
+
+export const AT = (iso: string): Instant => new Date(iso);
+export const T0 = AT('2026-01-01T00:00:00.000Z');
+
+/** Delete every row, in foreign-key order. Each test starts from nothing so a
+ *  failure points at the test that caused it rather than the one that ran
+ *  after it. */
+export async function truncateAll(prisma: PrismaClient): Promise<void> {
+  await prisma.$executeRawUnsafe(`
+    TRUNCATE TABLE
+      "OccupancyClaim", "SkillTrainingActivity", "SessionBoundActivity",
+      "ActivityParticipant", "Activity", "CharacterStamina", "Character",
+      "EntitlementAudit", "Entitlement", "AuthIdentity",
+      "LedgerEntry", "CurrencyBalance", "ActiveUseTimer",
+      "IdempotencyRecord", "SettlementOperation", "Account", "ContentBundle"
+    RESTART IDENTITY CASCADE
+  `);
+}
+
+export interface SeedOptions {
+  readonly at?: Instant;
+  readonly rosterCapacity?: number;
+}
+
+export async function seedAccount(prisma: PrismaClient, options: SeedOptions = {}) {
+  const at = options.at ?? T0;
+  const id = newId<'AccountId'>(at);
+  await prisma.account.create({
+    data: { id, rosterCapacity: options.rosterCapacity ?? 5, createdAt: at },
+  });
+  return id;
+}
+
+export async function seedBundle(prisma: PrismaClient, version = 'v1', at: Instant = T0) {
+  await prisma.contentBundle.create({
+    data: { version, checksum: `checksum-${version}`, publishedAt: at, location: `./${version}` },
+  });
+  return version;
+}
+
+export type VocationName = 'KNIGHT' | 'PALADIN' | 'SORCERER' | 'DRUID' | 'MONK';
+
+export async function seedCharacter(
+  prisma: PrismaClient,
+  accountId: string,
+  vocation: VocationName,
+  options: { at?: Instant; retiredAt?: Instant | null; name?: string } = {},
+) {
+  const at = options.at ?? T0;
+  const id = newId<'CharacterId'>(at);
+  await prisma.character.create({
+    data: {
+      id,
+      accountId,
+      vocation,
+      name: options.name ?? `${vocation.toLowerCase()}-${id.slice(0, 8)}`,
+      createdAt: at,
+      retiredAt: options.retiredAt ?? null,
+    },
+  });
+  return id;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Activity fixtures (§6.3.1, §8.1)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface ActivityRootOptions {
+  readonly at?: Instant;
+  readonly family: 'SESSION_BOUND' | 'WALL_CLOCK';
+  readonly activityTypeKey?: string;
+  readonly contentVersion?: string;
+}
+
+export async function seedActivityRoot(
+  prisma: PrismaClient,
+  accountId: string,
+  options: ActivityRootOptions,
+) {
+  const at = options.at ?? T0;
+  const id = newId<'ActivityId'>(at);
+  await prisma.activity.create({
+    data: {
+      id,
+      accountId,
+      activityTypeKey:
+        options.activityTypeKey ?? (options.family === 'SESSION_BOUND' ? 'hunt' : 'skill-training'),
+      family: options.family,
+      contentVersion: options.contentVersion ?? 'v1',
+      createdAt: at,
+    },
+  });
+  return id;
+}
+
+export async function seedParticipant(
+  prisma: PrismaClient,
+  activityId: string,
+  characterId: string,
+  family: 'SESSION_BOUND' | 'WALL_CLOCK',
+  slotIndex = 0,
+) {
+  await prisma.activityParticipant.create({
+    data: { activityId, characterId, family, slotIndex, staminaActivatedAt: null },
+  });
+}
+
+export async function seedClaim(
+  prisma: PrismaClient,
+  activityId: string,
+  characterId: string,
+  at: Instant = T0,
+) {
+  await prisma.occupancyClaim.create({ data: { characterId, activityId, acquiredAt: at } });
+}

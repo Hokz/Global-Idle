@@ -290,14 +290,20 @@ module.exports = {
     tsPreCompilationDeps: true,
     combinedDependencies: true,
     enhancedResolveOptions: {
-      // exportsFields is EMPTY on purpose. With the `exports` map in play,
-      // `@global-idle/domain` resolves to packages/domain/dist/index.js, which
-      // carries no source structure for the rules to match. Ignoring it lets
-      // mainFields pick the `source` field instead, so the cruise sees
-      // packages/domain/src/index.ts — source to source.
-      exportsFields: [],
+      // `source` FIRST, in both the condition list and mainFields. Each
+      // workspace package declares a "source" condition pointing at its src
+      // entry, so the cruise sees packages/domain/src/index.ts rather than
+      // dist/index.js — source to source, which is what the rules match on.
+      //
+      // Node consults only the conditions it knows (node, import, require,
+      // default) and TypeScript only with customConditions, so the condition
+      // is inert for both: the build still resolves through `exports` to dist
+      // (§3.3). Third-party packages keep resolving normally, which an earlier
+      // attempt with exportsFields: [] broke — uuid@14 is exports-only and
+      // stopped resolving at all.
+      exportsFields: ['exports'],
+      conditionNames: ['source', 'import', 'node', 'require', 'default', 'types'],
       mainFields: ['source', 'module', 'main'],
-      conditionNames: ['import', 'require', 'node', 'default', 'types'],
       extensions: ['.ts', '.tsx', '.mts', '.cts', '.js', '.mjs', '.cjs', '.json'],
       mainFiles: ['index'],
     },
