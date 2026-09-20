@@ -20,7 +20,7 @@
 
 Phase 0B produces the primitives that Phases 1, 2, 4, 7 and 8 will consume: a workspace with
 enforced boundaries, a database that enforces the load-bearing invariants below the application
-layer, and six domain primitives whose correctness is provable without any gameplay balance
+layer, and **seven** domain primitives whose correctness is provable without any gameplay balance
 existing yet.
 
 ### In scope
@@ -29,8 +29,8 @@ existing yet.
 |---|---|
 | Workspace, tooling, dependency-boundary enforcement | 0B.1, 0B.2 |
 | PostgreSQL, migrations, constraints | 0B.3 |
-| Character occupancy claims | 0B.6 |
-| Stamina durable state and mode machinery | 0B.4 |
+| Character occupancy claims, and durable Skill Training activity state | 0B.6, 0B.3 |
+| Stamina durable state, activity classification and mode derivation | 0B.5 |
 | `ActiveUseTimer` | 0B.5 |
 | Account entitlement / Premium state | 0B.5 |
 | Server time interface | 0B.5 |
@@ -48,6 +48,7 @@ existing yet.
 - login UI, character creation UI, world map, any gameplay screen;
 - Forge, Market, Wheel, Skill Tree, Imbuement application;
 - authoring creature, item or hunt content;
+- Skill Training **rates**, Exercise Weapon economy or skill progression formulas — only the durable lifecycle exists;
 - payment or store flows.
 
 **A useful test of scope:** if a deliverable requires a balance number to be correct, it is not
@@ -109,21 +110,48 @@ designated upgrade path, and the trigger is explicit: **adopt it when CI wall ti
 default pipeline exceeds roughly ten minutes, or when remote caching becomes worth configuring.**
 Recording the trigger prevents adding it reflexively now and prevents arguing about it later.
 
-### 3.3 Internal package format — **source-only, no build step**
+### 3.3 Internal package format — **composite packages, `tsc -b`**
 
-Internal packages (`shared`, `game-data`, `game-engine`) are consumed **as TypeScript source**,
-not as built artifacts:
+An earlier draft of this specification said "source-only, no build step" *and* "project
+references". That was incoherent: TypeScript project references consume the referenced project's
+**emitted declarations**, and `tsc --build` builds those projects. The two claims cannot both be
+true, and the independent review was right to block on it.
 
-- `apps/web` uses Next.js `transpilePackages`;
-- `apps/api` and `apps/worker` compile them through the same `tsc` pass via project references;
-- `vitest` executes them directly.
+**Decision: Option B — composite packages with project references.** Boring, well-trodden, and
+the same resolution model in the editor, typecheck, tests and production build.
 
-This sidesteps the ESM/CJS conflict entirely — NestJS ships CommonJS, Next.js prefers ESM, and
-making three internal packages satisfy both is a build-configuration tax with no payoff for a
-private monorepo. There is no publish target. Nothing is versioned independently.
+Each internal package:
 
-**Consequence to accept:** no package build cache. With three small packages that is
-immaterial, and it is revisited under the same trigger as §3.2.
+```jsonc
+// packages/<name>/tsconfig.json
+{ "compilerOptions": { "composite": true, "declaration": true, "declarationMap": true,
+                       "sourceMap": true, "rootDir": "src", "outDir": "dist" } }
+```
+
+```jsonc
+// packages/<name>/package.json
+{ "main": "./dist/index.js", "types": "./dist/index.d.ts",
+  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } } }
+```
+
+- the root `tsconfig.json` carries `references` to every package; each app references the
+  packages it uses;
+- `pnpm build` runs **`tsc -b`** at the root — which builds referenced projects in dependency
+  order — and then each app's own build (`next build`, `nest build`);
+- `pnpm dev` runs `tsc -b --watch` alongside the app dev servers;
+- **Vitest resolves packages through their `exports` map**, i.e. the built output, so tests and
+  production agree. There is no source alias that could let tests pass against code the build
+  would reject.
+
+**Why not the source-only model.** It requires every consumer to transpile workspace TypeScript
+itself. Next.js supports that through `transpilePackages`, but the NestJS path does not: a
+`tsc` build with `paths` does not rewrite those paths in the emitted JavaScript, so the output
+needs a runtime resolver — a well-known footgun, and one that makes the editor, the test runner
+and the production build disagree about where a module comes from. Paying a build step for three
+small packages is the cheaper side of that trade.
+
+**Consequence to accept:** `pnpm build` must run before `pnpm test` on a clean checkout. This is
+an explicit acceptance test (§15, 0B.2) rather than folklore.
 
 ### 3.4 TypeScript — **strict, shared base config**
 
@@ -171,18 +199,52 @@ on a transform pipeline this repo does not otherwise need.
 Integration tests use **Testcontainers** for ephemeral PostgreSQL and Redis, so a developer and
 CI run the same thing and neither depends on a hand-started database.
 
-### 3.8 ORM — **Prisma**, as the approved architecture states
+### 3.8 ORM — **Prisma 7.10.x**, with the `partialIndexes` preview feature
 
-With one concrete caveat the implementer must not discover the hard way:
+Prisma as the approved architecture states. The **version policy is pinned deliberately**, because
+two invariants in §6.4 depend on a capability whose availability changed recently.
 
-> **Prisma cannot express a partial unique index declaratively.** Invariant I1 — one *playable*
-> (non-retired) Character per vocation — is a unique constraint over non-retired rows only. It
-> must be created by **hand-edited raw SQL inside a Prisma migration**, and §12 requires a test
-> that proves it holds.
+**Researched, September 2026:**
 
-The declarative fallback, if the reviewer prefers it: a generated column holding the vocation
-when playable and `NULL` when retired, with a plain unique index — PostgreSQL does not collide
-on `NULL`. Both work. The partial index is recommended as the more direct statement of intent.
+| Fact | Source |
+|---|---|
+| Partial indexes arrived in **Prisma ORM 7.4** (February 2026) behind the `partialIndexes` **preview feature** — a `where` argument on `@@index`, `@@unique` and `@unique` | Prisma changelog 2026‑02‑11 |
+| **Prisma 8** (August 2026) promotes expression, partial and unique indexes to **direct schema authoring**, no preview flag | Prisma changelog 2026‑08‑02 |
+| `@prisma/client` npm **`latest` = 7.10.0** | npm dist-tags |
+| `prisma` CLI npm **`latest` = 8.0.0-rc.15**, `prev` = 7.10.0 | npm dist-tags |
+| Prisma engines require **Node >= 22.18.0** | package `engines` |
+
+**Decision: pin `prisma` and `@prisma/client` to `7.10.x` and enable the `partialIndexes`
+preview feature.**
+
+Rationale: Prisma 8 is a **release candidate**, not generally available — the `prisma` CLI's
+`latest` tag points at an RC while `@prisma/client`'s points at stable 7.10.0. A foundation
+phase should not pin a project to a pre-release. Prisma 7.4+ already provides the capability
+this specification needs; the only cost is a preview flag.
+
+```prisma
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["partialIndexes"]
+}
+```
+
+> **The earlier claim that "Prisma cannot express a partial unique index declaratively" is
+> withdrawn.** It was true of older Prisma and is not true of the pinned version. **Invariants
+> I1 and I9 are expressed declaratively in `schema.prisma`**, not in raw SQL.
+
+**Designated upgrade:** move to Prisma 8 once it reaches GA and drop the preview flag. Nothing
+in this specification changes at that point — the `where` syntax is the same; it merely stops
+being a preview.
+
+**Raw SQL is still used, for exactly one thing**, justified individually:
+
+| Raw SQL | Why no ORM can express it |
+|---|---|
+| Ledger role grants — `REVOKE UPDATE, DELETE ON "LedgerEntry" FROM <app role>` | A database **permission**, not a schema object. No ORM models it, and this is what makes invariant I6 (`ADR-003`, append-only ledger) true for a developer who has not read the ADR. |
+
+No other hand-written SQL is authorized by this specification. If implementation finds it needs
+more, that is a finding to report, not a decision to take quietly.
 
 ### 3.9 Supporting libraries
 
@@ -194,7 +256,8 @@ on `NULL`. Both work. The partial index is recommended as the more direct statem
 | Health | **@nestjs/terminus** | backs `/health/live` and `/health/ready` |
 | Redis client | **ioredis** | mature, cluster-capable later |
 | Job queue | **BullMQ** | Redis-backed; 0B proves the wiring with one trivial job |
-| UUIDv7 | **`uuid` v11+ (`uuidv7()`)** | generated in application code — see §6.2 |
+| UUIDv7 | **`uuid@14.x`** — `import { v7 as uuidv7 } from 'uuid'` | generated in application code — see §6.2 |
+| Node runtime | **Node 24 (Active LTS)** | satisfies Prisma's `engines: node >= 22.18.0`; pinned in `.nvmrc` and `engines` |
 
 ---
 
@@ -208,6 +271,7 @@ global-idle/
 │  └─ worker/         BullMQ consumers; shares api's domain code
 ├─ packages/
 │  ├─ shared/         contracts, types, ids, result types — no I/O
+│  ├─ domain/         bounded contexts, ORM, transactions — the application core
 │  ├─ game-data/      content schemas, validation, bundle build + resolver contract
 │  └─ game-engine/    pure simulation — no I/O, no framework
 ├─ infra/
@@ -222,32 +286,68 @@ global-idle/
 `packages/shared` is named **`shared`**, not `shared-types`, per `OPERATIONS_ARCHITECTURE.md` §1.
 It holds contracts and pure helpers, not only types.
 
-### 4.1 Where the domain lives
+### 4.1 Where the domain lives — `packages/domain`
 
-`ADR-012` specifies a modular monolith. The bounded contexts of `ADR-001` live **inside
-`apps/api`**, one module per context:
+An earlier draft put the bounded contexts inside `apps/api` and said `apps/worker` "shares
+api's domain code". That left the worker with no **legal** way to call a context: an
+`apps/worker → apps/api/src/**` edge is exactly the app-to-app reach-in `ADR-012` forbids. The
+independent review was right to block on it.
+
+**Decision: the bounded contexts live in `packages/domain`.** Both applications depend on it;
+neither depends on the other.
 
 ```text
-apps/api/src/
+packages/domain/src/
 ├─ contexts/
 │  ├─ identity/        Account, AuthIdentity, Session, Entitlement
-│  ├─ character/       Character, roster capacity, Progression, Skills, Stamina
+│  ├─ character/       Character, roster capacity, Stamina
 │  ├─ party/           Active Party configuration
-│  ├─ activity/        Activity, claims, settlement orchestration
-│  ├─ items/           ItemInstance, custody
-│  └─ economy/         ledger, balances, listings
-├─ platform/           clock, ids, idempotency, transactions, logging, metrics
-└─ main.ts
+│  ├─ activity/        Activity root, claims, occupancy, settlement orchestration
+│  └─ economy/         ledger, balances
+├─ platform/           clock, ids, idempotency, transactions, Prisma client
+└─ index.ts            the only legal entry point
 ```
 
-Each context exposes a **public surface** (an `index.ts` barrel). Reaching past it into another
-context's internals is a dependency-cruiser violation (§5.3).
+The earlier rationale — "extracting them would drag Prisma into `packages/`" — was simply
+wrong. The forbidden edge is **package → app**. A package depending on Prisma or on npm
+libraries breaks no rule. Correcting this is autonomous decision #6′ in §17.
 
-**Why contexts live in the app rather than in packages:** they need the ORM, transactions and
-the framework. Extracting them into packages would either drag those dependencies into
-`packages/` — breaking the rule that packages must not depend on apps — or force an abstraction
-layer that buys nothing while the monolith is one deployable. The context boundary is enforced
-by the module graph, not by the directory being a package.
+**Each context exposes a public surface** (`contexts/<name>/index.ts`). Reaching past it into
+another context's internals is a dependency-cruiser violation, inside the package as much as
+across it.
+
+### 4.2 API and worker
+
+**One deployable artifact, two process entry points**, satisfying `ADR-012`:
+
+| | `apps/api` | `apps/worker` |
+|---|---|---|
+| Role | HTTP + realtime adapters, composition root | BullMQ consumers, composition root |
+| Depends on | `packages/domain`, `shared` | `packages/domain`, `shared` |
+| May import the other app | **never** | **never** |
+| Container image | **the same image**, different start command | |
+
+Both are thin: adapters and wiring. Neither owns domain logic.
+
+**How 0B.6's reconciliation job calls a context.** It imports the Activity context's public
+surface from `packages/domain` and calls it, inside a transaction the domain package owns —
+the same call path `apps/api` uses. No privileged access, no second implementation.
+
+**Legal and forbidden edges, exactly:**
+
+```text
+LEGAL       apps/api    → packages/domain → packages/{shared, game-data, game-engine}
+            apps/worker → packages/domain → …
+            apps/web    → packages/shared
+
+FORBIDDEN   apps/worker → apps/api            (any path)
+            apps/api    → apps/worker
+            packages/*  → apps/*
+            anything    → packages/domain/src/contexts/*/internals
+                          (only contexts/<name>/index.ts is public)
+```
+
+Enforced by dependency-cruiser (§5.3) and tested by W6, W8 and W10.
 
 ---
 
@@ -256,32 +356,31 @@ by the module graph, not by the directory being a package.
 ### 5.1 The graph
 
 ```text
-apps/web ────────► packages/shared
-                          ▲
-apps/api ────────► packages/shared
-   │                      ▲
-   ├──────────────► packages/game-data
-   │                      ▲
-   └──────────────► packages/game-engine
+apps/web ──────────► packages/shared
 
-apps/worker ─────► (same as apps/api)
+apps/api ──────────► packages/domain ──┬──► packages/shared
+apps/worker ───────► packages/domain ──┼──► packages/game-data
+                                        └──► packages/game-engine
 
 packages/game-engine ──► packages/shared        (types only)
-packages/game-data  ──► packages/shared        (types only)
+packages/game-data   ──► packages/shared        (types only)
 ```
 
 **Nothing in `packages/` may depend on anything in `apps/`. Ever.**
+**Neither app may depend on the other.** They meet only through `packages/domain`.
 
 ### 5.2 Forbidden edges, exactly
 
 | Package | Must not import |
 |---|---|
 | `game-engine` | NestJS, Next.js, React, Prisma, `@prisma/client`, ioredis, BullMQ, `http`/`https`, `fs`, `path` (for I/O), `crypto` randomness, `Date.now`, `Math.random`, `process.env`, any app |
-| `game-data` | any app, `game-engine`, NestJS, Next.js, Prisma, ioredis |
+| `game-data` | any app, `game-engine`, `domain`, NestJS, Next.js, Prisma, ioredis |
 | `shared` | any app, any other package, any framework, any I/O |
-| `web` | Prisma, ioredis, `game-engine`, any `apps/api` internal |
-| `api` context module | another context's internals (anything not its `index.ts`) |
-| `worker` | another context's internals |
+| `domain` | any app, Next.js, React, HTTP transport types |
+| `domain` context module | another context's internals — only `contexts/<name>/index.ts` is public |
+| `web` | Prisma, ioredis, `game-engine`, `domain`, any `apps/api` or `apps/worker` internal |
+| `api` | `apps/worker` (any path) |
+| `worker` | `apps/api` (any path) |
 
 `game-engine`'s ban on `Date.now` and `Math.random` is `ADR-010`'s determinism requirement made
 mechanical. Lint rules alone would be bypassable; dependency-cruiser plus a targeted
@@ -332,19 +431,80 @@ The minimum needed to build and prove the 0B primitives. **Do not add gameplay t
 | `Entitlement` | Premium, account-wide | permanent **or** time-bounded; `validFrom`, nullable `validUntil` |
 | `Character` | the avatar | vocation, `retiredAt` nullable |
 | `CharacterStamina` | Stamina state | `remaining`, `mode`, `modeSince`, `updatedAt` |
-| `OccupancyClaim` | one per Character | names its activity; `ADR-013` |
-| `Activity` | activity row + account claim | lifecycle state, `graceExpiresAt`, pinned bundle version |
+| `OccupancyClaim` | one per Character | `characterId` unique; FK to `Activity.id`; `ADR-013` |
+| `Activity` | **shared root** for both activity families | `id`, `accountId`, `kind`, `createdAt` |
+| `SessionBoundActivity` | Hunt / Dungeon subtype | lifecycle state, `claimHolderSessionId`, `graceExpiresAt`, `contentVersion`, `rngSeed` |
+| `SkillTrainingActivity` | wall-clock subtype | `characterId`, status, `startedAt`, `lastSettledAt`, `endedAt` |
 | `ActiveUseTimer` | reusable duration state | `remainingDuration`, `qualifyingSince` |
 | `IdempotencyRecord` | client command keys | scope, fingerprint, result reference |
 | `SettlementOperation` | deterministic settlement ids | uniqueness target |
 | `LedgerEntry` + `CurrencyBalance` | economy invariant tests | minimal; no market, no forge |
-| `ContentBundleRef` | pinned bundle versions | what `ADR-016` derives the pinned set from |
+| `ContentBundle` | **bundle metadata** — `version` (PK), `checksum`, `publishedAt`, `location` | one row per published bundle; **not** a reference count |
 | `_prisma_migrations` | migration metadata | Prisma-managed |
 
 **Deliberately absent from 0B:** `ItemInstance`, custody scopes, `MarketListing`, Skills,
 Progression, Wheel, Skill Tree, Hunt/Room/Creature tables. They belong to the phases that use
 them. `ItemInstance` in particular is Phase 3 — `ADR-004`'s custody invariant is specified but
-not yet built, and that is correct.
+not yet built, and §6.6 traces that honestly.
+
+### 6.3.1 The two activity families, durably
+
+`ADR-002` defines two families with different lifecycles. They share an identity so
+`OccupancyClaim.activityId` has **one** referential target, and diverge in their subtype state so
+the lifecycles are not collapsed into one behaviour.
+
+```text
+Activity                     id, accountId, kind ∈ {SESSION_BOUND, WALL_CLOCK}, createdAt
+   ├── SessionBoundActivity  state ∈ {ONLINE_ACTIVE, RECONNECT_GRACE_PAUSED, ACTIVITY_ENDED}
+   │                         claimHolderSessionId, graceExpiresAt, contentVersion, rngSeed
+   └── SkillTrainingActivity characterId, status ∈ {ACCRUING, SETTLED, ENDED, EXHAUSTED, CANCELLED}
+                             startedAt, lastSettledAt, endedAt
+```
+
+**Why durable Skill Training state is required in 0B and not deferrable:** restart reconciliation
+must decide whether an occupancy claim is live or stranded. A claim naming a training activity
+that does not exist in durable state is unanswerable — the sweeper would have to guess, and
+guessing either strands a Character forever or releases one mid-training. The claim's referent
+must be durable for the reconciliation contract of §7.2 to mean anything.
+
+**What 0B's Skill Training state does *not* need:** training rates, Exercise Weapon economy,
+skill progression formulas, or any balance value. Those are Phase 4.
+
+**What it does need:** durable identity, Character owner, lifecycle status, start/end/exhaust/
+cancel transitions sufficient for reconciliation, server timestamps proving the wall-clock
+lifecycle, occupancy acquire/release semantics, and **no Base-XP capability** (invariant I10 —
+the training settlement port has no progression method).
+
+### 6.3.2 The account activity claim holder
+
+`ADR-008` requires newest-connection-wins with an atomic transfer, and the claim must survive a
+Redis flush (`ADR-009`).
+
+| Field | Where | Durable |
+|---|---|---|
+| `claimHolderSessionId` | `SessionBoundActivity` | **yes — PostgreSQL is authoritative** |
+| Session presence / liveness | Redis `session:presence:*` | no — ephemeral, rebuilt on reconnect |
+
+**Transfer is a compare-and-swap** inside one transaction:
+
+```sql
+UPDATE "SessionBoundActivity"
+   SET "claimHolderSessionId" = :newSession
+ WHERE "id" = :activityId
+   AND "claimHolderSessionId" = :expectedOldSession
+   AND "state" <> 'ACTIVITY_ENDED'
+```
+
+Zero rows updated means another session won the race; the caller receives `ActivityClaimHeld`
+and does not retry blindly. At no instant do two sessions hold the claim.
+
+**What survives a restart or Redis loss:** the claim holder, the activity state and
+`graceExpiresAt` — all in PostgreSQL. **What does not:** presence, which the next connection
+re-establishes.
+
+**Stale holder reconciliation:** a holder session id with no live presence is not by itself
+stale — that is exactly what reconnect grace is for. Staleness is decided from
+`graceExpiresAt` against `Clock.now()`, never from presence being absent (§11.2).
 
 ### 6.4 Invariant enforcement plan
 
@@ -353,10 +513,10 @@ for anything that can be raced.
 
 | # | Invariant | Enforced by |
 |---|---|---|
-| I1 | One **playable (non-retired)** Character per vocation per account | **partial unique index** on `(accountId, vocation) WHERE "retiredAt" IS NULL` — raw SQL in a migration (§3.8) |
+| I1 | One **playable (non-retired)** Character per vocation per account | **partial unique index** on `(accountId, vocation)` with the predicate `WHERE "retiredAt" IS NULL` — declared in `schema.prisma` via Prisma's `where` argument (§3.8), no raw SQL |
 | I2 | `count(playable characters) ≤ rosterCapacity ≤ 5` | transaction + `CHECK (rosterCapacity BETWEEN 1 AND 5)`; the count is verified inside the creating transaction |
 | I7 | Settlement idempotent under its operation id | **unique constraint** on `SettlementOperation.operationId` |
-| I9 | One Session holds an account's Activity claim | **partial unique index** on `Activity(accountId) WHERE state <> 'ENDED'` + conditional write |
+| I9 | One Session holds an account's Activity claim | **partial unique index** on `SessionBoundActivity(accountId)` with the predicate `WHERE state IN ('ONLINE_ACTIVE', 'RECONNECT_GRACE_PAUSED')` — declared with Prisma's `where` argument (§3.8) + compare-and-swap transfer |
 | I13 | One occupancy claim per Character | **unique constraint** on `OccupancyClaim.characterId` |
 | I15 | Duration never consumed outside a qualifying state | **interface capability** — only a state transition writes `qualifyingSince` |
 | I16 | A referenced content bundle is never deleted | **no delete path exists**; deletion is an explicit audited operation guarded by a reference query |
@@ -379,6 +539,29 @@ has not read `ADR-003`.
 - Raw SQL (partial indexes, role grants) lives in hand-edited migration files with a comment
   explaining which invariant it enforces.
 
+### 6.6 Invariant trace — what 0B proves and what it defers
+
+Not every accepted invariant can be proven by a phase that deliberately lacks the model it
+governs. Stating that honestly is more useful than a checklist that overclaims.
+
+| Invariant | Status in Phase 0B |
+|---|---|
+| I1 playable vocation uniqueness | **proven** — D4, D5 |
+| I2 roster capacity | **proven** — D6–D8 |
+| I5 balance reconciles to ledger | **proven** — economy suite |
+| I6 ledger append-only | **proven** — D9, by role grant |
+| I7 settlement idempotent | **proven** — I4 |
+| I9 one account activity claim | **proven** — A1–A3 |
+| I10 Skill Training cannot write Base XP | **proven structurally** — the port has no such method |
+| I12 no hard delete of a Character | **proven** — no delete path exists |
+| I13 one occupancy claim per Character | **proven** — O1–O10 |
+| I15 duration only consumed while qualifying | **proven** — T1–T11 |
+| I16 referenced bundle never deleted | **proven** — C4 |
+| **I4 an ItemInstance is in exactly one custody scope** | **ACCEPTED ARCHITECTURE — DEFERRED IMPLEMENTATION.** `ADR-004` is accepted and binding, but `ItemInstance` and custody scopes do not exist in 0B. The invariant is proven by the phase that introduces the item model (Phase 3). **Phase 0B claims no item-duplication coverage.** |
+| I3 Active Party membership rules | deferred to the phase that builds Active Party configuration |
+| I8 a paused Activity cannot advance | partially — the state machine exists; the tick path it forbids arrives in Phase 2 |
+| I11 formation/equipment frozen during an activity | deferred with the systems it constrains |
+
 ---
 
 ## 7. Domain primitive contracts
@@ -387,16 +570,49 @@ These are the substance of Phase 0B. Signatures are illustrative; the **semantic
 
 ### 7.1 Server time
 
+Two concerns, deliberately separated. An earlier draft called `Instant` "monotonic-safe", which
+is wrong: a wall-clock instant is **not** intrinsically monotonic, and a process monotonic clock
+cannot span a restart — which is precisely what durable timers must do.
+
 ```ts
 interface Clock {
-  now(): Instant;          // server-authoritative, monotonic-safe for durations
+  now(): Instant;            // authoritative UTC wall clock — the ONLY durable timestamp source
+}
+
+interface MonotonicSource {
+  elapsedSince(mark: Mark): Duration;   // intra-process only, NEVER persisted
 }
 ```
 
-- Injected everywhere. **No `Date.now()` inside domain or engine code.**
-- `FakeClock` in test support: settable, advanceable, deterministic.
-- A client-supplied timestamp is **never** an input to any settlement
+| Concern | Used for | Persisted |
+|---|---|---|
+| `Clock.now()` — UTC wall clock | every durable timestamp: `qualifyingSince`, `modeSince`, `graceExpiresAt`, ledger entries | **yes** |
+| `MonotonicSource` | intra-process measurement such as metrics timing | **never** |
+
+- injected everywhere. **No `Date.now()` in domain or engine code**;
+- `FakeClock` in test support: settable, advanceable, and able to **move backwards**, which §7.3
+  requires;
+- a client-supplied timestamp is **never** an input to any settlement
   (`CLIENT_SERVER_BOUNDARIES.md` §6).
+
+### 7.1.1 Clock regression
+
+Server wall clocks move backwards — NTP correction, VM migration, operator error. Durable
+settlement must be defined for it.
+
+**Rules:**
+
+1. an elapsed duration is computed as **`max(0, now − qualifyingSince)`**. It is never negative;
+2. a backward step therefore **stalls** a timer rather than reversing it. Nothing is minted, and
+   nothing already settled is restored;
+3. a regression beyond a **tolerance threshold** is logged at `error` and increments
+   `clock_regression_total`. It is an operational signal, not a silent correction;
+4. `qualifyingSince` is **never rewritten** to compensate — rewriting it would change history to
+   match a broken clock;
+5. forward jumps settle normally. An unusually large forward jump is logged, because it is
+   indistinguishable from a legitimately long qualifying period and an operator may want to know.
+
+Test T11 covers it.
 
 ### 7.2 Character occupancy claim
 
@@ -450,6 +666,50 @@ Semantics:
 
 Stamina uses this machinery with the sign inverted; it is the framework's first consumer and its
 reference implementation.
+
+### 7.3.1 Activity stamina classification — the contract that drives the modes
+
+`ACTIVITY_OCCUPANCY_AND_TIMERS.md` §3.2 requires that **every activity type declares whether it
+consumes Stamina**, and that an undeclared type is rejected rather than silently defaulting. An
+earlier draft of this specification defined the modes but never the declaration that produces
+them. Without it, §7.4's mode is unexplainable.
+
+```ts
+type StaminaClassification =
+  | 'STAMINA_CONSUMING'          // Hunt, Dungeon
+  | 'STAMINA_RECOVERY_ELIGIBLE'; // Skill Training, and anything not a consuming Hunt
+
+type ActivityTypeDescriptor = {
+  key: ActivityTypeKey;
+  family: 'SESSION_BOUND' | 'WALL_CLOCK';
+  stamina: StaminaClassification;   // REQUIRED — no default exists
+  occupiesCharacter: true;          // every activity occupies; ADR-013
+};
+```
+
+**Occupancy is not consumption.** These are orthogonal, and conflating them is the mistake this
+contract prevents: Skill Training **occupies** the Character (so it cannot also hunt) **and** is
+**recovery-eligible** (so its Stamina climbs). One claim, two independent classifications.
+
+**Mode derivation** is a pure function of authoritative state — never assigned freely:
+
+```text
+deriveStaminaMode(character) =
+
+  no occupancy claim                                          → RECOVERING
+  claim → activity type is STAMINA_RECOVERY_ELIGIBLE          → RECOVERING
+  claim → STAMINA_CONSUMING, state = RECONNECT_GRACE_PAUSED   → NEUTRAL
+  claim → STAMINA_CONSUMING, not yet activated                → NEUTRAL
+  claim → STAMINA_CONSUMING, ONLINE_ACTIVE and activated      → CONSUMING
+```
+
+"Activated" is the first-qualifying-XP flag of `ADR-014`, persisted on the session-bound
+activity per participant. Phase 0B stores and reads it; **Phase 2 decides what raises it.**
+
+**Registry validation.** Activity type descriptors are validated at startup and in CI. A
+descriptor missing `stamina` **fails validation and the process refuses to start** — the
+fail-fast rule of §11.3 applied to a domain registry. A new activity type cannot be added by
+forgetting to classify it.
 
 ### 7.4 Stamina
 
@@ -555,11 +815,46 @@ interface ContentBundleResolver {
 - the process holds the current bundle and may cache **several pinned historical bundles**;
 - **any referenced bundle must resolve** — `ADR-016`. No code may assume the current bundle is
   the only loadable one;
-- the **pinned set is a query over durable state** (`ContentBundleRef`), not separate
-  bookkeeping;
-- **no delete path exists**;
 - the engine receives **already-resolved definitions** and performs no I/O — resolution happens
   in the application layer before the engine is called.
+
+#### How the pinned set is derived
+
+`ContentBundle` is **metadata only**: version, checksum, published timestamp, storage location.
+It carries **no reference count and no pinned flag**. A counter would be a mutable side channel
+that can drift from reality, and a drifted counter is how a referenced bundle gets deleted.
+
+Durable entities **reference a bundle version directly** — in 0B that is
+`SessionBoundActivity.contentVersion`. The pinned set is therefore a **query over those real
+references**:
+
+```sql
+SELECT DISTINCT "contentVersion" FROM "SessionBoundActivity"
+ WHERE "state" IN ('ONLINE_ACTIVE', 'RECONNECT_GRACE_PAUSED')
+-- future phases add their own referencing tables to this union
+```
+
+It cannot disagree with reality, because it *is* reality.
+
+#### Deletion
+
+An earlier draft said "no delete path exists", which over-claimed: `ADR-016` permits removing a
+genuinely **un**referenced bundle through an explicit audited operation.
+
+| Bundle | May be deleted |
+|---|---|
+| **Referenced** by any durable row | **never** — the cleanup path refuses, and this is test C4 |
+| **Unreferenced** | yes, through the explicit audited cleanup path only |
+
+There is **no automatic sweep**. Cleanup is operator-invoked, logs what it removed, and
+re-derives the pinned set inside the same transaction as its deletion so a bundle cannot become
+referenced between the check and the delete.
+
+#### Restart
+
+The local filesystem provider must resolve a **historical** bundle **after a resolver or process
+restart**, not merely from an in-memory cache warmed earlier in the same process. Test C3 asserts
+exactly that: publish v1, pin an activity to it, advance to v2, restart, resolve v1.
 
 `DEFERRED` — the storage backend. 0B implements a local filesystem provider behind this
 interface; object storage is a later swap that changes no caller.
@@ -808,18 +1103,22 @@ GitHub Actions. Every check below is **blocking**. Cheapest first, so failures s
 | 7 | **Content validation** | invalid content bundle |
 | 8 | **Migration validation** | migrations failing from empty **or** from the previous state |
 | 9 | Integration tests (Testcontainers: PostgreSQL + Redis) | failures |
-| 10 | **Economy invariant tests** | duplication, double-spend, non-idempotent replay, reconciliation drift |
+| 10 | **Economy invariant tests** | currency double-spend under concurrency, non-idempotent replay, ledger mutation, reconciliation drift |
 | 11 | Build (`web`, `api`, `worker`) | build errors |
 
 Check 10 is a **category of its own**, not ordinary unit tests. `AGENTS.md` §6 warns that green
 CI does not prove game correctness; these are the part of correctness CI genuinely can prove, and
 the part where being wrong costs the most.
 
+**What check 10 does *not* cover in Phase 0B — stated so no one is misled.** An earlier draft
+claimed it caught *item duplication*. It cannot: `ItemInstance` and custody scopes are
+deliberately absent from 0B (§6.3), so there is no item to duplicate. See §6.6.
+
 **Phase 0B is not `VERIFIED` until CI exists and passes.**
 
 ---
 
-## 14. Test matrix
+## 14. Test matrix — **74 cases**
 
 Every row is required. `§` references the contract it proves.
 
@@ -836,6 +1135,9 @@ Every row is required. `§` references the contract it proves.
 | W7 | `web` importing `game-engine` or a persistence package fails |
 | W8 | One API context importing another's internals fails |
 | W9 | The full dependency graph matches the declared rules |
+| W10 | `apps/worker` importing anything under `apps/api` fails, and vice versa |
+| W11 | Importing a `domain` context internal rather than its `index.ts` fails |
+| W12 | **From a clean checkout**, `pnpm install && pnpm build && pnpm test` succeeds; tests resolve packages through their built `exports` |
 
 ### 14.2 Database
 
@@ -864,6 +1166,9 @@ Every row is required. `§` references the contract it proves.
 | O7 | Reconnect grace **reserves** claims rather than releasing them |
 | O8 | Restart reconciliation releases **only genuinely stranded** claims |
 | O9 | Concurrent party starts on overlapping Characters do not deadlock |
+| O10 | Restart reconciliation **preserves** a live Skill Training claim whose training is `ACCRUING` |
+| O11 | Restart reconciliation **releases** a claim whose training is `ENDED`, `EXHAUSTED` or `CANCELLED` |
+| O12 | Restart reconciliation **releases** a claim whose named activity row is absent |
 
 ### 14.4 Activity claim
 
@@ -872,6 +1177,9 @@ Every row is required. `§` references the contract it proves.
 | A1 | Only one authoritative Account Activity claim exists at a time |
 | A2 | Claim transfer (newest-connection-wins) is atomic — no instant with two holders |
 | A3 | A paused activity **reserves** its claim |
+| A4 | `claimHolderSessionId` survives a process restart and a full Redis flush |
+| A5 | Compare-and-swap transfer with a stale expected holder affects **zero rows** and returns `ActivityClaimHeld` |
+| A6 | Staleness is decided from `graceExpiresAt`, **not** from absent presence |
 
 ### 14.5 Timers and Stamina
 
@@ -887,6 +1195,10 @@ Every row is required. `§` references the contract it proves.
 | T8 | `NEUTRAL` mode consumes nothing and recovers nothing |
 | T9 | A timer is never decremented by any scheduled job |
 | T10 | Crash and retry produce neither double-consume nor double-recover |
+| T11 | **Clock regression**: a backwards `Clock.now()` yields elapsed `0`, never negative; nothing is minted or restored; `clock_regression_total` increments |
+| T12 | An activity type descriptor **missing** its `stamina` classification fails registry validation and the process refuses to start |
+| T13 | **Knight hunting + Druid training**: the Druid holds an occupancy claim **and** is `RECOVERING`; the Knight is `NEUTRAL` before activation and `CONSUMING` after |
+| T14 | A `STAMINA_CONSUMING` activity in `RECONNECT_GRACE_PAUSED` is `NEUTRAL` |
 
 ### 14.6 Idempotency
 
@@ -911,8 +1223,9 @@ Every row is required. `§` references the contract it proves.
 |---|---|
 | C1 | An invalid bundle fails validation |
 | C2 | A bundle builds with a version identifier |
-| C3 | A **historical pinned** bundle resolves after the current bundle advances |
-| C4 | A referenced bundle has **no delete path** |
+| C3 | A **historical pinned** bundle resolves after the current bundle advances **and after a process restart** — not from a warmed in-memory cache |
+| C4 | The cleanup path **refuses to delete a referenced bundle**; it deletes an unreferenced one and logs what it removed |
+| C6 | The pinned set is derived by querying real references; there is no reference-count column to drift |
 | C5 | An unlock set without exactly five keys fails validation |
 
 ### 14.9 Health
@@ -981,16 +1294,19 @@ config, `.prettierrc`, `.dependency-cruiser.cjs`, `vitest.workspace.ts`, `.gitig
 
 **Goal.** Six workspaces that build, start and import each other legally.
 
-**Files.** `apps/web` (Next.js), `apps/api` (NestJS + context directories), `apps/worker`
-(BullMQ entry), `packages/shared`, `packages/game-data`, `packages/game-engine` — each with
-`package.json`, `tsconfig.json`, and a trivial entry point.
+**Files.** `apps/web` (Next.js), `apps/api` (NestJS adapters + composition root), `apps/worker`
+(BullMQ consumers + composition root), `packages/shared`, `packages/domain` (context
+directories), `packages/game-data`, `packages/game-engine` — each with `package.json`,
+`tsconfig.json` (`composite: true` for packages), and a trivial entry point. Root `tsconfig.json`
+with `references`.
 
 **Prerequisites.** 0B.1.
 
-**Acceptance.** W6–W8, E3. All three apps build and start. `shared` is importable from `web`,
-`api` and `worker`.
+**Acceptance.** W6–W8, **W10–W12**, E3. All three apps build and start. Both apps reach the
+domain only through `packages/domain`; neither can import the other.
 
-**Done when.** `pnpm build` passes for every workspace and the three apps start clean.
+**Done when.** **W12 passes from a clean checkout** — `pnpm install && pnpm build && pnpm test`
+— and `tsc -b` builds the packages in dependency order.
 
 ---
 
@@ -998,16 +1314,18 @@ config, `.prettierrc`, `.dependency-cruiser.cjs`, `vitest.workspace.ts`, `.gitig
 
 **Goal.** A schema whose constraints enforce the load-bearing invariants.
 
-**Files.** `apps/api/prisma/schema.prisma`, initial migrations including **hand-edited raw SQL**
-for the partial unique indexes (I1, I9) and the ledger role grants (I6), a migration-check
-script.
+**Files.** `packages/domain/prisma/schema.prisma` with the `partialIndexes` preview feature
+enabled; the `Activity` root plus `SessionBoundActivity` and `SkillTrainingActivity` subtypes
+(§6.3.1); the account claim holder (§6.3.2); initial migrations with **I1 and I9 declared in the
+schema** and **raw SQL only for the ledger role grants** (I6); a migration-check script.
 
 **Prerequisites.** 0B.2.
 
 **Acceptance.** D1–D9.
 
 **Done when.** Migrations apply from empty and from the previous state; D4 and D5 both pass —
-duplicate playable vocation rejected, retired vocation reusable.
+duplicate playable vocation rejected, retired vocation reusable — and D9 confirms the
+application role cannot mutate a ledger row.
 
 ---
 
@@ -1032,15 +1350,18 @@ isolation, and the ledger reconciles.
 
 **Goal.** The duration machinery every timed system will use.
 
-**Files.** `platform/clock` (`Clock`, `SystemClock`, `FakeClock`); `contexts/character/stamina`;
-`contexts/identity/entitlement`; a shared `ActiveUseTimer` implementation.
+**Files.** `platform/clock` (`Clock`, `SystemClock`, `FakeClock` with backwards support,
+`MonotonicSource`); `contexts/character/stamina` including the activity-type registry and
+`deriveStaminaMode` (§7.3.1); `contexts/identity/entitlement`; a shared `ActiveUseTimer`.
 
 **Prerequisites.** 0B.4.
 
-**Acceptance.** T1–T10.
+**Acceptance.** T1–T14.
 
-**Done when.** T3 passes — restart from the durable marker produces an identical result — and
-T5 passes — a Premium transition splits an interval correctly.
+**Done when.** T3 passes (restart from the durable marker is identical), T5 passes (a Premium
+transition splits an interval), **T11 passes** (clock regression stalls rather than reverses),
+and **T13 passes** — Knight hunting while the Druid trains, with the Druid occupied *and*
+recovering.
 
 ---
 
@@ -1048,15 +1369,17 @@ T5 passes — a Premium transition splits an interval correctly.
 
 **Goal.** One action per Character; one activity per account.
 
-**Files.** `contexts/activity/claim`, `.../occupancy`, `.../lifecycle`, and the reconciliation
-job in `apps/worker`.
+**Files.** `packages/domain/src/contexts/activity/{claim,occupancy,lifecycle,skill-training}`;
+the reconciliation job in `apps/worker`, calling the Activity context's **public surface** —
+never reaching into `apps/api` (§4.2).
 
 **Prerequisites.** 0B.4.
 
-**Acceptance.** O1–O9, A1–A3.
+**Acceptance.** O1–O12, A1–A6.
 
-**Done when.** O3 and O4 pass — party acquisition is all-or-nothing with no partial claims — and
-O9 shows no deadlock under concurrent overlapping starts.
+**Done when.** O3 and O4 pass (all-or-nothing party acquisition), O9 shows no deadlock, **O10–O12
+pass** — reconciliation preserves a live training claim and releases only a terminal or orphaned
+one — and **A4–A6 pass** for the durable claim holder.
 
 ---
 
@@ -1145,11 +1468,12 @@ Objective and checkable. Every line needs evidence, not a claim.
 
 | # | Criterion |
 |---|---|
-| 1 | `pnpm install` succeeds from a clean checkout |
+| 1 | `pnpm install` then `pnpm build` then `pnpm test` succeeds from a **clean checkout**, in that order |
 | 2 | `pnpm format:check` passes |
 | 3 | `pnpm lint` passes |
 | 4 | `pnpm typecheck` passes across all workspaces |
 | 5 | `pnpm boundaries` passes, and a deliberately-added forbidden import fails it |
+| 5a | `apps/worker` cannot import `apps/api`, and no app reaches a `domain` context internal |
 | 6 | Unit tests pass |
 | 7 | Integration tests pass against ephemeral PostgreSQL and Redis |
 | 8 | Deterministic engine fixtures pass, including across a process restart |
@@ -1162,9 +1486,9 @@ Objective and checkable. Every line needs evidence, not a claim.
 | 15 | Redis connects; a full flush loses no durable state |
 | 16 | `/health/live` returns healthy with PostgreSQL down |
 | 17 | `/health/ready` fails independently on each of its four conditions |
-| 18 | The complete §14 test matrix passes |
+| 18 | The complete §14 test matrix passes — **all 74 cases** |
 | 19 | CI is green, with all eleven checks of §13 present |
-| 20 | **No accepted architecture invariant is contradicted** — traced ADR by ADR |
+| 20 | **No accepted architecture invariant is contradicted** — traced ADR by ADR, with §6.6's deferrals stated rather than overclaimed |
 | 21 | **No Hunt balance or gameplay loop was implemented** — no XP curve, damage formula, loot table or reward multiplier exists |
 
 Criterion 21 deserves its own review question: *did anything in this phase require a balance
@@ -1180,20 +1504,27 @@ Made under the project's autonomous execution model (`AGENTS.md` §3), recorded 
 |---|---|---|---|
 | 1 | **pnpm** | strict `node_modules` makes undeclared dependencies fail at resolution — a second boundary layer beneath the lint rules | low, before code exists |
 | 2 | **No task runner initially**, Turborepo trigger recorded | six workspaces do not need a build graph tool; `pnpm -r` is already topological | low |
-| 3 | **Source-only internal packages** | avoids the NestJS-CJS / Next-ESM conflict entirely; no publish target exists | medium — changing later means adding build config |
+| 3′ | **Composite packages with project references and `tsc -b`** — *corrects* the earlier source-only claim, which was incoherent with project references | one resolution model across editor, typecheck, tests and build; avoids the NestJS `paths`-not-rewritten footgun | low — decided before code exists |
 | 4 | **Vitest** | runs TS source directly (which #3 needs), workspace mode, fake timers for §14.5 | medium — test rewrites |
 | 5 | **dependency-cruiser** as the authoritative boundary gate | reasons over transitive edges, emits a reviewable graph | low |
-| 6 | **Contexts inside `apps/api`, not packages** | they need ORM and framework; extracting them would violate "packages must not depend on apps" | medium |
+| 6′ | **Contexts live in `packages/domain`; both apps depend on it** — *corrects* the earlier "contexts inside `apps/api`" | the earlier rationale was wrong: the forbidden edge is **package → app**, and a package depending on Prisma breaks no rule. This gives the worker a legal call path instead of an app-to-app reach-in | low — decided before code exists |
 | 7 | **UUIDv7 generated in application code** | not every PostgreSQL version offers `uuidv7()`; keeps generation testable under a fake clock | low |
-| 8 | **Partial unique index by raw SQL** for I1 | Prisma cannot express it declaratively; generated-column fallback documented | low |
+| 8′ | **Prisma 7.10.x pinned, `partialIndexes` preview enabled; I1 and I9 declared in the schema** — *corrects* the withdrawn "Prisma cannot express partial indexes" claim | researched: 7.4 added it behind a preview flag, 8 promotes it to GA but is still an RC. A foundation phase should not pin to a pre-release | low — dropping the flag on Prisma 8 GA changes no syntax |
 | 9 | **Ledger append-only by database role grant** | makes I6 true for a developer who has not read `ADR-003` | low |
 | 10 | **CI starts in 0B.1**, not at the end | avoids eleven checks failing at once against a large diff | low |
 | 11 | **0B.7 parallel to 0B.4–0B.6** | no dependency exists; shortens the critical path | low |
 | 12 | **Testcontainers** for integration tests | developer and CI run the same thing; no hand-started database | low |
 | 13 | **BullMQ** | Redis-backed, matches the approved Redis role | low |
 | 14 | **Retry bounded at 3 attempts** for serialization failures | bounded so a pathological case surfaces instead of spinning | low |
+| 15 | **Shared `Activity` root with two subtype tables** | gives `OccupancyClaim.activityId` one referential target while keeping the two lifecycles distinct, as `ADR-002` requires | low |
+| 16 | **`claimHolderSessionId` durable in PostgreSQL**, presence ephemeral in Redis | the claim must survive a Redis flush (`ADR-009`); presence must not | low |
+| 17 | **`StaminaClassification` is a required field with no default** | an unclassified activity type failing at startup is the only way "undeclared is rejected" is true in practice | low |
+| 18 | **`ContentBundle` is metadata; the pinned set is a query** | a reference count is a mutable side channel that can drift, and a drifted count deletes a referenced bundle | low |
+| 19 | **Elapsed is `max(0, now − qualifyingSince)`**; a backward clock stalls a timer | never negative, never mints or restores value; the regression is an operational signal, not a silent correction | low |
+| 20 | **Node 24 (Active LTS)** | satisfies Prisma's `engines: >= 22.18.0`; Node 26 becomes LTS in October 2026 and is the designated next step | low |
 
-None contradicts an accepted ADR or a LOCKED product rule.
+None contradicts an accepted ADR or a LOCKED product rule. Decisions 3′, 6′ and 8′ **correct**
+earlier ones in this same document, at the independent reviewer's direction.
 
 ---
 
