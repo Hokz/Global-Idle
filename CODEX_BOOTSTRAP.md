@@ -11,6 +11,7 @@ Start with:
 - `AGENTS.md`
 - `docs/DESIGN_INDEX.md`
 - `docs/MASTER_DEVELOPMENT_ROADMAP.md`
+- `docs/ECONOMY.md`
 - `docs/ARCHITECTURE.md`
 - `docs/MVP_SCOPE.md`
 - `docs/DECISIONS.md`

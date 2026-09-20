@@ -33,11 +33,12 @@ Before meaningful work, read:
 3. `docs/MASTER_DEVELOPMENT_ROADMAP.md`
 4. `docs/PRODUCT_VISION.md`
 5. `docs/GAME_SYSTEMS.md`
-6. `docs/ARCHITECTURE.md`
-7. `docs/MVP_SCOPE.md`
-8. `docs/DECISIONS.md`
-9. `docs/OPEN_QUESTIONS.md`
-10. any task-specific design document.
+6. `docs/ECONOMY.md`
+7. `docs/ARCHITECTURE.md`
+8. `docs/MVP_SCOPE.md`
+9. `docs/DECISIONS.md`
+10. `docs/OPEN_QUESTIONS.md`
+11. any task-specific design document.
 
 ## 3. Agent workflow
 
