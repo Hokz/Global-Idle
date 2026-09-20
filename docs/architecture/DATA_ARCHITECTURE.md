@@ -71,7 +71,9 @@ These are each exactly one transaction, all-or-nothing:
 | **Market listing** | item custody → escrow, listing row, fee, ledger |
 | **Forge attempt** | cost debit, ledger, two sacrifices → consumed, target tier on success |
 | **Roster slot unlock** | Gold debit, ledger, capacity increment |
-| **Character retirement** | character status, item custody → recovery, party config |
+| **Character retirement** | character status, item custody → recovery, party config, occupancy claim check |
+| **Activity start** | activity row, account activity claim, **one occupancy claim per participating Character** |
+| **Activity end / retirement of claims** | activity state, **release of every occupancy claim**, in the same transaction as the lifecycle transition |
 | **Skill training claim** | charges, skill progression, activity state |
 
 A partially applied settlement is not a state the system can be in. Loot materializing without
@@ -87,7 +89,8 @@ configuration.**
 | Data | Strategy | Why |
 |---|---|---|
 | Balances, item custody, listings, escrow | **pessimistic** — row locks in a deterministic order | contention is real, retries on value movement are error-prone, and correctness beats throughput |
-| Activity claim | **conditional write** | atomic acquire/transfer, no lock held across a request |
+| Activity claim (account/session) | **conditional write** | atomic acquire/transfer, no lock held across a request |
+| Character occupancy claim | **conditional write + uniqueness constraint** | one primary action per Character (`ADR-013`, I13). A party start acquires N claims in **one** transaction, in the globally consistent order below |
 | Activity run state | single-writer by construction | only the claim holder writes it |
 | Party configuration, UI preferences | **optimistic** — version column | contention is negligible; a lost update is a re-submit |
 
@@ -100,18 +103,33 @@ deadlock a marketplace; the ordering rule removes it.
 
 ## 5. Idempotency
 
-Every value-moving operation carries an **operation id**, unique across the system:
+`DECIDED IN PHASE 0A` — **two separate mechanisms**, deliberately not one. Conflating them is
+what produces the cross-account collision and the payload-mismatch hole that `ADR-017` closes.
 
-- client-supplied for commands (`CLIENT_SERVER_BOUNDARIES.md` §3);
-- server-generated and deterministic for settlements, derived from activity id and checkpoint
-  sequence.
+### Client-originated value-moving commands
 
-Enforcement is a **uniqueness constraint**, not an application check. Replaying an operation id
-violates the constraint and the operation returns its original result rather than performing
-again.
+```text
+key identity  =  (authenticated Account/principal, command namespace, client idempotency key)
+stored with   =  canonical semantic request fingerprint + authoritative result (or a reference to it)
+```
 
-`DECIDED IN PHASE 0A` — deriving the settlement operation id deterministically means a retried
-settlement after a network failure cannot double-apply, even if the caller lost the response.
+| Case | Behaviour |
+|---|---|
+| Key identity unseen | execute, store `(fingerprint, result)`, return result |
+| Same key identity, **same** fingerprint | return the original result; do not execute |
+| Same key identity, **different** fingerprint | **explicit conflict reject**; do not execute, do not overwrite |
+| Same client key, **different Account** | a different key identity entirely — no collision, no leakage |
+
+A client key is **not** globally unique across the system, and nothing may treat it as such. It
+is unique only within its principal and command namespace. Uniqueness is enforced by a
+constraint over the full key identity, not over the client key alone.
+
+### Server settlement
+
+Settlement operation ids are **server-generated and deterministic**, derived from activity id
+plus checkpoint sequence. They are not client keys, do not use the fingerprint contract, and are
+enforced by their own uniqueness constraint. Determinism means a retried settlement after a lost
+response cannot double-apply.
 
 ---
 
@@ -163,10 +181,17 @@ Two independent version axes, deliberately not conflated:
 | Axis | Versioned by | Compatibility rule |
 |---|---|---|
 | **Schema** | migrations | code tolerates one migration ahead and behind, so deploys can roll |
-| **Content** | content set version (`ADR-011`) | activities pin a version; superseded versions stay loadable while activities reference them |
+| **Content** | content bundle version (`ADR-011`, `ADR-016`) | activities pin a version; **a referenced bundle is never removed** and any referenced bundle is resolvable and loadable at runtime |
 
-A persisted activity therefore records its content version, and content retention must outlast
-the longest plausible activity. Retention policy is `DEFERRED` to operations.
+A persisted activity records its content bundle version, and **PostgreSQL references are what
+determine which bundles are pinned** — the pinned set is a query over durable state, not separate
+bookkeeping that could drift.
+
+`LOCKED` — a referenced bundle is never deleted (invariant I16, `ADR-016`). This is not a
+retention *policy* question and is not deferred: there is no automatic sweep that could remove
+one. Hunts are endless, so no bound on activity lifetime may be assumed. What remains `DEFERRED`
+to operations is only the storage backend for bundles and the cadence of the explicit, audited
+cleanup of genuinely **un**referenced versions.
 
 ---
 

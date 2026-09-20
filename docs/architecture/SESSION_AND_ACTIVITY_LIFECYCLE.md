@@ -87,8 +87,12 @@ reachable from `ONLINE_ACTIVE`.
 Preconditions: authenticated, connected, no existing activity claim, party valid, activity
 prerequisites met.
 
-On start the Activity records: the roster snapshot (composition and order), the pinned content
-version, the RNG seed, the initial participant profile, and an empty accumulator.
+On start, in **one transaction**, the Activity records the roster snapshot (composition and
+order), the pinned content bundle version, the RNG seed, the initial participant profile and an
+empty accumulator — **and acquires the occupancy claim for every participating Character**. If
+any participant already holds a claim, the whole start fails; nothing partial is left behind.
+Claims are acquired in the globally consistent order of `DATA_ARCHITECTURE.md` §4, so two party
+starts touching the same Characters cannot deadlock.
 
 ### 4.2 Settlement checkpoint
 
@@ -107,7 +111,9 @@ Trigger: the server observes transport loss.
 1. The activity stops ticking **immediately**.
 2. A settlement checkpoint runs, so progress up to the disconnect is not lost.
 3. State becomes `RECONNECT_GRACE_PAUSED` with a persisted `graceExpiresAt`.
-4. The claim is **reserved**, not released.
+4. The account activity claim is **reserved**, not released.
+5. Every participating Character's **occupancy claim is also reserved** — the activity still
+   exists, so those Characters are still committed to it and cannot be started on anything else.
 
 `DECIDED IN PHASE 0A` — settling on pause entry rather than discarding means a disconnect costs
 a player nothing they had already earned. Discarding would make an unstable connection a
@@ -132,13 +138,16 @@ timer having fired.** A Redis-scheduled job may trigger the check promptly, but 
 made against durable state, so a lost or late job cannot resurrect an activity that should have
 ended or end one that should not have. A periodic sweeper covers missed jobs (`ADR-009`).
 
-On expiry: the activity ends, any residual accumulator settles, the claim is released. A later
-Hunt re-entry starts at Room 1 — structurally, because run state died with the activity.
+On expiry: the activity ends, any residual accumulator settles, and **both the account activity
+claim and every participant's occupancy claim are released** — in the same transaction as the
+lifecycle transition, never as a follow-up step. A later Hunt re-entry starts at Room 1 —
+structurally, because run state died with the activity.
 
 ### 4.6 Explicit end
 
 Manual `stopActivity` and explicit logout **bypass the grace period entirely**. Final settlement
-runs, the activity ends, the claim is released — immediately, in the same request.
+runs, the activity ends, and all claims — account and per-Character occupancy — are released
+immediately, in the same request and the same transaction.
 
 The difference from a disconnect is *intent the server received*. When the server only observes
 transport loss — including a closed tab — it cannot distinguish intent and applies the grace
@@ -175,7 +184,10 @@ started ──► accruing (independent of session) ──► claimed / exhauste
 - the settlement path **cannot write Base XP** (invariant I10), enforced as a capability
   boundary rather than a runtime check.
 
-A player may have a Skill Training activity and a Hunt at the same time. They are independent.
+An account may have a Skill Training activity and a Hunt running at the same time **only on
+different Characters**. The same Character can never do both: it holds at most one occupancy
+claim (`ADR-013`, invariant I13). A Knight hunting while a Druid trains is the intended shape of
+roster play; a Knight hunting *and* training is refused at the command boundary.
 
 ---
 
@@ -190,7 +202,11 @@ On restart, for each activity:
 |---|---|
 | `ONLINE_ACTIVE` but no live session | transition to `RECONNECT_GRACE_PAUSED` with a fresh grace window |
 | `RECONNECT_GRACE_PAUSED`, not expired | leave paused; await reconnect |
-| `RECONNECT_GRACE_PAUSED`, expired | end it; settle any residual accumulator |
+| `RECONNECT_GRACE_PAUSED`, expired | end it; settle any residual accumulator; release all claims |
+
+The same sweeper recovers **stranded occupancy claims**: a claim whose named activity or training
+no longer exists in a live state is released. Because a claim names its activity, this is a
+reconciliation against durable state rather than guesswork (`ADR-013`).
 
 Progress lost by a crash is bounded by the settlement checkpoint interval, which is the explicit
 cost side of that tuning knob.

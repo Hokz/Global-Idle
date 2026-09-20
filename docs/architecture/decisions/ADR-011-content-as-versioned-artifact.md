@@ -35,6 +35,13 @@ runtime.**
 
 **Hot reload is explicitly not supported.** A content change is a deployment.
 
+> **Refined by `ADR-016`.** This ADR's original framing treated a bundle as something shipped
+> *inside* the application image, which made retention look like a short-window problem.
+> `ADR-016` corrects that: bundles are published to durable addressable storage, the running
+> server can resolve **any referenced bundle**, and a referenced bundle is never removed. The
+> versioning and pinning decisions here are unchanged; only the storage and retention model is
+> refined.
+
 ## Consequences
 
 **Benefits.**

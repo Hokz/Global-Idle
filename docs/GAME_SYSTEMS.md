@@ -38,9 +38,11 @@ at once. Different Characters on the account may act concurrently.
 - at exactly 0 the Character earns **no Hunt reward of any kind** but keeps fighting - zero
   stamina never forces an exit;
 - eligibility is per Character, and is a separate predicate from Shared XP level eligibility;
-- recovery happens whenever the Character is **not** in a consuming Hunt - including Dummy /
-  Exercise Weapon Skill Training, which does **not** block it. Premium recovers 1:1, Free 1:2,
-  capped at 42:00.
+- recovery happens whenever the Character is **not reserved in a Stamina-consuming Hunt
+  lifecycle** - including Dummy / Exercise Weapon Skill Training, which does **not** block it.
+  Premium recovers 1:1, Free 1:2, capped at 42:00;
+- **reconnect grace is neutral**: a paused Hunt neither consumes nor recovers, so a deliberate
+  disconnect cycle cannot be used to regenerate Stamina.
 
 ## Supplies
 
@@ -237,7 +239,9 @@ Duration is **12 hours of active use**, not wall-clock expiry. Nothing is consum
 item is unequipped, the Character is inactive or offline, or the activity is paused in reconnect
 grace. Remaining duration lives on the item and **resumes** on re-equip rather than resetting.
 
-Powerful Imbuements require the approved quest/boss progression unlock.
+Powerful Imbuements require completing **exactly five** configured boss completions of the
+approved quest/progression chain. The identities of those five bosses are open content design;
+the count is not.
 
 ## Market
 

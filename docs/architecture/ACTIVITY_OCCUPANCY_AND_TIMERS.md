@@ -179,7 +179,7 @@ Capped at 42:00. **There is no mandatory waiting period** before recovery begins
 
 ### 3.2 What recovers
 
-Any state in which the Character is not in an active Stamina-consuming Hunt:
+Any state in which the Character is **not reserved in a Stamina-consuming Hunt lifecycle**:
 
 - offline;
 - resting / idle;
@@ -187,6 +187,13 @@ Any state in which the Character is not in an active Stamina-consuming Hunt:
 - Dummy / Exercise Weapon Skill Training;
 - menus, hubs, Market, Atlas while the Character is not hunting;
 - any future activity explicitly configured as non-consuming.
+
+The qualifier matters. **"Offline recovers" does not extend to reconnect grace.** A Hunt paused
+in the 5-minute grace is a *reserved* Hunt state — the activity still exists and the Character's
+occupancy claim is still held — so it is `NEUTRAL`, recovering nothing. Without that
+qualification a player could disconnect deliberately and reconnect on a cycle to regenerate
+Stamina at resting rate while keeping the Hunt, which is a regeneration exploit dressed as a
+network problem. `docs/DECISIONS.md` carries the same rule.
 
 `DECIDED IN PHASE 0A` — **every activity type declares whether it consumes Stamina.** The
 declaration is part of the activity definition, and the default for a new type is *undeclared →
@@ -302,27 +309,25 @@ preserves the exact remaining value, because it is persisted, not held in memory
 
 ### 6.2 Unlock
 
-Powerful Imbuements require the approved quest/boss progression. The Product Owner specifies
-that the relevant access requires completing the **five required bosses** of that chain.
+`LOCKED BY PRODUCT` — Powerful Imbuement access requires completing **exactly five** required
+bosses of the approved quest/progression chain. The count is settled and is not an open question.
 
-`DECIDED IN PHASE 0A` — **the unlock is modelled as a named requirement over a configurable set
-of boss-completion facts**, not as five hard-coded checks:
+The unlock is modelled as a named requirement over a **configured set of exactly five
+boss-completion keys**, not as five hard-coded checks:
 
 ```text
-unlock.imbuement.powerful  ⟵  requires ALL of { boss completion keys }
+unlock.imbuement.powerful  ⟵  requires ALL of { 5 boss-completion keys }
 ```
 
-The set lives in content (`CONTENT_DATA_ARCHITECTURE.md`), so its membership is a reviewable
-data change rather than a code change. Architecture is unaffected by which bosses they are or
-how many there turn out to be.
+`DECIDED IN PHASE 0A` — the five keys live in content (`CONTENT_DATA_ARCHITECTURE.md`), so
+naming them is a reviewable data change rather than a code change. **Content validation enforces
+the cardinality**: the set must contain exactly five keys, and each must resolve to a defined
+boss. A set of four or six fails the build.
 
-> **⚠ Evidence gap — needs the Product Owner.** The Global Idle repository defines **no boss or
-> quest names at all**. The task instructs using existing repository references and not inventing
-> names, so none are invented here. For transparency: the analogous chain in the Canary research
-> reference has **six** pre-final bosses plus a final one, each gating a distinct Powerful
-> imbuement — not five. The count and the specific set therefore need the Product Owner to name
-> them before content can be authored. This blocks **content**, not architecture: the requirement
-> model above works for any set of any size.
+**Still open — content, not architecture:** the *identities* of those five bosses. The Global
+Idle repository defines no boss or quest names yet, and this document does not invent any. Only
+the five content keys are missing; nothing about the architecture, the requirement model or the
+count depends on them.
 
 ---
 

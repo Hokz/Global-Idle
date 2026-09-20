@@ -297,7 +297,19 @@ base item
 + imbuements
 ```
 
-High-tier Imbuements may require quest/boss unlocks.
+Locked product rules:
+
+- exactly **one** playable power tier: **Powerful**. Basic and Intricate are not player
+  progression tiers;
+- duration is **12 hours of active use**, not wall-clock expiry. Active-use timer semantics
+  apply: nothing is consumed while the item is unequipped, the Character is inactive or offline,
+  or the activity is paused in reconnect grace;
+- remaining duration is durable state on the `ItemInstance` and **resumes** on re-equip rather
+  than resetting;
+- access requires completing **exactly five** configured boss completions of the approved
+  quest/progression chain.
+
+The *identities* of those five bosses remain open content design. The count does not.
 
 ## 15. World map
 

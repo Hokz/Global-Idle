@@ -46,27 +46,43 @@ Use this workflow:
 
 ```text
 research
-→ understand
-→ design
-→ implement narrowly
-→ test
-→ run CI
-→ self-review
-→ report
+→ choose the best defensible decision
+→ document rationale and alternatives
+→ complete the assigned phase
+→ validate / test
+→ pull request
 → independent review
+→ correction loop
+→ merge only after review
 ```
 
-Do not stop for every minor uncertainty.
+**Execution is autonomous.** Do not stop mid-phase to ask permission, and do not leave an item
+open merely because it would ordinarily be a Product Owner call.
 
-Research first and make a defensible decision when the project rules are clear.
+A builder or architect **may resolve an ordinary OPEN decision** when it is necessary to complete
+the assigned phase, provided they:
+
+- do not contradict a **LOCKED** product decision;
+- research first, including authoritative sources where the repository is insufficient;
+- record the decision and its rationale;
+- identify the alternatives considered and the trade-offs;
+- keep the change inside the phase's scope;
+- validate and test it;
+- submit it for independent review;
+- **never merge their own work.**
+
+The Product Owner retains final approval and may reverse any autonomous decision during review.
 
 Stop and ask only when:
 
-- the Product Owner must choose between materially different game-design directions;
-- an action is destructive;
-- credentials/permissions are required;
-- legal/licensing uncertainty changes what can be shipped;
-- no defensible implementation path exists.
+- an action is destructive or irreversibly external;
+- credentials or permissions are required;
+- a legal or licensing blocker changes what can be shipped;
+- two **LOCKED** requirements are irreconcilable;
+- there is genuinely no defensible option after reasonable research.
+
+Note that a *balance or monetization value* is usually not a blocking decision: it is a
+configuration input. Defer it as a parameter and continue, rather than stopping the phase.
 
 ## 4. Product Owner vs agent authority
 

@@ -44,13 +44,13 @@ The client sends **intents**, never outcomes. `startHunt(huntId, partyConfig)` i
 | `setActiveParty(orderedCharacterIds)` | ownership, size 1–4, distinct, all active, **no running activity** (`ADR-005`) |
 | `unlockRosterSlot` | capacity < 5, sufficient Gold, transactional spend |
 | `createCharacter(vocation)` | slot available, vocation not owned, level rules |
-| `retireCharacter(characterId)` | ownership, not currently in a running activity (`ADR-007`) |
-| `startActivity(activityDefinitionId)` | ownership, prerequisites, unlocks, party validity, no existing activity |
-| `stopActivity` | ownership of the running activity |
+| `retireCharacter(characterId)` | ownership, no occupancy claim held (`ADR-007`, `ADR-013`) |
+| `startActivity(activityDefinitionId)` | ownership, prerequisites, unlocks, party validity, no existing **account** activity claim, and — in the same transaction — **atomic acquisition of the occupancy claim for every participating Character**; fails if any participant already holds one (`ADR-013`) |
+| `stopActivity` | ownership of the running activity; releases every participant's occupancy claim in the same transaction as the lifecycle transition |
 | `equipItem(characterId, itemInstanceId, slot)` | custody, ownership, equip requirements, **character not participating in a running activity** (`DOMAIN_MODEL.md` §5.12) |
 | `sellItem` / `listItem` / `buyListing` | custody, ownership, funds, escrow, fees |
 | `forgeAttempt(target, sacrificeA, sacrificeB)` | custody of all three, classification and rarity match, costs |
-| `startSkillTraining(characterId, exerciseItemId)` | custody, charges remaining |
+| `startSkillTraining(characterId, exerciseItemId)` | custody, charges remaining, and — in the same transaction — **atomic acquisition of that Character's occupancy claim**; fails if the Character is hunting, in a dungeon, or already training (`ADR-013`) |
 | `claimSkillTraining(characterId)` | ownership; server computes elapsed time |
 
 **Every command is authorized against the Account.** A command naming a character the account

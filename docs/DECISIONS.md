@@ -221,7 +221,13 @@ The distinction is *participating in a Stamina-consuming activity* vs *not parti
 
 - **Dummy / Exercise Weapon Skill Training recovers Stamina.** An earlier assumption that it
   blocked recovery is superseded;
-- offline, idle, menus, hubs, Market and Atlas all recover while the Character is not hunting;
+- offline, idle, menus, hubs, Market and Atlas all recover **while the Character is not reserved
+  in a Stamina-consuming Hunt lifecycle**;
+- **reconnect grace is neutral**: a Hunt paused in the 5-minute grace is a *reserved* Hunt state,
+  and it neither consumes nor recovers Stamina. "Offline recovers" does not extend to it. This
+  prevents a deliberate disconnect/reconnect cycle from becoming a Stamina regeneration exploit;
+- the **pre-consumption Hunt state** — in a Hunt, no qualifying XP yet — is neutral for the same
+  reason;
 - **Premium: 1 minute of eligible time = +1 minute** (1:1);
 - **Free: 2 minutes of eligible time = +1 minute** (1:2);
 - capped at 42:00; there is no mandatory waiting period;
@@ -247,7 +253,9 @@ wall-clock time.
   the activity is paused in reconnect grace;
 - remaining duration is durable state on the `ItemInstance`, and travels with the item;
 - re-equipping **resumes** the remaining duration; it never resets it;
-- Powerful Imbuements require the approved quest/boss progression unlock.
+- Powerful Imbuements require completing **exactly five** configured boss completions of the
+  approved quest/progression chain. The count is locked; the identities of those five bosses
+  remain open content design.
 
 ## Free/Premium
 

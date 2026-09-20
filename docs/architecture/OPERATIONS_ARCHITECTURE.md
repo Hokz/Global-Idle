@@ -204,14 +204,20 @@ not exist.
 |---|---|
 | PostgreSQL | automated backups plus point-in-time recovery. This is the only store whose loss is unrecoverable. |
 | Redis | not backed up. Nothing durable lives there (`ADR-009`). |
-| Content | in version control, shipped with the build. Recovered by redeploying. |
+| Content bundles | published immutably to durable addressable artifact storage and backed up with it. Version control remains the authoring and history source, but **redeploying an old application build is not the recovery mechanism** — the running server resolves any referenced bundle (`ADR-016`). |
 
 Restore procedure:
 
 1. restore PostgreSQL to the target point;
 2. **run ledger reconciliation before reopening economy writes**;
-3. recover activities per the restart path;
-4. redeploy the matching content version.
+3. **derive the set of referenced content bundles from the restored durable state, and confirm
+   every one of them is available in artifact storage**;
+4. recover activities per the restart path;
+5. reopen activities and the economy only once steps 2 and 3 both pass.
+
+`DECIDED IN PHASE 0A` — step 3 gates reopening for the same reason step 2 does. An activity
+pinned to a bundle that is not available cannot be recovered, and discovering that after players
+are back is worse than discovering it during the restore.
 
 `DECIDED IN PHASE 0A` — a restore that has not been rehearsed is a hypothesis. The procedure
 must be exercised against staging before launch; an untested backup is worse than a known

@@ -840,8 +840,14 @@ All of these share one pattern, stated once.
 | Transaction / audit | not transactional; changes arrive through deployment and are auditable through version control |
 
 Pinning matters: a content deployment mid-hunt must not change the creature a player is
-already fighting. `DEFERRED` to 0A.6 — pinning mechanics and the migration story when a
-content version a running activity depends on is withdrawn.
+already fighting.
+
+`DECIDED IN PHASE 0A` — see `ADR-016`. **A referenced bundle is never withdrawn.** Published
+bundles are immutable and live in durable addressable storage; the running server can resolve and
+load any bundle a persisted activity or item still references, so an activity pinned to version N
+stays recoverable across any number of deployments. There is no migration story for a withdrawn
+version because withdrawal of a referenced version cannot happen. Removing a genuinely
+unreferenced bundle is an explicit audited operation, never an automatic sweep. Invariant I16.
 
 | Concept | Purpose | Notes |
 |---|---|---|

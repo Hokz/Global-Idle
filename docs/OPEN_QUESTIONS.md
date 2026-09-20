@@ -62,7 +62,7 @@ locked in `docs/DECISIONS.md` and are **not** open.
 - XP behavior when a multi-character formation is not Shared-XP eligible;
 - exact adopted Tibia Global Shared XP bonus and distribution values;
 - exact definition of a "qualifying Hunt XP reward" for Stamina activation;
-- which bosses make up the Powerful Imbuement unlock set, and how many;
+- the identities of the five bosses in the Powerful Imbuement unlock set (the count is locked at five);
 - combat consequences of Party ordering beyond Slot 1 being the Frontline;
 - final name for the "Origin Character" concept;
 - final Skill Point state granted to a newly unlocked Level 8 character.

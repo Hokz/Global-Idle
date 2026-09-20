@@ -104,14 +104,22 @@ Gold debit, ledger append, capacity increment — one transaction.
 
 ## 5. Idempotency
 
-Every value-moving operation carries a unique **operation id**, enforced by a uniqueness
-constraint (`DATA_ARCHITECTURE.md` §5). A replay returns the original result instead of
-performing the operation again.
+Two mechanisms, deliberately separate (`ADR-017`, `DATA_ARCHITECTURE.md` §5):
 
-Settlement operation ids are **deterministic** — derived from activity id plus checkpoint
-sequence — so a retry after a lost response cannot double-apply.
+**Client-originated commands** carry a client idempotency key whose identity is
+`(authenticated principal, command namespace, client key)`, stored with a canonical request
+fingerprint. Same identity + same fingerprint returns the original result; same identity +
+**different** fingerprint is an **explicit conflict reject**; a key from another account is a
+different identity entirely, so there is no collision and no result leakage. A client key is
+never treated as globally unique.
 
-This is what makes a dropped mobile connection safe during a purchase.
+**Server settlements** carry a deterministic server-generated operation id derived from activity
+id plus checkpoint sequence, enforced by its own uniqueness constraint, so a retry after a lost
+response cannot double-apply.
+
+Together these are what make a dropped mobile connection safe during a purchase — and what stop
+a buggy client that reuses one key for two different purchases from silently getting the wrong
+one.
 
 ---
 

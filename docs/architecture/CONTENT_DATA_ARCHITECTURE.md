@@ -100,6 +100,7 @@ on every change, and it is a blocking check.
 | Loot table totals | probability sets that cannot sum correctly |
 | Room/floor continuity | a hunt missing room 4, a dungeon without its boss room |
 | Orphan detection | a creature no hunt or dungeon references |
+| Unlock set cardinality | the Powerful Imbuement unlock set not containing **exactly five** boss-completion keys |
 
 `DECIDED IN PHASE 0A` — **orphans are a warning, not an error.** Content is often authored ahead
 of the hunt that will use it, and failing the build for that would punish normal workflow.
@@ -146,22 +147,35 @@ never an automatic sweep.
 ## 6. Loading
 
 ```text
-build      content files + schemas
+build       content files + schemas
    ↓
-CI         validate → fail the build on error
+CI          validate → fail the build on error
    ↓
-artifact   versioned content set shipped with the deployment
+publish     immutable versioned BUNDLE → durable addressable artifact storage
    ↓
-runtime    loaded into memory at startup, read-only
+runtime     current bundle loaded at startup;
+            ANY referenced historical bundle resolvable and loadable on demand
    ↓
-engine     handed pre-resolved definitions, pinned to a version
+engine      handed pre-resolved definitions from the activity's pinned bundle
 ```
 
-- Loaded **once at startup**, held in memory, never written.
-- Redis may cache derived projections of content for client responses; the in-memory set remains
+`DECIDED IN PHASE 0A` — see `ADR-016`. A deployment has a **current** bundle, but the running
+process is **not limited to it**:
+
+- every published version is an **immutable bundle in durable addressable storage**, not only
+  a file baked into an application image;
+- the current bundle is loaded at startup; a bundle an activity pins is **resolved and loaded on
+  demand** and may be cached alongside it, so a process can hold **several pinned bundles**
+  simultaneously;
+- **PostgreSQL references decide which bundles are pinned.** The pinned set is a query over
+  durable state, not bookkeeping that could drift;
+- a referenced bundle can **never** be removed;
+- bundles are read-only in every path. Nothing writes content at runtime.
+- Redis may cache derived projections of content for client responses; the loaded bundles remain
   authoritative for the process.
-- The engine receives **resolved definitions**, never a key to look up (`ADR-010` — it has no
-  I/O to look anything up with).
+- The engine still receives **resolved definitions**, never a key to look up, and performs no
+  I/O of its own (`ADR-010`). Bundle resolution happens in the application layer before the
+  engine is called.
 
 ### Hot reload
 

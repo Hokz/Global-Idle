@@ -156,7 +156,11 @@ TRANSACTION   locks acquired in a globally consistent order
   │
   ├─ custody transition   exactly one scope, before and after
   │
-  ├─ operation id         uniqueness constraint ⇒ replay is a no-op
+  ├─ idempotency          CLIENT command: (principal, namespace, client key) + fingerprint
+  │                       same fingerprint ⇒ original result
+  │                       different fingerprint ⇒ explicit conflict reject
+  │                       SETTLEMENT: deterministic server-generated operation id
+  │                       both constraint-enforced ⇒ replay is a no-op
   │
   ▼
 COMMIT  ──►  audit record complete  ──►  client update
@@ -216,8 +220,10 @@ hole (`CLIENT_SERVER_BOUNDARIES.md` §6).
 ### No economy mutation without transaction and audit
 
 Every value movement is one transaction that appends to the ledger and updates the projection
-together, carries a constraint-enforced operation id, and leaves an audit record. Admin tooling
-uses the same paths — there is no privileged bypass (`ECONOMY_INTEGRITY.md` §6).
+together, is constraint-enforced against replay — by an account-scoped, fingerprinted client key
+for commands, or a deterministic server-generated operation id for settlements (`ADR-017`) — and
+leaves an audit record. Admin tooling uses the same paths; there is no privileged bypass
+(`ECONOMY_INTEGRITY.md` §6).
 
 ### No Hunt/Dungeon offline progression path
 
