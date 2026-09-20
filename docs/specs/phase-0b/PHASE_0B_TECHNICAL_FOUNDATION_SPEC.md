@@ -305,9 +305,9 @@ PostgreSQL; a camel-case column would.
 
 > **A `raw()` predicate is not hand-written migration SQL.** It is a declaration in
 > `schema.prisma` from which **Prisma Migrate generates** the `CREATE UNIQUE INDEX … WHERE (…)`
-> statement. The rule that custom migration SQL is authorized only where genuinely needed
-> (currently the ledger role grants) is unchanged, and **D13** proves the generated SQL — not
-> the schema file — carries each predicate.
+> statement. The rule that hand-written migration SQL is authorized only where genuinely needed
+> — the two cases in the table above, and no others — is unchanged, and **D13** proves the
+> generated SQL, not the schema file, carries each predicate.
 
 > **The earlier claim that "Prisma cannot express a partial unique index declaratively" is
 > withdrawn.** It was true of older Prisma and is not true of the pinned version. **Invariants
@@ -1238,11 +1238,16 @@ guarantee it does not have.
 > **On the hand-written SQL.** The review instruction was *"do not add unnecessary custom
 > migration SQL if fail-fast reconciliation is cleaner."* These two `CHECK` lines are weighed
 > against that and kept, for one reason: the startup sweep below has to exist regardless (for the
-> missing-subtype case), so the `CHECK`s add **no** code — they only move two of the three states
-> from *detected after the bad row exists* to *the bad row cannot be written*. That is the same
+> missing-subtype case), so the `CHECK`s add **no** code — they only move two of the three
+> subtype states from *detected after the bad row exists* to *the bad row cannot be written*. That is the same
 > trade §3.8 already makes for the ledger role grant, and it is the specification's stated
-> preference throughout. If the reviewer disagrees, deleting them costs nothing: the sweep
-> already covers all three states, and only the timing changes.
+> preference throughout. If the reviewer disagrees, deleting them costs only **timing**: the
+> sweep below is written to be exhaustive on its own over all four invalid states — the three
+> subtype states plus an empty roster — so removing
+> the `CHECK`s moves wrong-family and both-present from *cannot be written* to *caught at the
+> next start*, and changes nothing else. That is only true because the sweep compares
+> `Activity.family` against which subtype is present — an earlier draft's query did not, and the
+> claim was false until this one.
 
 #### The startup integrity sweep
 
@@ -1258,19 +1263,43 @@ SELECT a.id, a.family,
   FROM "Activity" a
   LEFT JOIN "SessionBoundActivity"  sb ON sb."activityId" = a.id
   LEFT JOIN "SkillTrainingActivity" st ON st."activityId" = a.id
- WHERE (sb."activityId" IS NULL AND st."activityId" IS NULL)   -- missing subtype
-    OR (sb."activityId" IS NOT NULL AND st."activityId" IS NOT NULL)  -- belt and braces
+      -- one predicate per family, each the full negation of "valid for this family"
+ WHERE (a.family = 'SESSION_BOUND'
+        AND (sb."activityId" IS NULL OR st."activityId" IS NOT NULL))
+    OR (a.family = 'WALL_CLOCK'
+        AND (st."activityId" IS NULL OR sb."activityId" IS NOT NULL))
+      -- and a roster, which no column can make mandatory for 1–4 participants
     OR NOT EXISTS (SELECT 1 FROM "ActivityParticipant" p WHERE p."activityId" = a.id);
 ```
 
-The second predicate is redundant while the `CHECK` constraints stand; it is kept so that
-removing them degrades the guarantee's **timing** rather than its **coverage**. The third catches
-a participant-less activity of **either** family — the wall-clock case is already unrepresentable,
-but a session-bound Hunt with no roster is not, since 1–4 participants cannot be named by one
-column.
+**Why it is written per family rather than per symptom.** An earlier draft enumerated symptoms —
+*no subtype*, *both subtypes*, *no participants* — and so never compared `a.family` against which
+subtype was actually present. A `WALL_CLOCK` root carrying only a `SessionBoundActivity` row has
+a subtype, does not have both, and may well have a participant: it passed. The review was right
+that the sweep did not cover wrong-family, and right that the *"already covers all three states"*
+claim above was false as a result.
 
-**Test O15** exercises the sweep: a root with no subtype, and a session-bound root with no
-participants, each make it refuse to start; a database with only valid activities passes.
+`family` is a two-valued enum, so **two predicates, each the complete negation of validity for
+one value, are exhaustive by construction** — there is no third case to forget. Each says the
+same thing: *the subtype for this family must be present, and the other must be absent.* That one
+shape catches all three subtype states at once:
+
+| Invalid state | Caught by |
+|---|---|
+| missing subtype | the `IS NULL` half of whichever family branch applies |
+| wrong-family subtype | the `IS NOT NULL` half of the same branch — and the `IS NULL` half of it too, since the right subtype is also absent |
+| both subtypes present | the `IS NOT NULL` half, from whichever branch the root's family selects |
+
+The final predicate catches a participant-less activity of **either** family. The wall-clock case
+is already unrepresentable (§6.3.1), but a session-bound Hunt with no roster is not, since 1–4
+participants cannot be named by a single column the way one trainee can.
+
+**Test O15** exercises the sweep across every branch: a root with no subtype, a root carrying the
+**wrong-family** subtype, a root carrying **both**, and a session-bound root with **no
+participants** each make it refuse to start; a database holding only valid activities of both
+families passes. Because the `CHECK` constraints make two of those states unrepresentable through
+the normal write path, the test constructs them by disabling the constraints for the fixture —
+which is also what makes it a genuine test of the sweep rather than of the `CHECK`s.
 
 ### 6.4 Invariant enforcement plan
 
@@ -1285,7 +1314,7 @@ for anything that can be raced.
 | I9 | One Session holds an account's Activity claim | **partial unique index** on `SessionBoundActivity(accountId)` with the predicate `WHERE state IN ('ONLINE_ACTIVE', 'RECONNECT_GRACE_PAUSED')` — declared as `where: raw(…)` in `schema.prisma` (§3.8), generated into the migration by Prisma Migrate (D13) + compare-and-swap transfer |
 | I13 | One occupancy claim per Character | **unique constraint** on `OccupancyClaim.characterId`; the claim's composite FK to `ActivityParticipant` makes it name a participant or nothing (D11) |
 | — | A wall-clock activity has **exactly one** participant (§6.3.1) | **two constraints, not one**: the partial unique index on `ActivityParticipant(activityId)` `WHERE family = 'WALL_CLOCK'` gives *at most one* (D12), and `SkillTrainingActivity`'s composite FK to `ActivityParticipant` gives *at least one* (D14) |
-| — | Every Activity root has exactly one subtype, of the right family (§6.3.3) | wrong-family and both-present: `CHECK (family = …)` + composite FK — **unrepresentable** (D15, D16). Missing subtype: the atomic start transaction (§8.1) + the startup integrity sweep, which refuses to start (O15) |
+| — | Every Activity root has exactly one subtype, of the right family (§6.3.3) | wrong-family and both-present: `CHECK (family = …)` + composite FK — **unrepresentable** at write time (D15, D16). Missing subtype: the atomic start transaction (§8.1). **All three**, plus an empty roster, are also caught by the startup integrity sweep, which refuses to start and never repairs (O15) |
 | — | Every Activity pins a content version (`ADR-011`) | `Activity.contentVersion` **NOT NULL** + FK `ON DELETE RESTRICT` (C9) |
 | I15 | Duration never consumed outside a qualifying state | **interface capability** — only a state transition writes `qualifyingSince` |
 | I16 | A **referenced** content bundle is never deleted | **FK `ON DELETE RESTRICT`** from every durable reference — the database refuses. An **un**referenced bundle may be removed through the explicit audited cleanup path (§7.7) |
@@ -2181,7 +2210,7 @@ number nobody can re-derive is a number that drifts.
 | O12 | Restart reconciliation **releases** a claim whose named activity row is absent |
 | O13 | The reconciliation rule is **total over every Skill Training status**: the test enumerates `ACCRUING`, `ENDED`, `EXHAUSTED`, `CANCELLED` from the persisted enum itself and asserts a preserve/release outcome for each. A status added to the enum without a reconciliation rule **fails this test** rather than being silently unhandled (§6.3.1) |
 | O14 | **Ending an activity releases occupancy and preserves the roster snapshot**: after a Hunt ends and after a Skill Training reaches each terminal status, every `OccupancyClaim` it held is gone and every `ActivityParticipant` row — slot order and `staminaActivatedAt` included — is still present and unchanged (§6.3.1, §7.2) |
-| O15 | **The startup integrity sweep** (§6.3.3): an `Activity` root with **no subtype row**, and a session-bound root with **no participant rows**, each make `assertActivityIntegrity` throw and the process refuse to start; a database holding only valid activities of both families passes. The sweep **never repairs** — the test fails if any row is written or deleted by it |
+| O15 | **The startup integrity sweep** (§6.3.3), across every branch: a root with **no subtype**, a root carrying the **wrong-family** subtype, a root carrying **both** subtypes, and a session-bound root with **no participant rows** each make `assertActivityIntegrity` throw and the process refuse to start; a database holding only valid activities of both families passes. The two states the `CHECK` constraints make unrepresentable are constructed with the constraints disabled for the fixture, so the test exercises the sweep rather than the `CHECK`s. The sweep **never repairs** — the test fails if any row is written or deleted by it |
 
 ### 14.4 Activity claim
 
@@ -2362,8 +2391,10 @@ at the end of 0B.2.
 `SkillTrainingActivity`, `ActivityParticipant` and `OccupancyClaim` with their composite foreign
 keys (§6.3.1); the account claim holder (§6.3.2); the **initial migration** covering every model,
 with **I1, I9 and the wall-clock cardinality index declared in the schema** (object form and
-`raw()`, §3.8) and **hand-written SQL only for the ledger role grants** (I6); the `migrate:check`
-script of §4.3, including its generated-SQL assertion (D13).
+`raw()`, §3.8) — partial indexes are **never** hand-written — and **hand-written migration SQL
+for exactly two things and no others: the ledger role grants (I6) and the two subtype-family
+`CHECK` constraints (§6.3.3)**; the `migrate:check` script of §4.3, including its generated-SQL
+assertion (D13).
 
 **Prerequisites.** 0B.2.
 
@@ -2618,7 +2649,7 @@ Made under the project's autonomous execution model (`AGENTS.md` §3), recorded 
 | 28 | **Ending an activity releases occupancy claims and retains `ActivityParticipant` rows** — *corrects* "deletes both" | the participant rows are the durable roster snapshot `ADR-002` and `DATA_ARCHITECTURE.md` §7 require for history, replay and support; removal belongs to a retention operation this specification does not authorize | low |
 | 29′ | **`SkillTrainingActivity.traineeCharacterId` returns, as a composite FK into `ActivityParticipant`** — *corrects* decision 29, which removed the column entirely | decision 29 fixed drift but left cardinality at *at most one*: nothing stopped a training with **zero** participants. A foreign key requires its target to exist, so the column supplies the missing *at least one* while remaining incapable of naming a non-participant — the "relationship that makes mismatch impossible" the third review asked for, now also closing the fourth review's gap | low — one column and one FK |
 | 32 | **Two hand-written `CHECK` constraints pin each subtype to its family** | with the composite FK already chaining subtype `family` to the root's, they make wrong-family **and** both-subtypes-present unrepresentable — two invalid states for two lines, and **no extra code**, since the startup sweep must exist anyway for the missing-subtype case. Weighed explicitly against the reviewer's "no unnecessary custom SQL" instruction in §6.3.3 | **very low — deleting them loses only timing, not coverage** |
-| 33 | **A missing subtype is prevented transactionally and detected by a startup sweep that throws and never repairs** | "every parent has at least one child" needs a deferred circular FK or a trigger; neither is worth it, and the specification says so instead of claiming a guarantee it does not have. Repairing would mean guessing which subtype was intended — one bad row becoming a silently wrong one | low |
+| 33 | **A missing subtype is prevented transactionally and detected by a startup sweep that throws and never repairs; the sweep is written per family so it is exhaustive over every invalid subtype state on its own** | "every parent has at least one child" needs a deferred circular FK or a trigger; neither is worth it, and the specification says so instead of claiming a guarantee it does not have. Writing the query as one complete negation per enum value — rather than as a list of symptoms — is what makes "deleting the `CHECK`s costs only timing" true rather than merely asserted. Repairing would mean guessing which subtype was intended: one bad row becoming a silently wrong one | low |
 | 34 | **§8.1 writes both start transactions out in full, in foreign-key insert order** | the atomicity §6.3.3 depends on was asserted in §6 and unstated in §8; and the Skill Training order (participant **before** subtype) is what makes "exactly one" hold even for a buggy caller | low |
 | 30 | **The activity-type registry is a frozen code module with startup reconciliation against persisted rows; no `ActivityType` table** | behaviour classification is code, versioned with the code that switches on it; a table is the mutable second source `ADR-011`'s spirit rejects; T16 turns removal or reclassification of a persisted type into a fail-fast event | low |
 | 31 | **0B.2 carries the generator, `prisma.config.ts` and the `ContentBundle` model; 0B.3 carries every other model and every migration; 0B.7 follows 0B.3** | each package's acceptance must be executable when that package ends. `ContentBundle` is the leaf every reference points at and has no foreign keys of its own, so it is the one model that can exist before the graph does | low |
