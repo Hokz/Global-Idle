@@ -1,10 +1,11 @@
 # Roadmap
 
-## Phase 0A — Architecture
+## Phase 0A — Architecture — `ARCHITECTURE_APPROVED`
 
 Goal: convert approved design into an explicit technical architecture.
 
 Entry point: [`docs/architecture/ARCHITECTURE_OVERVIEW.md`](architecture/ARCHITECTURE_OVERVIEW.md).
+All 17 ADRs are `ACCEPTED`.
 
 Documented, not implemented:
 - Character activity occupancy;
@@ -19,6 +20,11 @@ Documented, not implemented:
 - server-authoritative time.
 
 ## Phase 0B — Technical Foundation
+
+**Specification:**
+[`docs/specs/phase-0b/PHASE_0B_TECHNICAL_FOUNDATION_SPEC.md`](specs/phase-0b/PHASE_0B_TECHNICAL_FOUNDATION_SPEC.md)
+— currently `DRAFT` / PENDING INDEPENDENT REVIEW. It becomes `IMPLEMENTATION_SPEC_READY` on
+independent approval, and implementation follows on its own branch and pull request.
 
 Goal: prepare the project so implementation does not begin on ambiguous foundations.
 
