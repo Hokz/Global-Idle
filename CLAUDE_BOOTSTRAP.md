@@ -12,7 +12,7 @@ Read, in order:
 4. `docs/PRODUCT_VISION.md`
 5. `docs/GAME_SYSTEMS.md`
 6. `docs/ECONOMY.md`
-7. `docs/ARCHITECTURE.md`
+7. `docs/architecture/ARCHITECTURE_OVERVIEW.md`
 8. `docs/MVP_SCOPE.md`
 9. `docs/ROADMAP.md`
 10. `docs/DECISIONS.md`

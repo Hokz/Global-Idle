@@ -48,6 +48,17 @@ Unexpected connection loss uses a **5-minute** reconnect grace period.
 - when Loot Capacity is full, the game warns the player and combat may continue, but
   additional loot is no longer collected.
 
+### Room terminology
+
+- **Room** is the single generic unit of activity progression, in the domain, the engine and the
+  content schema;
+- *Floor* is a dungeon-flavoured display label for the same concept, kept for player-facing text;
+- boss halls are rooms too.
+
+Decided during Phase 0A architecture, because a generic dungeon engine cannot carry two
+incompatible names for its own progression unit. See
+`docs/architecture/DOMAIN_MODEL.md` §5.8.
+
 ## Death
 
 - punitive by design;

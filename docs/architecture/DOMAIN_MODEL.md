@@ -26,7 +26,7 @@ Every decision is tagged:
 | `LOCKED BY PRODUCT` | Already decided in `docs/DECISIONS.md` or a `docs/design/*` foundation. Architecture must conform. |
 | `DECIDED IN PHASE 0A` | Decided here under the Phase 0A delegation. Defensible, applied consistently, subject to independent review. |
 | `DEFERRED` | Real question, but it belongs to a later work package or to Phase 0B. |
-| `OPEN — PRODUCT` | A game-design question. Architecture must not answer it. Recorded in §9. |
+| `DEFERRED PARAMETER` | A balance or monetization value. It is a configuration input; no boundary, interface or invariant depends on it. |
 
 ---
 
@@ -552,8 +552,9 @@ dungeons where that reads better; the domain model, the engine and the content s
   all. A rule this important should be impossible to violate by accident, not merely
   documented. 0A.5 will express this as a narrowed settlement interface.
 
-`OPEN — PRODUCT` — maximum offline accrual duration, training rates, charge settlement. Already
-recorded in `docs/OPEN_QUESTIONS.md`; not architecture's to answer.
+`DEFERRED PARAMETER` — maximum offline accrual duration, training rates, charge settlement.
+Recorded in `docs/OPEN_QUESTIONS.md`. These are configuration inputs: the settlement path, its
+capability boundary and its timestamp source are fixed regardless of their values.
 
 ---
 
@@ -597,8 +598,9 @@ inputs at resolution time; the UI displays the same computation.
 | Mutable during an Activity | base only via settlement (hunting and training both contribute) |
 | Transaction / audit | yes |
 
-`OPEN — PRODUCT` — the Skill Point award trigger (Model A vs Model B) and the cost curve remain
-open in `COMBAT_LEVEL_SKILLS_FOUNDATION.md` §5, §45. The domain model works under either.
+`DEFERRED PARAMETER` — the Skill Point award trigger (Model A vs Model B) and the cost curve
+remain open in `COMBAT_LEVEL_SKILLS_FOUNDATION.md` §5, §45. The domain model works unchanged
+under either; the choice changes numbers, not boundaries.
 
 ---
 
@@ -618,11 +620,23 @@ each holding at most one instance.
 |---|---|
 | Owner | Items context |
 | State | durable |
-| Mutable during an Activity | loot arrives via settlement; `OPEN — PRODUCT` whether the player may re-equip mid-activity |
+| Mutable during an Activity | loot arrives via settlement; **equipment changes are rejected for participating characters** (see below) |
 | Transaction / audit | every custody transition is transactional and audited |
 
-**Loot Capacity** is a property of the owning character consumed by the engine as an input.
-Full capacity stops collection without stopping combat — `LOCKED BY PRODUCT`.
+`DECIDED IN PHASE 0A` — **equipment changes are rejected while a character is participating in
+a running Activity.** This follows directly from the formation lock (§5.5) and the checkpoint
+refresh (`ADR-006`): because the participant profile is re-derived at each settlement, a mid-run
+gear swap would take effect at the next checkpoint. That is the same power-swap exploit the
+formation lock exists to prevent, arriving through a different door — swap in a damage weapon for
+the boss room, swap back for the trash. Locking both closes it consistently.
+
+Characters **not** in the running Activity may be re-equipped freely; nothing about them feeds
+the run. Items may also be sold, listed or forged as long as they are not held by a participating
+character, since their custody is not frozen.
+
+**Loot Capacity** is pooled across the Active Party for the duration of an activity (§5.7) and
+consumed by the engine as an input. Full capacity stops collection without stopping combat —
+`LOCKED BY PRODUCT`.
 
 ---
 
@@ -640,7 +654,7 @@ six static copies.
 | Authoritative system | server only — *"the browser must never decide loot, rarity, forge success"* |
 | State | durable |
 | Lifecycle | materialized at settlement (loot) or by an economy operation (purchase, forge) → custody transitions → consumed (forge sacrifice) or destroyed |
-| Mutable during an Activity | created by settlement; `OPEN — PRODUCT` for equip changes mid-run |
+| Mutable during an Activity | created by settlement; custody is otherwise frozen for participating characters |
 | Transaction / audit | **always** |
 
 **Invariants.**
@@ -758,13 +772,18 @@ optional property, not part of the definition.
 **Invariants.**
 - `LOCKED BY PRODUCT` — **entitlement never grants a fifth Active Party member.** Party
   capacity is not an entitlement dimension at all.
-- `DECIDED IN PHASE 0A` — **roster capacity is Account state, not Entitlement state.** It is
-  bought with Gold, it is permanent, and it does not expire. Modelling it as an entitlement
-  would wrongly imply it could lapse. The superseded documentation conflated these; the domain
-  model keeps them apart.
+- `DECIDED IN PHASE 0A` — **roster capacity is not an entitlement.** It is bought with Gold, it
+  is permanent, and it does not expire. Modelling it as an entitlement would wrongly imply it
+  could lapse. It is owned by the Character context (§5.4) and merely stored on the Account row.
+  The superseded documentation conflated capacity with Premium; the domain model keeps them
+  apart.
 
-`OPEN — PRODUCT` — what Premium *does* offer for party management now that the fifth slot is
-superseded. Already recorded in `docs/OPEN_QUESTIONS.md`.
+`DEFERRED PARAMETER` — what Premium *does* offer for party management now that the fifth slot is
+superseded. This is a monetization question, and the Phase 0A scope is explicit that monetization
+values are not architecture's to invent. **No architecture depends on the answer**: entitlements
+are modelled generically, may be permanent or time-bounded, and gate orchestration rather than
+domain rules. Whatever is chosen plugs into the existing model. Recorded in
+`docs/OPEN_QUESTIONS.md`.
 
 ---
 
@@ -838,9 +857,9 @@ application-only check loses a race.
 
 | # | Invariant | Enforced by |
 |---|---|---|
-| I1 | One character per vocation per account | persistence constraint |
-| I2 | `count(characters) ≤ rosterCapacity ≤ 5` | persistence constraint + transaction |
-| I3 | Active Party size 1–4, entries distinct, all owned by the account | transaction |
+| I1 | One **active** character per vocation per account | partial unique constraint over active rows (`ADR-007`) |
+| I2 | `count(active characters) ≤ rosterCapacity ≤ 5` | persistence constraint + transaction |
+| I3 | Active Party size 1–4, entries distinct, all **active** and owned by the account | transaction |
 | I4 | An ItemInstance is in exactly one custody scope | persistence constraint |
 | I5 | Balance projection reconciles to the ledger | transaction + reconciliation job |
 | I6 | Ledger entries are append-only | persistence permission |
@@ -848,6 +867,8 @@ application-only check loses a race.
 | I8 | A paused Activity cannot advance | Activity state machine — no tick path exists from the paused state |
 | I9 | At most one Session holds an account's Activity claim | Activity ownership + atomic claim |
 | I10 | Skill Training cannot write Base XP | interface capability, not runtime check |
+| I11 | Formation and equipment cannot change for a running activity's participants | command rejected at the application layer |
+| I12 | A Character is never hard-deleted | no delete path exists (`ADR-007`) |
 
 I8 and I10 are stated as *structural* rather than *validated*. A check that can be forgotten is
 weaker than a path that does not exist.

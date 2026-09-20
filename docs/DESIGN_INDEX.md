@@ -85,7 +85,8 @@ everything under `docs/design/`:
 | `docs/GAME_SYSTEMS.md` | System-by-system overview |
 | `docs/DECISIONS.md` | Locked decisions that must not be silently reversed |
 | `docs/OPEN_QUESTIONS.md` | Project-level unresolved design questions |
-| `docs/ARCHITECTURE.md` | Technical architecture and boundaries |
+| `docs/architecture/ARCHITECTURE_OVERVIEW.md` | **Technical architecture — entry point.** The Phase 0A package: domain model, boundaries, persistence, lifecycle, engine, content, economy integrity, operations, and all ADRs |
+| `docs/ARCHITECTURE.md` | Phase 0 product-level sketch, superseded in detail by the package above |
 | `docs/MVP_SCOPE.md` | First playable vertical slice |
 | `docs/ECONOMY.md` | Economy principles, sinks and transaction rules |
 | `docs/REFERENCES.md` | Research source hierarchy |
