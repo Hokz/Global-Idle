@@ -1,0 +1,40 @@
+{
+  "name": "global-idle",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Global Idle — server-authoritative idle strategy RPG. Phase 0B technical foundation.",
+  "engines": {
+    "node": ">=24.21.0 <25"
+  },
+  "packageManager": "pnpm@12.5.1",
+  "scripts": {
+    "preinstall": "node ./scripts/check-node-version.mjs",
+    "generate": "pnpm --filter @global-idle/domain run prisma:generate",
+    "typecheck": "tsc -b && pnpm --filter @global-idle/web run typecheck",
+    "build": "pnpm run generate && tsc -b && pnpm --filter @global-idle/web run build",
+    "test": "vitest run",
+    "test:unit": "vitest run --project unit",
+    "test:fixtures": "vitest run --project fixtures",
+    "test:integration": "vitest run --project integration",
+    "test:invariants": "vitest run --project invariants",
+    "lint": "eslint .",
+    "format:check": "prettier --check .",
+    "format": "prettier --write .",
+    "boundaries": "depcruise --config .dependency-cruiser.cjs apps packages",
+    "migrate:check": "pnpm --filter @global-idle/domain run migrate:check",
+    "clean": "tsc -b --clean && rm -rf packages/*/dist apps/*/dist packages/domain/src/generated"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^24.9.2",
+    "dependency-cruiser": "^18.4.0",
+    "eslint": "^10.11.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.12.0",
+    "prettier": "^3.9.8",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.70.0",
+    "vitest": "^5.0.1"
+  }
+}

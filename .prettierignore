@@ -1,0 +1,15 @@
+node_modules/
+dist/
+coverage/
+.next/
+pnpm-lock.yaml
+packages/domain/src/generated/
+packages/domain/prisma/migrations/
+
+# Approved documents are NOT Prettier's to reformat.
+# The Phase 0B specification and the 18 ACCEPTED ADRs are governed content:
+# running `pnpm format` over them rewrote 43 files and 1,295 lines of the spec
+# on first use. Prettier's job in this repository is CODE.
+*.md
+docs/
+FOUNDATION_MANIFEST.json

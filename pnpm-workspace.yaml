@@ -1,0 +1,27 @@
+# Workspace list AND pnpm settings.
+# Phase 0B spec §3.10: pnpm 12 reads its settings from this file, not .npmrc.
+packages:
+  - 'apps/*'
+  - 'packages/*'
+
+# Linker behaviour is LOCKED. §3.1's second boundary layer depends on it:
+# an undeclared dependency must fail at module resolution. Setting
+# nodeLinker: hoisted, shamefullyHoist: true, or adding publicHoistPattern
+# entries re-creates the hoisting that lets an undeclared dependency resolve,
+# which silently deletes one of the two enforcement layers (§3.10, §5.3).
+# Changing any of these three lines is an ARCHITECTURE change, not a build fix.
+nodeLinker: isolated
+shamefullyHoist: false
+
+# A Node outside engines.node fails `pnpm install` rather than warning (§3.10).
+engineStrict: true
+
+# pnpm refuses dependency install scripts unless allowed here.
+# Every entry carries the reason it exists. Nothing is allowed wholesale,
+# and dangerouslyAllowAllBuilds is never used.
+allowBuilds:
+  prisma: true # preinstall entry script of the pinned CLI
+  '@prisma/engines': true # postinstall: fetches the schema engine the pinned CLI uses
+  esbuild: true # postinstall: verifies its platform binary (Vite / Vitest)
+minimumReleaseAgeExclude:
+  - dependency-cruiser@18.4.0
