@@ -91,7 +91,7 @@ constrains.
 
 | # | Criterion | Evidence |
 |---|---|---|
-| 1 | `pnpm install && pnpm build && pnpm test` from a clean checkout | **W12** copies the tree to a scratch directory with a pristine environment and runs exactly that sequence |
+| 1 | `pnpm install && pnpm build && pnpm test` from a clean checkout | **W12** copies the tree to a scratch directory with a pristine environment and runs exactly that sequence — including **`pnpm test`, the documented root command**, not a subset of it. An earlier version ran `vitest run --project unit` there, which proved clean-install → build → *unit tests* while claiming the criterion's own wording (see i30) |
 | 1a | No generated artifact in the checkout; `prisma generate` succeeds with no database reachable | `git check-ignore` confirms `packages/domain/src/generated/`, `dist/` and `*.tsbuildinfo`; **measured:** `DATABASE_URL` pointing at a dead port, `pnpm generate` exits 0. No `postinstall` hook generates anything |
 | 2 | `pnpm format:check` | passes |
 | 3 | `pnpm lint` | passes |
@@ -182,6 +182,10 @@ contradicts an accepted ADR.
 | i25 | `package-manager-cache: false` on `actions/setup-node` | **measured on GitHub:** it defaults to true, sees `packageManager: pnpm@12.5.1`, and shells out to `pnpm` to resolve the store path — while still installing the Node that Corepack ships with. Corepack cannot move earlier without shimming the runner's default Node. The store is cached explicitly anyway | low |
 | i26 | `not-to-unresolvable` exempts `generated/prisma/` | **measured on GitHub:** check 3 was red with five unresolvable imports of the generated client, because §13 runs boundaries at 3 and generation at 4. The cruise already excludes that tree from the graph, so whether it exists is check 4's question, not check 3's. Once generation has run, the import resolves and the exemption applies to nothing | low |
 | i27 | The test global setup attaches the application role's login after migrating | the migration creates `globalidle_app` `NOLOGIN` on purpose (§6.4), and **D9 passed here only because the role had been given a login by hand in an earlier session** — exactly the local state that makes a suite green on a developer machine and red in CI. Reproduced by resetting the role: `28P01 password authentication failed`. The migration still holds no credential | low |
+| i28 | An **observability port** in `platform/observability`, bound by each composition root | §12.3's counters and §12.2's events are reported by domain code that must not import `prom-client` or hold a logger (§5.2). The port is the boundary: `domain event → port → adapter`. The default is a no-op, so a process that binds nothing still works and a test binds its own and sees only its own |
+| i29 | Domain events are **buffered and emitted after the transaction commits** | a domain operation runs inside a transaction that may still roll back. One buffer per ATTEMPT, established by `withTransaction`, because a retried attempt's writes are gone and its events must go with them. A "success" line for a vanished row is worse than no line |
+| i30 | W12 runs **`pnpm test`**, and forwards `GLOBAL_IDLE_TEST_*` into the scratch checkout | §16 criterion 1 names the root command; hand-picking projects tests an approximation of the public interface instead of the interface. The nested run therefore includes the database suites, which need services: with a Docker daemon it brings its own up, and where the documented escape hatch is in use instead it has to be handed down, because `runClean` strips the environment on purpose |
+| i31 | The developer-bootstrap verification is a **script and a CI job of its own**, not a case in the test matrix | it runs `docker compose up`, so it cannot share a runner with the job whose PostgreSQL service already holds 5432, and putting it in the integration project would make `pnpm test` — which W12 now nests — require compose. §15's 0B.10 allows a dedicated step for exactly this |
 
 ---
 
@@ -195,7 +199,41 @@ is.
 |---|---|
 | **CI is green** (§16 criterion 19) | **VERIFIED** — [run 35550647692](https://github.com/Hokz/Global-Idle/actions/runs/35550647692), all thirteen checks. It took three runs; the three defects are i25, i26 and i27 |
 | **Integration tests under Testcontainers** (§16 criterion 7) | **VERIFIED in CI.** The `GLOBAL_IDLE_TEST_*` escape hatch is deliberately absent from the workflow, so Testcontainers was the only path. Locally it still cannot run — this environment has no Docker daemon — and the escape hatch exists for exactly that |
-| **`pnpm dev`** (§11.3, one command to a running stack) | **STILL NOT VERIFIED end to end.** It begins with `docker compose up`, and nothing in CI runs it. Every step *after* the compose stage was run individually — generate, build, migrate, build the bundle, seed, and all three apps started and served |
+| **`pnpm dev`** (§11.3, one command to a running stack) | **COVERED BY CI — first run pending at the time of writing**, in the `dev-bootstrap` job, which runs `scripts/verify-dev-bootstrap.mjs`. It spawns the REAL `pnpm dev` and waits for every acceptance signal before shutting the stack down: compose healthy, migrations applied *and present in `_prisma_migrations`*, the content bundle built, the seed *present as rows in the database*, `/health/live` and `/health/ready` 200 with all four conditions up, `apps/web` serving 200, the worker booted *and its repeatable sweep registered in the Redis the stack brought up*. It asks the running system wherever it can rather than grepping log lines |
+
+**Locally the bootstrap verification cannot run**, and fails loudly rather than skipping: this
+environment's egress policy refuses Docker Hub image blobs (`403` on
+`production.cloudfront.docker.com`), so `docker compose up` cannot pull `postgres:16-alpine`.
+The verifier detected `pnpm dev`'s early exit, printed the captured output and exited non-zero —
+which is the behaviour a bootstrap check is for. CI has the images and is the evidence.
+
+### Observability is proven by behaviour, not by declaration
+
+A registered metric and a declared event type are infrastructure. Nothing in
+`tests/integration/observability.test.ts` calls the port: every case performs the real domain
+operation and then asserts what the **real prom-client registry** and the bound sink recorded.
+
+| Proven | Case |
+|---|---|
+| `occupancy_conflicts_total` increments on a refused claim, and **not** on an unrelated failure | a second activity claiming the same Character; then an unknown activity type, which never reaches the claim |
+| `settlement_duration_seconds` observes **every** settlement | a first settlement and its idempotent replay — two observations, zero failures |
+| `settlement_failures_total` counts a real failure only | a settlement statement that violates `NOT NULL` |
+| `idempotency_replays_total` / `idempotency_conflicts_total` are counted separately | the same key replayed, then reused with a different fingerprint |
+| `economy.operation` carries its operation id | a committed posting |
+| `occupancy.acquired` / `occupancy.released` | a real activity start and end |
+| `activity.transition` | start, grace and end |
+| `session.evicted` **only when a holder actually loses the claim** | a transfer, then re-asserting the same holder |
+| `entitlement.transition` | grant and revoke |
+| **Nothing is emitted for a transaction that rolls back** | a posting followed by a throw: no ledger row, no event |
+
+**These cases were shown to bite.** Removing `metrics.occupancyConflict()` and the ledger's
+`recordDomainEvent` failed exactly those two cases and no others; silencing the port entirely
+failed nine of the ten, the tenth being the rollback case, which correctly still passes when
+nothing is emitted.
+
+> A first attempt at that check appeared to show the tests passing without the instrumentation.
+> It was wrong: Vitest resolves internal packages through their built `exports` (§3.7), so the
+> edit had to be compiled before it meant anything. The rebuilt run is the one above.
 
 ### The three defects CI found, and why they matter
 
