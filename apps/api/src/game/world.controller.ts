@@ -139,8 +139,7 @@ export class WorldController {
     const session = this.session(request);
     await this.own(request, id);
 
-    const key = typeof body?.huntKey === 'string' ? body.huntKey : '';
-    const bundle = await this.current();
+    const key = typeof body?.huntKey === 'string' ? body.huntKey.trim() : '';
 
     // §12: this route CARRIES an idempotency key. A double-submitted Enter
     // must replay its own answer rather than race the occupancy constraint and
@@ -158,15 +157,6 @@ export class WorldController {
     }
 
     try {
-      // Resolve and KIND-CHECK before anything is written. A key that does not
-      // resolve, or resolves to something that is not a runnable hunt, creates
-      // no Activity and takes no claim (§9.5).
-      const hunt = await content.resolveHunt(
-        this.resolver,
-        toContentVersion(bundle.version),
-        toContentKey(key),
-      );
-
       const idempotency = createIdempotencyPort((run) => withTransaction(this.prisma, run));
       const outcome = await idempotency.execute(
         {
@@ -174,11 +164,29 @@ export class WorldController {
           commandNamespace: 'hunt.enter',
           clientKey,
         },
-        // The SEMANTIC fields, not the transport. Two submissions of the same
-        // click agree here even if their JSON does not.
-        fingerprintOf({ characterId: id, huntKey: hunt.key, contentVersion: bundle.version }),
+        // THE CLIENT COMMAND, and nothing else (ADR-017).
+        //
+        // `contentVersion` used to be in here, and it is chosen by the SERVER
+        // from whatever bundle is current at the moment the request lands. A
+        // retry of the same logical command after a publication therefore
+        // fingerprinted differently and came back IDEMPOTENCY_CONFLICT — the
+        // client had changed nothing. Which bundle the Activity pinned is part
+        // of the first execution's RESULT, not of the command's identity.
+        fingerprintOf({ characterId: id, huntKey: key }),
         new Date(),
         async (tx) => {
+          // Resolution happens HERE, inside the executed callback, so a replay
+          // never re-resolves against a newer bundle. It costs a content read
+          // inside the transaction; the resolver caches per version, and the
+          // alternative is a retry that can be refused for a publication the
+          // caller never saw.
+          const bundle = await this.current();
+          const hunt = await content.resolveHunt(
+            this.resolver,
+            toContentVersion(bundle.version),
+            toContentKey(key),
+          );
+
           const activityId = await activityContext.startSessionBound(tx, {
             accountId: toAccountId(session.accountId),
             activityTypeKey: activityContext.HUNT,
@@ -206,7 +214,9 @@ export class WorldController {
 
       // Read the view back from DURABLE state in both outcomes. A replay that
       // returned a serialised snapshot would answer with the world as it was
-      // when the first call ran, not as it is (§9.6).
+      // when the first call ran, not as it is (§9.6) — and the Activity's own
+      // pinned version is what its Hunt resolves against, however far content
+      // has moved on since.
       return currentActivity(this.prisma, this.resolver, id);
     } catch (error) {
       const http = asHttp(error);

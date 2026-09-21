@@ -13,6 +13,7 @@ import { buildBundle, writeBundle } from '@global-idle/game-data';
 import { createClient, truncateAll } from '../support/db.js';
 import {
   HUNT_KEY,
+  MARKER_KEY,
   REGION_KEY,
   call,
   createCharacter,
@@ -362,5 +363,163 @@ describe('the pre-combat Hunt boundary', () => {
       select: { contentKey: true, contentVersion: true },
     });
     expect(after).toEqual(before);
+  });
+});
+
+/**
+ * The idempotency fingerprint is the CLIENT COMMAND — `{characterId, huntKey}`
+ * — and nothing the server chose for itself.
+ *
+ * `contentVersion` used to be in it. It is selected by the server from
+ * whatever bundle is current when the request lands, so a retry of the same
+ * logical command that arrived after a publication fingerprinted differently
+ * and was refused with IDEMPOTENCY_CONFLICT, for a change the caller never
+ * made. Which bundle the Activity pinned belongs to the first execution's
+ * RESULT (ADR-017).
+ *
+ * These cases are additional to the §16 matrix and deliberately carry no
+ * matrix ids.
+ */
+describe('replay across a content publication', () => {
+  /** Publish a bundle built from the authored source with one edit. */
+  async function publish(edit: (definitions: readonly unknown[]) => unknown[]): Promise<string> {
+    const source = await rookgaardSource();
+    const artifact = buildBundle({
+      ...source,
+      definitions: edit(source.definitions) as typeof source.definitions,
+    });
+    await writeBundle(directory, artifact);
+    await content.publish(prisma, artifact, directory, new Date());
+    return artifact.version;
+  }
+
+  it('replays when a NEWER bundle is current', async () => {
+    const key = idempotencyKey();
+    const first = await enterHunt<ActivityBody>(base, cookie, hero.id, HUNT_KEY, key);
+    expect(first.status).toBe(201);
+
+    // A genuinely DIFFERENT bundle: the version is a content hash, so an
+    // identical source would republish the same version and prove nothing.
+    const next = await publish((definitions) =>
+      definitions.map((definition) =>
+        (definition as { key: string }).key === REGION_KEY
+          ? { ...(definition as object), label: 'Rookgaard (revised)' }
+          : definition,
+      ),
+    );
+    expect(next).not.toBe(version);
+
+    const replay = await enterHunt<ActivityBody>(base, cookie, hero.id, HUNT_KEY, key);
+    expect(replay.status).toBe(201);
+    expect(replay.body.activityId).toBe(first.body.activityId);
+    expect(replay.body.contentVersion).toBe(version);
+    expect(await prisma.activity.count()).toBe(1);
+  });
+
+  it('replays when the Hunt CHANGED in the newer bundle', async () => {
+    const key = idempotencyKey();
+    const first = await enterHunt<ActivityBody>(base, cookie, hero.id, HUNT_KEY, key);
+    await publish((definitions) =>
+      definitions.map((definition) =>
+        (definition as { key: string }).key === HUNT_KEY
+          ? { ...(definition as object), label: 'Renamed After Entry', primaryCreature: 'Cave Rat' }
+          : definition,
+      ),
+    );
+
+    const replay = await enterHunt<ActivityBody>(base, cookie, hero.id, HUNT_KEY, key);
+    expect(replay.status).toBe(201);
+    expect(replay.body.activityId).toBe(first.body.activityId);
+    // The Activity pinned its own bundle, so it still describes the Hunt the
+    // player actually entered.
+    expect(replay.body.hunt.label).toBe('Rookgaard Sewers');
+    expect(replay.body.hunt.primaryCreature).toBe('Rat');
+  });
+
+  it('replays when the Hunt is ABSENT from the newer bundle', async () => {
+    const key = idempotencyKey();
+    const first = await enterHunt<ActivityBody>(base, cookie, hero.id, HUNT_KEY, key);
+
+    // Remove the hunt AND the marker that points at it, so the bundle still
+    // validates — content that no longer offers this Hunt at all.
+    await publish((definitions) =>
+      definitions.filter(
+        (definition) =>
+          (definition as { key: string }).key !== HUNT_KEY &&
+          (definition as { key: string }).key !== MARKER_KEY,
+      ),
+    );
+
+    const replay = await enterHunt<ActivityBody>(base, cookie, hero.id, HUNT_KEY, key);
+    expect(replay.status).toBe(201);
+    expect(replay.body.activityId).toBe(first.body.activityId);
+    expect(replay.body.hunt.label).toBe('Rookgaard Sewers');
+
+    // A FRESH command for the same Hunt is a different matter: there is
+    // nothing current to enter, and it is refused.
+    await call(base, `/api/characters/${hero.id}/activity`, { method: 'DELETE', cookie });
+    const fresh = await enterHunt<{ error: { code: string } }>(
+      base,
+      cookie,
+      hero.id,
+      HUNT_KEY,
+      idempotencyKey(),
+    );
+    expect(fresh.status).toBe(404);
+    expect(fresh.body.error.code).toBe('HUNT_NOT_FOUND');
+  });
+
+  it('replays when the Hunt is LOCKED in the newer bundle', async () => {
+    const key = idempotencyKey();
+    const first = await enterHunt<ActivityBody>(base, cookie, hero.id, HUNT_KEY, key);
+
+    await publish((definitions) =>
+      definitions.map((definition) =>
+        (definition as { key: string }).key === HUNT_KEY
+          ? { ...(definition as object), availability: 'LOCKED' }
+          : definition,
+      ),
+    );
+
+    const replay = await enterHunt<ActivityBody>(base, cookie, hero.id, HUNT_KEY, key);
+    expect(replay.status).toBe(201);
+    expect(replay.body.activityId).toBe(first.body.activityId);
+
+    // ...and a fresh entry into a now-locked Hunt is refused.
+    await call(base, `/api/characters/${hero.id}/activity`, { method: 'DELETE', cookie });
+    const fresh = await enterHunt<{ error: { code: string } }>(
+      base,
+      cookie,
+      hero.id,
+      HUNT_KEY,
+      idempotencyKey(),
+    );
+    expect(fresh.status).toBe(404);
+    expect(fresh.body.error.code).toBe('HUNT_NOT_FOUND');
+  });
+
+  it('still treats the same key aimed at a DIFFERENT hunt as a conflict', async () => {
+    await publish((definitions) => {
+      const sewers = definitions.find((d) => (d as { key: string }).key === HUNT_KEY);
+      return [
+        ...definitions,
+        { ...(sewers as object), key: 'hunt.rookgaard.cellar', label: 'Cellar' },
+      ];
+    });
+
+    const key = idempotencyKey();
+    const first = await enterHunt<ActivityBody>(base, cookie, hero.id, HUNT_KEY, key);
+    expect(first.status).toBe(201);
+
+    const conflicting = await enterHunt<{ error: { code: string } }>(
+      base,
+      cookie,
+      hero.id,
+      'hunt.rookgaard.cellar',
+      key,
+    );
+    expect(conflicting.status).toBe(409);
+    expect(conflicting.body.error.code).toBe('IDEMPOTENCY_CONFLICT');
+    expect(await prisma.activity.count()).toBe(1);
   });
 });
