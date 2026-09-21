@@ -55,7 +55,8 @@ Development agents must read:
 
 Phase 0A is `ARCHITECTURE_APPROVED` and Phase 0B is `VERIFIED` — the technical foundation is
 implemented, independently reviewed and accepted. Phase 1 is the first phase with a visible
-game surface.
+game surface; its specification is
+[`docs/specs/phase-1/PHASE_1_WORLD_CHARACTER_VERTICAL_SLICE_SPEC.md`](docs/specs/phase-1/PHASE_1_WORLD_CHARACTER_VERTICAL_SLICE_SPEC.md).
 
 ## Working process
 
