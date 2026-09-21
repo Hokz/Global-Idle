@@ -41,8 +41,21 @@ export {
 } from './platform/jobs/index.js';
 export type { GraceExpiryJobData } from './platform/jobs/index.js';
 
-export { createMetrics, setVersionGauge } from './platform/metrics/index.js';
+export { createMetrics, createMetricsPort, setVersionGauge } from './platform/metrics/index.js';
 export type { Metrics } from './platform/metrics/index.js';
+
+export {
+  measureSettlement,
+  observability,
+  recordDomainEvent,
+  setObservability,
+  withCommittedEvents,
+} from './platform/observability/index.js';
+export type {
+  DomainEventSink,
+  MetricsPort,
+  ObservabilityPort,
+} from './platform/observability/index.js';
 
 export {
   withTransaction,

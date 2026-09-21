@@ -12,6 +12,7 @@
  */
 import { createHash } from 'node:crypto';
 import type { AccountId, Instant, OperationId } from '@global-idle/shared';
+import { measureSettlement, metrics } from '../observability/index.js';
 import type { UnitOfWork } from '../transaction/index.js';
 
 export interface IdempotencyKeyIdentity {
@@ -84,10 +85,7 @@ export function createIdempotencyPort(runInTransaction: Runner): IdempotencyPort
         }),
       );
 
-      if (existing) {
-        if (existing.fingerprint !== fingerprint) return { outcome: 'conflict' };
-        return { outcome: 'replayed', result: (existing.result as R) ?? (undefined as R) };
-      }
+      if (existing) return answerFrom<R>(existing, fingerprint);
 
       try {
         const result = await runInTransaction(async (tx) => {
@@ -123,15 +121,31 @@ export function createIdempotencyPort(runInTransaction: Runner): IdempotencyPort
               },
             }),
           );
-          if (raced) {
-            if (raced.fingerprint !== fingerprint) return { outcome: 'conflict' };
-            return { outcome: 'replayed', result: (raced.result as R) ?? (undefined as R) };
-          }
+          if (raced) return answerFrom<R>(raced, fingerprint);
         }
         throw error;
       }
     },
   };
+}
+
+/**
+ * Answer from a stored record, and COUNT WHICH ANSWER IT WAS (§12.3).
+ *
+ * Both outcomes are returned from two places — the pre-check and the
+ * lost-race re-read — so the counting lives here rather than at four call
+ * sites where one could be forgotten or double-counted.
+ */
+function answerFrom<T>(
+  record: { fingerprint: string; result: unknown },
+  fingerprint: Fingerprint,
+): IdempotentOutcome<T> {
+  if (record.fingerprint !== fingerprint) {
+    metrics.idempotencyConflict();
+    return { outcome: 'conflict' };
+  }
+  metrics.idempotencyReplay();
+  return { outcome: 'replayed', result: (record.result as T) ?? (undefined as T) };
 }
 
 function isUniqueViolation(error: unknown): boolean {
@@ -147,19 +161,32 @@ export function settlementOperationId(activityId: string, checkpointSequence: nu
   return `settle:${activityId}:${checkpointSequence}` as OperationId;
 }
 
-/** Record a settlement exactly once. Returns false when it was already applied. */
+/**
+ * Record a settlement exactly once. Returns false when it was already applied.
+ *
+ * This IS the settlement operation Phase 0B has: §19 forbids building the
+ * reward loop here, so there is no settlement body to wrap yet. The timing and
+ * failure counting live on the primitive rather than on a caller, so the
+ * phase that adds a body inherits the instrumentation instead of having to
+ * remember it (§12.3).
+ *
+ * An already-applied settlement is a no-op, NOT a failure: it is exactly the
+ * outcome idempotency exists to produce.
+ */
 export async function claimSettlement(
   tx: UnitOfWork,
   operationId: OperationId,
   kind: string,
   at: Instant,
 ): Promise<boolean> {
-  const inserted = await tx.$executeRawUnsafe(
-    `INSERT INTO "SettlementOperation" ("operationId", "kind", "appliedAt")
-     VALUES ($1, $2, $3) ON CONFLICT ("operationId") DO NOTHING`,
-    operationId,
-    kind,
-    at,
-  );
-  return inserted === 1;
+  return measureSettlement(async () => {
+    const inserted = await tx.$executeRawUnsafe(
+      `INSERT INTO "SettlementOperation" ("operationId", "kind", "appliedAt")
+       VALUES ($1, $2, $3) ON CONFLICT ("operationId") DO NOTHING`,
+      operationId,
+      kind,
+      at,
+    );
+    return inserted === 1;
+  });
 }

@@ -16,6 +16,7 @@ import {
   type SessionId,
 } from '@global-idle/shared';
 import { activityTypeUnknown } from '../../platform/errors/index.js';
+import { recordDomainEvent } from '../../platform/observability/index.js';
 import type { UnitOfWork } from '../../platform/transaction/index.js';
 import { describe } from './types/registry.js';
 import { acquire, release } from './occupancy.js';
@@ -99,6 +100,12 @@ export async function startSessionBound(
   // 4. one claim per participant, ascending characterId (§8.5)
   await acquire(tx, input.participants, id, input.at);
 
+  recordDomainEvent({
+    kind: 'activity.transition',
+    activityId: id,
+    family: 'SESSION_BOUND',
+    to: 'ONLINE_ACTIVE',
+  });
   return id;
 }
 
@@ -170,6 +177,12 @@ export async function startSkillTraining(
 
   await acquire(tx, [input.trainee], id, input.at);
 
+  recordDomainEvent({
+    kind: 'activity.transition',
+    activityId: id,
+    family: 'WALL_CLOCK',
+    to: 'ACCRUING',
+  });
   return id;
 }
 
@@ -216,6 +229,12 @@ export async function endActivity(
   const claimsReleased = await release(tx, activityId);
   const participantsRetained = await tx.activityParticipant.count({ where: { activityId } });
 
+  recordDomainEvent({
+    kind: 'activity.transition',
+    activityId,
+    family: activity.family,
+    to: activity.family === 'SESSION_BOUND' ? 'ACTIVITY_ENDED' : terminal,
+  });
   return { claimsReleased, participantsRetained };
 }
 
@@ -228,5 +247,11 @@ export async function pauseForGrace(
   await tx.sessionBoundActivity.update({
     where: { activityId },
     data: { state: 'RECONNECT_GRACE_PAUSED', graceExpiresAt },
+  });
+  recordDomainEvent({
+    kind: 'activity.transition',
+    activityId,
+    family: 'SESSION_BOUND',
+    to: 'RECONNECT_GRACE_PAUSED',
   });
 }

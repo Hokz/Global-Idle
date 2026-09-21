@@ -10,6 +10,7 @@
  * singleton makes that a function of import order.
  */
 import { Counter, Gauge, Histogram, Registry, collectDefaultMetrics } from 'prom-client';
+import type { MetricsPort } from '../observability/index.js';
 
 export interface Metrics {
   readonly registry: Registry;
@@ -90,4 +91,22 @@ export function createMetrics(options: { defaultMetrics?: boolean } = {}): Metri
 export function setVersionGauge(gauge: Gauge, version: string): void {
   gauge.reset();
   gauge.labels(version).set(1);
+}
+
+/**
+ * The adapter: turns what the domain reports into the collectors above.
+ *
+ * This is the ONLY place the two sides meet. `packages/domain`'s contexts
+ * report through `MetricsPort` and never see prom-client, which is what keeps
+ * the counter's existence and the behaviour it counts in different modules
+ * (§12.3).
+ */
+export function createMetricsPort(metrics: Metrics): MetricsPort {
+  return {
+    occupancyConflict: () => metrics.occupancyConflictsTotal.inc(),
+    settlementDuration: (seconds) => metrics.settlementDurationSeconds.observe(seconds),
+    settlementFailure: () => metrics.settlementFailuresTotal.inc(),
+    idempotencyReplay: () => metrics.idempotencyReplaysTotal.inc(),
+    idempotencyConflict: () => metrics.idempotencyConflictsTotal.inc(),
+  };
 }

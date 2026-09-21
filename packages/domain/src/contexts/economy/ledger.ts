@@ -10,6 +10,7 @@
  */
 import { newId, type AccountId, type Instant, type OperationId } from '@global-idle/shared';
 import { insufficientFunds } from '../../platform/errors/index.js';
+import { recordDomainEvent } from '../../platform/observability/index.js';
 import { lockBalance, type UnitOfWork } from '../../platform/transaction/index.js';
 
 export type CurrencyKind = 'GOLD' | 'PREMIUM';
@@ -61,6 +62,19 @@ export async function post(tx: UnitOfWork, posting: LedgerPosting): Promise<bigi
   await tx.currencyBalance.update({
     where: { accountId_currency: { accountId: posting.accountId, currency: posting.currency } },
     data: { amount: next, updatedAt: posting.at },
+  });
+
+  // §12.2 always logs economy operations WITH THEIR OPERATION IDS — the field
+  // that makes a ledger line traceable to the command that produced it. The
+  // amount is stringified because a bigint has no JSON form and a log line
+  // that throws is worse than one that is absent.
+  recordDomainEvent({
+    kind: 'economy.operation',
+    accountId: posting.accountId,
+    currency: posting.currency,
+    amount: posting.amount.toString(),
+    reasonCode: posting.reasonCode,
+    operationId: posting.operationId,
   });
 
   return next;

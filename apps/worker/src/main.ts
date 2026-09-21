@@ -13,10 +13,14 @@ import {
   SystemClock,
   activity,
   createLogger,
+  createMetrics,
+  createMetricsPort,
   createPrismaClient,
   createRedis,
   loadConfig,
+  logDomainEvent,
   newCorrelationId,
+  setObservability,
   withCorrelationId,
 } from '@global-idle/domain';
 import { runGraceExpiry } from './jobs/grace-expiry.js';
@@ -31,6 +35,14 @@ export async function bootstrap(): Promise<() => Promise<void>> {
   // start rather than failing on the first job.
   const config = loadConfig();
   const logger = createLogger({ level: config.LOG_LEVEL, app: 'worker' });
+
+  // The worker calls the same context surfaces apps/api does, so it binds the
+  // same observability port. Without this, a claim released by the sweeper
+  // would be the one release that never got logged (§12.2).
+  setObservability({
+    metrics: createMetricsPort(createMetrics({ defaultMetrics: false })),
+    events: (event) => logDomainEvent(logger, event),
+  });
 
   const prisma = createPrismaClient({
     connectionString: config.DATABASE_APP_URL ?? config.DATABASE_URL,

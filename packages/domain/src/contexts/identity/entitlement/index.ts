@@ -8,6 +8,7 @@
 import { newId, type AccountId, type DurationMs, type Instant } from '@global-idle/shared';
 import { durationMs } from '@global-idle/shared';
 import type { UnitOfWork } from '../../../platform/transaction/index.js';
+import { recordDomainEvent } from '../../../platform/observability/index.js';
 
 export type EntitlementKind = 'PREMIUM';
 
@@ -134,6 +135,12 @@ export async function grant(
       reason: input.reason,
     },
   });
+  recordDomainEvent({
+    kind: 'entitlement.transition',
+    accountId: input.accountId,
+    entitlementId: id,
+    transition: 'GRANTED',
+  });
   return id;
 }
 
@@ -143,7 +150,12 @@ export async function revoke(
   at: Instant,
   reason: string,
 ): Promise<void> {
-  await tx.entitlement.update({ where: { id: entitlementId }, data: { validUntil: at } });
+  // The update returns the row, so the event carries the account without a
+  // second read.
+  const revoked = await tx.entitlement.update({
+    where: { id: entitlementId },
+    data: { validUntil: at },
+  });
   await tx.entitlementAudit.create({
     data: {
       id: newId<'EntitlementId'>(at),
@@ -152,5 +164,11 @@ export async function revoke(
       occurredAt: at,
       reason,
     },
+  });
+  recordDomainEvent({
+    kind: 'entitlement.transition',
+    accountId: revoked.accountId,
+    entitlementId,
+    transition: 'REVOKED',
   });
 }

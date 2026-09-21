@@ -12,7 +12,6 @@ import { Redis } from 'ioredis';
 import {
   MAINTENANCE_QUEUE,
   content,
-  createMetrics,
   createPrismaClient,
   type AppConfig,
   type Metrics,
@@ -77,7 +76,7 @@ function metricsRedis(url: string): Redis {
 
 @Module({})
 export class HealthModule implements OnApplicationShutdown {
-  static forRoot(config: AppConfig): DynamicModule {
+  static forRoot(config: AppConfig, metrics: Metrics): DynamicModule {
     return {
       module: HealthModule,
       imports: [TerminusModule],
@@ -108,7 +107,9 @@ export class HealthModule implements OnApplicationShutdown {
             new Queue(MAINTENANCE_QUEUE, { connection: metricsRedis(c.REDIS_URL) }),
           inject: [APP_CONFIG],
         },
-        { provide: METRICS, useFactory: (): Metrics => createMetrics() },
+        // Provided by the caller, because the domain reports into this same
+        // registry through the observability port (§12.3).
+        { provide: METRICS, useValue: metrics },
       ],
       exports: [APP_CONFIG, PRISMA, REDIS_PROBE, CONTENT_RESOLVER, METRICS],
     };

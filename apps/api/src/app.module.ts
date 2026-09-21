@@ -1,16 +1,27 @@
-import { Module, type DynamicModule } from '@nestjs/common';
+import {
+  Module,
+  type DynamicModule,
+  type MiddlewareConsumer,
+  type NestModule,
+} from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { LoggerModule } from 'nestjs-pino';
 import {
   CORRELATION_ID_HEADER,
   REDACTED_PATHS,
+  createLogger,
+  createMetrics,
+  createMetricsPort,
   loadConfig,
+  logDomainEvent,
+  setObservability,
   type AppConfig,
 } from '@global-idle/domain';
+import { CorrelationMiddleware } from './correlation.middleware.js';
 import { HealthModule } from './health/health.module.js';
 
 @Module({})
-export class AppModule {
+export class AppModule implements NestModule {
   /**
    * Configuration is read ONCE, here, and injected downwards (§11.3). A test
    * overrides a field to point the same wiring at a dependency that is
@@ -18,6 +29,17 @@ export class AppModule {
    */
   static forRoot(overrides: Partial<AppConfig> = {}): DynamicModule {
     const config: AppConfig = { ...loadConfig(), ...overrides };
+
+    // ONE metrics registry, created here and shared: /metrics reports it and
+    // the domain reports INTO it, through the port. Two registries would mean
+    // a counter that increments and a counter that is scraped.
+    const metrics = createMetrics();
+    const logger = createLogger({ level: config.LOG_LEVEL, app: 'api' });
+    setObservability({
+      metrics: createMetricsPort(metrics),
+      events: (event) => logDomainEvent(logger, event),
+    });
+
     return {
       module: AppModule,
       imports: [
@@ -39,8 +61,12 @@ export class AppModule {
             redact: { paths: [...REDACTED_PATHS], censor: '[redacted]' },
           },
         }),
-        HealthModule.forRoot(config),
+        HealthModule.forRoot(config, metrics),
       ],
     };
+  }
+
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(CorrelationMiddleware).forRoutes('*path');
   }
 }

@@ -7,6 +7,7 @@
  */
 import { MAX_SERIALIZATION_RETRIES } from '@global-idle/shared';
 import type { PrismaClient } from '../../generated/prisma/client.js';
+import { withCommittedEvents } from '../observability/index.js';
 
 /** The transactional handle a domain operation receives. */
 export type UnitOfWork = Parameters<Parameters<PrismaClient['$transaction']>[0]>[0];
@@ -58,10 +59,16 @@ export async function withTransaction<T>(
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
-      return await prisma.$transaction(body, {
-        isolationLevel: options.isolation ?? 'ReadCommitted',
-        timeout: options.timeoutMs ?? 15_000,
-      });
+      // One event buffer PER ATTEMPT (§12.2). A retried attempt rolled its
+      // writes back, and the events it reported have to go with them —
+      // wrapping the whole loop would emit a "success" line for a transaction
+      // that never committed.
+      return await withCommittedEvents(() =>
+        prisma.$transaction(body, {
+          isolationLevel: options.isolation ?? 'ReadCommitted',
+          timeout: options.timeoutMs ?? 15_000,
+        }),
+      );
     } catch (error) {
       lastError = error;
       if (!isRetryable(error) || attempt === maxAttempts) throw error;

@@ -7,6 +7,7 @@
  */
 import type { ActivityId, Instant, SessionId } from '@global-idle/shared';
 import { activityClaimHeld } from '../../platform/errors/index.js';
+import { recordDomainEvent } from '../../platform/observability/index.js';
 import type { UnitOfWork } from '../../platform/transaction/index.js';
 
 /**
@@ -21,18 +22,39 @@ export async function transferClaim(
   expectedHolder: SessionId | null,
   newHolder: SessionId,
 ): Promise<void> {
-  const updated = await tx.$executeRawUnsafe(
+  // RETURNING, so the swap is still ONE statement but also tells us whose
+  // claim it was: §12.2 always logs a session eviction, and the account it
+  // happened on is the only thing that makes the line useful.
+  const swapped = await tx.$queryRawUnsafe<{ accountId: string }[]>(
     `UPDATE "SessionBoundActivity"
         SET "claimHolderSessionId" = $1
       WHERE "activityId" = $2
         AND "claimHolderSessionId" IS NOT DISTINCT FROM $3
-        AND "state" <> 'ACTIVITY_ENDED'`,
+        AND "state" <> 'ACTIVITY_ENDED'
+   RETURNING "accountId"`,
     newHolder,
     activityId,
     expectedHolder,
   );
-  if (updated !== 1) {
-    throw activityClaimHeld({ activityId, expectedHolder, newHolder, rowsAffected: updated });
+  if (swapped.length !== 1) {
+    throw activityClaimHeld({
+      activityId,
+      expectedHolder,
+      newHolder,
+      rowsAffected: swapped.length,
+    });
+  }
+
+  // An eviction is a PREVIOUS holder losing the claim (ADR-008). Taking an
+  // unheld claim is an acquisition, and reporting it as an eviction would
+  // make the count meaningless.
+  if (expectedHolder !== null && expectedHolder !== newHolder) {
+    recordDomainEvent({
+      kind: 'session.evicted',
+      accountId: swapped[0]!.accountId,
+      previousSessionId: expectedHolder,
+      newSessionId: newHolder,
+    });
   }
 }
 
