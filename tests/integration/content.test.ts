@@ -70,6 +70,7 @@ async function seedHunt(accountId: string, contentVersion: string, state = 'ONLI
       activityTypeKey: 'hunt',
       family: 'SESSION_BOUND',
       contentVersion,
+      contentKey: 'hunt.rookgaard.sewers',
       createdAt: T0,
     },
   });
@@ -96,6 +97,7 @@ async function seedSkillTraining(accountId: string, characterId: string, content
       activityTypeKey: 'skill-training',
       family: 'WALL_CLOCK',
       contentVersion,
+      contentKey: 'hunt.rookgaard.sewers',
       createdAt: T0,
     },
   });
@@ -493,6 +495,7 @@ describe('§14.8 content', () => {
           activityTypeKey: 'hunt',
           family: 'SESSION_BOUND',
           contentVersion: 'v-does-not-exist',
+          contentKey: 'hunt.rookgaard.sewers',
           createdAt: T0,
         },
       }),

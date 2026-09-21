@@ -162,10 +162,17 @@ model EntitlementAudit {
 // ═══════════════════════════════════════════════════════════════════════════
 
 model Character {
-  id        String    @id
+  id        String @id
   accountId String
-  vocation  Vocation
+  /// NULLABLE from Phase 1: the ORIGIN Character has not chosen a vocation yet
+  /// (TUTORIAL_ROOKGAARD_ROADMAP.md §3 — Level 1, Rookgaard, vocation chosen at
+  /// the Level-8 Oracle). `null` means NOT CHOSEN YET; it is not a sixth
+  /// vocation. I1 below does not constrain nulls, so I1b does.
+  vocation  Vocation?
   name      String
+  /// Phase 1. Origin Characters start at 1; an unlocked Character will start at
+  /// 8 (DOMAIN_MODEL.md §5.5). CHECK (baseLevel >= 1) is hand-written.
+  baseLevel Int       @default(1)
   createdAt DateTime
   /// ADR-007: retirement, not deletion. A Character is never hard-deleted
   /// (I12) — history stays referentially intact.
@@ -180,6 +187,10 @@ model Character {
   /// predicate is needed (§3.8). A RETIRED Character does not reserve its
   /// vocation, which is exactly what tests D4 and D5 separate.
   @@unique([accountId, vocation], where: { retiredAt: null })
+  /// I1b — at most ONE playable un-vocationalized ORIGIN Character per account
+  /// (Phase 1 spec §13.2). I1 treats nulls as distinct, so without this a
+  /// second Origin Character would be accepted.
+  @@unique([accountId], where: { retiredAt: null, vocation: null }, name: "originCharacter")
   @@index([accountId])
   @@map("Character")
 }
@@ -214,6 +225,11 @@ model Activity {
   /// ADR-011: EVERY Activity pins the content version it started with — both
   /// families, not just session-bound. NOT NULL, ON DELETE RESTRICT (test C9).
   contentVersion  String
+  /// WHICH content definition this Activity instance represents (Phase 1 spec
+  /// §9.5). activityTypeKey says which code path runs; this says which Hunt,
+  /// and later which Dungeon. Resolved against THIS row's contentVersion, never
+  /// against the current bundle. Immutable after creation.
+  contentKey      String
   createdAt       DateTime
 
   account       Account                @relation(fields: [accountId], references: [id])
@@ -230,6 +246,8 @@ model Activity {
   @@index([activityTypeKey, family])
   @@index([accountId])
   @@index([contentVersion])
+  /// Reload reads (contentVersion, contentKey) together.
+  @@index([contentVersion, contentKey])
   @@map("Activity")
 }
 

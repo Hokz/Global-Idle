@@ -34,6 +34,19 @@ const REQUIRED_SQL = [
       /CREATE UNIQUE INDEX "SessionBoundActivity_accountId_key"[\s\S]*?WHERE \(state IN \('ONLINE_ACTIVE', 'RECONNECT_GRACE_PAUSED'\)\)/,
   },
   {
+    invariant: 'I1b — one playable un-vocationalized ORIGIN Character per account (Phase 1 §13.2)',
+    pattern:
+      /CREATE UNIQUE INDEX "Character_accountId_key"[\s\S]*?WHERE "retiredAt" IS NULL AND "vocation" IS NULL/,
+  },
+  {
+    invariant: 'Phase 1 §13.2 — baseLevel has a floor',
+    pattern: /CHECK \("baseLevel" >= 1\)/,
+  },
+  {
+    invariant: 'Phase 1 §13.3 — Activity.contentKey is NOT NULL and shaped like a content key',
+    pattern: /ALTER COLUMN "contentKey" SET NOT NULL[\s\S]*?CHECK \("contentKey" ~ '\^\[a-z0-9\]\+/,
+  },
+  {
     invariant: 'at most one participant on a wall-clock activity (§6.3.1)',
     pattern:
       /CREATE UNIQUE INDEX "ActivityParticipant_activityId_key"[\s\S]*?WHERE \(family = 'WALL_CLOCK'\)/,

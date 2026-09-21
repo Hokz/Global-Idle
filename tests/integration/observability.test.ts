@@ -36,6 +36,7 @@ import {
   sessionId as toSessionId,
 } from '@global-idle/shared';
 import {
+  T_HUNT_KEY,
   T0,
   createClient,
   expectDomainError,
@@ -97,6 +98,7 @@ async function startHunt(account: string, characters: string[], session = 'sessi
     activity.startSessionBound(tx, {
       accountId: toAccountId(account),
       activityTypeKey: activity.HUNT,
+      contentKey: T_HUNT_KEY,
       contentVersion: toContentVersion('v1'),
       participants: characters.map(toCharacterId),
       claimHolderSessionId: toSessionId(session),
@@ -126,6 +128,7 @@ describe('§12.3 metrics are incremented by the behaviour they observe', () => {
         activity.startSessionBound(tx, {
           accountId: toAccountId(other),
           activityTypeKey: 'not-a-registered-type' as never,
+          contentKey: T_HUNT_KEY,
           contentVersion: toContentVersion('v1'),
           participants: [toCharacterId(knight)],
           claimHolderSessionId: toSessionId('session-3'),

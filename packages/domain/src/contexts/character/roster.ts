@@ -12,7 +12,12 @@
  *   serialise rather than deadlock.
  */
 import { newId, type AccountId, type CharacterId, type Instant } from '@global-idle/shared';
-import { rosterCapacityExceeded } from '../../platform/errors/index.js';
+import {
+  characterNameTaken,
+  isOriginCharacterViolation,
+  originCharacterExists,
+  rosterCapacityExceeded,
+} from '../../platform/errors/index.js';
 import { lockAccount, type UnitOfWork } from '../../platform/transaction/index.js';
 import { STAMINA_MAX } from './stamina/index.js';
 import { deriveStaminaMode } from './stamina/index.js';
@@ -21,8 +26,16 @@ export type VocationName = 'KNIGHT' | 'PALADIN' | 'SORCERER' | 'DRUID' | 'MONK';
 
 export interface CreateCharacterInput {
   readonly accountId: AccountId;
-  readonly vocation: VocationName;
+  /**
+   * `null` is the ORIGIN Character: Level 1, no vocation yet, chosen at the
+   * Level-8 Oracle (TUTORIAL_ROOKGAARD_ROADMAP.md §3, §34). It is NOT a sixth
+   * vocation, and I1b lets an account hold only one.
+   */
+  readonly vocation: VocationName | null;
   readonly name: string;
+  /** Origin Characters start at 1; an unlocked one will start at 8
+   *  (DOMAIN_MODEL.md §5.5). Phase 1 only creates origins. */
+  readonly baseLevel: number;
   readonly at: Instant;
 }
 
@@ -50,17 +63,36 @@ export async function createCharacter(
     throw rosterCapacityExceeded({ accountId: input.accountId, playable, rosterCapacity });
   }
 
-  const id = newId<'CharacterId'>(input.at);
-  await tx.character.create({
-    data: {
-      id,
-      accountId: input.accountId,
-      vocation: input.vocation,
-      name: input.name,
-      createdAt: input.at,
-      retiredAt: null,
-    },
+  // Names are unique among PLAYABLE characters on the account. Checked inside
+  // the transaction, with the account row already locked above, so two
+  // concurrent creates serialise rather than both passing the read.
+  const nameTaken = await tx.character.findFirst({
+    where: { accountId: input.accountId, retiredAt: null, name: input.name },
+    select: { id: true },
   });
+  if (nameTaken) throw characterNameTaken({ accountId: input.accountId, name: input.name });
+
+  const id = newId<'CharacterId'>(input.at);
+  try {
+    await tx.character.create({
+      data: {
+        id,
+        accountId: input.accountId,
+        vocation: input.vocation,
+        name: input.name,
+        baseLevel: input.baseLevel,
+        createdAt: input.at,
+        retiredAt: null,
+      },
+    });
+  } catch (error) {
+    // I1b is the DATABASE's answer, not a read-then-write check here: an
+    // application-only check loses to a concurrent create, which is the same
+    // reasoning DOMAIN_MODEL.md §5.5 gives for I1. Only that constraint is
+    // translated; anything else keeps its identity.
+    if (!isOriginCharacterViolation(error)) throw error;
+    throw originCharacterExists({ accountId: input.accountId });
+  }
   await tx.characterStamina.create({
     data: {
       characterId: id,

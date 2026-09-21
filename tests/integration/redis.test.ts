@@ -27,7 +27,14 @@ import {
   operationId as toOperationId,
   sessionId as toSessionId,
 } from '@global-idle/shared';
-import { T0, createClient, seedBundle, truncateAll } from '../support/db.js';
+import {
+  ORIGIN_LEVEL,
+  T0,
+  T_HUNT_KEY,
+  createClient,
+  seedBundle,
+  truncateAll,
+} from '../support/db.js';
 import { createMaintenanceQueue, scheduleGraceExpiryCheck } from '../../apps/worker/src/queues.js';
 
 const prisma = createClient();
@@ -53,16 +60,29 @@ async function seedDurableState() {
   });
 
   const knight = await withTransaction(prisma, (tx) =>
-    character.createCharacter(tx, { accountId, vocation: 'KNIGHT', name: 'Knight', at: T0 }),
+    character.createCharacter(tx, {
+      accountId,
+      vocation: 'KNIGHT',
+      name: 'Knight',
+      baseLevel: ORIGIN_LEVEL,
+      at: T0,
+    }),
   );
   const druid = await withTransaction(prisma, (tx) =>
-    character.createCharacter(tx, { accountId, vocation: 'DRUID', name: 'Druid', at: T0 }),
+    character.createCharacter(tx, {
+      accountId,
+      vocation: 'DRUID',
+      name: 'Druid',
+      baseLevel: ORIGIN_LEVEL,
+      at: T0,
+    }),
   );
 
   const activityId = await withTransaction(prisma, (tx) =>
     activity.startSessionBound(tx, {
       accountId,
       activityTypeKey: activity.HUNT,
+      contentKey: T_HUNT_KEY,
       contentVersion: toContentVersion('v1'),
       participants: [knight, druid],
       claimHolderSessionId: toSessionId('session-1'),

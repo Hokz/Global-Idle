@@ -217,6 +217,7 @@ describe('§14.2 activity integrity', () => {
           activityTypeKey: 'hunt',
           family: 'SESSION_BOUND',
           contentVersion: 'v1',
+          contentKey: 'hunt.rookgaard.sewers',
           createdAt: T0,
         },
       });
@@ -266,6 +267,7 @@ describe('§14.2 activity integrity', () => {
           activityTypeKey: 'skill-training',
           family: 'WALL_CLOCK',
           contentVersion: 'v1',
+          contentKey: 'hunt.rookgaard.sewers',
           createdAt: T0,
         },
       });

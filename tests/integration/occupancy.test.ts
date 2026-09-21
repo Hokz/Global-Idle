@@ -10,6 +10,8 @@ import {
   minutes,
 } from '@global-idle/shared';
 import {
+  T_HUNT_KEY,
+  T_TRAINING_KEY,
   T0,
   createClient,
   expectDomainError,
@@ -27,7 +29,9 @@ async function startHunt(accountId: string, characters: string[], session = 'ses
     activity.startSessionBound(tx, {
       accountId: toAccountId(accountId),
       activityTypeKey: activity.HUNT,
+      contentKey: T_HUNT_KEY,
       contentVersion: toContentVersion('v1'),
+      contentKey: 'hunt.rookgaard.sewers',
       participants: characters.map(toCharacterId),
       claimHolderSessionId: toSessionId(session),
       rngSeed: 'seed',
@@ -41,7 +45,9 @@ async function startTraining(accountId: string, trainee: string) {
     activity.startSkillTraining(tx, {
       accountId: toAccountId(accountId),
       activityTypeKey: activity.SKILL_TRAINING,
+      contentKey: T_TRAINING_KEY,
       contentVersion: toContentVersion('v1'),
+      contentKey: 'hunt.rookgaard.sewers',
       trainee: toCharacterId(trainee),
       at: T0,
     }),
@@ -352,6 +358,7 @@ describe('§14.3 occupancy', () => {
         activityTypeKey: 'hunt',
         family: 'SESSION_BOUND',
         contentVersion: 'v1',
+        contentKey: 'hunt.rookgaard.sewers',
         createdAt: T0,
       },
     });
@@ -373,6 +380,7 @@ describe('§14.3 occupancy', () => {
         activityTypeKey: 'hunt',
         family: 'SESSION_BOUND',
         contentVersion: 'v1',
+        contentKey: 'hunt.rookgaard.sewers',
         createdAt: T0,
       },
     });

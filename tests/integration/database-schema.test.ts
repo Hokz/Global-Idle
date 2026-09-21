@@ -8,6 +8,7 @@ import {
   seedAccount,
   seedCharacter,
   truncateAll,
+  ORIGIN_LEVEL,
   T0,
 } from '../support/db.js';
 import { character, withTransaction } from '@global-idle/domain';
@@ -147,6 +148,7 @@ describe('§14.2 database', () => {
           accountId: toAccountId(account),
           vocation,
           name: vocation,
+          baseLevel: ORIGIN_LEVEL,
           at: new Date(T0.getTime() + index),
         }),
       ).then(

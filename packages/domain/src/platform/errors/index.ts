@@ -13,7 +13,11 @@ export type DomainErrorCode =
   | 'ActivityIntegrityViolation'
   | 'ActivityTypeUnknown'
   | 'RosterCapacityExceeded'
-  | 'InsufficientFunds';
+  | 'InsufficientFunds'
+  | 'OriginCharacterExists'
+  | 'CharacterNameTaken'
+  | 'ContentKindMismatch'
+  | 'HuntNotFound';
 
 export class DomainError extends Error {
   constructor(
@@ -76,6 +80,27 @@ export const rosterCapacityExceeded = (details: Record<string, unknown> = {}) =>
 
 export const insufficientFunds = (details: Record<string, unknown> = {}) =>
   new DomainError('InsufficientFunds', 'The account balance would go negative.', details);
+
+/** I1b (Phase 1 §13.2): an account may hold at most one playable Origin
+ *  Character — the un-vocationalized Level-1 one. Further Characters are
+ *  vocation UNLOCKS starting at Level 8, which Phase 1 does not implement. */
+export const originCharacterExists = (details: Record<string, unknown> = {}) =>
+  new DomainError(
+    'OriginCharacterExists',
+    'This account already has its Origin Character.',
+    details,
+  );
+
+export const characterNameTaken = (details: Record<string, unknown> = {}) =>
+  new DomainError('CharacterNameTaken', 'That name is already used on this account.', details);
+
+/** The content key resolved, but to the wrong KIND — a marker where a hunt was
+ *  required. Shape is a database CHECK; kind lives in a bundle (§9.5). */
+export const contentKindMismatch = (details: Record<string, unknown> = {}) =>
+  new DomainError('ContentKindMismatch', 'That content key is not a hunt.', details);
+
+export const huntNotFound = (details: Record<string, unknown> = {}) =>
+  new DomainError('HuntNotFound', 'No such hunt in the pinned content bundle.', details);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // What the DATABASE refused, read structurally (§8.3, §8.4)
@@ -145,6 +170,15 @@ function sqlState(error: unknown): string | undefined {
  * available, the table alone decides; when neither is, this returns false and
  * the original error propagates untouched — mislabelling is the worse failure.
  */
+/** Did the database refuse this INSERT because the account already holds a
+ *  playable Origin Character (I1b)? Same structural reading as
+ *  {@link isOccupancyUniqueViolation}, and just as narrow. */
+export function isOriginCharacterViolation(error: unknown): boolean {
+  const candidate = error as DriverRefusal;
+  const isUnique = candidate?.code === 'P2002' || sqlState(error) === UNIQUE_VIOLATION;
+  return isUnique && refusal(error)?.constraint?.index === 'Character_accountId_key';
+}
+
 export function isOccupancyUniqueViolation(error: unknown): boolean {
   const candidate = error as DriverRefusal;
   const isUnique = candidate?.code === 'P2002' || sqlState(error) === UNIQUE_VIOLATION;

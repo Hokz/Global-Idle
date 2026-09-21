@@ -10,7 +10,13 @@
  * | Unlock-set cardinality  | a set not containing EXACTLY FIVE keys         |
  * | Orphan detection        | WARNING ONLY — content is often authored ahead |
  */
-import { bundleSourceSchema, type BundleSource } from './schema.js';
+import {
+  atlasMarkerSchema,
+  bundleSourceSchema,
+  huntSchema,
+  regionSchema,
+  type BundleSource,
+} from './schema.js';
 
 export const POWERFUL_IMBUEMENT_SET_SIZE = 5;
 
@@ -53,6 +59,73 @@ export function validateBundleSource(input: unknown): ValidationResult {
       });
     }
     defined.add(definition.key);
+  }
+
+  // ── Phase 1 kinds (spec §10.2) ──────────────────────────────────────────
+  // A definition whose `kind` names a Phase 1 shape must satisfy that shape,
+  // and its pointers must point at the RIGHT KIND. "Resolves" is not enough:
+  // a marker targeting a region instead of a hunt resolves perfectly and is
+  // still wrong, and the client would discover it at render time.
+  const kindOf = new Map(source.definitions.map((d) => [d.key, d.kind]));
+  const schemaFor = {
+    region: regionSchema,
+    'atlas-marker': atlasMarkerSchema,
+    hunt: huntSchema,
+  } as const;
+
+  for (const definition of source.definitions) {
+    const schema = schemaFor[definition.kind as keyof typeof schemaFor];
+    if (!schema) continue;
+    const typed = schema.safeParse(definition);
+    if (!typed.success) {
+      for (const issue of typed.error.issues) {
+        issues.push({
+          severity: 'error',
+          check: `kind-conformance:${definition.kind}`,
+          message: `${definition.key}.${issue.path.join('.') || '(root)'}: ${issue.message}`,
+        });
+      }
+      continue;
+    }
+
+    const expect = (pointer: string, field: string, wanted: string): void => {
+      const actual = kindOf.get(pointer);
+      if (actual !== undefined && actual !== wanted) {
+        issues.push({
+          severity: 'error',
+          check: 'reference-kind',
+          message: `${definition.key}.${field} points at ${pointer}, which is a ${actual}, not a ${wanted}`,
+        });
+      }
+    };
+
+    if (typed.data.kind === 'atlas-marker') {
+      expect(typed.data.region, 'region', 'region');
+      expect(typed.data.target, 'target', 'hunt');
+      const region = source.definitions.find((d) => d.key === typed.data.region);
+      const regionTyped = region ? regionSchema.safeParse(region) : undefined;
+      if (regionTyped?.success) {
+        const { x, y, width, height } = regionTyped.data.atlas;
+        const p = typed.data.position;
+        if (p.x < x || p.x > x + width || p.y < y || p.y > y + height) {
+          issues.push({
+            severity: 'error',
+            check: 'marker-bounds',
+            message: `${definition.key} sits at (${p.x}, ${p.y}), outside ${regionTyped.data.key}`,
+          });
+        }
+      }
+    }
+
+    if (typed.data.kind === 'hunt') expect(typed.data.region, 'region', 'region');
+
+    if (typed.data.kind === 'region' && typed.data.minZoom > typed.data.maxZoom) {
+      issues.push({
+        severity: 'error',
+        check: 'region-zoom',
+        message: `${definition.key}: minZoom ${typed.data.minZoom} exceeds maxZoom ${typed.data.maxZoom}`,
+      });
+    }
   }
 
   for (const definition of source.definitions) {
