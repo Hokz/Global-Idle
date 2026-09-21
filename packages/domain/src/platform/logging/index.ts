@@ -109,6 +109,15 @@ export type DomainLogEvent =
       readonly accountId: string;
     }
   | {
+      /** Phase 2. A Hunt run stopped, and why. */
+      readonly kind: 'hunt.ended';
+      readonly activityId: string;
+      readonly characterId: string;
+      readonly reason: string;
+      readonly room: number;
+      readonly cycle: number;
+    }
+  | {
       readonly kind: 'activity.transition';
       readonly activityId: string;
       readonly family: string;

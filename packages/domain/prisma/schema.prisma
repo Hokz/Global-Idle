@@ -173,6 +173,10 @@ model Character {
   /// Phase 1. Origin Characters start at 1; an unlocked Character will start at
   /// 8 (DOMAIN_MODEL.md §5.5). CHECK (baseLevel >= 1) is hand-written.
   baseLevel Int       @default(1)
+  /// Phase 2. DURABLE Base XP. The level above is derived from it through the
+  /// Canary curve and stored alongside so a read does not have to compute it;
+  /// the XP is the truth and the level is its consequence.
+  baseXp    BigInt    @default(0)
   createdAt DateTime
   /// ADR-007: retirement, not deletion. A Character is never hard-deleted
   /// (I12) — history stays referentially intact.
@@ -181,6 +185,7 @@ model Character {
   account      Account              @relation(fields: [accountId], references: [id])
   stamina      CharacterStamina?
   participants ActivityParticipant[]
+  huntRuns     HuntRun[]
 
   /// I1 — one PLAYABLE (non-retired) Character per vocation per account.
   /// Object form: the pinned Prisma accepts null equality here, so no raw()
@@ -237,6 +242,7 @@ model Activity {
   sessionBound  SessionBoundActivity?
   skillTraining SkillTrainingActivity?
   participants  ActivityParticipant[]
+  huntRun       HuntRun?
 
   /// Composite FK targets. Every projection of a root fact is chained back to
   /// it, so it cannot be written with a value the root does not have (§6.3.1).
@@ -270,6 +276,65 @@ model SessionBoundActivity {
   /// raw() because the object form has no IN (§3.8, tests D10 and D13).
   @@unique([accountId], where: raw("state IN ('ONLINE_ACTIVE', 'RECONNECT_GRACE_PAUSED')"))
   @@map("SessionBoundActivity")
+}
+
+/// Phase 2 — the durable state of one Hunt run (Phase 2 spec §9).
+///
+/// One row per Activity, holding the POSITION of the simulation rather than a
+/// process running it: `tick` and `simulatedThrough` are what an
+/// advance-on-read resumes from, and they are what makes a restart produce the
+/// same future rather than a different one (ADR-015, P2-D1).
+///
+/// Nothing presentational lives here. Positions, sprites and animation phases
+/// are the client's to derive from this.
+model HuntRun {
+  activityId  String @id
+  characterId String
+
+  /// Current room, and completed clears of the endless one.
+  room  Int
+  cycle Int @default(0)
+
+  /// Simulated ticks, and the instant they reach. `simulatedThrough` never
+  /// advances while the run is paused, which is what makes reconnect grace
+  /// cost nothing.
+  tick             Int
+  simulatedThrough DateTime
+
+  characterHealth         Int
+  characterNextAttackTick Int      @default(0)
+  supplyCharges           Int
+  /// The living encounter: `[{ key, health, nextAttackTick }]`. Json because
+  /// it is an opaque, versioned snapshot of engine state, never queried by
+  /// field and never joined to.
+  creatures               Json
+
+  /// This run's earnings, for display. The DURABLE totals are Character.baseXp
+  /// and the currency ledger; these are a session view, not a second truth.
+  sessionXp   BigInt @default(0)
+  sessionGold BigInt @default(0)
+
+  /// Monotonic. Each settlement derives its operation id from it, so a retry
+  /// of checkpoint N is a no-op (§9).
+  checkpointSequence Int @default(0)
+
+  /// The last heartbeat. Liveness is a heartbeat rather than a socket (P2-D7).
+  lastSeenAt DateTime
+
+  endedReason HuntEndReason?
+  endedAt     DateTime?
+
+  activity  Activity  @relation(fields: [activityId], references: [id])
+  character Character @relation(fields: [characterId], references: [id])
+
+  @@index([characterId])
+  @@map("HuntRun")
+}
+
+enum HuntEndReason {
+  DIED
+  LEFT
+  GRACE_EXPIRED
 }
 
 model SkillTrainingActivity {

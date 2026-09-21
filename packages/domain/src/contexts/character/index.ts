@@ -23,3 +23,6 @@ export type {
   StaminaMode,
   StaminaSegment,
 } from './stamina/index.js';
+
+export { settleStamina } from './stamina/settlement.js';
+export type { SettleStaminaInput, StaminaSettlement } from './stamina/settlement.js';
