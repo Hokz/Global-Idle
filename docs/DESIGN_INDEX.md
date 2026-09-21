@@ -100,6 +100,7 @@ everything under `docs/design/`:
 | `docs/architecture/ARCHITECTURE_OVERVIEW.md` | **Technical architecture — entry point.** The Phase 0A package (`ARCHITECTURE_APPROVED`): domain model, boundaries, persistence, lifecycle, engine, content, economy integrity, operations, and all 18 `ACCEPTED` ADRs (`ADR-001`–`ADR-017` from Phase 0A, `ADR-018` from the Phase 0B specification) |
 | `docs/specs/phase-0b/PHASE_0B_TECHNICAL_FOUNDATION_SPEC.md` | **Phase 0B implementation specification** — tooling, workspace boundaries, primitive contracts, test matrix and Definition of Done (**`VERIFIED`**) |
 | `docs/specs/phase-0b/PHASE_0B_FOUNDATION_REVIEW.md` | **Phase 0B evidence** — the 92-case matrix, an ADR-by-ADR trace, §16 line by line, and every autonomous implementation decision (**`VERIFIED`**, accepted 2026-09-21) |
+| `docs/specs/phase-1/PHASE_1_WORLD_CHARACTER_VERTICAL_SLICE_SPEC.md` | **Phase 1 implementation specification** — the first visible vertical slice: account/session, character, World Atlas shell, Rookgaard, one Hunt entry (`IMPLEMENTATION_SPEC_DRAFT`) |
 | `docs/ARCHITECTURE.md` | Phase 0 product-level sketch, superseded in detail by the package above |
 | `docs/MVP_SCOPE.md` | First playable vertical slice |
 | `docs/ECONOMY.md` | Economy principles, sinks and transaction rules |

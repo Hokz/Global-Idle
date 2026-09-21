@@ -179,6 +179,9 @@ content bundles, transactions — are implemented and independently reviewed. **
 not build parallel replacements.**
 
 Do not import the entire content universe or build the entire game at once. In particular,
+Phase 1 specification:
+`docs/specs/phase-1/PHASE_1_WORLD_CHARACTER_VERTICAL_SLICE_SPEC.md`.
+
 Phase 1 does **not** include the Hunt simulator, combat, loot, itemization, party gameplay or
 the five vocation kits — those are Phase 2 and later.
 

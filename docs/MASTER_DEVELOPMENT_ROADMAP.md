@@ -461,6 +461,9 @@ a disconnected character.
 - CI.
 
 ### Phase 1 — World/character vertical slice — current phase
+- implementation specification:
+  [`docs/specs/phase-1/PHASE_1_WORLD_CHARACTER_VERTICAL_SLICE_SPEC.md`](specs/phase-1/PHASE_1_WORLD_CHARACTER_VERTICAL_SLICE_SPEC.md)
+  (`IMPLEMENTATION_SPEC_DRAFT` — awaiting independent review);
 - account;
 - character;
 - vocation;
