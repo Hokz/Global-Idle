@@ -251,10 +251,16 @@ module.exports = {
         "pnpm's isolated linker is refusing to hoist into existence (§3.1). Both are errors. " +
         'This is also what makes test W7 bite: apps/web importing @global-idle/domain cannot ' +
         'resolve, because domain is not one of its declared dependencies — without this rule ' +
-        'the violation would simply produce no edge and no finding.',
+        'the violation would simply produce no edge and no finding.\n\n' +
+        'The generated Prisma client is exempt, and must be: the cruise already EXCLUDES that ' +
+        'tree from the graph, so whether it has been generated is not a boundary question — it ' +
+        "is §13 check 4's question, and check 4 runs AFTER check 3. Measured: on a clean " +
+        'checkout, `pnpm boundaries` reported five unresolvable imports of ' +
+        '../../generated/prisma/client.js, which is an ordering artefact and not a violation. ' +
+        'Once generation has run the import resolves and the exemption applies to nothing.',
       severity: 'error',
       from: {},
-      to: { couldNotResolve: true },
+      to: { couldNotResolve: true, pathNot: '(^|/)generated/prisma/' },
     },
     {
       name: 'no-circular',
