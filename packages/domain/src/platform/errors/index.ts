@@ -77,6 +77,84 @@ export const rosterCapacityExceeded = (details: Record<string, unknown> = {}) =>
 export const insufficientFunds = (details: Record<string, unknown> = {}) =>
   new DomainError('InsufficientFunds', 'The account balance would go negative.', details);
 
+// ─────────────────────────────────────────────────────────────────────────────
+// What the DATABASE refused, read structurally (§8.3, §8.4)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** PostgreSQL class 23 — integrity constraint violation. */
+const UNIQUE_VIOLATION = '23505';
+
+/**
+ * The OccupancyClaim uniqueness constraints, BY NAME.
+ *
+ * `OccupancyClaim_pkey` is the primary key on `characterId` — I13 itself, and
+ * the one a lost race actually trips, whichever activity the winner claimed
+ * for. The composite is the redundant unique index Prisma requires on the
+ * defining side of the 1:1; it guards the same thing, so it counts too.
+ */
+const OCCUPANCY_UNIQUE_CONSTRAINTS = new Set([
+  'OccupancyClaim_pkey',
+  'OccupancyClaim_activityId_characterId_key',
+]);
+
+interface DriverRefusal {
+  readonly code?: string;
+  readonly meta?: {
+    readonly code?: string;
+    readonly driverAdapterError?: {
+      readonly cause?: {
+        readonly originalCode?: string;
+        readonly constraint?: { readonly index?: string };
+        readonly table?: string;
+      };
+    };
+  };
+}
+
+const refusal = (error: unknown) => (error as DriverRefusal)?.meta?.driverAdapterError?.cause;
+
+/** The SQLSTATE the database raised, never the prose around it. */
+function sqlState(error: unknown): string | undefined {
+  const candidate = error as DriverRefusal;
+  return (
+    refusal(error)?.originalCode ??
+    candidate?.meta?.code ??
+    (typeof candidate?.code === 'string' && /^[0-9A-Z]{5}$/.test(candidate.code)
+      ? candidate.code
+      : undefined)
+  );
+}
+
+/**
+ * Did the database refuse this write because a Character ALREADY HOLDS a
+ * claim — and nothing else?
+ *
+ * This predicate is deliberately narrow. `acquire` translates what it matches
+ * into a typed `OccupancyConflict` and counts it in
+ * `occupancy_conflicts_total`, so anything it matches wrongly becomes both a
+ * lie to the caller and a lie in the metric: a foreign-key violation, a
+ * connection failure or a permission error is not player contention, and a
+ * SERIALIZATION FAILURE belongs to the retry layer (§8.3) — swallowing one
+ * here would turn a retryable transaction into a spurious domain error.
+ *
+ * Measured against Prisma 7.10 with `@prisma/adapter-pg`: a lost race arrives
+ * as P2002 with SQLSTATE 23505 and
+ * `meta.driverAdapterError.cause.constraint.index` naming the constraint.
+ * `meta.target` is NOT populated by this adapter, which is why nothing here
+ * reads it. When the SQLSTATE says unique violation but no constraint name is
+ * available, the table alone decides; when neither is, this returns false and
+ * the original error propagates untouched — mislabelling is the worse failure.
+ */
+export function isOccupancyUniqueViolation(error: unknown): boolean {
+  const candidate = error as DriverRefusal;
+  const isUnique = candidate?.code === 'P2002' || sqlState(error) === UNIQUE_VIOLATION;
+  if (!isUnique) return false;
+
+  const constraint = refusal(error)?.constraint?.index;
+  if (typeof constraint === 'string') return OCCUPANCY_UNIQUE_CONSTRAINTS.has(constraint);
+  return refusal(error)?.table === 'OccupancyClaim';
+}
+
 /**
  * `StaminaExhausted` is deliberately NOT here. ADR-014 and
  * ACTIVITY_OCCUPANCY_AND_TIMERS.md §2.3 make it a STATE, not an error: it

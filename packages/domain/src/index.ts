@@ -118,5 +118,5 @@ export {
 } from './platform/redis/index.js';
 export type { RedisKeyFamily, RedisPort } from './platform/redis/index.js';
 
-export { DomainError } from './platform/errors/index.js';
+export { DomainError, isOccupancyUniqueViolation } from './platform/errors/index.js';
 export type { DomainErrorCode } from './platform/errors/index.js';

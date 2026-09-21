@@ -185,6 +185,8 @@ contradicts an accepted ADR.
 | i28 | An **observability port** in `platform/observability`, bound by each composition root | §12.3's counters and §12.2's events are reported by domain code that must not import `prom-client` or hold a logger (§5.2). The port is the boundary: `domain event → port → adapter`. The default is a no-op, so a process that binds nothing still works and a test binds its own and sees only its own |
 | i29 | Domain events are **buffered and emitted after the transaction commits** | a domain operation runs inside a transaction that may still roll back. One buffer per ATTEMPT, established by `withTransaction`, because a retried attempt's writes are gone and its events must go with them. A "success" line for a vanished row is worse than no line |
 | i30 | W12 runs **`pnpm test`**, and forwards `GLOBAL_IDLE_TEST_*` into the scratch checkout | §16 criterion 1 names the root command; hand-picking projects tests an approximation of the public interface instead of the interface. The nested run therefore includes the database suites, which need services: with a Docker daemon it brings its own up, and where the documented escape hatch is in use instead it has to be handed down, because `runClean` strips the environment on purpose |
+| i32 | `isOccupancyUniqueViolation` in `platform/errors`, matched on the **constraint name** | `acquire` turns what it matches into a typed conflict AND a `occupancy_conflicts_total` increment, so a broad predicate lies twice. Measured against Prisma 7.10 + `@prisma/adapter-pg`: a lost race is P2002 / SQLSTATE 23505 with `meta.driverAdapterError.cause.constraint.index` naming `OccupancyClaim_pkey`. `meta.target` is **not** populated by this adapter, which is why nothing reads it. Anything else — a foreign key, a dead connection, a serialization failure the retry layer owns (§8.3) — propagates untouched |
+| i33 | `reconcileStranded` deletes with `DELETE … RETURNING`, matched on the **(character, activity) pair** | the §12.2 event has to describe what this transaction actually released. Under ReadCommitted a candidate can be gone by the time the delete runs, so counting candidates would record a release that never happened; matching the pair rather than the Character alone also leaves a claim re-acquired for a live activity where it is. One event per activity, because a sweep can strand claims from several at once and a single aggregate filed under an arbitrary id is a false record |
 | i31 | The developer-bootstrap verification is a **script and a CI job of its own**, not a case in the test matrix | it runs `docker compose up`, so it cannot share a runner with the job whose PostgreSQL service already holds 5432, and putting it in the integration project would make `pnpm test` — which W12 now nests — require compose. §15's 0B.10 allows a dedicated step for exactly this |
 
 ---
@@ -198,7 +200,7 @@ is.
 | Claim | Status |
 |---|---|
 | **CI is green** (§16 criterion 19) | **VERIFIED** — [run 35550647692](https://github.com/Hokz/Global-Idle/actions/runs/35550647692), all thirteen checks. It took three runs; the three defects are i25, i26 and i27 |
-| **Integration tests under Testcontainers** (§16 criterion 7) | **VERIFIED in CI.** The `GLOBAL_IDLE_TEST_*` escape hatch is deliberately absent from the workflow, so Testcontainers was the only path. Locally it still cannot run — this environment has no Docker daemon — and the escape hatch exists for exactly that |
+| **Integration tests under Testcontainers** (§16 criterion 7) | **VERIFIED in CI.** The `GLOBAL_IDLE_TEST_*` escape hatch is deliberately absent from the workflow, so Testcontainers was the only path. Locally Testcontainers still cannot run — the daemon starts, but this environment's egress policy refuses Docker Hub image blobs — and the escape hatch exists for exactly that. The suite has since been run here against a local PostgreSQL 16 and Redis through that hatch, which is how the Prisma error shapes behind i32 were measured rather than assumed |
 | **`pnpm dev`** (§11.3, one command to a running stack) | **VERIFIED** — [run 35557424621](https://github.com/Hokz/Global-Idle/actions/runs/35557424621), the `dev-bootstrap` job, which runs `scripts/verify-dev-bootstrap.mjs`. It spawns the REAL `pnpm dev` and waits for every acceptance signal before shutting the stack down: compose healthy, migrations applied *and present in `_prisma_migrations`*, the content bundle built, the seed *present as rows in the database*, `/health/live` and `/health/ready` 200 with all four conditions up, `apps/web` serving 200, the worker booted *and its repeatable sweep registered in the Redis the stack brought up*. It asks the running system wherever it can rather than grepping log lines. Every signal was met, in order, and the stack was torn down with its volumes |
 
 **Locally the bootstrap verification still cannot run**, and fails loudly rather than skipping: this
@@ -206,6 +208,17 @@ environment's egress policy refuses Docker Hub image blobs (`403` on
 `production.cloudfront.docker.com`), so `docker compose up` cannot pull `postgres:16-alpine`.
 The verifier detected `pnpm dev`'s early exit, printed the captured output and exited non-zero —
 which is the behaviour a bootstrap check is for. CI has the images, and is the evidence above.
+
+### One thing found here and deliberately left alone
+
+`isRetryable` (§8.3, `platform/transaction`) reads the SQLSTATE from `code` and `meta.code`.
+Measured against this stack, a deadlock arrives as `code: 'P2010'` with the real SQLSTATE at
+`meta.driverAdapterError.cause.originalCode` — a path that function does not read — and
+`'P2010'` itself matches its five-character SQLSTATE test, so the structural check returns a
+code that is not a SQLSTATE and never matches. **Retries work today only because the message
+regex still matches Prisma's prose.** Behaviour is correct, so this is fragility rather than a
+defect, and rewriting the retry layer was outside this correction pass. Raised here rather than
+changed.
 
 ### Observability is proven by behaviour, not by declaration
 
@@ -215,12 +228,13 @@ operation and then asserts what the **real prom-client registry** and the bound 
 
 | Proven | Case |
 |---|---|
-| `occupancy_conflicts_total` increments on a refused claim, and **not** on an unrelated failure | a second activity claiming the same Character; then an unknown activity type, which never reaches the claim |
+| `occupancy_conflicts_total` increments on a refused claim, and **not** on an unrelated failure | a second activity claiming the same Character; an unknown activity type, which never reaches the claim; and a **real foreign-key violation inside the insert itself**, which propagates as P2003 and is not counted |
 | `settlement_duration_seconds` observes **every** settlement | a first settlement and its idempotent replay — two observations, zero failures |
 | `settlement_failures_total` counts a real failure only | a settlement statement that violates `NOT NULL` |
 | `idempotency_replays_total` / `idempotency_conflicts_total` are counted separately | the same key replayed, then reused with a different fingerprint |
 | `economy.operation` carries its operation id | a committed posting |
 | `occupancy.acquired` / `occupancy.released` | a real activity start and end |
+| `occupancy.released` on the **reconciliation** path, one event per activity | a stranded party of two and a stranded solo swept in one call: two events, `2` and `1`, not one aggregate of `3` |
 | `activity.transition` | start, grace and end |
 | `session.evicted` **only when a holder actually loses the claim** | a transfer, then re-asserting the same holder |
 | `entitlement.transition` | grant and revoke |
@@ -229,7 +243,10 @@ operation and then asserts what the **real prom-client registry** and the bound 
 **These cases were shown to bite.** Removing `metrics.occupancyConflict()` and the ledger's
 `recordDomainEvent` failed exactly those two cases and no others; silencing the port entirely
 failed nine of the ten, the tenth being the rollback case, which correctly still passes when
-nothing is emitted.
+nothing is emitted. The seven cases added by the second correction pass were checked the same
+way: restoring the over-broad `catch` failed the foreign-key case alone; deleting the
+reconciliation events failed the two that assert them; and replacing them with a single
+aggregate event failed the per-activity case and nothing else.
 
 > A first attempt at that check appeared to show the tests passing without the instrumentation.
 > It was wrong: Vitest resolves internal packages through their built `exports` (§3.7), so the

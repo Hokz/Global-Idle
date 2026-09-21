@@ -8,7 +8,7 @@
  * than from a column that could have drifted.
  */
 import type { CharacterId, Instant } from '@global-idle/shared';
-import { occupancyConflict } from '../../platform/errors/index.js';
+import { isOccupancyUniqueViolation, occupancyConflict } from '../../platform/errors/index.js';
 import { metrics, recordDomainEvent } from '../../platform/observability/index.js';
 import { lockCharactersInOrder, type UnitOfWork } from '../../platform/transaction/index.js';
 
@@ -60,6 +60,14 @@ export async function acquire(
     // constraint is the real guard; the read above only produces a better
     // message. This is translated to a typed conflict and NOT retried blindly
     // — the caller decides (§8.3).
+    //
+    // ONLY that constraint. Catching every failure here would dress a foreign
+    // key violation, a dead connection or a permission error as player
+    // contention, and `occupancy_conflicts_total` would quietly become a
+    // database-health metric (§12.3). Worse, it would swallow the
+    // SERIALIZATION FAILURES the transaction layer owns (§8.3): a retryable
+    // transaction would surface as a domain error that never retries.
+    if (!isOccupancyUniqueViolation(error)) throw error;
     metrics.occupancyConflict();
     throw occupancyConflict({
       activityId,
@@ -171,10 +179,42 @@ export async function reconcileStranded(tx: UnitOfWork): Promise<ReleasedClaim[]
     if (!live) released.push({ ...claim, reason: 'activity-terminal' });
   }
 
-  if (released.length > 0) {
-    await tx.occupancyClaim.deleteMany({
-      where: { characterId: { in: released.map((claim) => claim.characterId) } },
-    });
+  if (released.length === 0) return [];
+
+  // DELETE ... RETURNING, so what follows describes what this transaction
+  // ACTUALLY removed rather than what it decided to remove. Under
+  // ReadCommitted a candidate can be gone by the time the delete runs, and an
+  // event counting candidates would then record a release that never
+  // happened. Matching on the PAIR rather than the Character alone also means
+  // a claim re-acquired for a live activity in the meantime is left where it
+  // is instead of being swept away by a decision made before it existed.
+  const deleted = await tx.$queryRawUnsafe<{ characterId: string; activityId: string }[]>(
+    `DELETE FROM "OccupancyClaim"
+      WHERE ("characterId", "activityId")
+         IN (SELECT * FROM UNNEST($1::text[], $2::text[]))
+  RETURNING "characterId", "activityId"`,
+    released.map((claim) => claim.characterId),
+    released.map((claim) => claim.activityId),
+  );
+
+  const candidates = new Map(released.map((claim) => [claim.characterId, claim]));
+  const actual = deleted
+    .map((row) => candidates.get(row.characterId))
+    .filter((claim): claim is ReleasedClaim => claim !== undefined);
+  if (actual.length === 0) return [];
+
+  // §12.2 logs claim release on EVERY path that releases one, and this is the
+  // recovery path — the one where an absent event matters most. ONE EVENT PER
+  // ACTIVITY: a sweep can strand claims from several at once, and a single
+  // aggregate filed under an arbitrary activity id would be a false record of
+  // what happened to each.
+  const perActivity = new Map<string, number>();
+  for (const claim of actual) {
+    perActivity.set(claim.activityId, (perActivity.get(claim.activityId) ?? 0) + 1);
   }
-  return released;
+  for (const [activityId, count] of [...perActivity].sort(([a], [b]) => a.localeCompare(b))) {
+    recordDomainEvent({ kind: 'occupancy.released', activityId, released: count });
+  }
+
+  return actual;
 }
