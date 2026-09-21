@@ -94,19 +94,24 @@ test.describe('Phase 1 vertical slice', () => {
       await expect(details).toContainText('Rat');
     });
 
-    await test.step('E2E9: ENTER creates a real pre-combat Activity', async () => {
+    await test.step('E2E9: ENTER creates a real Activity, in the pre-consumption state', async () => {
       await page.getByTestId('enter').click();
-      await expect(page.getByTestId('pre-combat')).toBeVisible();
-      await expect(page.getByTestId('pre-combat')).toContainText('Combat arrives in Phase 2');
-      // The documented pre-consumption state: NEUTRAL, and still 42:00.
+      // PHASE 2 REPLACED THE SURFACE THIS STEP USED TO NAME. Phase 1 shipped a
+      // placeholder that said "combat arrives in Phase 2"; Phase 2's approved
+      // spec §10 replaces it with the Game Window. What this step CLAIMS is
+      // unchanged and is still Phase 1's: ENTER creates a real Activity and
+      // the Character is in it, occupied, with Stamina NEUTRAL and untouched
+      // until the first qualifying XP.
+      await expect(page.getByTestId('game-window')).toBeVisible();
+      await expect(page.getByTestId('game-window')).toContainText('Rookgaard Sewers');
       await expect(page.getByTestId('stamina')).toContainText('NEUTRAL');
       await expect(page.getByTestId('stamina')).toContainText('42:00');
     });
 
     await test.step('E2E10: RELOAD returns to the same Hunt, and LEAVE releases it', async () => {
       await page.reload();
-      await expect(page.getByTestId('pre-combat')).toBeVisible();
-      await expect(page.getByTestId('pre-combat')).toContainText('Rookgaard Sewers');
+      await expect(page.getByTestId('game-window')).toBeVisible();
+      await expect(page.getByTestId('game-window')).toContainText('Rookgaard Sewers');
 
       await page.getByTestId('leave').click();
       await expect(page.getByTestId('atlas')).toBeVisible();
@@ -114,17 +119,22 @@ test.describe('Phase 1 vertical slice', () => {
     });
   });
 
-  test('no Phase 2 gameplay is present on the pre-combat surface', async ({ page }) => {
+  test('no LATER phase leaks into the Hunt surface', async ({ page }) => {
+    // The Phase 1 version of this guard named Phase 2's vocabulary, because
+    // Phase 2 had not happened. It has, so the guard moves forward with the
+    // code rather than being deleted: the surface must not ship Phase 3's
+    // itemization — inventory, equipment, loot, rarity — nor any shadow
+    // version of it. Phase 2 §1.2 creates none of them.
     const who = handle();
     await signIn(page, who);
     await createCharacter(page, 'Scout');
     await page.getByTestId('marker-marker.rookgaard.sewers').click();
     await page.getByTestId('enter').click();
-    await expect(page.getByTestId('pre-combat')).toBeVisible();
+    await expect(page.getByTestId('game-window')).toBeVisible();
 
     const body = (await page.locator('body').innerText()).toLowerCase();
-    for (const forbidden of ['xp', 'damage', 'loot', 'gold', 'room ', 'supplies']) {
-      expect(body, `Phase 2 vocabulary leaked: ${forbidden}`).not.toContain(forbidden);
+    for (const forbidden of ['inventory', 'equip', 'loot', 'rarity', 'backpack', 'affix']) {
+      expect(body, `a later phase's vocabulary leaked: ${forbidden}`).not.toContain(forbidden);
     }
     await page.getByTestId('leave').click();
   });
