@@ -119,29 +119,33 @@ function redis(...args) {
 async function shutDown() {
   if (child && child.exitCode === null) {
     say('stopping the stack');
-    // SIGTERM to the whole group. Measured, rather than assumed:
+    // SIGTERM to the whole group, then SIGKILL. All three behaviours below
+    // were MEASURED on CI rather than assumed, and the third is the one this
+    // settles on:
     //
-    // - SIGINT to the `pnpm` wrapper does not reach dev.mjs at all, so its own
-    //   handler never runs and the grace period is pure waiting;
-    // - SIGINT to the GROUP does reach everything, but `node --watch` answers
-    //   it with an FSWatcher assertion and a core dump. Harmless after the
-    //   verification has finished, and alarming in a green log.
+    // - SIGINT to the `pnpm` wrapper never reaches the node process under it,
+    //   so nothing happens and the grace period is pure waiting;
+    // - SIGINT to the GROUP reaches everything, and `node --watch` answers it
+    //   with an FSWatcher assertion and a core dump — harmless once the
+    //   verification has finished, and alarming in a green log;
+    // - SIGTERM to the GROUP stops the three apps cleanly, with no assertion.
+    //   The orchestrator itself does not then exit, so the bounded SIGKILL
+    //   finishes the job.
     //
-    // SIGTERM reaches dev.mjs and the three watchers directly and is the
-    // signal each of them handles. SIGKILL remains as a bounded fallback,
-    // because a verification that can hang on shutdown is a verification that
-    // can hang.
+    // That last step is not a wart to be tidied away: a verification that can
+    // hang on shutdown is a verification that can hang, and the kill is what
+    // guarantees no orphaned watcher outlives the run.
     try {
       process.kill(-child.pid, 'SIGTERM');
     } catch {
       /* already gone */
     }
 
-    for (let waited = 0; waited < 10_000 && child.exitCode === null; waited += 250) {
+    for (let waited = 0; waited < 5_000 && child.exitCode === null; waited += 250) {
       await sleep(250);
     }
     if (child.exitCode === null) {
-      say('the stack did not stop on SIGTERM; killing the process group');
+      say('apps stopped; killing the remaining process group');
       try {
         process.kill(-child.pid, 'SIGKILL');
       } catch {
