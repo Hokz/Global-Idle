@@ -485,6 +485,13 @@ Hunt-only column would have to be replaced rather than reused.
 **Where it must NOT live:** client state, the URL, Redis, the idempotency result JSON, or a log
 line. Each of those loses the fact on the exact failure the durability exists for.
 
+**No new resolution machinery is needed**, which is part of why this design is small. Phase 0B's
+`ContentBundleResolver` already exposes `resolve(version)` — documented as *"any referenced
+version, not merely the current one (`ADR-016`)"* — and a resolved bundle carries its definitions
+as a `ReadonlyMap` keyed by content key. So *"resolve `contentKey` in the Activity's own pinned
+`contentVersion`"* is one existing call plus one map lookup, and `ADR-016` (a referenced bundle is
+never garbage-collected) is what keeps an old Activity readable after the bundle moves on.
+
 **Creation transaction.** Inside the single transaction that already starts the Activity:
 resolve the bundle pinned for this Activity → look up `contentKey` in it → assert `kind` matches
 the activity type → assert `availability = AVAILABLE` → write the row. A key that does not resolve
