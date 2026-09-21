@@ -199,13 +199,13 @@ is.
 |---|---|
 | **CI is green** (§16 criterion 19) | **VERIFIED** — [run 35550647692](https://github.com/Hokz/Global-Idle/actions/runs/35550647692), all thirteen checks. It took three runs; the three defects are i25, i26 and i27 |
 | **Integration tests under Testcontainers** (§16 criterion 7) | **VERIFIED in CI.** The `GLOBAL_IDLE_TEST_*` escape hatch is deliberately absent from the workflow, so Testcontainers was the only path. Locally it still cannot run — this environment has no Docker daemon — and the escape hatch exists for exactly that |
-| **`pnpm dev`** (§11.3, one command to a running stack) | **COVERED BY CI — first run pending at the time of writing**, in the `dev-bootstrap` job, which runs `scripts/verify-dev-bootstrap.mjs`. It spawns the REAL `pnpm dev` and waits for every acceptance signal before shutting the stack down: compose healthy, migrations applied *and present in `_prisma_migrations`*, the content bundle built, the seed *present as rows in the database*, `/health/live` and `/health/ready` 200 with all four conditions up, `apps/web` serving 200, the worker booted *and its repeatable sweep registered in the Redis the stack brought up*. It asks the running system wherever it can rather than grepping log lines |
+| **`pnpm dev`** (§11.3, one command to a running stack) | **VERIFIED** — [run 35557424621](https://github.com/Hokz/Global-Idle/actions/runs/35557424621), the `dev-bootstrap` job, which runs `scripts/verify-dev-bootstrap.mjs`. It spawns the REAL `pnpm dev` and waits for every acceptance signal before shutting the stack down: compose healthy, migrations applied *and present in `_prisma_migrations`*, the content bundle built, the seed *present as rows in the database*, `/health/live` and `/health/ready` 200 with all four conditions up, `apps/web` serving 200, the worker booted *and its repeatable sweep registered in the Redis the stack brought up*. It asks the running system wherever it can rather than grepping log lines. Every signal was met, in order, and the stack was torn down with its volumes |
 
-**Locally the bootstrap verification cannot run**, and fails loudly rather than skipping: this
+**Locally the bootstrap verification still cannot run**, and fails loudly rather than skipping: this
 environment's egress policy refuses Docker Hub image blobs (`403` on
 `production.cloudfront.docker.com`), so `docker compose up` cannot pull `postgres:16-alpine`.
 The verifier detected `pnpm dev`'s early exit, printed the captured output and exited non-zero —
-which is the behaviour a bootstrap check is for. CI has the images and is the evidence.
+which is the behaviour a bootstrap check is for. CI has the images, and is the evidence above.
 
 ### Observability is proven by behaviour, not by declaration
 

@@ -116,14 +116,32 @@ function redis(...args) {
   return result.status === 0 ? (result.stdout ?? '').trim() : null;
 }
 
-function shutDown() {
+async function shutDown() {
   if (child && child.exitCode === null) {
     say('stopping the stack');
     try {
-      // The whole process group: dev.mjs plus web, api and worker.
-      process.kill(-child.pid, 'SIGINT');
+      // Signal DEV.MJS, not the whole group. It installs its own SIGINT
+      // handler and stops the three apps it spawned, so this exercises the
+      // shutdown path a developer's Ctrl-C takes. Signalling the group
+      // instead tears `node --watch` out from under itself, which it answers
+      // with an FSWatcher assertion and a core dump — harmless after the
+      // verification has finished, and alarming in a green log.
+      child.kill('SIGINT');
     } catch {
       /* already gone */
+    }
+
+    // Bounded: if its own shutdown does not finish, take the group.
+    for (let waited = 0; waited < 15_000 && child.exitCode === null; waited += 250) {
+      await sleep(250);
+    }
+    if (child.exitCode === null) {
+      say('the stack did not stop on its own; signalling the process group');
+      try {
+        process.kill(-child.pid, 'SIGKILL');
+      } catch {
+        /* already gone */
+      }
     }
   }
   // Compose is not the dev script's to clean up, so it is ours. `-v` because
@@ -224,7 +242,7 @@ try {
 } catch (error) {
   failure = error;
 } finally {
-  shutDown();
+  await shutDown();
 }
 
 if (failure) {
