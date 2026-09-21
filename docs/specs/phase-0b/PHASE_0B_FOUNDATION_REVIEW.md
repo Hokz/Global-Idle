@@ -1,6 +1,6 @@
 # Phase 0B — Foundation review
 
-**Status:** `IMPLEMENTATION_COMPLETE — PENDING CI VERIFICATION`
+**Status:** `IMPLEMENTATION_COMPLETE — CI GREEN — PENDING PRODUCT OWNER REVIEW`
 **Specification:** [`PHASE_0B_TECHNICAL_FOUNDATION_SPEC.md`](./PHASE_0B_TECHNICAL_FOUNDATION_SPEC.md) (`IMPLEMENTATION_SPEC_READY`)
 **Branch:** `feat/phase-0b-technical-foundation`
 
@@ -8,10 +8,13 @@ This is work package **0B.11**'s deliverable: the test matrix, an ADR-by-ADR tra
 Definition of Done with evidence rather than assertion, and a list of everything the
 implementation decided on its own.
 
-> **Read the last section first if you are deciding whether Phase 0B is done.** §16 criterion 19
-> — *CI is green* — **cannot be satisfied from the implementation environment**, which has no
-> Docker daemon and cannot run GitHub Actions. Phase 0B is **not `VERIFIED`** until the workflow
-> has run on GitHub and passed.
+> **§16 criterion 19 is now satisfied.** The workflow ran on GitHub and **all thirteen checks
+> passed**, including the Testcontainers suites this environment could not exercise:
+> [run 35550647692](https://github.com/Hokz/Global-Idle/actions/runs/35550647692). It took three attempts, and each failure was a real defect a green
+> local suite could not have shown — §6 records them.
+>
+> Moving Phase 0B itself to `VERIFIED` is the Product Owner's call, not this document's. What
+> this document reports is that every criterion now carries evidence.
 
 ---
 
@@ -97,7 +100,7 @@ constrains.
 | 5a | `apps/worker ↛ apps/api`; no app reaches a context internal | **W10**, **W11** |
 | 5b | The §3.10 contract holds **mechanically** | `.nvmrc` = `24.21.0`; `engines.node` = `>=24.21.0 <25`; `packageManager` = `pnpm@12.5.1`; `pnpm-workspace.yaml` sets `nodeLinker: isolated`, `shamefullyHoist: false`, `engineStrict: true` and an explicit `allowBuilds` map. **Measured:** installing under Node 22.22.2 fails at the `preinstall` guard; removing one `allowBuilds` entry fails the install with `ERR_PNPM_IGNORED_BUILDS`; CI reads `.nvmrc` through `node-version-file` and restates no version |
 | 6 | Unit tests | 23 pass; 3 fixture cases pass |
-| 7 | Integration tests against ephemeral PostgreSQL and Redis | 67 integration and 6 invariant cases pass. **See §6** — they ran against a locally installed PostgreSQL 16 and Redis 7 through the documented escape hatch; the Testcontainers path is CI's, and has not run here |
+| 7 | Integration tests against ephemeral PostgreSQL and Redis | **satisfied.** 67 integration and 6 invariant cases pass **under Testcontainers in CI** ([run](https://github.com/Hokz/Global-Idle/actions/runs/35550647692), checks 10 and 11), and locally against PostgreSQL 16 and Redis 7 through the documented escape hatch |
 | 8 | Deterministic engine fixtures, including across a process restart | **E1**, **E2** — against a **committed golden file**, because two fresh runs of a broken implementation agree with each other perfectly |
 | 9 | Content validation passes; an invalid bundle fails it | `pnpm --filter @global-idle/game-data run validate` exits 0; **measured:** an invalid source exits 1 and names the check. **C1** covers every §10.2 check |
 | 10 | Migrations apply from empty **and** from the previous state | `migrate:check` — **D1**, **D2**; **D13** asserts the generated SQL carries every declared partial-index predicate and both hand-written `CHECK` constraints |
@@ -109,7 +112,7 @@ constrains.
 | 16 | `/health/live` healthy with PostgreSQL down | **H1** |
 | 17 | `/health/ready` fails independently on each of its four conditions | **H2** (PostgreSQL), **H3** (Redis), **H4** (migration version), **H5** (content unavailable *and* invalid). H2 also asserts the control: with everything up, all four report `up` |
 | 18 | The complete §14 matrix — all 92 cases | 92/92, counted (§1 above) |
-| 19 | **CI green, thirteen checks, each the same script a developer runs** | `.github/workflows/ci.yml` has all thirteen. **NOT SATISFIED — see §6.** Every check was run locally and passes; the workflow has never executed on GitHub |
+| 19 | **CI green, thirteen checks, each the same script a developer runs** | **satisfied.** All thirteen green on GitHub: [run 35550647692](https://github.com/Hokz/Global-Idle/actions/runs/35550647692). The same thirteen also pass locally, in the same order, against a genuinely clean checkout |
 | 20 | No accepted architecture invariant contradicted | §2 above, ADR by ADR, with §6.6's deferrals stated rather than overclaimed |
 | 21 | No Hunt balance or gameplay loop | no XP curve, damage formula, loot table or reward multiplier exists. The engine's per-participant draw is **deliberately uninterpreted**; `settleRecovery` produces the 39:00 and Premium **split** and applies no multiplier to it. *Did anything require a balance number to be correct?* **No.** |
 | 22 | No product rule created by this phase | the registry classifies **Hunt and Skill Training only**; there is no Dungeon descriptor, and **T12** proves an unclassified type cannot reach production. *Did anything decide something the Product Owner has not?* **No** — §5 lists every implementation decision, and none is a product rule |
@@ -121,8 +124,7 @@ constrains.
 | 25 | One source of truth for activity types | a frozen code registry, no `ActivityType` table, no content entry — **T16** makes a persisted key the registry does not know a startup refusal |
 | 26 | The `prisma-client` generator's output, in `src/`, compiled by `tsc -b`, wired through `@prisma/adapter-pg`, configured by `prisma.config.ts` | `packages/domain/prisma/schema.prisma` — no `prisma-client-js` generator block exists in the repository — the only occurrences of the name are a comment recording that it is not used, and URLs inside the generated client |
 
-**Twenty-five of twenty-six are satisfied with evidence. Criterion 19 is not, and cannot be from
-here.**
+**All twenty-six are satisfied with evidence.**
 
 ---
 
@@ -183,19 +185,33 @@ contradicts an accepted ADR.
 
 ---
 
-## 6. What is **not** verified here
+## 6. Verification status — including what is still **not** verified
 
-Stated plainly, because a foundation review that overclaims is worse than one that is short.
+Stated plainly, because a foundation review that overclaims is worse than one that is short. Two
+of the three claims below were unverified when this document was first written; the third still
+is.
 
 | Claim | Status |
 |---|---|
-| **CI is green** (§16 criterion 19) | **NOT YET.** The workflow has now run on GitHub and found three real defects that passing locally had hidden — see i25, i26 and i27. Each is fixed, reproduced first and verified after. All thirteen checks also pass locally against a **genuinely clean checkout**, in the workflow's order, with no `node_modules`, no `dist` and no generated client in it. The criterion stays unsatisfied until a run is green |
-| **Integration tests under Testcontainers** (§16 criterion 7) | **NOT VERIFIED.** This environment has no Docker daemon. They ran against a locally installed PostgreSQL 16 and Redis 7 through `GLOBAL_IDLE_TEST_DATABASE_URL` / `GLOBAL_IDLE_TEST_REDIS_URL`, the escape hatch `tests/support/global-setup.ts` documents. With a daemon present and those variables unset — which is CI — Testcontainers is the only path |
-| **`pnpm dev`** (§11.3, one command to a running stack) | **NOT VERIFIED end to end**, for the same reason: it begins with `docker compose up`. Every step *after* the compose stage was run individually — generate, build, migrate, build the bundle, seed, and all three apps started and served |
-| **Check 0 as GitHub runs it** | **NOT VERIFIED.** Its four mechanisms were each verified directly (see criterion 5b), but not through `actions/setup-node` |
+| **CI is green** (§16 criterion 19) | **VERIFIED** — [run 35550647692](https://github.com/Hokz/Global-Idle/actions/runs/35550647692), all thirteen checks. It took three runs; the three defects are i25, i26 and i27 |
+| **Integration tests under Testcontainers** (§16 criterion 7) | **VERIFIED in CI.** The `GLOBAL_IDLE_TEST_*` escape hatch is deliberately absent from the workflow, so Testcontainers was the only path. Locally it still cannot run — this environment has no Docker daemon — and the escape hatch exists for exactly that |
+| **`pnpm dev`** (§11.3, one command to a running stack) | **STILL NOT VERIFIED end to end.** It begins with `docker compose up`, and nothing in CI runs it. Every step *after* the compose stage was run individually — generate, build, migrate, build the bundle, seed, and all three apps started and served |
 
-**Phase 0B is not `VERIFIED` until the workflow is green.** That is §13's own last line, and this
-document does not soften it.
+### The three defects CI found, and why they matter
+
+Each passed locally and failed on GitHub, for a different reason:
+
+| # | Defect | Why local could not see it |
+|---|---|---|
+| i25 | `actions/setup-node` shelled out to `pnpm` for its own cache before Corepack had provided it | a step needing a tool the previous step installs — there is no local equivalent of that sequence |
+| i26 | `pnpm boundaries` (check 3) needed the client `pnpm generate` (check 4) produces | a check depending on a later check having run — invisible once generation has been run even once |
+| i27 | D9 could not connect as `globalidle_app` | the role had been given a login **by hand** here in an earlier session; the migration leaves it `NOLOGIN` on purpose |
+
+**All three were invisible to a green local suite.** That is the whole argument for criterion 19,
+and it is the reason this document did not claim the phase was done before the workflow ran.
+
+§13's last line — *Phase 0B is not `VERIFIED` until CI exists and passes* — is now met on the
+evidence. The status transition itself belongs to the Product Owner.
 
 ---
 
@@ -228,12 +244,8 @@ None of the three changes a boundary, an interface, an invariant or a product ru
 
 ## 8. Next step
 
-1. Drive the pull request's CI to green.
-2. When the workflow is green, Phase 0B moves to `VERIFIED` and this document's status line moves
-   with it.
-3. Nothing in Phase 1 or Phase 2 should begin against an unverified foundation.
-
-Three defects CI found that local runs could not, recorded because the pattern matters more than
-the fixes: a step that needed a tool the previous step installs; a check that depended on a later
-check having run; and a test that passed on accumulated local state. **All three were invisible
-to a green local suite**, which is the whole argument for criterion 19.
+1. **Independent Phase 0B implementation review** of [PR #4](https://github.com/Hokz/Global-Idle/pull/4).
+2. If the review accepts it, the Product Owner moves Phase 0B to `VERIFIED` and this document's
+   status line moves with it.
+3. `pnpm dev` is the one claim still untested end to end. It needs one run on a machine with a
+   Docker daemon, and is worth doing before Phase 1 relies on it.
