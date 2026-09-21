@@ -20,9 +20,12 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import {
+  SESSION_COOKIE,
   character as characterContext,
+  hunt,
   identity,
   mintSessionId,
+  openSession,
   observability,
   recordDomainEvent,
   sealSession,
@@ -35,7 +38,7 @@ import {
 import { accountId as toAccountId, newId } from '@global-idle/shared';
 import type { ContentBundleResolver } from '@global-idle/game-data';
 import { CONTENT_RESOLVER, COOKIE_POLICY, PRISMA, SESSION_SECRET } from './tokens.js';
-import { SessionGuard, type RequestWithSession } from './session.guard.js';
+import { SessionGuard, readCookie, type RequestWithSession } from './session.guard.js';
 import { asHttp, codeOf, fail, notFound } from './errors.js';
 import {
   currentActivity,
@@ -124,7 +127,26 @@ export class GameController {
 
   @Delete('session')
   @HttpCode(HttpStatus.NO_CONTENT)
-  signOut(@Res({ passthrough: true }) reply: Reply) {
+  async signOut(
+    @Req() request: RequestWithSession,
+    @Res({ passthrough: true }) reply: Reply,
+  ): Promise<void> {
+    // Signing out is an EXPLICIT departure, so it takes no grace (§8): the
+    // Activity ends here rather than being left for the sweeper to notice in
+    // five minutes. Read WITHOUT a guard, because clearing a cookie must work
+    // for a caller whose session has already expired — a sign-out that can
+    // fail with 401 leaves the browser holding the cookie it asked to drop.
+    const raw = request.headers['cookie'];
+    const session = openSession(
+      this.secret,
+      readCookie(Array.isArray(raw) ? raw[0] : raw, SESSION_COOKIE),
+    );
+    if (session) {
+      await withTransaction(this.prisma, (tx) =>
+        hunt.endForSession(tx, String(session.sessionId), new Date()),
+      );
+    }
+
     // The SAME attributes it was set with; a browser keeps the original
     // cookie when they differ.
     reply.setHeader('Set-Cookie', clearedSessionCookie(this.cookiePolicy));
