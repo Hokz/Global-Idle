@@ -644,9 +644,12 @@ than racing the occupancy constraint.
 
 ### 13.1 Reused unchanged
 
-`Account`, `AuthIdentity`, `Entitlement`, `EntitlementAudit`, `CharacterStamina`, `Activity`,
+`Account`, `AuthIdentity`, `Entitlement`, `EntitlementAudit`, `CharacterStamina`,
 `SessionBoundActivity`, `ActivityParticipant`, `OccupancyClaim`, `IdempotencyRecord`,
 `ContentBundle`. **No** new table duplicates state an existing context owns.
+
+**`Activity` is NOT in that list** — §9.5 adds a column to it, specified in §13.3. An earlier draft
+listed it here as unchanged, which contradicted §9.5 outright.
 
 ### 13.2 `Character` — the migration this phase requires
 
@@ -715,7 +718,68 @@ before it becomes a surprise in Phase 4.
 `UPDATE … SET vocation = <chosen> WHERE vocation IS NULL` — a product decision, so the migration
 is **forward-only** and the rollback note says so plainly rather than pretending it is reversible.
 
-### 13.3 Not added, deliberately
+### 13.3 `Activity` — the content-identity migration
+
+§9.5 makes `Activity.contentKey` durable. That is a schema change, and this is it.
+
+```sql
+-- 1. the column, nullable for the moment it takes to reach step 3
+ALTER TABLE "Activity" ADD COLUMN "contentKey" TEXT;
+
+-- 2. no backfill is possible. A pre-Phase-1 Activity row records
+--    activityTypeKey = 'hunt' and a contentVersion, and NOTHING that says which
+--    definition it ran. There is no truthful value to write, and an invented one
+--    ('', 'legacy', 'unknown') would put a false fact in the durable record of a
+--    system whose entire premise is that the server's state is the truth.
+
+-- 3. tighten. This FAILS LOUDLY if any Activity row exists, which is the
+--    intended behaviour — see below.
+ALTER TABLE "Activity" ALTER COLUMN "contentKey" SET NOT NULL;
+
+-- 4. the key must be SHAPED like a content key, checked in the same place I1
+--    and I2 are: the database, not a caller that forgets. This is the POSIX
+--    translation of KEY_PATTERN in packages/game-data/src/keys.ts -- the same
+--    rule, not a lookalike, so the two cannot drift into disagreeing about
+--    what a key is.
+ALTER TABLE "Activity"
+  ADD CONSTRAINT "Activity_contentKey_format_check"
+  CHECK ("contentKey" ~ '^[a-z0-9]+([-_][a-z0-9]+)*(\.[a-z0-9]+([-_][a-z0-9]+)*)+$');
+
+CREATE INDEX "Activity_contentVersion_contentKey_idx"
+    ON "Activity" ("contentVersion", "contentKey");
+```
+
+**Why the migration is allowed to fail on existing rows.** Phase 0B created no Activities anywhere
+that matters: there is **no production deployment** (§3.2 — Phase 1 is not production-deployable,
+and neither was Phase 0B), and every Activity that exists is a Testcontainers row, a local dev-seed
+row, or a row in a developer's disposable database. Refusing to migrate such a database — with an
+error a developer can read — is better than the two alternatives:
+
+| Alternative | Why not |
+|---|---|
+| Backfill a sentinel (`''`, `'legacy'`) | writes a value that is not true into the column reload depends on. The first bug it causes will be silent |
+| Leave the column nullable forever | the schema would then permit an Activity that cannot say what it is, which is the exact defect §9.5 exists to remove. A `NOT NULL` that arrives "later" arrives never |
+
+The developer remedy is one line and already routine here: `pnpm infra:down && pnpm dev`
+re-creates the stack from empty (the bootstrap verification already tears volumes down with
+`compose down -v`). The spec says this plainly so it is a known step, not a surprise.
+
+The translation was checked against PostgreSQL 16 and against `isContentKey` on the same fifteen
+inputs — `hunt.rookgaard.sewers`, `skill-training.basic` and `some_key.with_underscores` accepted;
+`nodots`, `Upper.Case`, `trailing.`, `.leading`, `double..dot`, `has space.key` and `---.---`
+rejected — and the two agree on every one. A first draft of this constraint used
+`^[a-z0-9]+(\.[a-z0-9-]+)+$`, which silently rejected underscores and accepted `---.---`; the
+canonical rule is the one to copy, not to paraphrase.
+
+**Kind compatibility is application-enforced, not a constraint.** The database can check the key's
+*shape*; it cannot know that `hunt.rookgaard.sewers` is `kind: "hunt"` — that fact lives in a
+content bundle, not in a table. §9.5's creation transaction resolves and kind-checks before
+insert, and AC12 proves a wrong-kind key creates nothing.
+
+**Rollback:** dropping the column loses which Hunt each Activity was, and nothing can reconstruct
+it. Forward-only, like §13.2, and stated rather than implied.
+
+### 13.4 Not added, deliberately
 
 No `Progression` table — Base Level is one integer until XP exists, and a table now would be a
 second home for character state. No `Session` table — the signed cookie *is* the session (§3.2.1),
@@ -812,7 +876,7 @@ it**; the count is the consequence, not a target.
 | **S** — session/auth | S1–S11 | create session; reload persists; no cookie → 401; logout clears; cookie for account A cannot read account B; `/health` and `/metrics` stay unauthenticated; tampered signature rejected; **`sessionId` is minted server-side**; **same cookie ⇒ same `sessionId`**; **a second login ⇒ a different `sessionId` on the same account**; **a client-supplied `sessionId` is ignored** |
 | **DEV** — dev-provider containment | DEV1–DEV4 | the provider is registered only when `NODE_ENV!==production` **and** `GLOBAL_IDLE_DEV_AUTH=1`; with either missing the route is **absent (404)**; `NODE_ENV=production` + `GLOBAL_IDLE_DEV_AUTH=1` **fails to boot**; the demo seed and E2E use the dev provider |
 | **CH** — character | CH1–CH9 | create with server-owned fields; `vocation` is NULL; `baseLevel` is 1; Stamina row created at 42:00 NEUTRAL; name validation; duplicate name; roster capacity refusal; client-supplied `baseLevel`/`vocation` rejected; **a second Origin Character is refused with `ORIGIN_CHARACTER_EXISTS`** |
-| **D** — database/invariant | D14–D20 | migration applies on a clean DB **and** over Phase 0B's; the **first** Origin Character is accepted; a **second** on the same account is **refused by I1b**; a **different account** may have its own; D4/D5 still pass (two Knights refused, retired vocation reusable); a Knight and an Origin Character coexist; `baseLevel >= 1` CHECK holds |
+| **D** — database/invariant | D14–D23 | migration applies on a clean DB **and** over a Phase 0B database with no Activity rows; the **first** Origin Character is accepted; a **second** on the same account is **refused by I1b**; a **different account** may have its own; D4/D5 still pass (two Knights refused, retired vocation reusable); a Knight and an Origin Character coexist; `baseLevel >= 1` CHECK holds; **`Activity.contentKey` is `NOT NULL` after migration**; **the format CHECK rejects a malformed key and accepts every key the Phase 1 bundle authors**; **the migration FAILS on a database that still holds Activity rows, with a readable error** (§13.3) |
 | **AT** — atlas/content | AT1–AT7 | bundle validates; marker→region kind-check; marker→hunt kind-check; hunt's `activityTypeKey` resolves in the registry; position within bounds; exactly one AVAILABLE region; unknown asset id fails the build |
 | **API** — contracts | API1–API10 | each route's happy path and its documented error code, including `404`-not-`403` for a foreign character |
 | **AC** — activity boundary | AC1–AC13 | Enter creates a real Activity; claim acquired; `staminaActivatedAt` stays NULL; Stamina stays NEUTRAL; reload returns the same Activity; Leave ends it and releases the claim; second Enter → `OccupancyConflict`; double-submitted Enter is idempotent; **`contentKey` is persisted on the Activity**; **reload reconstructs the Hunt from `(contentVersion, contentKey)` alone**; **the key resolves against the Activity's OWN pinned version**; **a non-`hunt` kind is refused with `CONTENT_KIND_MISMATCH` and creates nothing**; **no endpoint can change `contentKey` after creation** |
@@ -820,9 +884,9 @@ it**; the count is the consequence, not a target.
 | **E2E** — browser flow | E2E1–E2E10 | V1–V10 of §15, desktop and touch viewports |
 | **REG** — Phase 0B regression | REG1–REG5 | the 92-case matrix still passes; `pnpm dev` bootstrap still green; boundaries unchanged; occupancy/idempotency/content contracts Phase 1 consumes behave as Phase 0B proved |
 
-**Totals: 10 groups, 84 mandatory cases** — S 11, DEV 4, CH 9, D 7, AT 7, API 10, AC 13, UI 8,
+**Totals: 10 groups, 87 mandatory cases** — S 11, DEV 4, CH 9, D 10, AT 7, API 10, AC 13, UI 8,
 E2E 10, REG 5 —
-counted by a `scripts/count-matrix.mjs` extension, so "84/84" stays a countable claim rather than
+counted by a `scripts/count-matrix.mjs` extension, so "87/87" stays a countable claim rather than
 an assertion. Phase 0B's 92 cases remain in force and are **not** renumbered.
 
 ---
@@ -886,8 +950,8 @@ noise Phase 1 has no consumer for.
 | 1 | `pnpm install && pnpm build && pnpm test` succeeds from a clean checkout (W12 still passes) |
 | 2 | `pnpm dev` brings the stack up and serves the Phase 1 routes; the `dev-bootstrap` job is green |
 | 3 | The Phase 0B 92-case matrix passes **unchanged** |
-| 4 | The Phase 1 matrix is 84/84, counted by script |
-| 5 | The migration applies to a clean database **and** over an existing Phase 0B database |
+| 4 | The Phase 1 matrix is 87/87, counted by script |
+| 5 | The migration applies to a clean database **and** over a Phase 0B database with no Activity rows; on one that still holds them it fails with the readable error of §13.3, not silently |
 | 6 | D4/D5 still pass; exactly **one** playable Origin Character per Account (I1b, D16–D18) |
 | 7 | A reviewer can complete V1→V10 in a browser at 1440×900 **and** 390×844 with touch |
 | 8 | One character is visible with Level 1, no vocation, 42:00 NEUTRAL, Free |
@@ -923,7 +987,7 @@ noise Phase 1 has no consumer for.
 | P1-D10 | `vocation` becomes nullable; forward-only migration | see §13.2 — the schema cannot otherwise represent the approved origin character |
 | P1-D11 | No retirement UI in Phase 1 | with capacity 1, a retire button strands the player |
 | P1-D12 | No server-side "selected character" | the Activity context already owns in-flight state; a second home would drift |
-| P1-D13 | `Activity.contentKey` — durable, server-owned, generic | the Activity row could not say **which** Hunt it was; a `huntKey` column would have to be replaced by Phase 5's Dungeons (§9.5) |
+| P1-D13 | `Activity.contentKey` — durable, server-owned, generic; migration in §13.3 | the Activity row could not say **which** Hunt it was; a `huntKey` column would have to be replaced by Phase 5's Dungeons (§9.5) |
 | P1-D14 | `sessionId` distinct from `accountId`, both in the signed cookie | `claimHolderSessionId` needs a real session identity; passing `accountId` would make two browsers indistinguishable and break `ADR-008` eviction before Phase 2 implements it (§3.2.1) |
 | P1-D15 | **No** `Character.locationKey`, and no `location` content kind | nothing in Phase 1 decides anything from a location; the first draft's key resolved against nothing (§5.4) |
 | P1-D16 | **I1b** — one playable Origin Character per Account, by partial unique index | I1 does not constrain NULLs at all, so without a second index a second Origin Character is accepted (§13.2) |
