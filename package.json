@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Global Idle \u2014 server-authoritative idle strategy RPG. Phase 0B technical foundation.",
+  "description": "Global Idle — server-authoritative idle strategy RPG. Phase 0B technical foundation.",
   "engines": {
     "node": ">=24.21.0 <25"
   },
@@ -36,6 +36,7 @@
     "@global-idle/game-data": "workspace:*",
     "@global-idle/game-engine": "workspace:*",
     "@global-idle/shared": "workspace:*",
+    "@playwright/test": "1.56.1",
     "@prisma/adapter-pg": "7.10.0",
     "@testcontainers/postgresql": "^12.1.0",
     "@testcontainers/redis": "^12.1.0",

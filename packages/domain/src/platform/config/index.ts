@@ -48,6 +48,21 @@ export const configSchema = z.object({
   /** Local filesystem provider root for content bundles (§7.7). */
   CONTENT_BUNDLE_DIR: z.string().min(1).default('./packages/game-data/bundles'),
   /**
+   * Origins the browser may call the API from, with credentials. Phase 1 runs
+   * apps/web and apps/api on different ports, so the cookie is cross-origin
+   * and CORS is not optional. An explicit LIST, never a wildcard: `*` and
+   * credentials are mutually exclusive for a good reason.
+   */
+  WEB_ORIGINS: z
+    .string()
+    .default('http://127.0.0.1:3000,http://localhost:3000')
+    .transform((value) =>
+      value
+        .split(',')
+        .map((origin) => origin.trim())
+        .filter(Boolean),
+    ),
+  /**
    * Signs the session cookie (Phase 1 §3.2). REQUIRED, with a default only
    * outside production: a slice that refuses to boot locally teaches nothing,
    * and a guessable secret in production is not a default, it is a hole.

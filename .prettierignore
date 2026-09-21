@@ -22,3 +22,7 @@ apps/web/next-env.d.ts
 # output against these bytes; a formatter that adds a trailing newline breaks
 # a determinism test for a reason that has nothing to do with determinism.
 tests/fixtures/engine/golden.json
+
+# Playwright run output, not source.
+test-results/
+playwright-report/

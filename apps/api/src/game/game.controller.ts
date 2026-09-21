@@ -46,10 +46,17 @@ interface Reply {
   setHeader(name: string, value: string): void;
 }
 
-/** 2-20 characters, letters and single inner spaces. Deliberately strict:
- *  loosening a name rule later is easy, tightening one is a migration. */
+/** A CHARACTER name: 2-20 characters, letters and single inner spaces.
+ *  Deliberately strict — loosening a name rule later is easy, tightening one
+ *  is a migration. */
 const NAME = /^[A-Za-z]+(?: [A-Za-z]+)*$/;
 const nameIsValid = (name: string) => name.length >= 2 && name.length <= 20 && NAME.test(name);
+
+/** A dev HANDLE is not a character name. It identifies a test account, so
+ *  digits are fine and the rule only has to be unambiguous and bounded. */
+const HANDLE = /^[A-Za-z0-9][A-Za-z0-9 _-]*$/;
+const handleIsValid = (handle: string) =>
+  handle.length >= 2 && handle.length <= 32 && HANDLE.test(handle);
 
 @Controller('api')
 export class GameController {
@@ -71,7 +78,7 @@ export class GameController {
   @Post('session')
   async signIn(@Body() body: { handle?: unknown }, @Res({ passthrough: true }) reply: Reply) {
     const handle = typeof body?.handle === 'string' ? body.handle.trim() : '';
-    if (!nameIsValid(handle)) {
+    if (!handleIsValid(handle)) {
       throw fail(HttpStatus.UNPROCESSABLE_ENTITY, 'NAME_INVALID', 'Enter a handle.');
     }
 
