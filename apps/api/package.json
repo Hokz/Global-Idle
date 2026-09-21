@@ -7,8 +7,8 @@
   "source": "./src/main.ts",
   "scripts": {
     "clean": "rm -rf dist *.tsbuildinfo",
-    "start": "node --env-file-if-exists=../../.env ./dist/main.js",
-    "dev": "node --env-file-if-exists=../../.env --watch ./dist/main.js"
+    "start": "cd ../.. && node --env-file-if-exists=.env apps/api/dist/main.js",
+    "dev": "cd ../.. && node --env-file-if-exists=.env --watch apps/api/dist/main.js"
   },
   "dependencies": {
     "@global-idle/domain": "workspace:*",

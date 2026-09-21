@@ -11,6 +11,7 @@
  * variable turns one misconfiguration into as many restarts as there are
  * mistakes.
  */
+import { resolve } from 'node:path';
 import { z } from 'zod';
 
 const postgresUrl = z
@@ -80,5 +81,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       parsed.error.issues.map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`),
     );
   }
-  return parsed.data;
+
+  // Resolved to an ABSOLUTE path here, once. A relative content directory
+  // means something different to every process that reads it, and the api and
+  // the worker do not share a working directory unless something makes them —
+  // their start scripts do, and this makes the value unambiguous afterwards.
+  return { ...parsed.data, CONTENT_BUNDLE_DIR: resolve(parsed.data.CONTENT_BUNDLE_DIR) };
 }
