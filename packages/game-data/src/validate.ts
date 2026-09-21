@@ -19,6 +19,8 @@ import { ACTIVITY_TYPE_KEYS, ASSET_IDS } from '@global-idle/shared';
 import {
   atlasMarkerSchema,
   bundleSourceSchema,
+  combatProfileSchema,
+  creatureSchema,
   huntSchema,
   regionSchema,
   type BundleSource,
@@ -77,6 +79,8 @@ export function validateBundleSource(input: unknown): ValidationResult {
     region: regionSchema,
     'atlas-marker': atlasMarkerSchema,
     hunt: huntSchema,
+    creature: creatureSchema,
+    'combat-profile': combatProfileSchema,
   } as const;
 
   for (const definition of source.definitions) {
@@ -125,6 +129,7 @@ export function validateBundleSource(input: unknown): ValidationResult {
 
     if (typed.data.kind === 'hunt') {
       expect(typed.data.region, 'region', 'region');
+
       // §10.2: the content/registry reconciliation, extended. The domain
       // describes what an activity type DOES; this checks only that the name
       // is one it describes, and the domain refuses to boot if that list and
@@ -136,6 +141,71 @@ export function validateBundleSource(input: unknown): ValidationResult {
           message:
             `${definition.key}.activityTypeKey is "${typed.data.activityTypeKey}", ` +
             `which no activity type describes (known: ${ACTIVITY_TYPE_KEYS.join(', ')})`,
+        });
+      }
+
+      // ── Phase 2: a Hunt a player can enter must be simulatable ─────────
+      const { rooms, combatProfile } = typed.data;
+      if (typed.data.availability === 'AVAILABLE' && (!rooms || rooms.length === 0)) {
+        issues.push({
+          severity: 'error',
+          check: 'hunt-rooms',
+          message: `${definition.key} is AVAILABLE but authors no rooms; there would be nothing to simulate`,
+        });
+      }
+      if (typed.data.availability === 'AVAILABLE' && !combatProfile) {
+        issues.push({
+          severity: 'error',
+          check: 'hunt-rooms',
+          message: `${definition.key} is AVAILABLE but names no combatProfile`,
+        });
+      }
+      if (combatProfile) expect(combatProfile, 'combatProfile', 'combat-profile');
+
+      if (rooms && rooms.length > 0) {
+        // Room numbers are 1..n with no gaps: a missing room is a run that
+        // walks into nothing, and it is far cheaper to catch here.
+        const numbers = rooms.map((room) => room.number).sort((a, b) => a - b);
+        const contiguous = numbers.every((value, index) => value === index + 1);
+        if (!contiguous) {
+          issues.push({
+            severity: 'error',
+            check: 'hunt-rooms',
+            message: `${definition.key} rooms are ${numbers.join(', ')}; they must be 1..${numbers.length} with no gaps`,
+          });
+        }
+
+        // EXACTLY ONE endless room, and it must be the last. Two would make
+        // progression ambiguous; none would make the Hunt end at room n with
+        // nothing to do, which is not what §4 describes.
+        const endless = rooms.filter((room) => room.endless);
+        const last = Math.max(...numbers);
+        if (endless.length !== 1 || endless[0]?.number !== last) {
+          issues.push({
+            severity: 'error',
+            check: 'hunt-rooms',
+            message:
+              `${definition.key} must mark exactly one endless room and it must be the last (room ${last}); ` +
+              `found ${endless.length} at ${endless.map((room) => room.number).join(', ') || 'none'}`,
+          });
+        }
+
+        for (const room of rooms) {
+          for (const entry of room.creatures)
+            expect(entry.key, `rooms[${room.number}]`, 'creature');
+        }
+      }
+    }
+
+    if (typed.data.kind === 'creature') {
+      // A creature that cannot be killed in finite time is a content bug, not
+      // a difficulty setting: its minimum defence roll already exceeds any
+      // attack the game can produce.
+      if (typed.data.maxHealth <= 0) {
+        issues.push({
+          severity: 'error',
+          check: 'creature-sanity',
+          message: `${definition.key} has no health`,
         });
       }
     }
