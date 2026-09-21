@@ -63,6 +63,78 @@ export function assertDevAuthSafe(env: NodeJS.ProcessEnv = process.env): void {
 }
 
 /**
+ * ONE LOCAL HOST CONVENTION: `127.0.0.1`.
+ *
+ * A session cookie is stored against a HOST, and `SameSite=Lax` compares the
+ * site of the request with the site of the page that made it. `localhost` and
+ * `127.0.0.1` are different hosts and therefore different sites, so a page on
+ * one calling an API on the other is a CROSS-SITE request and the cookie is
+ * simply not sent — a silent 401 with nothing in the network panel to explain
+ * it. The fix is not a looser cookie; it is one convention, used everywhere.
+ *
+ * `127.0.0.1` rather than `localhost` because it is literal: no name
+ * resolution, and no chance of resolving to `::1` on one machine and `127.0.0.1`
+ * on another, which would reintroduce exactly this split.
+ */
+export const LOCAL_HOST = '127.0.0.1';
+export const LOCAL_WEB_ORIGIN = `http://${LOCAL_HOST}:3000`;
+export const LOCAL_API_ORIGIN = `http://${LOCAL_HOST}:3001`;
+
+/** Hosts a browser already treats as a trustworthy origin over plain HTTP. */
+const LOOPBACK = new Set(['127.0.0.1', 'localhost', '::1', '[::1]']);
+
+export class InsecureSessionOrigin extends Error {
+  constructor(readonly origin: string) {
+    super(
+      `PUBLIC_ORIGIN ${origin} serves the session cookie over plaintext HTTP on a ` +
+        'non-loopback host. A session that travels in the clear is readable by ' +
+        'anything on the path, and marking it Secure would simply stop the cookie ' +
+        'working. Serve it over https, or bind it to loopback. Refusing to start.',
+    );
+    this.name = 'InsecureSessionOrigin';
+  }
+}
+
+export interface SessionCookiePolicy {
+  /** `Secure` is set unless the session is served over loopback HTTP. */
+  readonly secure: boolean;
+}
+
+/**
+ * The cookie policy for an origin, decided ONCE from configuration.
+ *
+ * Deliberately not inferred per request: `X-Forwarded-Proto`, `Host` and the
+ * request body are all attacker-controlled, and a cookie whose security
+ * attributes depend on them has no security attributes. The deployment says
+ * what it is; the code believes the deployment and nothing else.
+ */
+export function sessionCookiePolicy(publicOrigin: string): SessionCookiePolicy {
+  let url: URL;
+  try {
+    url = new URL(publicOrigin);
+  } catch {
+    throw new InsecureSessionOrigin(publicOrigin);
+  }
+  if (url.protocol === 'https:') return { secure: true };
+  if (url.protocol === 'http:' && LOOPBACK.has(url.hostname)) return { secure: false };
+  throw new InsecureSessionOrigin(publicOrigin);
+}
+
+const attributes = (policy: SessionCookiePolicy): string =>
+  `Path=/; HttpOnly; SameSite=Lax${policy.secure ? '; Secure' : ''}`;
+
+/** The `Set-Cookie` value that establishes a session. */
+export function sessionCookie(sealed: string, policy: SessionCookiePolicy): string {
+  return `${SESSION_COOKIE}=${encodeURIComponent(sealed)}; ${attributes(policy)}`;
+}
+
+/** The `Set-Cookie` value that clears one. The attributes must MATCH the ones
+ *  it was set with, or the browser keeps the original cookie. */
+export function clearedSessionCookie(policy: SessionCookiePolicy): string {
+  return `${SESSION_COOKIE}=; ${attributes(policy)}; Max-Age=0`;
+}
+
+/**
  * A new login. The id is SERVER-MINTED; nothing accepts one from a client.
  *
  * `at` is REQUIRED rather than defaulted: §7.1 keeps the wall clock out of the

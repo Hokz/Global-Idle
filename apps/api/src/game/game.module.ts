@@ -10,9 +10,14 @@
  * resolver a second cache that can disagree with the first.
  */
 import { Module, type DynamicModule } from '@nestjs/common';
-import { assertDevAuthSafe, devAuthEnabled, type AppConfig } from '@global-idle/domain';
+import {
+  assertDevAuthSafe,
+  devAuthEnabled,
+  sessionCookiePolicy,
+  type AppConfig,
+} from '@global-idle/domain';
 import { HealthModule } from '../health/health.module.js';
-import { SESSION_SECRET } from './tokens.js';
+import { COOKIE_POLICY, SESSION_SECRET } from './tokens.js';
 import { GameController } from './game.controller.js';
 import { WorldController } from './world.controller.js';
 
@@ -26,7 +31,11 @@ export class GameModule {
       module: GameModule,
       imports: [health],
       controllers: devAuthEnabled() ? [GameController, WorldController] : [WorldController],
-      providers: [{ provide: SESSION_SECRET, useValue: config.SESSION_SECRET }],
+      providers: [
+        { provide: SESSION_SECRET, useValue: config.SESSION_SECRET },
+        // Decided once, here, from configuration — never per request.
+        { provide: COOKIE_POLICY, useValue: sessionCookiePolicy(config.PUBLIC_ORIGIN) },
+      ],
     };
   }
 }

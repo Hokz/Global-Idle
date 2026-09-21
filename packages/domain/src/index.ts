@@ -122,12 +122,19 @@ export { DomainError, isOccupancyUniqueViolation } from './platform/errors/index
 
 export {
   DevAuthMisconfigured,
+  InsecureSessionOrigin,
+  LOCAL_API_ORIGIN,
+  LOCAL_HOST,
+  LOCAL_WEB_ORIGIN,
   SESSION_COOKIE,
   assertDevAuthSafe,
+  clearedSessionCookie,
   devAuthEnabled,
   mintSessionId,
   openSession,
   sealSession,
+  sessionCookie,
+  sessionCookiePolicy,
 } from './platform/session/index.js';
-export type { SessionPayload } from './platform/session/index.js';
+export type { SessionCookiePolicy, SessionPayload } from './platform/session/index.js';
 export type { DomainErrorCode } from './platform/errors/index.js';

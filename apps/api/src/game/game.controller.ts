@@ -20,19 +20,21 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import {
-  SESSION_COOKIE,
   character as characterContext,
   identity,
   mintSessionId,
   observability,
   recordDomainEvent,
   sealSession,
+  sessionCookie,
+  clearedSessionCookie,
   withTransaction,
   type PrismaClient,
+  type SessionCookiePolicy,
 } from '@global-idle/domain';
 import { accountId as toAccountId, newId } from '@global-idle/shared';
 import type { ContentBundleResolver } from '@global-idle/game-data';
-import { CONTENT_RESOLVER, PRISMA, SESSION_SECRET } from './tokens.js';
+import { CONTENT_RESOLVER, COOKIE_POLICY, PRISMA, SESSION_SECRET } from './tokens.js';
 import { SessionGuard, type RequestWithSession } from './session.guard.js';
 import { asHttp, codeOf, fail, notFound } from './errors.js';
 import {
@@ -65,6 +67,7 @@ export class GameController {
     @Inject(PRISMA) private readonly prisma: PrismaClient,
     @Inject(CONTENT_RESOLVER) private readonly resolver: ContentBundleResolver,
     @Inject(SESSION_SECRET) private readonly secret: string,
+    @Inject(COOKIE_POLICY) private readonly cookiePolicy: SessionCookiePolicy,
   ) {}
 
   private session(request: RequestWithSession) {
@@ -112,17 +115,19 @@ export class GameController {
       accountId: toAccountId(accountId),
       sessionId: mintSessionId(new Date()),
     });
-    reply.setHeader(
-      'Set-Cookie',
-      `${SESSION_COOKIE}=${encodeURIComponent(sealed)}; Path=/; HttpOnly; SameSite=Lax`,
-    );
+    // The attributes come from the POLICY, decided once from configuration:
+    // `Secure` off on loopback HTTP, on everywhere else, and a non-loopback
+    // plaintext origin refuses to boot rather than shipping either mistake.
+    reply.setHeader('Set-Cookie', sessionCookie(sealed, this.cookiePolicy));
     return { accountId };
   }
 
   @Delete('session')
   @HttpCode(HttpStatus.NO_CONTENT)
   signOut(@Res({ passthrough: true }) reply: Reply) {
-    reply.setHeader('Set-Cookie', `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
+    // The SAME attributes it was set with; a browser keeps the original
+    // cookie when they differ.
+    reply.setHeader('Set-Cookie', clearedSessionCookie(this.cookiePolicy));
   }
 
   // ── account ────────────────────────────────────────────────────────────

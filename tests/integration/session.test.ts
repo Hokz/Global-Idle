@@ -11,10 +11,15 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   DevAuthMisconfigured,
+  InsecureSessionOrigin,
+  LOCAL_API_ORIGIN,
+  LOCAL_WEB_ORIGIN,
   SESSION_COOKIE,
   assertDevAuthSafe,
   devAuthEnabled,
+  loadConfig,
   openSession,
+  sessionCookiePolicy,
 } from '@global-idle/domain';
 import { createClient, truncateAll } from '../support/db.js';
 import {
@@ -73,6 +78,10 @@ describe('sessions', () => {
     // not to be able to.
     expect(header).toContain('HttpOnly');
     expect(header).toContain('SameSite=Lax');
+    // NOT Secure on loopback HTTP: a Secure cookie over http is a cookie the
+    // browser throws away, so marking it here would break local development
+    // while looking more careful.
+    expect(header).not.toContain('Secure');
 
     const stored = await prisma.authIdentity.findUnique({
       where: { provider_subject: { provider: 'dev', subject: 'rookie' } },
@@ -110,6 +119,10 @@ describe('sessions', () => {
     const header = response.headers.get('set-cookie') ?? '';
     expect(header).toContain(`${SESSION_COOKIE}=;`);
     expect(header).toContain('Max-Age=0');
+    // The SAME attributes it was set with. A browser that sees different ones
+    // keeps the original cookie, and the player stays signed in.
+    expect(header).toContain('HttpOnly');
+    expect(header).toContain('SameSite=Lax');
   });
 
   it("S5: account A's cookie cannot read account B's character — 404, not 403", async () => {
@@ -290,5 +303,108 @@ describe('dev credential provider containment', () => {
     await boot();
     const cookie = await signIn(base, 'e2e-shaped-handle');
     expect((await call(base, '/api/me', { cookie })).status).toBe(200);
+  });
+});
+
+/**
+ * The session cookie's security attributes, and the ONE host convention they
+ * depend on. These cases are additional to the §16 matrix and deliberately
+ * carry no matrix ids.
+ */
+describe('session cookie policy and host convention', () => {
+  it('serves the documented browser URL and keeps the cookie through API calls', async () => {
+    await boot();
+    // The documented URL, the web app's default API base, the CORS default
+    // and the E2E base are ONE host. A page on `localhost` calling an API on
+    // `127.0.0.1` is cross-site, and SameSite=Lax would drop the cookie with
+    // nothing to show for it.
+    expect(LOCAL_WEB_ORIGIN).toBe('http://127.0.0.1:3000');
+    expect(LOCAL_API_ORIGIN).toBe('http://127.0.0.1:3001');
+    expect(
+      loadConfig({ DATABASE_URL: 'postgres://x', REDIS_URL: 'redis://x' }).WEB_ORIGINS,
+    ).toEqual([LOCAL_WEB_ORIGIN]);
+
+    const cookie = await signIn(base, 'rookie');
+    const me = await call<{ accountId: string }>(base, '/api/me', {
+      cookie,
+      headers: { Origin: LOCAL_WEB_ORIGIN },
+    });
+    expect(me.status).toBe(200);
+
+    // The same cookie again: a reload is not a new sign-in.
+    const again = await call<{ accountId: string }>(base, '/api/me', {
+      cookie,
+      headers: { Origin: LOCAL_WEB_ORIGIN },
+    });
+    expect(again.body.accountId).toBe(me.body.accountId);
+  });
+
+  it('decides Secure from the configured origin, not from the request', () => {
+    expect(sessionCookiePolicy('https://play.example.com').secure).toBe(true);
+    expect(sessionCookiePolicy('https://play.example.com:8443').secure).toBe(true);
+
+    for (const loopback of [
+      'http://127.0.0.1:3001',
+      'http://localhost:3001',
+      'http://[::1]:3001',
+    ]) {
+      expect(sessionCookiePolicy(loopback).secure, loopback).toBe(false);
+    }
+
+    // Plaintext on a public host is refused outright. Marking it Secure would
+    // stop the cookie working; not marking it would put a session on the wire
+    // in the clear. Neither is a default worth having.
+    expect(() => sessionCookiePolicy('http://play.example.com')).toThrow(InsecureSessionOrigin);
+    expect(() => sessionCookiePolicy('not an origin')).toThrow(InsecureSessionOrigin);
+  });
+
+  it('emits Secure when the API is configured on an https origin', async () => {
+    await boot({ PUBLIC_ORIGIN: 'https://play.example.com' });
+    const response = await call(base, '/api/session', {
+      method: 'POST',
+      body: JSON.stringify({ handle: 'rookie' }),
+    });
+
+    const header = response.headers.get('set-cookie') ?? '';
+    expect(header).toContain('Secure');
+    expect(header).toContain('HttpOnly');
+    expect(header).toContain('SameSite=Lax');
+
+    const cleared = await call(base, '/api/session', { method: 'DELETE' });
+    expect(cleared.headers.get('set-cookie') ?? '').toContain('Secure');
+  });
+
+  it('refuses to BOOT on a plaintext non-loopback origin, with every other problem listed', () => {
+    expect(() =>
+      loadConfig({
+        DATABASE_URL: 'postgresql://x',
+        REDIS_URL: 'redis://x',
+        PUBLIC_ORIGIN: 'http://play.example.com',
+      }),
+    ).toThrow(/PUBLIC_ORIGIN/);
+
+    // Configuration reports EVERY problem at once (§11.3), so a second
+    // mistake is not hidden behind this one.
+    try {
+      loadConfig({ PUBLIC_ORIGIN: 'http://play.example.com' });
+      throw new Error('expected a configuration failure');
+    } catch (error) {
+      const problems = (error as { problems?: readonly string[] }).problems ?? [];
+      expect(problems.join('\n')).toMatch(/PUBLIC_ORIGIN/);
+      expect(problems.join('\n')).toMatch(/DATABASE_URL/);
+      expect(problems.join('\n')).toMatch(/REDIS_URL/);
+    }
+  });
+
+  it('does not infer cookie security from anything a client sends', async () => {
+    await boot();
+    const response = await call(base, '/api/session', {
+      method: 'POST',
+      headers: { 'X-Forwarded-Proto': 'https', Origin: 'https://evil.example.com' },
+      body: JSON.stringify({ handle: 'rookie', secure: true, cookie: 'Secure' }),
+    });
+
+    // The deployment said loopback HTTP, so the cookie is loopback HTTP's.
+    expect(response.headers.get('set-cookie') ?? '').not.toContain('Secure');
   });
 });

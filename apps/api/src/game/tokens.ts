@@ -6,3 +6,4 @@
  */
 export { CONTENT_RESOLVER, PRISMA } from '../health/tokens.js';
 export const SESSION_SECRET = Symbol('SESSION_SECRET');
+export const COOKIE_POLICY = Symbol('COOKIE_POLICY');
