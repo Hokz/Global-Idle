@@ -39,7 +39,7 @@ browser
 ```
 
 Reload at any point re-reads the server. The Hunt the Character is in is **durable server state**
-(§9.6), not a URL segment and not client memory.
+(§9.5), not a URL segment and not client memory.
 
 That last stretch is the part that needs care, and §9 specifies it exactly.
 
@@ -299,7 +299,7 @@ Two ways out, and the smaller one wins:
 | Option | Verdict |
 |---|---|
 | **A** — define a real `location` content kind, validated like the others | Correct, and premature. Nothing in Phase 1 *reads* location to decide anything: there is no movement, no travel, no location-gated content, and exactly one region |
-| **B** — **do not store location at all** ← chosen | The only need is displaying where the Character is. That is already derivable: the Atlas has one `AVAILABLE` region, and an occupied Character's Activity resolves to its Hunt (§9.6) |
+| **B** — **do not store location at all** ← chosen | The only need is displaying where the Character is. That is already derivable: the Atlas has one `AVAILABLE` region, and an occupied Character's Activity resolves to its Hunt (§9.5) |
 
 So the panel shows `Rookgaard` from the region definition, or the Hunt's label when the Character
 is in one. No new column, no new content kind, no unvalidated key anywhere — **every durable
@@ -421,7 +421,7 @@ precedes combat**, and it is reachable using only `VERIFIED` primitives:
 | `staminaActivatedAt = null` | the documented pre-consumption state; Phase 2 raises it |
 | `SessionBoundState: ONLINE_ACTIVE` | the connection is live |
 | `activity.endActivity` on Leave | releases the claim in the same transaction |
-| reconnect-grace primitives | **present but not driven by Phase 1 UI** — see §9.5 |
+| reconnect-grace primitives | **present but not driven by Phase 1 UI** — see §9.6 |
 
 | Phase 1 must NOT | Why |
 |---|---|
@@ -452,7 +452,7 @@ Always `NEUTRAL`, always 42:00, for every character, in and out of a Hunt. Nothi
 consumes (no qualifying XP) and nothing recovers (recovery is a Skill-Training/offline concern
 Phase 1 does not surface). The *state machine* is exercised; the *transitions* are Phase 2's.
 
-### 9.6 The Activity must know WHICH Hunt it is — `Activity.contentKey`
+### 9.5 The Activity must know WHICH Hunt it is — `Activity.contentKey`
 
 **Decision P1-D13 — `Activity` gains a durable, server-owned `contentKey`.**
 
@@ -491,7 +491,7 @@ the activity type → assert `availability = AVAILABLE` → write the row. A key
 is `404 HUNT_NOT_FOUND`; one that resolves to the wrong kind is `422 CONTENT_KIND_MISMATCH`.
 Neither creates an Activity, and the occupancy claim is never taken.
 
-### 9.5 Reload and Leave
+### 9.6 Reload and Leave
 
 | Action | Server | Client |
 |---|---|---|
@@ -610,7 +610,7 @@ where `code` is a stable `SCREAMING_SNAKE` identifier (the UI switches on `code`
 | `GET` | `/api/characters/:id` | → `CharacterDetail` | **404** if not owned (§19) |
 | `GET` | `/api/atlas` | → `{ contentVersion, regions[], markers[] }` | from the pinned bundle |
 | `GET` | `/api/hunts/:key` | → `HuntDetail` | `404` for an unknown or non-`hunt` key |
-| `POST` | `/api/characters/:id/hunt` | `{ huntKey }` → `ActivityView` | starts the Activity (§9.2, §9.6); `404 HUNT_NOT_FOUND`, `422 CONTENT_KIND_MISMATCH`, `409 OCCUPANCY_CONFLICT` |
+| `POST` | `/api/characters/:id/hunt` | `{ huntKey }` → `ActivityView` | starts the Activity (§9.2, §9.5); `404 HUNT_NOT_FOUND`, `422 CONTENT_KIND_MISMATCH`, `409 OCCUPANCY_CONFLICT` |
 | `GET` | `/api/characters/:id/activity` | → `ActivityView \| null` | what reload reads |
 | `DELETE` | `/api/characters/:id/activity` | → `204` | Leave |
 
@@ -621,7 +621,7 @@ StaminaView      = { remainingMs, maxMs, mode: 'CONSUMING' | 'NEUTRAL' | 'RECOVE
 ActivityView     = {
   activityId, activityTypeKey,
   contentVersion,            // the bundle this Activity was pinned to (ADR-011)
-  contentKey,                // WHICH definition — durable, server-owned (§9.6)
+  contentKey,                // WHICH definition — durable, server-owned (§9.5)
   hunt: HuntDetail,          // resolved from (contentVersion, contentKey) on read
   state, startedAt,
 }
@@ -916,7 +916,7 @@ noise Phase 1 has no consumer for.
 | P1-D10 | `vocation` becomes nullable; forward-only migration | see §13.2 — the schema cannot otherwise represent the approved origin character |
 | P1-D11 | No retirement UI in Phase 1 | with capacity 1, a retire button strands the player |
 | P1-D12 | No server-side "selected character" | the Activity context already owns in-flight state; a second home would drift |
-| P1-D13 | `Activity.contentKey` — durable, server-owned, generic | the Activity row could not say **which** Hunt it was; a `huntKey` column would have to be replaced by Phase 5's Dungeons (§9.6) |
+| P1-D13 | `Activity.contentKey` — durable, server-owned, generic | the Activity row could not say **which** Hunt it was; a `huntKey` column would have to be replaced by Phase 5's Dungeons (§9.5) |
 | P1-D14 | `sessionId` distinct from `accountId`, both in the signed cookie | `claimHolderSessionId` needs a real session identity; passing `accountId` would make two browsers indistinguishable and break `ADR-008` eviction before Phase 2 implements it (§3.2.1) |
 | P1-D15 | **No** `Character.locationKey`, and no `location` content kind | nothing in Phase 1 decides anything from a location; the first draft's key resolved against nothing (§5.4) |
 | P1-D16 | **I1b** — one playable Origin Character per Account, by partial unique index | I1 does not constrain NULLs at all, so without a second index a second Origin Character is accepted (§13.2) |
