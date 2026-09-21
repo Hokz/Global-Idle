@@ -4,7 +4,7 @@
 Product Owner on 2026-09-21. **Not** implemented, **not** `VERIFIED`.
 **Review outcome:** structurally approved at `f7f9d8c`, subject to one editorial correction —
 §13.1 still listed `Activity` as unchanged while §9.5/§13.3 extend it. That is corrected here and
-was the only remaining finding.
+was the only remaining review finding.
 **Phase:** 1 — World / Character vertical slice
 **Baseline:** Phase 0A `ARCHITECTURE_APPROVED` (`ADR-001`–`ADR-018` `ACCEPTED`); Phase 0B
 [`PHASE_0B_TECHNICAL_FOUNDATION_SPEC.md`](../phase-0b/PHASE_0B_TECHNICAL_FOUNDATION_SPEC.md)
@@ -13,6 +13,18 @@ was the only remaining finding.
 [`DOMAIN_MODEL.md`](../../architecture/DOMAIN_MODEL.md),
 [`ACTIVITY_OCCUPANCY_AND_TIMERS.md`](../../architecture/ACTIVITY_OCCUPANCY_AND_TIMERS.md),
 [`CLIENT_SERVER_BOUNDARIES.md`](../../architecture/CLIENT_SERVER_BOUNDARIES.md)
+
+**Corrections made after approval, by the implementing phase, each recorded where it applies:**
+1. **§9.4 — Stamina is not always `NEUTRAL`.** The approved draft said it was, in and out of a
+   Hunt. Run against the real `deriveStaminaMode`, an idle Character derives **`RECOVERING`**. The
+   specification does not get to redefine a pure function in a `VERIFIED` package, so §9.4, §5.1,
+   §6 and §15's V4 were corrected to the derived values. This makes the §9.2 boundary *more*
+   observable, not less: entering the Hunt now visibly moves `RECOVERING → NEUTRAL`.
+2. **§16 — the D group was renumbered `D14–D23` → `D19–D28`.** Phase 0B already owns `D1–D18`,
+   so the draft's ids collided with five live cases. No Phase 0B id moves and the group stays at
+   ten cases. See the note under the matrix.
+
+Neither correction changes a contract, a boundary, or the 87-case total.
 
 > This document is a **specification**. It contains no implementation. Its job is to make the
 > implementing phase mechanical: exact contracts, exact boundaries, exact tests, an objective
@@ -36,7 +48,7 @@ browser
   → Rookgaard Sewers  (the one Hunt marker)
   → hunt details panel
   → ENTER HUNT
-  → pre-combat Hunt screen: the Character is IN the Hunt, occupied, Stamina NEUTRAL
+  → pre-combat Hunt screen: the Character is IN the Hunt, occupied, Stamina NEUTRAL (§9.4)
   → LEAVE
   → back to the Atlas, claim released
 ```
@@ -253,7 +265,7 @@ aptitudes, Gold roster unlocks, and vocation immutability enforcement at confirm
 | `baseLevel` | server | **1** (`TUTORIAL_ROOKGAARD_ROADMAP.md` §3) |
 | `createdAt` | server clock (`ADR-010`) | — |
 | `retiredAt` | server | `null` |
-| Stamina | server | `CharacterStamina` row, `remainingMs = STAMINA_MAX` (42:00), mode `NEUTRAL` |
+| Stamina | server | `CharacterStamina` row, `remainingMs = STAMINA_MAX` (42:00), mode **derived** by `deriveStaminaMode` — `RECOVERING` for a Character holding no claim (§9.4) |
 
 The client sends **`{ name }`** and nothing else. Everything else is server-owned; a request
 carrying `baseLevel` or `vocation` is rejected by schema validation, not ignored.
@@ -329,8 +341,8 @@ nothing authoritative (`CLIENT_SERVER_BOUNDARIES.md`).
 | Where the Character is | the **Atlas region** + current activity | `Rookgaard` when idle, or the Hunt's label when in one — both resolved from content (§10), neither from a durable location column (§5.4) |
 
 **Stamina is displayed, not ticked.** `deriveStaminaMode` is server-side and the mode in Phase 1 is
-always `NEUTRAL` (nothing consumes or recovers — §9.4). A client-side countdown would be the
-browser inventing authoritative state; the panel re-fetches instead.
+whatever the server derived (§9.4) — never a value the client picks. A client-side countdown
+would be the browser inventing authoritative state; the panel re-fetches instead.
 
 ---
 
@@ -451,9 +463,26 @@ implies simulation.
 
 ### 9.4 Stamina in Phase 1
 
-Always `NEUTRAL`, always 42:00, for every character, in and out of a Hunt. Nothing in Phase 1
-consumes (no qualifying XP) and nothing recovers (recovery is a Skill-Training/offline concern
-Phase 1 does not surface). The *state machine* is exercised; the *transitions* are Phase 2's.
+Always **42:00**, and the mode is whatever `deriveStaminaMode` returns for the Character's real
+occupancy — never a constant this phase asserts:
+
+| Character state | Derived mode | Why |
+|---|---|---|
+| Idle, holding no claim | **`RECOVERING`** | `deriveStaminaMode({ claim: null })`. It is capped at `STAMINA_MAX`, so nothing actually moves — recovering and already full |
+| In the pre-combat Hunt | **`NEUTRAL`** | a `STAMINA_CONSUMING` activity, `ONLINE_ACTIVE`, with `staminaActivatedAt = null` — the pre-consumption state of §9.2 |
+
+> **A draft of this section said "always `NEUTRAL`, in and out of a Hunt".** That is wrong for the
+> idle case and was corrected against the running code, not against memory:
+> `deriveStaminaMode({ claim: null })` returns `RECOVERING`, and the function is a pure function of
+> authoritative state in a `VERIFIED` package. The specification does not get to redefine it.
+>
+> The corrected reading is also the better evidence for §9.2: entering the Hunt visibly moves the
+> mode `RECOVERING → NEUTRAL`, which is precisely the documented pre-consumption transition, and a
+> phase that asserted a constant could not show it.
+
+Nothing in Phase 1 consumes (no qualifying XP) and nothing recovers in practice (the value is
+already at maximum). The *state machine* is exercised; the *transitions that move the number* are
+Phase 2's.
 
 ### 9.5 The Activity must know WHICH Hunt it is — `Activity.contentKey`
 
@@ -847,7 +876,7 @@ and **390×844** (iPhone-class) and with touch emulation on:
 | V1 | session entry; entering a handle lands on the character list |
 | V2 | empty account → creation form; invalid/taken name shows an inline error |
 | V3 | one character in the list, selectable |
-| V4 | character panel: name, `Level 1`, *"Not yet chosen — Oracle at Level 8"*, `42:00 NEUTRAL`, `Free` |
+| V4 | character panel: name, `Level 1`, *"Not yet chosen — Oracle at Level 8"*, `42:00 RECOVERING` (idle — §9.4), `Free` |
 | V5 | Atlas shell renders; pan and zoom work with mouse **and** touch |
 | V6 | Rookgaard is `AVAILABLE`; the locked regions are visibly locked and inert |
 | V7 | the Rookgaard Sewers marker is visible and selectable **by tap**, not only hover |
@@ -887,19 +916,31 @@ it**; the count is the consequence, not a target.
 |---|---|---|
 | **S** — session/auth | S1–S11 | create session; reload persists; no cookie → 401; logout clears; cookie for account A cannot read account B; `/health` and `/metrics` stay unauthenticated; tampered signature rejected; **`sessionId` is minted server-side**; **same cookie ⇒ same `sessionId`**; **a second login ⇒ a different `sessionId` on the same account**; **a client-supplied `sessionId` is ignored** |
 | **DEV** — dev-provider containment | DEV1–DEV4 | the provider is registered only when `NODE_ENV!==production` **and** `GLOBAL_IDLE_DEV_AUTH=1`; with either missing the route is **absent (404)**; `NODE_ENV=production` + `GLOBAL_IDLE_DEV_AUTH=1` **fails to boot**; the demo seed and E2E use the dev provider |
-| **CH** — character | CH1–CH9 | create with server-owned fields; `vocation` is NULL; `baseLevel` is 1; Stamina row created at 42:00 NEUTRAL; name validation; duplicate name; roster capacity refusal; client-supplied `baseLevel`/`vocation` rejected; **a second Origin Character is refused with `ORIGIN_CHARACTER_EXISTS`** |
-| **D** — database/invariant | D14–D23 | migration applies on a clean DB **and** over a Phase 0B database with no Activity rows; the **first** Origin Character is accepted; a **second** on the same account is **refused by I1b**; a **different account** may have its own; D4/D5 still pass (two Knights refused, retired vocation reusable); a Knight and an Origin Character coexist; `baseLevel >= 1` CHECK holds; **`Activity.contentKey` is `NOT NULL` after migration**; **the format CHECK rejects a malformed key and accepts every key the Phase 1 bundle authors**; **the migration FAILS on a database that still holds Activity rows, with a readable error** (§13.3) |
+| **CH** — character | CH1–CH9 | create with server-owned fields; `vocation` is NULL; `baseLevel` is 1; Stamina row created at 42:00 with the DERIVED mode (`RECOVERING` while idle); name validation; duplicate name; roster capacity refusal; client-supplied `baseLevel`/`vocation` rejected; **a second Origin Character is refused with `ORIGIN_CHARACTER_EXISTS`** |
+| **D** — database/invariant | **D19–D28** | the migration applies on a clean database (D19) and over a Phase 0B database with no Activity rows (D20); the **first** Origin Character is accepted (D21); a **second** on the same account is **refused by I1b** (D22); a **different account** may have its own (D23); a Knight and an Origin Character coexist on one account (D24); the `baseLevel >= 1` CHECK holds (D25); **`Activity.contentKey` is `NOT NULL` after the migration** (D26); **the format CHECK rejects a malformed key and accepts every key the Phase 1 bundle authors** (D27); **the migration FAILS on a database that still holds Activity rows, with a readable error** (D28, §13.3) |
 | **AT** — atlas/content | AT1–AT7 | bundle validates; marker→region kind-check; marker→hunt kind-check; hunt's `activityTypeKey` resolves in the registry; position within bounds; exactly one AVAILABLE region; unknown asset id fails the build |
 | **API** — contracts | API1–API10 | each route's happy path and its documented error code, including `404`-not-`403` for a foreign character |
-| **AC** — activity boundary | AC1–AC13 | Enter creates a real Activity; claim acquired; `staminaActivatedAt` stays NULL; Stamina stays NEUTRAL; reload returns the same Activity; Leave ends it and releases the claim; second Enter → `OccupancyConflict`; double-submitted Enter is idempotent; **`contentKey` is persisted on the Activity**; **reload reconstructs the Hunt from `(contentVersion, contentKey)` alone**; **the key resolves against the Activity's OWN pinned version**; **a non-`hunt` kind is refused with `CONTENT_KIND_MISMATCH` and creates nothing**; **no endpoint can change `contentKey` after creation** |
+| **AC** — activity boundary | AC1–AC13 | Enter creates a real Activity; claim acquired; `staminaActivatedAt` stays NULL; Stamina reads `NEUTRAL` in the Hunt and `RECOVERING` once it ends; reload returns the same Activity; Leave ends it and releases the claim; second Enter → `OccupancyConflict`; double-submitted Enter is idempotent; **`contentKey` is persisted on the Activity**; **reload reconstructs the Hunt from `(contentVersion, contentKey)` alone**; **the key resolves against the Activity's OWN pinned version**; **a non-`hunt` kind is refused with `CONTENT_KIND_MISMATCH` and creates nothing**; **no endpoint can change `contentKey` after creation** |
 | **UI** — component/interaction | UI1–UI8 | Atlas pan/zoom; marker selection by click **and** by tap; `Escape` deselects; focus visible; locked region inert; bottom sheet at mobile width; no layout shift on load; error state renders with retry |
 | **E2E** — browser flow | E2E1–E2E10 | V1–V10 of §15, desktop and touch viewports |
 | **REG** — Phase 0B regression | REG1–REG5 | the 92-case matrix still passes; `pnpm dev` bootstrap still green; boundaries unchanged; occupancy/idempotency/content contracts Phase 1 consumes behave as Phase 0B proved |
 
-**Totals: 10 groups, 87 mandatory cases** — S 11, DEV 4, CH 9, D 10, AT 7, API 10, AC 13, UI 8,
-E2E 10, REG 5 —
+**Totals: 10 groups, 87 mandatory cases** — S 11, DEV 4, CH 9, D 10 (**D19–D28**), AT 7, API 10,
+AC 13, UI 8, E2E 10, REG 5 —
 counted by a `scripts/count-matrix.mjs` extension, so "87/87" stays a countable claim rather than
-an assertion. Phase 0B's 92 cases remain in force and are **not** renumbered.
+an assertion. Phase 0B's 92 cases remain in force and are **not** renumbered — which is why the
+D group starts at **D19**.
+
+> **Correction — the D group was numbered `D14–D23` in the reviewed draft, and that collided.**
+> Phase 0B's D group is `D1–D18`, so `D14–D18` named two different cases at once and the sentence
+> above about not renumbering contradicted the row under it. The Phase 1 ids move to `D19–D28`;
+> **no Phase 0B id moves**, and the count stays 10.
+>
+> The same pass removed one double-count: the draft listed *"D4/D5 still pass"* as a Phase 1 D
+> case, but D4 and D5 are Phase 0B cases that already run, and re-running them is exactly what
+> **REG1** is. The freed slot went to a behaviour that had been folded into a neighbour — the
+> migration over a Phase 0B database (**D20**) is now its own case rather than a clause inside
+> the clean-database one. Ten cases before, ten after; the totals are untouched.
 
 ---
 
@@ -964,14 +1005,14 @@ noise Phase 1 has no consumer for.
 | 3 | The Phase 0B 92-case matrix passes **unchanged** |
 | 4 | The Phase 1 matrix is 87/87, counted by script |
 | 5 | The migration applies to a clean database **and** over a Phase 0B database with no Activity rows; on one that still holds them it fails with the readable error of §13.3, not silently |
-| 6 | D4/D5 still pass; exactly **one** playable Origin Character per Account (I1b, D16–D18) |
+| 6 | D4/D5 still pass (Phase 0B cases, re-run by **REG1**); exactly **one** playable Origin Character per Account (I1b, **D21–D23**) |
 | 7 | A reviewer can complete V1→V10 in a browser at 1440×900 **and** 390×844 with touch |
-| 8 | One character is visible with Level 1, no vocation, 42:00 NEUTRAL, Free |
+| 8 | One character is visible with Level 1, no vocation, 42:00 `RECOVERING` while idle, Free |
 | 9 | The Atlas shell renders, pans and zooms with mouse and touch |
 | 10 | Rookgaard is available; locked regions are visible and inert |
 | 11 | The Rookgaard Sewers marker is selectable without hover |
 | 12 | ENTER creates a real Activity; reload returns to it; LEAVE releases the claim |
-| 13 | `staminaActivatedAt` is NULL and Stamina is NEUTRAL throughout (AC3, AC4) |
+| 13 | `staminaActivatedAt` is NULL throughout, and the Stamina mode is the DERIVED one — `NEUTRAL` in the Hunt, `RECOVERING` when idle (AC3, AC4) |
 | 14 | No Phase 2 gameplay exists: no rooms, encounters, XP, gold, loot, damage or supplies |
 | 15 | No vocation kit exists for any of the five vocations |
 | 16 | Every authoritative value in the UI came from a server response |
