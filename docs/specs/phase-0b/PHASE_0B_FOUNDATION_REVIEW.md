@@ -8,10 +8,12 @@ This is work package **0B.11**'s deliverable: the test matrix, an ADR-by-ADR tra
 Definition of Done with evidence rather than assertion, and a list of everything the
 implementation decided on its own.
 
-> **§16 criterion 19 is now satisfied.** The workflow ran on GitHub and **all thirteen checks
-> passed**, including the Testcontainers suites this environment could not exercise:
-> [run 35550647692](https://github.com/Hokz/Global-Idle/actions/runs/35550647692). It took three attempts, and each failure was a real defect a green
-> local suite could not have shown — §6 records them.
+> **§16 criterion 19 is now satisfied.** The workflow runs on GitHub and **all thirteen checks
+> pass**, including the Testcontainers suites this environment could not exercise:
+> [run 35614825163](https://github.com/Hokz/Global-Idle/actions/runs/35614825163), on the current head, alongside the
+> `dev-bootstrap` job. The FIRST green run took three attempts
+> ([35550647692](https://github.com/Hokz/Global-Idle/actions/runs/35550647692)), and each failure
+> was a real defect a green local suite could not have shown — §6 records them.
 >
 > Moving Phase 0B itself to `VERIFIED` is the Product Owner's call, not this document's. What
 > this document reports is that every criterion now carries evidence.
@@ -47,9 +49,12 @@ TOTAL 92/92
 | §14.10 Engine | E1, E2 | `tests/fixtures/engine-determinism.test.ts` |
 | | E3 | `tests/fixtures/engine-boundary.test.ts` |
 
-Full run, all four Vitest projects: **15 files, 99 tests, 0 failures** — 23 unit, 3 fixtures, 67 integration, 6 invariants. The seven cases beyond
-the matrix are unnumbered assertions that belong with their neighbours (the `/metrics` surface,
-the registry's own consistency) and are not counted toward the 92.
+Full run, all four Vitest projects: **16 files, 116 tests, 0 failures** — 23 unit, 3 fixtures,
+84 integration, 6 invariants. The twenty-four cases beyond the matrix are not counted toward the
+92: seven unnumbered assertions that belong with their neighbours (the `/metrics` surface, the
+registry's own consistency), and the seventeen observability cases the two correction passes
+added — ten proving §12.2 and §12.3 are exercised by real flows, seven proving occupancy errors
+are classified narrowly and reconciliation reports what it released.
 
 ---
 
@@ -100,7 +105,7 @@ constrains.
 | 5a | `apps/worker ↛ apps/api`; no app reaches a context internal | **W10**, **W11** |
 | 5b | The §3.10 contract holds **mechanically** | `.nvmrc` = `24.21.0`; `engines.node` = `>=24.21.0 <25`; `packageManager` = `pnpm@12.5.1`; `pnpm-workspace.yaml` sets `nodeLinker: isolated`, `shamefullyHoist: false`, `engineStrict: true` and an explicit `allowBuilds` map. **Measured:** installing under Node 22.22.2 fails at the `preinstall` guard; removing one `allowBuilds` entry fails the install with `ERR_PNPM_IGNORED_BUILDS`; CI reads `.nvmrc` through `node-version-file` and restates no version |
 | 6 | Unit tests | 23 pass; 3 fixture cases pass |
-| 7 | Integration tests against ephemeral PostgreSQL and Redis | **satisfied.** 67 integration and 6 invariant cases pass **under Testcontainers in CI** ([run](https://github.com/Hokz/Global-Idle/actions/runs/35550647692), checks 10 and 11), and locally against PostgreSQL 16 and Redis 7 through the documented escape hatch |
+| 7 | Integration tests against ephemeral PostgreSQL and Redis | **satisfied.** 84 integration and 6 invariant cases pass **under Testcontainers in CI** ([run 35614825163](https://github.com/Hokz/Global-Idle/actions/runs/35614825163), checks 10 and 11), and locally against PostgreSQL 16 and Redis through the documented escape hatch |
 | 8 | Deterministic engine fixtures, including across a process restart | **E1**, **E2** — against a **committed golden file**, because two fresh runs of a broken implementation agree with each other perfectly |
 | 9 | Content validation passes; an invalid bundle fails it | `pnpm --filter @global-idle/game-data run validate` exits 0; **measured:** an invalid source exits 1 and names the check. **C1** covers every §10.2 check |
 | 10 | Migrations apply from empty **and** from the previous state | `migrate:check` — **D1**, **D2**; **D13** asserts the generated SQL carries every declared partial-index predicate and both hand-written `CHECK` constraints |
@@ -112,7 +117,7 @@ constrains.
 | 16 | `/health/live` healthy with PostgreSQL down | **H1** |
 | 17 | `/health/ready` fails independently on each of its four conditions | **H2** (PostgreSQL), **H3** (Redis), **H4** (migration version), **H5** (content unavailable *and* invalid). H2 also asserts the control: with everything up, all four report `up` |
 | 18 | The complete §14 matrix — all 92 cases | 92/92, counted (§1 above) |
-| 19 | **CI green, thirteen checks, each the same script a developer runs** | **satisfied.** All thirteen green on GitHub: [run 35550647692](https://github.com/Hokz/Global-Idle/actions/runs/35550647692). The same thirteen also pass locally, in the same order, against a genuinely clean checkout |
+| 19 | **CI green, thirteen checks, each the same script a developer runs** | **satisfied.** All thirteen green on GitHub: [run 35614825163](https://github.com/Hokz/Global-Idle/actions/runs/35614825163), on the current head. The same thirteen also pass locally, in the same order, against a genuinely clean checkout |
 | 20 | No accepted architecture invariant contradicted | §2 above, ADR by ADR, with §6.6's deferrals stated rather than overclaimed |
 | 21 | No Hunt balance or gameplay loop | no XP curve, damage formula, loot table or reward multiplier exists. The engine's per-participant draw is **deliberately uninterpreted**; `settleRecovery` produces the 39:00 and Premium **split** and applies no multiplier to it. *Did anything require a balance number to be correct?* **No.** |
 | 22 | No product rule created by this phase | the registry classifies **Hunt and Skill Training only**; there is no Dungeon descriptor, and **T12** proves an unclassified type cannot reach production. *Did anything decide something the Product Owner has not?* **No** — §5 lists every implementation decision, and none is a product rule |
@@ -193,15 +198,15 @@ contradicts an accepted ADR.
 
 ## 6. Verification status — including what is still **not** verified
 
-Stated plainly, because a foundation review that overclaims is worse than one that is short. Two
-of the three claims below were unverified when this document was first written; the third still
-is.
+Stated plainly, because a foundation review that overclaims is worse than one that is short. All
+three claims below were unverified when this document was first written. All three now carry a
+CI run as evidence; what remains unverified is stated under the table, not hidden in it.
 
 | Claim | Status |
 |---|---|
-| **CI is green** (§16 criterion 19) | **VERIFIED** — [run 35550647692](https://github.com/Hokz/Global-Idle/actions/runs/35550647692), all thirteen checks. It took three runs; the three defects are i25, i26 and i27 |
+| **CI is green** (§16 criterion 19) | **VERIFIED** — [run 35614825163](https://github.com/Hokz/Global-Idle/actions/runs/35614825163), all thirteen checks plus the matrix count, on the current head. The first green run took three attempts; those three defects are i25, i26 and i27 |
 | **Integration tests under Testcontainers** (§16 criterion 7) | **VERIFIED in CI.** The `GLOBAL_IDLE_TEST_*` escape hatch is deliberately absent from the workflow, so Testcontainers was the only path. Locally Testcontainers still cannot run — the daemon starts, but this environment's egress policy refuses Docker Hub image blobs — and the escape hatch exists for exactly that. The suite has since been run here against a local PostgreSQL 16 and Redis through that hatch, which is how the Prisma error shapes behind i32 were measured rather than assumed |
-| **`pnpm dev`** (§11.3, one command to a running stack) | **VERIFIED** — [run 35557424621](https://github.com/Hokz/Global-Idle/actions/runs/35557424621), the `dev-bootstrap` job, which runs `scripts/verify-dev-bootstrap.mjs`. It spawns the REAL `pnpm dev` and waits for every acceptance signal before shutting the stack down: compose healthy, migrations applied *and present in `_prisma_migrations`*, the content bundle built, the seed *present as rows in the database*, `/health/live` and `/health/ready` 200 with all four conditions up, `apps/web` serving 200, the worker booted *and its repeatable sweep registered in the Redis the stack brought up*. It asks the running system wherever it can rather than grepping log lines. Every signal was met, in order, and the stack was torn down with its volumes |
+| **`pnpm dev`** (§11.3, one command to a running stack) | **VERIFIED** — [run 35614825163](https://github.com/Hokz/Global-Idle/actions/runs/35614825163), the `dev-bootstrap` job, which runs `scripts/verify-dev-bootstrap.mjs`. It has passed on every run since it was added ([35557424621](https://github.com/Hokz/Global-Idle/actions/runs/35557424621) was the first). It spawns the REAL `pnpm dev` and waits for every acceptance signal before shutting the stack down: compose healthy, migrations applied *and present in `_prisma_migrations`*, the content bundle built, the seed *present as rows in the database*, `/health/live` and `/health/ready` 200 with all four conditions up, `apps/web` serving 200, the worker booted *and its repeatable sweep registered in the Redis the stack brought up*. It asks the running system wherever it can rather than grepping log lines. Every signal was met, in order, and the stack was torn down with its volumes |
 
 **Locally the bootstrap verification still cannot run**, and fails loudly rather than skipping: this
 environment's egress policy refuses Docker Hub image blobs (`403` on
@@ -302,5 +307,6 @@ None of the three changes a boundary, an interface, an invariant or a product ru
 1. **Independent Phase 0B implementation review** of [PR #4](https://github.com/Hokz/Global-Idle/pull/4).
 2. If the review accepts it, the Product Owner moves Phase 0B to `VERIFIED` and this document's
    status line moves with it.
-3. `pnpm dev` is the one claim still untested end to end. It needs one run on a machine with a
-   Docker daemon, and is worth doing before Phase 1 relies on it.
+3. Nothing in §16 is now untested. The one environmental limit that remains is recorded in §6:
+   the bootstrap verification cannot run where Docker Hub image blobs are blocked, and fails
+   loudly rather than skipping when they are.
