@@ -60,6 +60,31 @@ export async function setup(): Promise<void> {
     env: { ...process.env, DATABASE_URL: databaseUrl },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
+
+  await attachApplicationRoleCredential(databaseUrl);
+}
+
+/**
+ * The migration creates `globalidle_app` NOLOGIN on purpose — a migration has
+ * no business holding a credential (§6.4). Attaching one is a DEPLOYMENT
+ * concern, and for the test stack this is the deployment.
+ *
+ * Without it, D9 cannot connect as the least-privileged role and the whole
+ * append-only guarantee goes untested. It passed on a developer machine only
+ * because the role had been given a login there by hand, which is exactly the
+ * kind of local state that makes a suite green here and red in CI.
+ */
+async function attachApplicationRoleCredential(databaseUrl: string): Promise<void> {
+  const { PrismaPg } = await import('@prisma/adapter-pg');
+  const { PrismaClient } = await import('../../packages/domain/src/generated/prisma/client.js');
+  const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: databaseUrl }) });
+  try {
+    await prisma.$executeRawUnsafe(
+      `ALTER ROLE "globalidle_app" WITH LOGIN PASSWORD 'globalidle_app'`,
+    );
+  } finally {
+    await prisma.$disconnect();
+  }
 }
 
 export async function teardownAll(): Promise<void> {

@@ -16,7 +16,12 @@ export function createClient(url: string = databaseUrl()): PrismaClient {
   return new PrismaClient({ adapter: new PrismaPg({ connectionString: url }) });
 }
 
-/** A client connected as the least-privileged application role (I6, test D9). */
+/**
+ * A client connected as the least-privileged application role (I6, test D9).
+ *
+ * The role is created NOLOGIN by the migration; the test global setup attaches
+ * this credential, exactly as a deployment would. See global-setup.ts.
+ */
 export function createAppRoleClient(): PrismaClient {
   const url = new URL(databaseUrl());
   url.username = 'globalidle_app';

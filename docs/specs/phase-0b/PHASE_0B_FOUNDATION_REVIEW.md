@@ -177,6 +177,9 @@ contradicts an accepted ADR.
 | i22 | CI checks 6 and 7 run `pnpm test:unit` and `pnpm test:fixtures` | §13's command column reads *"`pnpm test` — unit project"*. Taken literally, checks 6 and 7 would each run the whole suite and duplicate checks 10 and 11. Both are scripts a developer runs | low |
 | i23 | CI provides a PostgreSQL **service** for check 9 and installs `psql` if the image lacks it | `migrate:check` creates and drops scratch databases; checks 10 and 11 still use Testcontainers and never this service | low |
 | i24 | `'silent'` added to `LOG_LEVELS` | a health check that prints a request line per case buries the failure it is reporting. It is a real pino level | low |
+| i25 | `package-manager-cache: false` on `actions/setup-node` | **measured on GitHub:** it defaults to true, sees `packageManager: pnpm@12.5.1`, and shells out to `pnpm` to resolve the store path — while still installing the Node that Corepack ships with. Corepack cannot move earlier without shimming the runner's default Node. The store is cached explicitly anyway | low |
+| i26 | `not-to-unresolvable` exempts `generated/prisma/` | **measured on GitHub:** check 3 was red with five unresolvable imports of the generated client, because §13 runs boundaries at 3 and generation at 4. The cruise already excludes that tree from the graph, so whether it exists is check 4's question, not check 3's. Once generation has run, the import resolves and the exemption applies to nothing | low |
+| i27 | The test global setup attaches the application role's login after migrating | the migration creates `globalidle_app` `NOLOGIN` on purpose (§6.4), and **D9 passed here only because the role had been given a login by hand in an earlier session** — exactly the local state that makes a suite green on a developer machine and red in CI. Reproduced by resetting the role: `28P01 password authentication failed`. The migration still holds no credential | low |
 
 ---
 
@@ -186,7 +189,7 @@ Stated plainly, because a foundation review that overclaims is worse than one th
 
 | Claim | Status |
 |---|---|
-| **CI is green** (§16 criterion 19) | **NOT VERIFIED.** The workflow has never run on GitHub. Every one of its thirteen checks was run locally, in order, and passes |
+| **CI is green** (§16 criterion 19) | **NOT YET.** The workflow has now run on GitHub and found three real defects that passing locally had hidden — see i25, i26 and i27. Each is fixed, reproduced first and verified after. All thirteen checks also pass locally against a **genuinely clean checkout**, in the workflow's order, with no `node_modules`, no `dist` and no generated client in it. The criterion stays unsatisfied until a run is green |
 | **Integration tests under Testcontainers** (§16 criterion 7) | **NOT VERIFIED.** This environment has no Docker daemon. They ran against a locally installed PostgreSQL 16 and Redis 7 through `GLOBAL_IDLE_TEST_DATABASE_URL` / `GLOBAL_IDLE_TEST_REDIS_URL`, the escape hatch `tests/support/global-setup.ts` documents. With a daemon present and those variables unset — which is CI — Testcontainers is the only path |
 | **`pnpm dev`** (§11.3, one command to a running stack) | **NOT VERIFIED end to end**, for the same reason: it begins with `docker compose up`. Every step *after* the compose stage was run individually — generate, build, migrate, build the bundle, seed, and all three apps started and served |
 | **Check 0 as GitHub runs it** | **NOT VERIFIED.** Its four mechanisms were each verified directly (see criterion 5b), but not through `actions/setup-node` |
@@ -225,7 +228,12 @@ None of the three changes a boundary, an interface, an invariant or a product ru
 
 ## 8. Next step
 
-1. Open the pull request and let CI run.
+1. Drive the pull request's CI to green.
 2. When the workflow is green, Phase 0B moves to `VERIFIED` and this document's status line moves
    with it.
 3. Nothing in Phase 1 or Phase 2 should begin against an unverified foundation.
+
+Three defects CI found that local runs could not, recorded because the pattern matters more than
+the fixes: a step that needed a tool the previous step installs; a check that depended on a later
+check having run; and a test that passed on accumulated local state. **All three were invisible
+to a green local suite**, which is the whole argument for criterion 19.
