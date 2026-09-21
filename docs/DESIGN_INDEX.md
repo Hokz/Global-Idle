@@ -40,6 +40,7 @@ Every design document carries a status marker. A document advances through these
 ```text
 DRAFT
 → DESIGN_APPROVED / DESIGN_BASELINE
+→ IMPLEMENTATION_SPEC_DRAFT
 → IMPLEMENTATION_SPEC_READY
 → IMPLEMENTED
 → VERIFIED
@@ -49,7 +50,8 @@ DRAFT
 |---|---|
 | `DRAFT` | Under discussion. Not safe to build against. |
 | `DESIGN_APPROVED` / `DESIGN_BASELINE` | The Product Owner has approved the direction. Open items may remain. |
-| `IMPLEMENTATION_SPEC_READY` | The design has been turned into a concrete implementation spec. |
+| `IMPLEMENTATION_SPEC_DRAFT` | An implementation spec is complete and submitted for independent review. Not yet approved — do not build against it. |
+| `IMPLEMENTATION_SPEC_READY` | The design has been turned into a concrete implementation spec, approved after review. |
 | `IMPLEMENTED` | The described behavior exists in the codebase. |
 | `VERIFIED` | The implementation has been tested and confirmed to match the design. |
 
@@ -96,7 +98,8 @@ everything under `docs/design/`:
 | `docs/DECISIONS.md` | Locked decisions that must not be silently reversed |
 | `docs/OPEN_QUESTIONS.md` | Project-level unresolved design questions |
 | `docs/architecture/ARCHITECTURE_OVERVIEW.md` | **Technical architecture — entry point.** The Phase 0A package (`ARCHITECTURE_APPROVED`): domain model, boundaries, persistence, lifecycle, engine, content, economy integrity, operations, and all 18 `ACCEPTED` ADRs (`ADR-001`–`ADR-017` from Phase 0A, `ADR-018` from the Phase 0B specification) |
-| `docs/specs/phase-0b/PHASE_0B_TECHNICAL_FOUNDATION_SPEC.md` | **Phase 0B implementation specification** — tooling, workspace boundaries, primitive contracts, test matrix and Definition of Done (**`IMPLEMENTATION_SPEC_READY`**) |
+| `docs/specs/phase-0b/PHASE_0B_TECHNICAL_FOUNDATION_SPEC.md` | **Phase 0B implementation specification** — tooling, workspace boundaries, primitive contracts, test matrix and Definition of Done (**`VERIFIED`**) |
+| `docs/specs/phase-0b/PHASE_0B_FOUNDATION_REVIEW.md` | **Phase 0B evidence** — the 92-case matrix, an ADR-by-ADR trace, §16 line by line, and every autonomous implementation decision (**`VERIFIED`**, accepted 2026-09-21) |
 | `docs/ARCHITECTURE.md` | Phase 0 product-level sketch, superseded in detail by the package above |
 | `docs/MVP_SCOPE.md` | First playable vertical slice |
 | `docs/ECONOMY.md` | Economy principles, sinks and transaction rules |

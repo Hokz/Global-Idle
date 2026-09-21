@@ -1,7 +1,9 @@
 # Phase 0B — Technical Foundation: Implementation Specification
 
-**Document status:** **`IMPLEMENTATION_SPEC_READY`**
+**Document status:** **`VERIFIED`** — implemented and independently reviewed; see
+[`PHASE_0B_FOUNDATION_REVIEW.md`](./PHASE_0B_FOUNDATION_REVIEW.md)
 **Approved:** 2026-09-20 — by the Product Owner, after five rounds of independent review
+**Verified:** 2026-09-21 — Product Owner accepted the independent review of `922e1c3cc5b966632c900931417242857239136a`
 **Phase:** 0B — Technical Foundation
 **Baseline:** Phase 0A, `ARCHITECTURE_APPROVED`, `ADR-001`–`ADR-017` `ACCEPTED`; `ADR-018`
 `ACCEPTED` with this specification

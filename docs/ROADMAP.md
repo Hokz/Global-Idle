@@ -19,12 +19,14 @@ Documented, not implemented:
 - Party mixed-Stamina behaviour;
 - server-authoritative time.
 
-## Phase 0B — Technical Foundation
+## Phase 0B — Technical Foundation — `VERIFIED`
 
 **Specification:**
 [`docs/specs/phase-0b/PHASE_0B_TECHNICAL_FOUNDATION_SPEC.md`](specs/phase-0b/PHASE_0B_TECHNICAL_FOUNDATION_SPEC.md)
-— **`IMPLEMENTATION_SPEC_READY`**, approved by the Product Owner after independent review.
-Implementation follows on its own branch and pull request.
+— **`VERIFIED`**. Implemented, independently reviewed, and accepted by the Product Owner on
+2026-09-21. Evidence:
+[`docs/specs/phase-0b/PHASE_0B_FOUNDATION_REVIEW.md`](specs/phase-0b/PHASE_0B_FOUNDATION_REVIEW.md)
+— 92/92 contractual matrix, 116 tests, both CI jobs green, `pnpm dev` verified end to end.
 
 Goal: prepare the project so implementation does not begin on ambiguous foundations.
 
@@ -58,7 +60,7 @@ Deliverables:
 
 No full gameplay yet.
 
-## Phase 1 — Character + World Map
+## Phase 1 — Character + World Map — current phase
 
 - account;
 - character creation;

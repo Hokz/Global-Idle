@@ -1,6 +1,8 @@
 # Phase 0B — Foundation review
 
-**Status:** `IMPLEMENTATION_COMPLETE — CI GREEN — PENDING PRODUCT OWNER REVIEW`
+**Status:** **`VERIFIED`**
+**Accepted:** 2026-09-21 — by the Product Owner, on the independent review of
+`922e1c3cc5b966632c900931417242857239136a` ([CI run 35617898597](https://github.com/Hokz/Global-Idle/actions/runs/35617898597))
 **Specification:** [`PHASE_0B_TECHNICAL_FOUNDATION_SPEC.md`](./PHASE_0B_TECHNICAL_FOUNDATION_SPEC.md) (`IMPLEMENTATION_SPEC_READY`)
 **Branch:** `feat/phase-0b-technical-foundation`
 
@@ -16,8 +18,11 @@ implementation decided on its own.
 > ([35550647692](https://github.com/Hokz/Global-Idle/actions/runs/35550647692)), and each failure
 > was a real defect a green local suite could not have shown — §6 records them.
 >
-> Moving Phase 0B itself to `VERIFIED` is the Product Owner's call, not this document's. What
-> this document reports is that every criterion now carries evidence.
+> **The Product Owner has accepted the independent review and moved Phase 0B to `VERIFIED`.**
+> The review found no remaining technical blocker: the two occupancy corrections are correct,
+> the documentation correction is consistent, W12 passes, the real `pnpm dev` bootstrap passes
+> end to end, both CI jobs are green, the contractual matrix is 92/92, and the full suite is
+> 16 files / 116 tests / 0 failures. This document reports the evidence that transition rests on.
 
 ---
 
