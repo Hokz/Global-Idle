@@ -21,7 +21,7 @@
  * positions and inventing persisted ones would be a second source of truth.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { api, type HuntEvent, type RunView } from '../_lib/api';
+import { ApiError, api, type HuntEvent, type RunView } from '../_lib/api';
 
 /** How often a connected client proves it is still there. Comfortably inside
  *  the server's liveness window, so an ordinary hiccup is not a disconnect. */
@@ -92,6 +92,18 @@ export function GameWindow({ characterId, label, summary, onEnded }: GameWindowP
   const [leaving, setLeaving] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const seen = useRef(-1);
+  /**
+   * The caller's callback, behind a ref.
+   *
+   * `onEnded` is an inline arrow at every call site, so depending on it
+   * directly would give `poll` a new identity on every render — and the effect
+   * below would tear the interval down and rebuild it each time. It happens to
+   * keep roughly the right cadence, which is worse than failing: a component
+   * that re-rendered a little faster would reset the timer before it ever
+   * fired, and the Hunt would silently stop advancing.
+   */
+  const finish = useRef(onEnded);
+  finish.current = onEnded;
 
   const poll = useCallback(async () => {
     try {
@@ -117,8 +129,15 @@ export function GameWindow({ characterId, label, summary, onEnded }: GameWindowP
           ].slice(-8),
         );
       }
-    } catch {
-      // A failed poll is a connection problem, not a game state. The server
+    } catch (cause) {
+      // A SIGNED-OUT session is not a lost connection, and telling a player to
+      // wait five minutes for one would be a lie they could sit through. Hand
+      // it back to the page, which asks the server which screen this is now.
+      if (cause instanceof ApiError && cause.status === 401) {
+        await finish.current();
+        return;
+      }
+      // Anything else is a connection problem, not a game state. The server
       // holds the run for five minutes; say so instead of tearing the screen
       // down.
       setFailed(true);
