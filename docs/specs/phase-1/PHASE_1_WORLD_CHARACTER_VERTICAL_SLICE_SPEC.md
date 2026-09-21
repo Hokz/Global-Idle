@@ -1,7 +1,10 @@
 # Phase 1 — World / Character Vertical Slice: Implementation Specification
 
-**Document status:** **`IMPLEMENTATION_SPEC_DRAFT`** — complete draft, ready for independent
-review. **Not** approved, **not** implemented, **not** `VERIFIED`.
+**Document status:** **`IMPLEMENTATION_SPEC_READY`** — independently reviewed and accepted by the
+Product Owner on 2026-09-21. **Not** implemented, **not** `VERIFIED`.
+**Review outcome:** structurally approved at `f7f9d8c`, subject to one editorial correction —
+§13.1 still listed `Activity` as unchanged while §9.5/§13.3 extend it. That is corrected here and
+was the only remaining finding.
 **Phase:** 1 — World / Character vertical slice
 **Baseline:** Phase 0A `ARCHITECTURE_APPROVED` (`ADR-001`–`ADR-018` `ACCEPTED`); Phase 0B
 [`PHASE_0B_TECHNICAL_FOUNDATION_SPEC.md`](../phase-0b/PHASE_0B_TECHNICAL_FOUNDATION_SPEC.md)
@@ -642,14 +645,23 @@ than racing the occupancy constraint.
 
 ## 13. Persistence / schema impact
 
-### 13.1 Reused unchanged
+### 13.1 What Phase 1 touches, and what it does not
+
+**Reused unchanged** — no column added, no constraint altered:
 
 `Account`, `AuthIdentity`, `Entitlement`, `EntitlementAudit`, `CharacterStamina`,
 `SessionBoundActivity`, `ActivityParticipant`, `OccupancyClaim`, `IdempotencyRecord`,
-`ContentBundle`. **No** new table duplicates state an existing context owns.
+`ContentBundle`.
 
-**`Activity` is NOT in that list** — §9.5 adds a column to it, specified in §13.3. An earlier draft
-listed it here as unchanged, which contradicted §9.5 outright.
+**Extended by Phase 1** — two tables, both specified in full below:
+
+| Table | Change | Specified in |
+|---|---|---|
+| `Character` | `vocation` becomes nullable; `baseLevel` added with a `CHECK (>= 1)`; the **I1b** partial unique index added | **§13.2** |
+| `Activity` | `contentKey` added, `NOT NULL` after migration; content-key format `CHECK`; index on `(contentVersion, contentKey)` | **§13.3** |
+
+**No** new table duplicates state an existing context owns, and no Phase 0B constraint is
+weakened — I1, I2 and every Activity invariant survive both migrations intact.
 
 ### 13.2 `Character` — the migration this phase requires
 

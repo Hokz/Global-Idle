@@ -64,7 +64,8 @@ No full gameplay yet.
 
 **Specification:**
 [`docs/specs/phase-1/PHASE_1_WORLD_CHARACTER_VERTICAL_SLICE_SPEC.md`](specs/phase-1/PHASE_1_WORLD_CHARACTER_VERTICAL_SLICE_SPEC.md)
-— `IMPLEMENTATION_SPEC_DRAFT`, awaiting independent review.
+— **`IMPLEMENTATION_SPEC_READY`**, accepted by the Product Owner after independent review on
+2026-09-21. Implementation follows on its own branch and pull request.
 
 - account;
 - character creation;
