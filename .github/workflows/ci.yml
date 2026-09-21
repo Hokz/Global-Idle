@@ -70,6 +70,12 @@ jobs:
         with:
           # CI CANNOT DRIFT FROM .nvmrc, because it reads it (§3.10).
           node-version-file: .nvmrc
+          # setup-node's own package-manager cache would shell out to `pnpm`
+          # while resolving the store path — before Corepack has provided it,
+          # because Corepack needs the Node this step is still installing.
+          # Measured: "Unable to locate executable file: pnpm". The store is
+          # cached explicitly below instead, keyed on the lockfile.
+          package-manager-cache: false
 
       - name: '0b · Corepack'
         # After setup-node, never before: Corepack ships with the Node line,
