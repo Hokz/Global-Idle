@@ -17,11 +17,15 @@ import {
   Param,
   Post,
   Req,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import {
   activity as activityContext,
   content,
+  createIdempotencyPort,
+  fingerprintOf,
+  observability,
   withTransaction,
   type PrismaClient,
 } from '@global-idle/domain';
@@ -40,8 +44,13 @@ import {
 } from '@global-idle/game-data';
 import { CONTENT_RESOLVER, PRISMA } from './tokens.js';
 import { SessionGuard, type RequestWithSession } from './session.guard.js';
-import { asHttp, fail, notFound } from './errors.js';
+import { asHttp, codeOf, fail, notFound } from './errors.js';
 import { currentActivity, huntView } from './views.js';
+
+/** The one response this controller writes itself; see `activity` below. */
+interface JsonReply {
+  json(body: unknown): void;
+}
 
 @Controller('api')
 @UseGuards(SessionGuard)
@@ -61,7 +70,7 @@ export class WorldController {
    *  a build artefact, so there is no empty state to design for. */
   @Get('atlas')
   async atlas() {
-    const bundle = await this.resolver.current();
+    const bundle = await this.current();
     const regions = [];
     const markers = [];
     for (const definition of bundle.definitions.values()) {
@@ -76,9 +85,20 @@ export class WorldController {
     return { contentVersion: bundle.version, regions, markers };
   }
 
+  /** The current bundle, counting the failure §18 asks for. A broken deploy
+   *  is the only way this throws, and it should be visible as one. */
+  private async current() {
+    try {
+      return await this.resolver.current();
+    } catch (error) {
+      observability().metrics.atlasContentLoadFailure();
+      throw asHttp(error);
+    }
+  }
+
   @Get('hunts/:key')
   async hunt(@Param('key') key: string) {
-    const bundle = await this.resolver.current();
+    const bundle = await this.current();
     try {
       return huntView(
         await content.resolveHunt(
@@ -92,11 +112,22 @@ export class WorldController {
     }
   }
 
-  /** What reload reads. Durable state only (§9.6). */
+  /**
+   * What reload reads. Durable state only (§9.6).
+   *
+   * §12 declares this `ActivityView | null`, so it answers with the literal
+   * JSON `null` when there is no Activity. Returning the value through Nest
+   * would send an EMPTY 200 instead, which every consumer then has to guess
+   * about — an empty body is not `null`, it is "no answer".
+   */
   @Get('characters/:id/activity')
-  async activity(@Req() request: RequestWithSession, @Param('id') id: string) {
+  async activity(
+    @Req() request: RequestWithSession,
+    @Param('id') id: string,
+    @Res() reply: JsonReply,
+  ): Promise<void> {
     await this.own(request, id);
-    return currentActivity(this.prisma, this.resolver, id);
+    reply.json((await currentActivity(this.prisma, this.resolver, id)) ?? null);
   }
 
   @Post('characters/:id/hunt')
@@ -109,7 +140,22 @@ export class WorldController {
     await this.own(request, id);
 
     const key = typeof body?.huntKey === 'string' ? body.huntKey : '';
-    const bundle = await this.resolver.current();
+    const bundle = await this.current();
+
+    // §12: this route CARRIES an idempotency key. A double-submitted Enter
+    // must replay its own answer rather than race the occupancy constraint and
+    // come back as a conflict with itself — which is what happens without
+    // one, and which the player reads as "the button is broken".
+    const raw = request.headers['idempotency-key'];
+    const clientKey = (Array.isArray(raw) ? raw[0] : raw)?.trim() ?? '';
+    if (!clientKey) {
+      observability().metrics.huntEntryFailure('IDEMPOTENCY_KEY_REQUIRED');
+      throw fail(
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        'IDEMPOTENCY_KEY_REQUIRED',
+        'This request must carry an Idempotency-Key header.',
+      );
+    }
 
     try {
       // Resolve and KIND-CHECK before anything is written. A key that does not
@@ -121,24 +167,51 @@ export class WorldController {
         toContentKey(key),
       );
 
-      await withTransaction(this.prisma, (tx) =>
-        activityContext.startSessionBound(tx, {
-          accountId: toAccountId(session.accountId),
-          activityTypeKey: activityContext.HUNT,
-          contentVersion: toContentVersion(bundle.version),
-          // WHICH hunt. Durable, so reload does not need the URL (§9.5).
-          contentKey: toContentKey(hunt.key),
-          participants: [toCharacterId(id)],
-          // The AUTHENTICATED session, not the account: ADR-008 eviction is
-          // between connections, and accountId would make two browsers one.
-          claimHolderSessionId: toSessionId(session.sessionId),
-          rngSeed: hunt.key,
-          at: new Date(),
-        }),
+      const idempotency = createIdempotencyPort((run) => withTransaction(this.prisma, run));
+      const outcome = await idempotency.execute(
+        {
+          principalId: toAccountId(session.accountId),
+          commandNamespace: 'hunt.enter',
+          clientKey,
+        },
+        // The SEMANTIC fields, not the transport. Two submissions of the same
+        // click agree here even if their JSON does not.
+        fingerprintOf({ characterId: id, huntKey: hunt.key, contentVersion: bundle.version }),
+        new Date(),
+        async (tx) => {
+          const activityId = await activityContext.startSessionBound(tx, {
+            accountId: toAccountId(session.accountId),
+            activityTypeKey: activityContext.HUNT,
+            contentVersion: toContentVersion(bundle.version),
+            // WHICH hunt. Durable, so reload does not need the URL (§9.5).
+            contentKey: toContentKey(hunt.key),
+            participants: [toCharacterId(id)],
+            // The AUTHENTICATED session, not the account: ADR-008 eviction is
+            // between connections, and accountId would make two browsers one.
+            claimHolderSessionId: toSessionId(session.sessionId),
+            rngSeed: hunt.key,
+            at: new Date(),
+          });
+          return { activityId: String(activityId) };
+        },
       );
+
+      if (outcome.outcome === 'conflict') {
+        throw fail(
+          HttpStatus.CONFLICT,
+          'IDEMPOTENCY_CONFLICT',
+          'That idempotency key was already used for a different request.',
+        );
+      }
+
+      // Read the view back from DURABLE state in both outcomes. A replay that
+      // returned a serialised snapshot would answer with the world as it was
+      // when the first call ran, not as it is (§9.6).
       return currentActivity(this.prisma, this.resolver, id);
     } catch (error) {
-      throw asHttp(error);
+      const http = asHttp(error);
+      observability().metrics.huntEntryFailure(codeOf(http));
+      throw http;
     }
   }
 
@@ -167,6 +240,9 @@ export class WorldController {
       where: { id: characterId, accountId, retiredAt: null },
       select: { id: true },
     });
-    if (!row) throw notFound();
+    if (!row) {
+      observability().metrics.authorizationReject('/api/characters/:id');
+      throw notFound();
+    }
   }
 }

@@ -30,6 +30,7 @@ export default function Play() {
   const [selected, setSelected] = useState<Marker | null>(null);
   const [hunt, setHunt] = useState<HuntView | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const refresh = useCallback(async () => {
@@ -38,15 +39,37 @@ export default function Play() {
     return detail;
   }, [characterId]);
 
-  useEffect(() => {
-    Promise.all([refresh(), api<AtlasData>('/api/atlas')])
+  const load = useCallback(() => {
+    setFailed(false);
+    return Promise.all([refresh(), api<AtlasData>('/api/atlas')])
       .then(([, world]) => setAtlas(world))
       .catch((cause) => {
         if (cause instanceof ApiError && cause.status === 401) router.replace('/');
         else if (cause instanceof ApiError && cause.status === 404) router.replace('/characters');
-        else setError('Could not load the world.');
+        // Anything else is a failure the PLAYER can act on, so it is shown
+        // with a way to act on it. A spinner that never resolves is the worst
+        // of both: no information and no way forward.
+        else setFailed(true);
       });
   }, [refresh, router]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  // Escape deselects, wherever focus happens to be. Scoping this to the SVG
+  // meant Escape did nothing once focus moved into the details sheet, which is
+  // exactly where a player would press it.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setSelected(null);
+        setHunt(null);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   async function select(marker: Marker | null) {
     setSelected(marker);
@@ -66,6 +89,10 @@ export default function Play() {
     try {
       await api(`/api/characters/${characterId}/hunt`, {
         method: 'POST',
+        // One key per CLICK. A retry of this submission replays the server's
+        // own answer instead of racing the occupancy claim; the next
+        // deliberate entry mints a new one and genuinely runs.
+        headers: { 'Idempotency-Key': crypto.randomUUID() },
         body: JSON.stringify({ huntKey: selected.target }),
       });
       await refresh();
@@ -86,6 +113,24 @@ export default function Play() {
     } finally {
       setBusy(false);
     }
+  }
+
+  if (failed) {
+    return (
+      <main className="shell">
+        <section className="panel stack" data-testid="load-error" role="alert">
+          <h2>The world did not load</h2>
+          <p className="muted small" style={{ margin: 0 }}>
+            Nothing was lost — your character is safe on the server. Try again.
+          </p>
+          <div className="row">
+            <button className="primary" data-testid="retry" onClick={() => void load()}>
+              Retry
+            </button>
+          </div>
+        </section>
+      </main>
+    );
   }
 
   if (!character) {

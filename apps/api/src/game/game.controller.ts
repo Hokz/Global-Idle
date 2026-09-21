@@ -24,6 +24,7 @@ import {
   character as characterContext,
   identity,
   mintSessionId,
+  observability,
   recordDomainEvent,
   sealSession,
   withTransaction,
@@ -33,7 +34,7 @@ import { accountId as toAccountId, newId } from '@global-idle/shared';
 import type { ContentBundleResolver } from '@global-idle/game-data';
 import { CONTENT_RESOLVER, PRISMA, SESSION_SECRET } from './tokens.js';
 import { SessionGuard, type RequestWithSession } from './session.guard.js';
-import { asHttp, fail, notFound } from './errors.js';
+import { asHttp, codeOf, fail, notFound } from './errors.js';
 import {
   currentActivity,
   staminaView,
@@ -181,6 +182,7 @@ export class GameController {
     const { accountId } = this.session(request);
     const name = typeof body?.name === 'string' ? body.name.trim() : '';
     if (!nameIsValid(name)) {
+      observability().metrics.characterCreationFailure('NAME_INVALID');
       throw fail(
         HttpStatus.UNPROCESSABLE_ENTITY,
         'NAME_INVALID',
@@ -200,10 +202,15 @@ export class GameController {
           at: new Date(),
         }),
       );
+      // POST-COMMIT: `withTransaction` has already resolved, so this event
+      // describes a Character that exists. Reporting it inside the transaction
+      // would announce one that a rollback could still take away (§18).
       recordDomainEvent({ kind: 'character.created', characterId: id, accountId });
       return this.detail(accountId, id);
     } catch (error) {
-      throw asHttp(error);
+      const http = asHttp(error);
+      observability().metrics.characterCreationFailure(codeOf(http));
+      throw http;
     }
   }
 
@@ -221,7 +228,10 @@ export class GameController {
       where: { id: characterId, accountId, retiredAt: null },
       select: { id: true, name: true, baseLevel: true, vocation: true },
     });
-    if (!row) throw notFound();
+    if (!row) {
+      observability().metrics.authorizationReject('/api/characters/:id');
+      throw notFound();
+    }
     return {
       id: row.id,
       name: row.name,

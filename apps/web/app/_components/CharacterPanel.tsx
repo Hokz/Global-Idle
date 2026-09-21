@@ -32,7 +32,7 @@ export function CharacterPanel({ character }: { character: CharacterDetail }) {
           <h2 id="character-heading" style={{ marginBottom: 2 }}>
             {character.name}
           </h2>
-          <p className="muted small" style={{ margin: 0 }}>
+          <p className="muted small" style={{ margin: 0 }} data-testid="level">
             Level {character.baseLevel}
           </p>
         </div>
