@@ -8,8 +8,25 @@ export const GAME_DATA_PACKAGE = '@global-idle/game-data' as const;
 export { contentKey, isContentKey, keyNamespace } from './keys.js';
 export type { ContentKey } from './keys.js';
 
-export { bundleSourceSchema, definitionSchema, unlockSetSchema } from './schema.js';
-export type { BundleSource, ContentBundleArtifact, Definition, UnlockSet } from './schema.js';
+export {
+  atlasMarkerSchema,
+  bundleSourceSchema,
+  definitionSchema,
+  huntSchema,
+  markerCategory,
+  parseTyped,
+  regionSchema,
+  unlockSetSchema,
+} from './schema.js';
+export type {
+  AtlasMarker,
+  BundleSource,
+  ContentBundleArtifact,
+  Definition,
+  Hunt,
+  Region,
+  UnlockSet,
+} from './schema.js';
 
 export { POWERFUL_IMBUEMENT_SET_SIZE, validateBundleSource } from './validate.js';
 export type { ValidationIssue, ValidationResult } from './validate.js';

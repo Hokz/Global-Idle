@@ -1,12 +1,14 @@
-# Phase 0B CI — §13. THIRTEEN BLOCKING CHECKS, numbered 0-12, cheapest first
-# so failures surface fast.
+# CI — Phase 0B's §13 THIRTEEN BLOCKING CHECKS, numbered 0-12, cheapest first
+# so failures surface fast, plus the two jobs that need a runner of their own.
 #
 # CI runs the SAME SCRIPTS AS A DEVELOPER, IN THE SAME ORDER (§4.3). There is
 # no CI-only build command and no step that exists only in this file: a
 # divergence here is how a pipeline starts proving something other than what
 # developers run. Every `run:` below is a script from package.json.
 #
-# Phase 0B is not VERIFIED until this workflow exists and passes.
+# Phase 1 adds ONE check — `browser` — and no others. Its content validation,
+# asset resolution and matrix count ride steps that already exist, because
+# Phase 1 §17 says a phase must not add a check that restates one.
 
 name: ci
 
@@ -24,7 +26,7 @@ concurrency:
 
 jobs:
   checks:
-    name: 'Phase 0B — 13 blocking checks'
+    name: '13 blocking checks'
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -165,11 +167,119 @@ jobs:
         # `next build` typechecks apps/web a second time.
         run: pnpm build
 
-      # ─────────────────────────────────────────── the matrix is countable
-      - name: 'Test matrix — 92 cases'
-        # Not a §13 check; it is how "all 92 cases pass" stays a countable
-        # claim rather than an assertion (§14).
+      # ─────────────────────────────────────────── the matrices are countable
+      - name: 'Test matrices — Phase 0B 92, Phase 1 87'
+        # Not a §13 check; it is how "all 92 pass" and "all 87 pass" stay
+        # countable claims rather than assertions (Phase 0B §14, Phase 1 §16).
+        # It fails on a missing id, a duplicate, and an id belonging to no
+        # matrix — which is what keeps the two id spaces from colliding now
+        # that Phase 1 continues the D group at D19.
         run: node scripts/count-matrix.mjs
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  browser:
+    name: 'Browser acceptance — Playwright, Chromium'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    # A JOB OF ITS OWN (Phase 1 §17), because it is the only one that needs a
+    # browser binary. Folding it into `checks` would make every other check pay
+    # for a download it has no use for.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: globalidle
+          POSTGRES_PASSWORD: globalidle
+          POSTGRES_DB: globalidle
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U globalidle -d globalidle"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+
+    env:
+      DATABASE_URL: postgresql://globalidle:globalidle@127.0.0.1:5432/globalidle?schema=public
+      REDIS_URL: redis://127.0.0.1:6379
+      CONTENT_BUNDLE_DIR: ./packages/game-data/bundles
+      API_PORT: '3001'
+      LOG_LEVEL: error
+      # NODE_ENV IS DELIBERATELY UNSET. `next start` sets production for its own
+      # process, which is what a production build needs; setting it for the
+      # whole job would make the API refuse to boot, because
+      # GLOBAL_IDLE_DEV_AUTH=1 with NODE_ENV=production is the one combination
+      # §3.2 turns into a crash (DEV3).
+      CI: '1'
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+
+      - run: corepack enable
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.local/share/pnpm/store
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-store-${{ runner.os }}-
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: 'Playwright browser cache'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          # KEYED ON THE LOCKFILE, so the cache follows the PINNED Playwright
+          # version exactly. A hand-written version in this key would be a
+          # second place to remember on every upgrade, and the one that gets
+          # forgotten is the one that serves a stale browser.
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: 'Install Chromium only'
+        # Chromium ONLY: §15's acceptance is behavioural, and three engines
+        # would triple the install and the runtime for one flow.
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: 'Build'
+        run: pnpm build
+
+      - name: 'Migrate, build content, seed'
+        # The same scripts `pnpm dev` runs, in the same order. The E2E stack
+        # needs a migrated database and a published bundle for the same reason
+        # a developer does.
+        run: |
+          pnpm --filter @global-idle/domain run prisma:migrate
+          pnpm --filter @global-idle/game-data run build:bundle
+          pnpm seed
+
+      - name: 'Browser acceptance — E2E1-E2E10, UI1-UI8, desktop and touch'
+        # Playwright starts and stops the API and the web server itself; see
+        # playwright.config.ts for why it owns them rather than trusting a
+        # background process to still be alive.
+        run: pnpm test:e2e
+
+      - name: 'Traces from a failed run'
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: test-results/
+          retention-days: 7
 
   # ═══════════════════════════════════════════════════════════════════════════
   dev-bootstrap:

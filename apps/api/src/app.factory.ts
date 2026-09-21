@@ -10,7 +10,7 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import type { INestApplication } from '@nestjs/common';
-import type { AppConfig } from '@global-idle/domain';
+import { loadConfig, type AppConfig } from '@global-idle/domain';
 import { AppModule } from './app.module.js';
 
 export async function createApp(
@@ -23,6 +23,12 @@ export async function createApp(
     AppModule.forRoot(overrides),
     options.bufferLogs ? { bufferLogs: true } : { logger: false },
   );
+  // The browser holds the session in a cookie and apps/web is a different
+  // origin, so credentialed CORS is a requirement of the slice, not a
+  // convenience. The origin list is explicit; `*` cannot carry credentials.
+  const config = { ...loadConfig(), ...overrides };
+  app.enableCors({ origin: config.WEB_ORIGINS, credentials: true });
+
   app.enableShutdownHooks();
   return app;
 }

@@ -15,3 +15,9 @@ packages/game-data/bundles/
 .env.local
 *.log
 .DS_Store
+
+# Playwright run output (traces, screenshots, the last-run marker). Evidence of
+# a run, never source.
+test-results/
+playwright-report/
+blob-report/

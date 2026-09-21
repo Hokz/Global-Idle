@@ -1,0 +1,112 @@
+{
+  "name": "rookgaard",
+  "definitions": [
+    {
+      "key": "region.rookgaard",
+      "kind": "region",
+      "references": [],
+      "label": "Rookgaard",
+      "availability": "AVAILABLE",
+      "atlas": {
+        "x": 120,
+        "y": 140,
+        "width": 360,
+        "height": 260
+      },
+      "minZoom": 0.6,
+      "maxZoom": 3,
+      "backdropAssetId": "atlas.region.rookgaard"
+    },
+    {
+      "key": "region.mainland",
+      "kind": "region",
+      "references": [],
+      "label": "Mainland",
+      "availability": "LOCKED",
+      "atlas": {
+        "x": 540,
+        "y": 90,
+        "width": 420,
+        "height": 300
+      },
+      "minZoom": 0.6,
+      "maxZoom": 3,
+      "backdropAssetId": "atlas.region.locked"
+    },
+    {
+      "key": "region.thais",
+      "kind": "region",
+      "references": [],
+      "label": "Thais",
+      "availability": "LOCKED",
+      "atlas": {
+        "x": 560,
+        "y": 420,
+        "width": 220,
+        "height": 170
+      },
+      "minZoom": 0.6,
+      "maxZoom": 3,
+      "backdropAssetId": "atlas.region.locked"
+    },
+    {
+      "key": "region.carlin",
+      "kind": "region",
+      "references": [],
+      "label": "Carlin",
+      "availability": "LOCKED",
+      "atlas": {
+        "x": 140,
+        "y": 460,
+        "width": 220,
+        "height": 160
+      },
+      "minZoom": 0.6,
+      "maxZoom": 3,
+      "backdropAssetId": "atlas.region.locked"
+    },
+    {
+      "key": "region.edron",
+      "kind": "region",
+      "references": [],
+      "label": "Edron",
+      "availability": "LOCKED",
+      "atlas": {
+        "x": 820,
+        "y": 430,
+        "width": 180,
+        "height": 150
+      },
+      "minZoom": 0.6,
+      "maxZoom": 3,
+      "backdropAssetId": "atlas.region.locked"
+    },
+    {
+      "key": "hunt.rookgaard.sewers",
+      "kind": "hunt",
+      "references": ["region.rookgaard"],
+      "label": "Rookgaard Sewers",
+      "region": "region.rookgaard",
+      "summary": "Damp tunnels beneath the town. Where every adventurer starts.",
+      "primaryCreature": "Rat",
+      "activityTypeKey": "hunt",
+      "availability": "AVAILABLE"
+    },
+    {
+      "key": "marker.rookgaard.sewers",
+      "kind": "atlas-marker",
+      "references": ["region.rookgaard", "hunt.rookgaard.sewers"],
+      "label": "Rookgaard Sewers",
+      "category": "HUNT",
+      "region": "region.rookgaard",
+      "position": {
+        "x": 262,
+        "y": 286
+      },
+      "target": "hunt.rookgaard.sewers",
+      "iconAssetId": "marker.hunt",
+      "availability": "AVAILABLE"
+    }
+  ],
+  "unlockSets": []
+}

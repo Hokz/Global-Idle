@@ -1,0 +1,180 @@
+/* Phase 1 is the first visible surface. Neutral, legible, responsive — and
+   deliberately not a design system: final art is not the goal yet (§11). */
+:root {
+  --bg: #16181d;
+  --panel: #1e2127;
+  --panel-2: #262a32;
+  --line: #333844;
+  --text: #e7e9ee;
+  --muted: #9aa1b1;
+  --accent: #c2703a;
+  --accent-2: #f0a163;
+  --focus: #7fb3ff;
+}
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+body {
+  background: var(--bg);
+  color: var(--text);
+  font:
+    15px/1.5 ui-sans-serif,
+    system-ui,
+    -apple-system,
+    Segoe UI,
+    Roboto,
+    sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+a {
+  color: var(--accent-2);
+}
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.shell {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 16px;
+}
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px;
+}
+h1 {
+  font-size: 22px;
+  margin: 0 0 4px;
+}
+h2 {
+  font-size: 17px;
+  margin: 0 0 10px;
+}
+.muted {
+  color: var(--muted);
+}
+.small {
+  font-size: 13px;
+}
+
+button,
+.btn {
+  font: inherit;
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--text);
+  cursor: pointer;
+  min-height: 44px; /* touch target */
+}
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent-2);
+  color: #fff;
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+input {
+  font: inherit;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #14161a;
+  color: var(--text);
+  min-height: 44px;
+  width: 100%;
+}
+.error {
+  color: #ff9a8a;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 360px;
+}
+
+.stat {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+.stat:last-child {
+  border-bottom: 0;
+}
+.stat dt {
+  color: var(--muted);
+}
+.stat dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Desktop: map beside the detail panel. Mobile: the panel becomes a sheet. */
+.world {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+@media (min-width: 900px) {
+  .world {
+    grid-template-columns: 1fr 340px;
+  }
+}
+
+.atlas {
+  width: 100%;
+  height: 60vh;
+  min-height: 320px;
+  background: #101216;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  touch-action: none;
+  display: block;
+}
+.sheet {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px;
+}
+@media (max-width: 899px) {
+  .sheet.floating {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 20;
+    border-radius: 14px 14px 0 0;
+    box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.5);
+  }
+}
+.skeleton {
+  background: var(--panel-2);
+  border-radius: 8px;
+  min-height: 60vh;
+}

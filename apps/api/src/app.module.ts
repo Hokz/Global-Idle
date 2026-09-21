@@ -19,6 +19,7 @@ import {
 } from '@global-idle/domain';
 import { CorrelationMiddleware } from './correlation.middleware.js';
 import { HealthModule } from './health/health.module.js';
+import { GameModule } from './game/game.module.js';
 
 @Module({})
 export class AppModule implements NestModule {
@@ -39,6 +40,8 @@ export class AppModule implements NestModule {
       metrics: createMetricsPort(metrics),
       events: (event) => logDomainEvent(logger, event),
     });
+
+    const health = HealthModule.forRoot(config, metrics);
 
     return {
       module: AppModule,
@@ -61,7 +64,10 @@ export class AppModule implements NestModule {
             redact: { paths: [...REDACTED_PATHS], censor: '[redacted]' },
           },
         }),
-        HealthModule.forRoot(config, metrics),
+        health,
+        // Phase 1's player-facing routes, sharing the health root's Prisma
+        // client and content resolver rather than building their own.
+        GameModule.forRoot(config, health),
       ],
     };
   }

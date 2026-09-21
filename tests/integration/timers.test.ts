@@ -218,8 +218,8 @@ describe('§14.5 timers and stamina (durable)', () => {
     // start. Removing a type that has persisted rows is a fail-fast event.
     const unknown = newId<'ActivityId'>(new Date(T0.getTime() + 1));
     await prisma.$executeRawUnsafe(
-      `INSERT INTO "Activity" ("id","accountId","activityTypeKey","family","contentVersion","createdAt")
-       VALUES ($1,$2,'dungeon','SESSION_BOUND','v1',$3)`,
+      `INSERT INTO "Activity" ("id","accountId","activityTypeKey","family","contentVersion","contentKey","createdAt")
+       VALUES ($1,$2,'dungeon','SESSION_BOUND','v1','dungeon.rookgaard.doublet',$3)`,
       unknown,
       account,
       T0,
@@ -233,8 +233,8 @@ describe('§14.5 timers and stamina (durable)', () => {
     // key's family is immutable — a change of lifecycle is a new key.
     const reclassified = newId<'ActivityId'>(new Date(T0.getTime() + 2));
     await prisma.$executeRawUnsafe(
-      `INSERT INTO "Activity" ("id","accountId","activityTypeKey","family","contentVersion","createdAt")
-       VALUES ($1,$2,'hunt','WALL_CLOCK','v1',$3)`,
+      `INSERT INTO "Activity" ("id","accountId","activityTypeKey","family","contentVersion","contentKey","createdAt")
+       VALUES ($1,$2,'hunt','WALL_CLOCK','v1','hunt.rookgaard.sewers',$3)`,
       reclassified,
       account,
       T0,

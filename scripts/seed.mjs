@@ -93,6 +93,7 @@ async function seedAccount() {
         accountId,
         vocation,
         name: `${vocation[0]}${vocation.slice(1).toLowerCase()}`,
+        baseLevel: 8,
         at: now,
       }),
     );
@@ -101,9 +102,55 @@ async function seedAccount() {
   return accountId;
 }
 
+/**
+ * The Phase 1 REVIEW FIXTURE: an account a human can actually sign into,
+ * holding one ORIGIN Character — Level 1, no vocation, Stamina full.
+ *
+ * Deliberately separate from the account above, which holds five vocationed
+ * Characters at Level 8 and therefore cannot demonstrate the Level-1 origin
+ * state the slice is about.
+ */
+const REVIEWER_HANDLE = 'Reviewer';
+
+async function seedReviewer() {
+  const existing = await prisma.authIdentity.findUnique({
+    where: { provider_subject: { provider: 'dev', subject: REVIEWER_HANDLE } },
+  });
+  if (existing) {
+    say(`reviewer account ${existing.accountId} already seeded`);
+    return;
+  }
+
+  const accountId = await withTransaction(prisma, async (tx) => {
+    const id = await identity.createAccount(tx, { at: now, rosterCapacity: 1 });
+    await identity.linkIdentity(tx, {
+      accountId: id,
+      provider: 'dev',
+      subject: REVIEWER_HANDLE,
+      at: now,
+    });
+    return id;
+  });
+
+  const id = await withTransaction(prisma, (tx) =>
+    character.createCharacter(tx, {
+      accountId,
+      // The Origin Character: vocation chosen at the Level-8 Oracle, not here.
+      vocation: null,
+      name: 'Rookie',
+      baseLevel: 1,
+      at: now,
+    }),
+  );
+  say(
+    `created reviewer account ${accountId} with Origin Character ${id} (sign in as "${REVIEWER_HANDLE}")`,
+  );
+}
+
 try {
   await publishBundles();
   await seedAccount();
+  await seedReviewer();
   say('seed complete');
 } finally {
   await prisma.$disconnect();

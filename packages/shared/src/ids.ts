@@ -25,6 +25,9 @@ export type TimerId = Branded<'TimerId'>;
 export type OperationId = Branded<'OperationId'>;
 export type ContentVersion = Branded<'ContentVersion'>;
 export type ActivityTypeKey = Branded<'ActivityTypeKey'>;
+/** A canonical content key — `hunt.rookgaard.sewers`. The grammar lives in
+ *  packages/game-data/src/keys.ts and is mirrored by a database CHECK. */
+export type ContentKey = Branded<'ContentKey'>;
 
 /**
  * A time-ordered identifier. `at` is the authoritative instant the caller is
@@ -42,3 +45,4 @@ export const sessionId = (value: string): SessionId => value as SessionId;
 export const operationId = (value: string): OperationId => value as OperationId;
 export const contentVersion = (value: string): ContentVersion => value as ContentVersion;
 export const activityTypeKey = (value: string): ActivityTypeKey => value as ActivityTypeKey;
+export const contentKey = (value: string): ContentKey => value as ContentKey;

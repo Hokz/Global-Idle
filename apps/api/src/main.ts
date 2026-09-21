@@ -21,6 +21,9 @@ import {
  */
 export async function runStartupChecks(prisma: PrismaClient): Promise<void> {
   activity.validateRegistry();
+  // Content may name an activity type; the registry has to describe it, or a
+  // player's first click is a 500 (Phase 1 §10.2).
+  activity.assertRegistryCoversContentVocabulary();
   await withTransaction(prisma, async (tx) => {
     await activity.assertRegistryMatchesDatabase(tx);
     await activity.assertActivityIntegrity(tx);

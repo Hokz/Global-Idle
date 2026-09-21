@@ -25,6 +25,14 @@ export interface Metrics {
   /** Client retry behaviour. */
   readonly idempotencyReplaysTotal: Counter;
   readonly idempotencyConflictsTotal: Counter;
+  /** Phase 1 §18. Why a character was not created. */
+  readonly characterCreationFailuresTotal: Counter;
+  /** The Atlas could not read its bundle — a broken deploy, not a user error. */
+  readonly atlasContentLoadFailuresTotal: Counter;
+  /** Why entering a Hunt was refused. */
+  readonly huntEntryFailuresTotal: Counter;
+  /** Which session-scoped route refused a request. */
+  readonly authorizationRejectsTotal: Counter;
   /** MUST BE ZERO. Any non-zero value is a P1 (ADR-003, I5). */
   readonly ledgerReconciliationMismatches: Gauge;
   /** Whether a deploy actually rolled out. */
@@ -67,6 +75,25 @@ export function createMetrics(options: { defaultMetrics?: boolean } = {}): Metri
       'idempotency_conflicts_total',
       'Idempotency keys reused with a different request fingerprint',
     ),
+    characterCreationFailuresTotal: counter(
+      'character_creation_failures_total',
+      'Character creations refused, by reason',
+      ['reason'],
+    ),
+    atlasContentLoadFailuresTotal: counter(
+      'atlas_content_load_failures_total',
+      'Atlas requests that could not resolve a content bundle',
+    ),
+    huntEntryFailuresTotal: counter(
+      'hunt_entry_failures_total',
+      'Hunt entries refused, by reason',
+      ['reason'],
+    ),
+    authorizationRejectsTotal: counter(
+      'authorization_rejects_total',
+      'Requests refused by a session-scoped route, by route template',
+      ['route'],
+    ),
     ledgerReconciliationMismatches: gauge(
       'ledger_reconciliation_mismatches',
       'Accounts whose balance projection disagrees with the ledger. Any non-zero value is a P1',
@@ -108,5 +135,10 @@ export function createMetricsPort(metrics: Metrics): MetricsPort {
     settlementFailure: () => metrics.settlementFailuresTotal.inc(),
     idempotencyReplay: () => metrics.idempotencyReplaysTotal.inc(),
     idempotencyConflict: () => metrics.idempotencyConflictsTotal.inc(),
+    characterCreationFailure: (reason) =>
+      metrics.characterCreationFailuresTotal.labels(reason).inc(),
+    atlasContentLoadFailure: () => metrics.atlasContentLoadFailuresTotal.inc(),
+    huntEntryFailure: (reason) => metrics.huntEntryFailuresTotal.labels(reason).inc(),
+    authorizationReject: (route) => metrics.authorizationRejectsTotal.labels(route).inc(),
   };
 }

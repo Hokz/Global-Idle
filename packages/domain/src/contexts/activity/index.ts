@@ -10,6 +10,7 @@ export {
   ActivityTypeRegistryError,
   HUNT,
   SKILL_TRAINING,
+  assertRegistryCoversContentVocabulary,
   describe,
   registrySnapshot,
   validateRegistry,

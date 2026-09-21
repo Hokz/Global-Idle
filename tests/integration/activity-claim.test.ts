@@ -14,6 +14,7 @@ import {
   sessionId as toSessionId,
 } from '@global-idle/shared';
 import {
+  T_HUNT_KEY,
   T0,
   createClient,
   expectDomainError,
@@ -31,6 +32,7 @@ async function startHunt(accountId: string, characters: string[], session: strin
     activity.startSessionBound(tx, {
       accountId: toAccountId(accountId),
       activityTypeKey: activity.HUNT,
+      contentKey: T_HUNT_KEY,
       contentVersion: toContentVersion('v1'),
       participants: characters.map(toCharacterId),
       claimHolderSessionId: toSessionId(session),

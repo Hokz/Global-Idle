@@ -4,7 +4,7 @@
 // application uses; nothing here re-implements a query the domain owns.
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../../packages/domain/src/generated/prisma/client.js';
-import { newId, type Instant } from '@global-idle/shared';
+import { contentKey, newId, type Instant } from '@global-idle/shared';
 
 export function databaseUrl(): string {
   const url = process.env['DATABASE_URL'];
@@ -28,6 +28,14 @@ export function createAppRoleClient(): PrismaClient {
   url.password = 'globalidle_app';
   return createClient(url.toString());
 }
+
+/** Phase 1 made `contentKey` required on every Activity (spec §9.5). These
+ *  are well-formed keys for suites that assert LIFECYCLE rather than content
+ *  identity; the content-identity cases resolve real definitions instead. */
+export const T_HUNT_KEY = contentKey('hunt.rookgaard.sewers');
+export const T_TRAINING_KEY = contentKey('skill-training.rookgaard.basics');
+/** Origin Characters are Level 1 (TUTORIAL_ROOKGAARD_ROADMAP.md §3). */
+export const ORIGIN_LEVEL = 1;
 
 export const AT = (iso: string): Instant => new Date(iso);
 export const T0 = AT('2026-01-01T00:00:00.000Z');
@@ -117,6 +125,7 @@ export async function seedActivityRoot(
         options.activityTypeKey ?? (options.family === 'SESSION_BOUND' ? 'hunt' : 'skill-training'),
       family: options.family,
       contentVersion: options.contentVersion ?? 'v1',
+      contentKey: 'hunt.rookgaard.sewers',
       createdAt: at,
     },
   });

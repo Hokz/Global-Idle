@@ -1,29 +1,90 @@
 #!/usr/bin/env node
 /**
- * Count the implemented §14 test cases and compare them with the matrix the
- * approved specification fixes at 92.
+ * Count the implemented matrix cases and compare them with what the approved
+ * specifications fix: Phase 0B §14 at **92**, Phase 1 §16 at **87**.
  *
- * The convention this relies on: every matrix case is exactly ONE `it` whose
- * title begins with its id. That is what makes "all 92 cases pass" a countable
- * claim rather than an assertion.
+ * The convention this relies on: every matrix case is exactly ONE test whose
+ * title begins with its id and a colon — `it('W1: ...')` for a Vitest case,
+ * `test('UI3: ...')` or `test.step('E2E4: ...')` for a Playwright one. That is
+ * what makes "all 92 pass" and "all 87 pass" countable claims rather than
+ * assertions.
+ *
+ * Two matrices, one script, because their id spaces OVERLAP: Phase 0B owns
+ * `D1`–`D18` and Phase 1 continues the same letter at `D19`. A counter that
+ * treated `D` as one group would report Phase 1's cases as Phase 0B's, and a
+ * counter per phase would have to be told which files belong to which — which
+ * is a second thing to keep in sync. The id decides.
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const EXPECTED = {
-  W: 13,
-  D: 18,
-  O: 15,
-  A: 6,
-  T: 16,
-  I: 4,
-  R: 3,
-  C: 9,
-  H: 5,
-  E: 3,
+
+/**
+ * Each group is `[first, last]` INCLUSIVE, so a group that continues another
+ * phase's letter says so in its own range instead of in a comment.
+ */
+const MATRICES = {
+  'phase-0b': {
+    spec: 'docs/specs/phase-0b/PHASE_0B_TECHNICAL_FOUNDATION_SPEC.md §14',
+    groups: {
+      W: [1, 13],
+      D: [1, 18],
+      O: [1, 15],
+      A: [1, 6],
+      T: [1, 16],
+      I: [1, 4],
+      R: [1, 3],
+      C: [1, 9],
+      H: [1, 5],
+      E: [1, 3],
+    },
+  },
+  'phase-1': {
+    spec: 'docs/specs/phase-1/PHASE_1_WORLD_CHARACTER_VERTICAL_SLICE_SPEC.md §16',
+    groups: {
+      S: [1, 11],
+      DEV: [1, 4],
+      CH: [1, 9],
+      D: [19, 28],
+      AT: [1, 7],
+      API: [1, 10],
+      AC: [1, 13],
+      UI: [1, 8],
+      E2E: [1, 10],
+      REG: [1, 5],
+    },
+  },
 };
+
+// Longest-first so `AC13` is not read as `A` + `C13`, and `E2E1` is not `E` +
+// `2`. Regex alternation is ordered, and that order is the whole contract.
+const PREFIXES = [
+  'DEV',
+  'REG',
+  'API',
+  'E2E',
+  'CH',
+  'AC',
+  'AT',
+  'UI',
+  'A',
+  'C',
+  'D',
+  'E',
+  'H',
+  'I',
+  'O',
+  'R',
+  'S',
+  'T',
+  'W',
+];
+const ID = new RegExp(
+  String.raw`\b(?:it|test)(?:\.\w+)*\(\s*['"\`](${PREFIXES.join('|')})(\d{1,2}):`,
+  'g',
+);
 
 const walk = (dir) =>
   readdirSync(dir).flatMap((entry) => {
@@ -31,40 +92,76 @@ const walk = (dir) =>
     return statSync(full).isDirectory() ? walk(full) : [full];
   });
 
+/** Which matrix owns an id — decided by the id alone, never by the file. */
+function ownerOf(prefix, number) {
+  for (const [phase, matrix] of Object.entries(MATRICES)) {
+    const range = matrix.groups[prefix];
+    if (range && number >= range[0] && number <= range[1]) return phase;
+  }
+  return null;
+}
+
+// id -> { prefix, number, file }. The PARSE is kept rather than the string:
+// `E2E10` cannot be split back into a prefix and a number by a regex over the
+// id alone, and a counter that tried reported ten missing cases that were all
+// present.
 const found = new Map();
-const duplicates = [];
-for (const file of walk(join(ROOT, 'tests')).filter((f) => f.endsWith('.test.ts'))) {
+const duplicates = new Map(); // id -> [files]
+const orphans = []; // ids in no matrix range
+
+for (const file of walk(join(ROOT, 'tests')).filter((f) => /\.(test|spec)\.ts$/.test(f))) {
   const source = readFileSync(file, 'utf8');
-  for (const match of source.matchAll(/\bit(?:\.\w+)*\(\s*['"`]([WDOATIRCHE]\d{1,2}):/g)) {
-    const id = match[1];
-    if (found.has(id)) duplicates.push(id);
-    else found.set(id, file.slice(ROOT.length + 1));
+  const relative = file.slice(ROOT.length + 1);
+  for (const match of source.matchAll(ID)) {
+    const id = match[1] + match[2];
+    if (found.has(id)) {
+      duplicates.set(id, [...(duplicates.get(id) ?? [found.get(id).file]), relative]);
+      continue;
+    }
+    const number = Number(match[2]);
+    found.set(id, { prefix: match[1], number, file: relative });
+    if (!ownerOf(match[1], number)) orphans.push(`${id} (${relative})`);
   }
 }
 
 let ok = true;
-const lines = [];
-for (const [prefix, expected] of Object.entries(EXPECTED)) {
-  const ids = [...found.keys()].filter((id) => id[0] === prefix);
-  const numbers = ids.map((id) => Number(id.slice(1))).sort((a, b) => a - b);
-  const missing = Array.from({ length: expected }, (_, i) => i + 1).filter(
-    (n) => !numbers.includes(n),
-  );
-  const extra = numbers.filter((n) => n > expected);
-  if (missing.length > 0 || extra.length > 0) ok = false;
-  lines.push(
-    `${prefix}: ${numbers.length}/${expected}` +
-      (missing.length ? `  MISSING ${missing.map((n) => prefix + n).join(',')}` : '') +
-      (extra.length ? `  UNEXPECTED ${extra.map((n) => prefix + n).join(',')}` : ''),
-  );
+const report = [];
+
+for (const [phase, matrix] of Object.entries(MATRICES)) {
+  const lines = [];
+  let total = 0;
+  let expectedTotal = 0;
+  for (const [prefix, [first, last]] of Object.entries(matrix.groups)) {
+    const expected = last - first + 1;
+    expectedTotal += expected;
+    const numbers = [...found.values()]
+      .filter((entry) => entry.prefix === prefix && ownerOf(prefix, entry.number) === phase)
+      .map((entry) => entry.number)
+      .sort((a, b) => a - b);
+    total += numbers.length;
+    const missing = [];
+    for (let n = first; n <= last; n += 1) if (!numbers.includes(n)) missing.push(prefix + n);
+    if (missing.length > 0) ok = false;
+    lines.push(
+      `  ${prefix}: ${numbers.length}/${expected}` +
+        (missing.length ? `  MISSING ${missing.join(',')}` : ''),
+    );
+  }
+  if (total !== expectedTotal) ok = false;
+  report.push(`${phase} (${matrix.spec})`, ...lines, `  TOTAL ${total}/${expectedTotal}`, '');
 }
 
-const total = found.size;
-const expectedTotal = Object.values(EXPECTED).reduce((a, b) => a + b, 0);
-console.log(lines.join('\n'));
-if (duplicates.length > 0) {
-  console.log(`DUPLICATE ids: ${[...new Set(duplicates)].join(', ')}`);
+console.log(report.join('\n').trimEnd());
+
+if (duplicates.size > 0) {
   ok = false;
+  console.log('\nDUPLICATE ids — one matrix case is exactly one test:');
+  for (const [id, files] of duplicates) console.log(`  ${id}: ${files.join(', ')}`);
 }
-console.log(`TOTAL ${total}/${expectedTotal}`);
-if (!ok || total !== expectedTotal) process.exit(1);
+if (orphans.length > 0) {
+  ok = false;
+  console.log('\nIds in NO matrix range — either the test is misnamed or the matrix moved:');
+  for (const orphan of orphans) console.log(`  ${orphan}`);
+}
+
+process.exit(ok ? 0 : 1);

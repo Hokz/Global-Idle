@@ -30,6 +30,22 @@ export interface MetricsPort {
   idempotencyReplay(): void;
   /** An idempotency key reused with a different request fingerprint. */
   idempotencyConflict(): void;
+
+  // ── Phase 1 §18 ──────────────────────────────────────────────────────
+  // Four counters, each with a consumer: a rising `reason` here is a question
+  // someone can answer. Pan, zoom and marker selection are deliberately NOT
+  // here — per-click telemetry nothing reads is noise, and §18 says so.
+
+  /** A character was NOT created. `reason` is why: invalid name, taken name,
+   *  roster full, an Origin Character already exists. */
+  characterCreationFailure(reason: string): void;
+  /** The Atlas could not read its content bundle. */
+  atlasContentLoadFailure(): void;
+  /** Entering a Hunt was refused. `reason` is the domain code. */
+  huntEntryFailure(reason: string): void;
+  /** A session-scoped route refused a request. `route` is the template, never
+   *  a concrete id — an id in a label is an unbounded cardinality bug. */
+  authorizationReject(route: string): void;
 }
 
 export type DomainEventSink = (event: DomainLogEvent) => void;
@@ -46,6 +62,10 @@ const NO_OP: ObservabilityPort = {
     settlementFailure() {},
     idempotencyReplay() {},
     idempotencyConflict() {},
+    characterCreationFailure() {},
+    atlasContentLoadFailure() {},
+    huntEntryFailure() {},
+    authorizationReject() {},
   },
   events() {},
 };
@@ -77,6 +97,10 @@ export const metrics: MetricsPort = {
   settlementFailure: () => bound.metrics.settlementFailure(),
   idempotencyReplay: () => bound.metrics.idempotencyReplay(),
   idempotencyConflict: () => bound.metrics.idempotencyConflict(),
+  characterCreationFailure: (reason) => bound.metrics.characterCreationFailure(reason),
+  atlasContentLoadFailure: () => bound.metrics.atlasContentLoadFailure(),
+  huntEntryFailure: (reason) => bound.metrics.huntEntryFailure(reason),
+  authorizationReject: (route) => bound.metrics.authorizationReject(route),
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
