@@ -128,8 +128,13 @@ async function shutDown() {
     // - SIGINT to the GROUP reaches everything, and `node --watch` answers it
     //   with an FSWatcher assertion and a core dump — harmless once the
     //   verification has finished, and alarming in a green log;
-    // - SIGTERM to the GROUP stops the three apps cleanly, with no assertion.
-    //   The orchestrator itself does not then exit, so the bounded SIGKILL
+    // - SIGTERM to the GROUP reaches dev.mjs and the three watchers directly,
+    //   and is the signal each of them handles. CORRECTION to what this
+    //   comment said first: `node --watch` still logs an FSEventWrap
+    //   assertion as it tears its watchers down, visible in the run this
+    //   settled on. What changes is that the abort does not follow, and it
+    //   happens after every acceptance signal has already been met. The
+    //   orchestrator itself does not then exit, so the bounded SIGKILL
     //   finishes the job.
     //
     // That last step is not a wart to be tidied away: a verification that can
