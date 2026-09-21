@@ -18,10 +18,12 @@ FOUNDATION_MANIFEST.json
 # Prettier rewrites it, Next regenerates it, and format:check never settles.
 apps/web/next-env.d.ts
 
-# A BYTE-EXACT golden artifact, not source. E1 and E2 compare the engine's
-# output against these bytes; a formatter that adds a trailing newline breaks
-# a determinism test for a reason that has nothing to do with determinism.
-tests/fixtures/engine/golden.json
+# BYTE-EXACT golden artifacts, not source. E1, E2, SIM2 and SIM10 compare the
+# engine's output against these bytes; a formatter that adds a trailing newline
+# breaks a determinism test for a reason that has nothing to do with
+# determinism. The GLOB rather than the one file, because the second golden
+# arrived, was not listed, and was reformatted within the hour.
+tests/fixtures/engine/*.json
 
 # Playwright run output, not source.
 test-results/
