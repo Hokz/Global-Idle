@@ -11,20 +11,42 @@
  * there is anything to violate it, as ADR-012 requires.
  */
 
-/** Frameworks and I/O clients the pure packages may never reach. */
+/**
+ * Frameworks and I/O clients the pure packages may never reach.
+ *
+ * Written as PATHS UNDER node_modules, not as bare specifiers, because a rule
+ * matches the RESOLVED path. `'^@nestjs'` matched nothing: an import that
+ * resolves lands at `node_modules/.pnpm/@nestjs+common@…/node_modules/@nestjs/
+ * common/index.js`, and an import that does not resolve is caught by
+ * `not-to-unresolvable` instead. That left these rules resting entirely on a
+ * package being absent from a workspace — which stops being true the moment
+ * anything is added to the repository root. Measured: with `@nestjs/common` a
+ * root devDependency, a NestJS import inside game-engine produced NO finding.
+ *
+ * The trailing slash matters: `react/` must not also match `react-dom/`.
+ */
 const FRAMEWORKS = [
-  '^@nestjs',
-  '^next$',
-  '^next/',
-  '^react$',
-  '^react-dom',
-  '^@prisma/client',
-  '^prisma$',
-  '^ioredis$',
-  '^bullmq$',
-  '^express$',
-  '^pino',
-  '^prom-client$',
+  'node_modules/@nestjs/',
+  'node_modules/nestjs-pino/',
+  'node_modules/next/',
+  'node_modules/react/',
+  'node_modules/react-dom/',
+  'node_modules/@prisma/client/',
+  'node_modules/prisma/',
+  'node_modules/ioredis/',
+  'node_modules/bullmq/',
+  'node_modules/express/',
+  'node_modules/pino/',
+  'node_modules/pino-http/',
+  'node_modules/prom-client/',
+];
+
+/** The UI and transport packages the application core may never reach. */
+const UI_AND_TRANSPORT = [
+  'node_modules/next/',
+  'node_modules/react/',
+  'node_modules/react-dom/',
+  'node_modules/express/',
 ];
 
 /** Node core modules that perform or enable I/O. */
@@ -168,7 +190,7 @@ module.exports = {
         'framework or an HTTP transport type (§5.2, ADR-018).',
       severity: 'error',
       from: { path: '^packages/domain/' },
-      to: { path: ['^next$', '^next/', '^react$', '^react-dom', '^express$'] },
+      to: { path: UI_AND_TRANSPORT },
     },
 
     // ---------------------------------------------------------------- context public surfaces — W11
@@ -211,10 +233,10 @@ module.exports = {
       from: { path: '^apps/web/' },
       to: {
         path: [
-          '^@prisma/client',
-          '^prisma$',
-          '^ioredis$',
-          '^bullmq$',
+          'node_modules/@prisma/client/',
+          'node_modules/prisma/',
+          'node_modules/ioredis/',
+          'node_modules/bullmq/',
           '^packages/game-engine/',
           '^packages/domain/',
         ],
@@ -266,13 +288,18 @@ module.exports = {
   ],
 
   options: {
+    // node_modules modules are LEAVES: present in the graph so a rule can
+    // match them, never cruised into. Excluding them entirely — as an earlier
+    // version did — silently deleted every framework edge before any rule
+    // could see it.
     doNotFollow: { path: 'node_modules' },
     exclude: {
       path: [
-        'node_modules',
-        '(^|/)dist/',
-        '(^|/)coverage/',
-        '(^|/)\\.next/',
+        // Our own build output, not node_modules': a dependency whose package
+        // entry happens to live under dist/ (bullmq does) must stay visible.
+        '^(apps|packages)/[^/]+/dist/',
+        '^(apps|packages)/[^/]+/coverage/',
+        '^apps/[^/]+/\\.next/',
         '(^|/)src/generated/',
         // Declaration files are not source. This repository authors none —
         // every .d.ts here is generated (next-env.d.ts, Prisma's emitted
