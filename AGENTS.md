@@ -171,8 +171,15 @@ Mechanics research and internal prototypes are separate from public-release asse
 
 ## 10. Immediate focus
 
-Current phase: **Phase 0 / architecture foundation**.
+Current phase: **Phase 1 — World / Character vertical slice**.
 
-Do not import the entire content universe or build the entire game at once.
+Phase 0A (`ARCHITECTURE_APPROVED`) and Phase 0B (`VERIFIED`, accepted 2026-09-21) are closed.
+Phase 0B's primitives — occupancy, Stamina, active-use timers, entitlements, idempotency,
+content bundles, transactions — are implemented and independently reviewed. **Reuse them; do
+not build parallel replacements.**
+
+Do not import the entire content universe or build the entire game at once. In particular,
+Phase 1 does **not** include the Hunt simulator, combat, loot, itemization, party gameplay or
+the five vocation kits — those are Phase 2 and later.
 
 The first playable target is the vertical slice described in `docs/MVP_SCOPE.md`.

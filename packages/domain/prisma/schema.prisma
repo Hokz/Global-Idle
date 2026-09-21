@@ -1,0 +1,430 @@
+// Phase 0B schema. §4.3 fixes the generator; §6.3 fixes the models.
+//
+// 0B.2 carries the generator, the datasource and exactly one model:
+// ContentBundle, the leaf every later reference points at, with no foreign
+// keys of its own. That is what makes 0B.2's clean-build proof (W12)
+// executable at the end of 0B.2 rather than depending on 0B.3.
+// Every other model, and every migration, belongs to 0B.3.
+
+generator client {
+  // The current Prisma 7 generator. prisma-client-js is not used (§3.8, §19).
+  // Every field is written explicitly even where the generator could infer it:
+  // moduleFormat would be inferred from the nearest package.json and
+  // importFileExtension from tsconfig, and inference is correct today and
+  // silently wrong the day someone edits a tsconfig.
+  provider               = "prisma-client"
+  output                 = "../src/generated/prisma"
+  runtime                = "nodejs"
+  moduleFormat           = "esm"
+  generatedFileExtension = "ts"
+  importFileExtension    = "js"
+  previewFeatures        = ["partialIndexes"]
+}
+
+datasource db {
+  // No url here. Prisma 7 refuses one: "The datasource property `url` is no
+  // longer supported in schema files." It lives in prisma.config.ts, and the
+  // client is constructed with a driver adapter (§4.3).
+  provider = "postgresql"
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Enumerations
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// LOCKED BY PRODUCT (docs/DECISIONS.md): five vocations, one playable of each
+/// per account. Vocation is immutable once confirmed (DOMAIN_MODEL.md §5.4).
+enum Vocation {
+  KNIGHT
+  PALADIN
+  SORCERER
+  DRUID
+  MONK
+}
+
+/// ADR-002: two families with genuinely different lifecycles. `family` is a
+/// projection of the activity type's descriptor in the code registry (§7.3.2).
+enum ActivityFamily {
+  SESSION_BOUND
+  WALL_CLOCK
+}
+
+/// The session-bound lifecycle. The partial unique index for I9 names the
+/// non-terminal states EXPLICITLY rather than negating the terminal one, so
+/// adding a future terminal state cannot silently widen it (§6.3.1).
+enum SessionBoundState {
+  ONLINE_ACTIVE
+  RECONNECT_GRACE_PAUSED
+  ACTIVITY_ENDED
+}
+
+/// There is no fifth status, and no SETTLED: settlement is an OPERATION on a
+/// training that stays ACCRUING, recorded by lastSettledAt. The restart
+/// sweeper's rule is total over exactly these four (§6.3.1, tests O10-O13).
+enum SkillTrainingStatus {
+  ACCRUING
+  ENDED
+  EXHAUSTED
+  CANCELLED
+}
+
+enum EntitlementKind {
+  PREMIUM
+}
+
+/// Derived from authoritative state, never assigned freely (§7.3.1, §7.4).
+enum StaminaMode {
+  CONSUMING
+  NEUTRAL
+  RECOVERING
+}
+
+/// Premium currency is a currency type in the same ledger, with the same
+/// guarantees (ECONOMY_INTEGRITY.md §10).
+enum CurrencyKind {
+  GOLD
+  PREMIUM
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Identity & Access
+// ═══════════════════════════════════════════════════════════════════════════
+
+model Account {
+  id String @id
+
+  /// Stored on Account but OWNED BY THE CHARACTER CONTEXT (DOMAIN_MODEL.md
+  /// §5.4): count(playable characters) <= rosterCapacity <= 5 is a
+  /// Character-context invariant. Bounds are enforced by a CHECK constraint
+  /// added in the initial migration; the count is verified inside the
+  /// creating transaction (I2, §6.4).
+  rosterCapacity Int      @default(1)
+  createdAt      DateTime
+
+  authIdentities AuthIdentity[]
+  characters     Character[]
+  entitlements   Entitlement[]
+  activities     Activity[]
+  balances       CurrencyBalance[]
+  ledgerEntries  LedgerEntry[]
+
+  @@map("Account")
+}
+
+/// Credential -> Account. Foundations only; Phase 1 builds the flows (§6.3).
+model AuthIdentity {
+  id        String   @id
+  accountId String
+  provider  String
+  subject   String
+  createdAt DateTime
+
+  account Account @relation(fields: [accountId], references: [id])
+
+  @@unique([provider, subject])
+  @@index([accountId])
+  @@map("AuthIdentity")
+}
+
+/// Account-wide, never per Character. validUntil null means PERMANENT: expiry
+/// is optional, not part of the definition (§7.5, DOMAIN_MODEL.md §5.17).
+model Entitlement {
+  id         String          @id
+  accountId  String
+  kind       EntitlementKind
+  validFrom  DateTime
+  validUntil DateTime?
+
+  account Account             @relation(fields: [accountId], references: [id])
+  audit   EntitlementAudit[]
+
+  @@index([accountId, kind, validFrom])
+  @@map("Entitlement")
+}
+
+/// Entitlement transitions are auditable (§7.5), and §8.1 makes the audit
+/// record part of the same transaction as the entitlement row.
+model EntitlementAudit {
+  id            String   @id
+  entitlementId String
+  transition    String
+  occurredAt    DateTime
+  reason        String
+
+  entitlement Entitlement @relation(fields: [entitlementId], references: [id])
+
+  @@index([entitlementId, occurredAt])
+  @@map("EntitlementAudit")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Character
+// ═══════════════════════════════════════════════════════════════════════════
+
+model Character {
+  id        String    @id
+  accountId String
+  vocation  Vocation
+  name      String
+  createdAt DateTime
+  /// ADR-007: retirement, not deletion. A Character is never hard-deleted
+  /// (I12) — history stays referentially intact.
+  retiredAt DateTime?
+
+  account      Account              @relation(fields: [accountId], references: [id])
+  stamina      CharacterStamina?
+  participants ActivityParticipant[]
+
+  /// I1 — one PLAYABLE (non-retired) Character per vocation per account.
+  /// Object form: the pinned Prisma accepts null equality here, so no raw()
+  /// predicate is needed (§3.8). A RETIRED Character does not reserve its
+  /// vocation, which is exactly what tests D4 and D5 separate.
+  @@unique([accountId, vocation], where: { retiredAt: null })
+  @@index([accountId])
+  @@map("Character")
+}
+
+/// Per-Character Stamina (ADR-014). The mode is DERIVED from authoritative
+/// state by deriveStaminaMode (§7.3.1) and stored for cheap reads; it is never
+/// assigned freely.
+model CharacterStamina {
+  characterId String      @id
+  remainingMs Int
+  mode        StaminaMode
+  modeSince   DateTime
+  updatedAt   DateTime
+
+  character Character @relation(fields: [characterId], references: [id])
+
+  @@map("CharacterStamina")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Activity — the shared root and its two subtypes (§6.3.1, §6.3.3)
+// ═══════════════════════════════════════════════════════════════════════════
+
+model Activity {
+  id        String         @id
+  accountId String
+  /// Validated against the CODE registry of §7.3.2. There is no ActivityType
+  /// table: the descriptor selects which code path runs, and behaviour is
+  /// versioned with the code that implements it.
+  activityTypeKey String
+  family          ActivityFamily
+  /// ADR-011: EVERY Activity pins the content version it started with — both
+  /// families, not just session-bound. NOT NULL, ON DELETE RESTRICT (test C9).
+  contentVersion  String
+  createdAt       DateTime
+
+  account       Account                @relation(fields: [accountId], references: [id])
+  bundle        ContentBundle          @relation(fields: [contentVersion], references: [version], onDelete: Restrict)
+  sessionBound  SessionBoundActivity?
+  skillTraining SkillTrainingActivity?
+  participants  ActivityParticipant[]
+
+  /// Composite FK targets. Every projection of a root fact is chained back to
+  /// it, so it cannot be written with a value the root does not have (§6.3.1).
+  @@unique([id, family])
+  @@unique([id, accountId, family])
+  /// §7.3.2 startup reconciliation reads exactly this pair.
+  @@index([activityTypeKey, family])
+  @@index([accountId])
+  @@index([contentVersion])
+  @@map("Activity")
+}
+
+model SessionBoundActivity {
+  activityId String         @id
+  accountId  String
+  family     ActivityFamily
+
+  state                SessionBoundState
+  claimHolderSessionId String?
+  graceExpiresAt       DateTime?
+  rngSeed              String
+
+  activity Activity @relation(fields: [activityId, accountId, family], references: [id, accountId, family])
+
+  /// Prisma requires an explicit @@unique on the defining side of a 1:1, even
+  /// though activityId is already this model's primary key.
+  @@unique([activityId, accountId, family])
+  /// I9 — one non-terminal session-bound Activity per Account.
+  /// raw() because the object form has no IN (§3.8, tests D10 and D13).
+  @@unique([accountId], where: raw("state IN ('ONLINE_ACTIVE', 'RECONNECT_GRACE_PAUSED')"))
+  @@map("SessionBoundActivity")
+}
+
+model SkillTrainingActivity {
+  activityId String         @id
+  family     ActivityFamily
+
+  /// NOT a second source of truth: a composite FK INTO the participant row.
+  /// A foreign key requires its target to exist, which is the "at least one"
+  /// half of exactly-one (test D14). The partial unique index on
+  /// ActivityParticipant supplies "at most one" (test D12).
+  traineeCharacterId String
+
+  status        SkillTrainingStatus
+  startedAt     DateTime
+  lastSettledAt DateTime
+  endedAt       DateTime?
+
+  activity Activity            @relation(fields: [activityId, family], references: [id, family])
+  trainee  ActivityParticipant @relation(fields: [activityId, traineeCharacterId], references: [activityId, characterId])
+
+  /// Required by Prisma on the defining side of each 1:1; activityId is
+  /// already this model's primary key.
+  @@unique([activityId, family])
+  @@unique([activityId, traineeCharacterId])
+  @@map("SkillTrainingActivity")
+}
+
+/// The durable ROSTER SNAPSHOT (ADR-002, DATA_ARCHITECTURE.md §7). Retained
+/// after the Activity ends: the claim is the occupancy fact and dies with the
+/// run; this is the history fact and outlives it (§6.3.1, test O14).
+model ActivityParticipant {
+  activityId  String
+  characterId String
+  family      ActivityFamily
+  slotIndex   Int
+  /// Per-Character activation (ADR-014). null means NOT YET ACTIVATED, which
+  /// §7.3.1 reads as NEUTRAL. Phase 0B stores and reads it; Phase 2 decides
+  /// what raises it.
+  staminaActivatedAt DateTime?
+
+  activity  Activity               @relation(fields: [activityId, family], references: [id, family])
+  character Character              @relation(fields: [characterId], references: [id])
+  claim     OccupancyClaim?
+  training  SkillTrainingActivity?
+
+  @@id([activityId, characterId])
+  /// Required by Prisma so SkillTrainingActivity.trainee and OccupancyClaim
+  /// may define a 1:1 against these columns, which @@id already makes unique.
+  @@unique([activityId, characterId])
+  /// AT MOST one participant on a wall-clock activity — the trainee (test D12).
+  @@unique([activityId], where: raw("family = 'WALL_CLOCK'"))
+  @@index([characterId])
+  @@map("ActivityParticipant")
+}
+
+/// ADR-013 / I13 — at most one claim per Character, globally. The composite FK
+/// means a claim can only name a PARTICIPANT of the activity it claims, so the
+/// sweeper reads the trainee through the participant row rather than from a
+/// column that could have drifted (test D11).
+model OccupancyClaim {
+  characterId String @id
+  activityId  String
+  acquiredAt  DateTime
+
+  participant ActivityParticipant @relation(fields: [activityId, characterId], references: [activityId, characterId])
+
+  /// Required by Prisma on the defining side of the 1:1. characterId is
+  /// already this model's primary key (I13: one claim per Character), so this
+  /// adds no new guarantee — it states one Prisma needs to see.
+  @@unique([activityId, characterId])
+  @@index([activityId])
+  @@map("OccupancyClaim")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Duration, idempotency and settlement (§7.3, §7.6)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Reusable active-use duration state. NEVER decremented on a schedule: no
+/// cron, no per-second tick, no background sweep (§7.3, test T9). Both fields
+/// are durable, so a crash resettles from qualifyingSince and produces the
+/// same result (test T3).
+model ActiveUseTimer {
+  id              String    @id
+  remainingMs     Int
+  qualifyingSince DateTime?
+  updatedAt       DateTime
+
+  @@map("ActiveUseTimer")
+}
+
+/// ADR-017 — client commands. Uniqueness is over the FULL identity, never the
+/// client key alone, so the same key on different accounts cannot collide or
+/// leak (test I3).
+model IdempotencyRecord {
+  principalId      String
+  commandNamespace String
+  clientKey        String
+  fingerprint      String
+  result           Json?
+  createdAt        DateTime
+
+  @@id([principalId, commandNamespace, clientKey])
+  @@index([createdAt])
+  @@map("IdempotencyRecord")
+}
+
+/// I7 — settlement is idempotent under its operation id. The id is
+/// DETERMINISTIC (activityId + checkpointSequence), so a retry after a lost
+/// response cannot double-apply (§7.6, test I4).
+model SettlementOperation {
+  operationId String   @id
+  kind        String
+  appliedAt   DateTime
+
+  @@map("SettlementOperation")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Economy (ADR-003)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// I6 — append-only. Enforced by a DATABASE PERMISSION: the application role
+/// has no UPDATE or DELETE on this table (§6.4, test D9). That makes the
+/// guarantee true for a developer who has never read ADR-003.
+model LedgerEntry {
+  id          String       @id
+  accountId   String
+  currency    CurrencyKind
+  /// Signed. Credit is positive, debit is negative; the balance projection is
+  /// their sum (ADR-003).
+  amount      BigInt
+  reasonCode  String
+  operationId String
+  createdAt   DateTime
+
+  account Account @relation(fields: [accountId], references: [id])
+
+  @@index([accountId, currency, createdAt])
+  @@index([operationId])
+  @@map("LedgerEntry")
+}
+
+/// A projection of the ledger, updated in the SAME transaction as the entry it
+/// reflects (ADR-003). It is never the source of truth; test I5's
+/// reconciliation compares it against the sum of entries.
+model CurrencyBalance {
+  accountId String
+  currency  CurrencyKind
+  amount    BigInt
+  updatedAt DateTime
+
+  account Account @relation(fields: [accountId], references: [id])
+
+  @@id([accountId, currency])
+  @@map("CurrencyBalance")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Content (§7.7)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Bundle metadata, and nothing more. It carries NO reference count and NO
+/// pinned flag: a counter is a mutable side channel that can drift from
+/// reality, and a drifted counter is how a referenced bundle gets deleted.
+/// The pinned set is a query over real references (§7.7, test C6).
+model ContentBundle {
+  version     String   @id
+  checksum    String
+  publishedAt DateTime
+  location    String
+
+  activities Activity[]
+
+  @@map("ContentBundle")
+}

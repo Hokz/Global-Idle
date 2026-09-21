@@ -1,0 +1,27 @@
+{
+  "name": "@global-idle/game-data",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "clean": "rm -rf dist *.tsbuildinfo bundles",
+    "build:bundle": "node ./dist/cli/build-bundle.js",
+    "validate": "node ./dist/cli/validate.js"
+  },
+  "dependencies": {
+    "@global-idle/shared": "workspace:*",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^24.9.2"
+  }
+}

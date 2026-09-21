@@ -1,0 +1,23 @@
+{
+  "name": "@global-idle/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/main.js",
+  "source": "./src/main.ts",
+  "scripts": {
+    "clean": "rm -rf dist *.tsbuildinfo",
+    "start": "cd ../.. && node --env-file-if-exists=.env apps/worker/dist/main.js",
+    "dev": "cd ../.. && node --env-file-if-exists=.env --watch apps/worker/dist/main.js"
+  },
+  "dependencies": {
+    "@global-idle/domain": "workspace:*",
+    "@global-idle/shared": "workspace:*",
+    "bullmq": "^6.3.8",
+    "ioredis": "^6.0.0",
+    "pino": "^10.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.9.2"
+  }
+}

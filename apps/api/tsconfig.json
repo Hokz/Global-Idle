@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "rootDir": "src",
+    "outDir": "dist",
+    "types": ["node"],
+    // NestJS 12 still uses legacy decorators with emitted metadata. Both options
+    // exist in TypeScript 6.0 and are on neither TypeScript 7's removal list nor
+    // this project's (§3.4).
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
+  },
+  "include": ["src/**/*.ts"],
+  "references": [{ "path": "../../packages/shared" }, { "path": "../../packages/domain" }]
+}

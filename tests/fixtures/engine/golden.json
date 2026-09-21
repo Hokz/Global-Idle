@@ -1,0 +1,45 @@
+{
+  "result": {
+    "activityId": "activity-fixture",
+    "tick": 68,
+    "elapsedMs": 61000,
+    "contentVersion": "v0000000000000001",
+    "participants": [
+      {
+        "characterId": "character-a",
+        "rngDraw": 0.17403818480670452
+      },
+      {
+        "characterId": "character-b",
+        "rngDraw": 0.545459785265848
+      },
+      {
+        "characterId": "character-c",
+        "rngDraw": 0.7253718941938132
+      }
+    ],
+    "drawsConsumed": 3
+  },
+  "floats": [
+    0.012049464508891106,
+    0.5742070693522692,
+    0.08307592757046223,
+    0.7653757857624441,
+    0.7453149701468647
+  ],
+  "ints": [
+    5,
+    1,
+    2,
+    1,
+    1
+  ],
+  "picks": [
+    "a",
+    "a",
+    "c",
+    "a",
+    "a"
+  ],
+  "drawCount": 18
+}

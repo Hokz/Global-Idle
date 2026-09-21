@@ -1,0 +1,20 @@
+{
+  "// ": "apps/web is NOT a project reference. Next.js sets noEmit, and TypeScript refuses a referenced project that disables emit (TS6310). It extends the base for strictness, is typechecked by its own `tsc --noEmit` (the second half of `pnpm typecheck`) and again by `next build` (§4.4, test W13). It MAY consume references; it just cannot be one.",
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "jsx": "preserve",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "allowJs": true,
+    "incremental": true,
+    "plugins": [{ "name": "next" }],
+    "paths": { "@/*": ["./*"] }
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules", ".next", "dist"]
+}

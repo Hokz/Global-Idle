@@ -1,0 +1,37 @@
+# Workspace list AND pnpm settings.
+# Phase 0B spec §3.10: pnpm 12 reads its settings from this file, not .npmrc.
+packages:
+  - 'apps/*'
+  - 'packages/*'
+
+# Linker behaviour is LOCKED. §3.1's second boundary layer depends on it:
+# an undeclared dependency must fail at module resolution. Setting
+# nodeLinker: hoisted, shamefullyHoist: true, or adding publicHoistPattern
+# entries re-creates the hoisting that lets an undeclared dependency resolve,
+# which silently deletes one of the two enforcement layers (§3.10, §5.3).
+# Changing any of these three lines is an ARCHITECTURE change, not a build fix.
+nodeLinker: isolated
+shamefullyHoist: false
+
+# A Node outside engines.node fails `pnpm install` rather than warning (§3.10).
+engineStrict: true
+
+# pnpm refuses dependency install scripts unless allowed here.
+# Every entry carries the reason it exists. Nothing is allowed wholesale,
+# and dangerouslyAllowAllBuilds is never used.
+allowBuilds:
+  # pnpm 12 refuses dependency install scripts unless they are allowed here.
+  # Every entry carries the reason it exists. Nothing is allowed wholesale, and
+  # dangerouslyAllowAllBuilds is never used. A new entry appears only when
+  # `pnpm install` reports an ignored build, and is added with its reason.
+  # Keep every reason on ONE line: pnpm rewrites this block, and a wrapped
+  # comment gets spliced apart when it inserts a new key.
+  prisma: true # preinstall entry script of the pinned CLI
+  '@prisma/engines': true # postinstall: fetches the schema engine the pinned CLI uses
+  msgpackr-extract: true # postinstall: native accelerator, via bullmq -> msgpackr in apps/worker
+  cpu-features: true # install: optional native CPU probe, via testcontainers -> ssh2 (test only)
+  ssh2: true # install: optional native crypto binding, via testcontainers (test only)
+  protobufjs: true # postinstall: generates its type registry, via testcontainers (test only)
+minimumReleaseAgeExclude:
+  - dependency-cruiser@18.4.0
+  - '@nestjs/terminus@12.1.0'

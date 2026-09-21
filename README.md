@@ -51,9 +51,11 @@ Development agents must read:
 
 ## Current phase
 
-**Phase 0 — Project Foundation**
+**Phase 1 — World / Character vertical slice**
 
-No production gameplay implementation should begin until the architecture, data boundaries and MVP vertical slice are reviewed.
+Phase 0A is `ARCHITECTURE_APPROVED` and Phase 0B is `VERIFIED` — the technical foundation is
+implemented, independently reviewed and accepted. Phase 1 is the first phase with a visible
+game surface.
 
 ## Working process
 
@@ -81,4 +83,8 @@ The implementer should not be the only final reviewer of the same change.
 
 ## Repository status
 
-Initial documentation foundation only. Gameplay code comes after Phase 0 review.
+Documentation baseline plus the Phase 0B technical foundation: monorepo, PostgreSQL schema and
+migrations, Redis, the domain primitives, content pipeline, health/observability surface and
+CI. `pnpm install && pnpm dev` brings the stack up and is verified end to end in CI.
+
+Gameplay code begins in Phase 1.

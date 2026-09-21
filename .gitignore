@@ -1,0 +1,17 @@
+node_modules/
+dist/
+*.tsbuildinfo
+coverage/
+.next/
+out/
+
+# Generated Prisma client — never committed (§4.3).
+packages/domain/src/generated/
+
+# Built content bundles — produced by `pnpm --filter @global-idle/game-data run build`.
+packages/game-data/bundles/
+
+.env
+.env.local
+*.log
+.DS_Store

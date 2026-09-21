@@ -445,10 +445,11 @@ a disconnected character.
   active-use timers, `ItemImbuement` timer ownership, Party mixed-Stamina behaviour,
   server-authoritative time.
 
-### Phase 0B — Foundation
+### Phase 0B — Foundation — `VERIFIED`
 - implementation specification:
   [`docs/specs/phase-0b/PHASE_0B_TECHNICAL_FOUNDATION_SPEC.md`](specs/phase-0b/PHASE_0B_TECHNICAL_FOUNDATION_SPEC.md)
-  (**`IMPLEMENTATION_SPEC_READY`** — approved after independent review);
+  (**`VERIFIED`** — implemented, independently reviewed, accepted 2026-09-21; evidence in
+  [`PHASE_0B_FOUNDATION_REVIEW.md`](specs/phase-0b/PHASE_0B_FOUNDATION_REVIEW.md));
 - documentation;
 - architecture;
 - Character occupancy primitive; Stamina durable state; generic `ActiveUseTimer` contract;
@@ -459,7 +460,7 @@ a disconnected character.
 - simulation contract;
 - CI.
 
-### Phase 1 — World/character vertical slice
+### Phase 1 — World/character vertical slice — current phase
 - account;
 - character;
 - vocation;

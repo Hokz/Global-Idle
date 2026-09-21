@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "rootDir": "src",
+    "outDir": "dist",
+    "types": ["node"],
+    // The generated Prisma client lives at src/generated/prisma and is compiled
+    // by this project like any other source (§4.3). Prisma's emitted client does
+    // not satisfy noUnusedLocals/noUnusedParameters; ESLint's
+    // @typescript-eslint/no-unused-vars keeps hand-written code honest instead.
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
+  },
+  "include": ["src/**/*.ts"],
+  "references": [{ "path": "../shared" }, { "path": "../game-data" }, { "path": "../game-engine" }]
+}

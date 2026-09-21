@@ -1,0 +1,28 @@
+{
+  "name": "placeholder",
+  "definitions": [
+    {
+      "key": "placeholder.node.a",
+      "kind": "placeholder",
+      "references": ["placeholder.node.b"],
+      "probability": 0.5,
+      "magnitude": 1
+    },
+    { "key": "placeholder.node.b", "kind": "placeholder", "references": [] },
+    { "key": "placeholder.node.c", "kind": "placeholder", "references": [] },
+    { "key": "placeholder.node.d", "kind": "placeholder", "references": [] },
+    { "key": "placeholder.node.e", "kind": "placeholder", "references": [] }
+  ],
+  "unlockSets": [
+    {
+      "key": "placeholder.unlock-set.five",
+      "members": [
+        "placeholder.node.a",
+        "placeholder.node.b",
+        "placeholder.node.c",
+        "placeholder.node.d",
+        "placeholder.node.e"
+      ]
+    }
+  ]
+}

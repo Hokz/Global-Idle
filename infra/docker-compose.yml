@@ -1,0 +1,46 @@
+# Local infrastructure (§11.3). PostgreSQL and Redis, nothing else: `web`,
+# `api` and `worker` run on the host with hot reload, so a code change does not
+# wait for an image build.
+#
+# This file is for DEVELOPMENT. CI brings its own services up through
+# Testcontainers (§3.7), which is why nothing here is referenced by a test.
+
+name: global-idle
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    # ADR-009: the sole durable truth. It is the one service here whose data
+    # is kept in a named volume.
+    environment:
+      POSTGRES_USER: globalidle
+      POSTGRES_PASSWORD: globalidle
+      POSTGRES_DB: globalidle
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      # `pnpm dev` waits on this before migrating: a migration against a
+      # database that is still starting fails in a way that looks like a
+      # broken migration.
+      test: ['CMD-SHELL', 'pg_isready -U globalidle -d globalidle']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  redis:
+    image: redis:7-alpine
+    # §11.1: Redis holds nothing that cannot be rebuilt from PostgreSQL, so it
+    # deliberately has NO VOLUME. Losing it on `docker compose down` is the
+    # documented behaviour, not an accident to be fixed with persistence.
+    ports:
+      - '6379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  postgres-data:
