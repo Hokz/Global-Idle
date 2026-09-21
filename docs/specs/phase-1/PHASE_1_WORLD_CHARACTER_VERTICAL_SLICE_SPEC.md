@@ -514,6 +514,18 @@ characters coexist while two Knights still collide. D4 and D5 must keep passing 
 they are the control — and a new case (§16, D-group) asserts the NULL behaviour explicitly so the
 property is tested rather than assumed.
 
+**This was measured, not recalled.** Against PostgreSQL 16 with the index declared exactly as
+above and `vocation` nullable:
+
+| Probe | Result |
+|---|---|
+| Two NULL-vocation rows, one account | **both accepted** — the origin characters coexist |
+| Two `KNIGHT` rows, one account | **refused**, `duplicate key value violates unique constraint` — D4's control holds |
+| Retire the first `KNIGHT`, insert another | **accepted**, one playable `KNIGHT` — D5's control holds |
+
+The implementing pass should still write D16 rather than trust this table: a probe on a scratch
+table proves the *index semantics*, not that the migration was applied to the real one.
+
 `baseLevel` is defaulted for the migration's sake and then always written explicitly by
 `createCharacter`; the `CHECK` is the constraint that actually holds the floor.
 
