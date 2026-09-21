@@ -9,7 +9,7 @@
  *
  * Idempotent, so `pnpm dev` can run it on every start.
  */
-import { readFile, readdir } from 'node:fs/promises';
+import { readFile, readdir, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import {
   character,
@@ -26,8 +26,20 @@ const now = new Date();
 
 const say = (line) => process.stdout.write(`${line}\n`);
 
-/** Publish every built bundle that is not published yet. The bundle files are
- *  produced by `pnpm --filter @global-idle/game-data run build:bundle`. */
+/**
+ * Publish every built bundle that is not published yet, OLDEST BUILD FIRST.
+ *
+ * The order matters and used to be accidental. `currentVersion` breaks a tie
+ * on `publishedAt` by version string, so publishing several bundles at one
+ * instant made "current" mean "whichever content hash happens to sort
+ * highest" — which is not a fact about the game. A stale bundle left in the
+ * output directory by an earlier build then became the world, and the symptom
+ * was the current content silently serving an older definition.
+ *
+ * Each bundle is now published at its own instant, ordered by when its file
+ * was WRITTEN, so the most recently built content is the current content and
+ * older bundles stay resolvable for the Activities that pinned them.
+ */
 async function publishBundles() {
   const directory = resolve(config.CONTENT_BUNDLE_DIR);
   let files;
@@ -40,14 +52,21 @@ async function publishBundles() {
   }
   if (files.length === 0) throw new Error(`No content bundles at ${directory}.`);
 
-  for (const file of files) {
+  const dated = await Promise.all(
+    files.map(async (file) => ({ file, at: (await stat(join(directory, file))).mtimeMs })),
+  );
+  dated.sort((a, b) => a.at - b.at);
+
+  let step = 0;
+  for (const { file } of dated) {
     const artifact = JSON.parse(await readFile(join(directory, file), 'utf8'));
     const already = await prisma.contentBundle.findUnique({ where: { version: artifact.version } });
     if (already) {
       say(`bundle ${artifact.version} already published`);
       continue;
     }
-    await content.publish(prisma, artifact, directory, now);
+    step += 1;
+    await content.publish(prisma, artifact, directory, new Date(now.getTime() + step));
     say(`published bundle ${artifact.version}`);
   }
 }
