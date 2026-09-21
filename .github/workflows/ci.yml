@@ -1,0 +1,166 @@
+# Phase 0B CI — §13. THIRTEEN BLOCKING CHECKS, numbered 0-12, cheapest first
+# so failures surface fast.
+#
+# CI runs the SAME SCRIPTS AS A DEVELOPER, IN THE SAME ORDER (§4.3). There is
+# no CI-only build command and no step that exists only in this file: a
+# divergence here is how a pipeline starts proving something other than what
+# developers run. Every `run:` below is a script from package.json.
+#
+# Phase 0B is not VERIFIED until this workflow exists and passes.
+
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: 'Phase 0B — 13 blocking checks'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    services:
+      # Check 9 (`migrate:check`) applies migrations to real scratch databases
+      # and needs a server to create them on. Checks 10 and 11 do NOT use this
+      # service — they bring their own up through Testcontainers, which is what
+      # a developer gets locally (§3.7).
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: globalidle
+          POSTGRES_PASSWORD: globalidle
+          POSTGRES_DB: globalidle
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U globalidle -d globalidle"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+
+    env:
+      # EXPORTED FOR EVERY STEP (§4.3). `prisma generate` does not connect, but
+      # prisma.config.ts reads this variable EAGERLY, and a variable that is
+      # unset only in CI is the classic divergence. It points at the service
+      # above, so the static steps get a real URL rather than a placeholder
+      # that would fail the moment something did connect.
+      DATABASE_URL: postgresql://globalidle:globalidle@127.0.0.1:5432/globalidle?schema=public
+      CI: '1'
+
+    steps:
+      - uses: actions/checkout@v5
+
+      # ─────────────────────────────────────────── check 0 — toolchain and install
+      #
+      # Four ways for the build to stop, not four sentences in a document
+      # (§3.10): engineStrict on the Node range, packageManager on the pnpm
+      # version, allowBuilds on dependency install scripts, and
+      # --frozen-lockfile on a lockfile that disagrees with package.json.
+      - name: '0a · Node from .nvmrc'
+        uses: actions/setup-node@v5
+        with:
+          # CI CANNOT DRIFT FROM .nvmrc, because it reads it (§3.10).
+          node-version-file: .nvmrc
+
+      - name: '0b · Corepack'
+        # After setup-node, never before: Corepack ships with the Node line,
+        # and enabling it first would shim the runner's default Node instead of
+        # the one this job runs on.
+        run: corepack enable
+
+      - name: '0c · pnpm store cache'
+        uses: actions/cache@v4
+        with:
+          # Keyed on the lockfile, so a cold run and a warm run differ in wall
+          # time only, never in outcome (§4.3).
+          path: ~/.local/share/pnpm/store
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-store-${{ runner.os }}-
+
+      - name: '0d · Install'
+        run: pnpm install --frozen-lockfile
+
+      # ─────────────────────────────────────────── checks 1-3 — the cheap gates
+      - name: '1 · Format check'
+        run: pnpm format:check
+
+      - name: '2 · Lint'
+        run: pnpm lint
+
+      - name: '3 · Dependency boundaries'
+        run: pnpm boundaries
+
+      # ─────────────────────────────────────────── checks 4-5 — generation and types
+      - name: '4 · Prisma client generation'
+        # A CHECK, not a hidden setup step: a schema that cannot generate fails
+        # HERE, plainly, instead of surfacing as a confusing unresolved-module
+        # error inside the typecheck (§13).
+        run: pnpm generate
+
+      - name: '5 · Typecheck — all seven workspaces'
+        # `tsc -b` over the six composite projects, then apps/web's own
+        # `tsc --noEmit`. Not `tsc --noEmit` at the root: project references
+        # resolve against emitted declarations (§4.4). W13 proves the coverage.
+        run: pnpm typecheck
+
+      # ─────────────────────────────────────────── checks 6-7 — the fast suites
+      - name: '6 · Unit tests'
+        run: pnpm test:unit
+
+      - name: '7 · Deterministic engine fixtures'
+        # Fails on non-reproducible output for the same seed (E1, E2), and on a
+        # forbidden import in the engine's module graph (E3).
+        run: pnpm test:fixtures
+
+      # ─────────────────────────────────────────── check 8 — content
+      - name: '8 · Content validation'
+        # Runs the CLI from dist, which check 5 emitted.
+        run: pnpm --filter @global-idle/game-data run validate
+
+      # ─────────────────────────────────────────── check 9 — migrations
+      - name: '9a · psql for the migration check'
+        # Provisioning, not a build command: migrate:check creates and drops
+        # scratch databases through psql. Skipped when the runner image already
+        # ships it.
+        run: command -v psql || (sudo apt-get update && sudo apt-get install -y postgresql-client)
+
+      - name: '9b · Migration validation'
+        # Applies from empty AND from the previous state, and asserts the
+        # generated SQL carries every declared partial-index predicate and both
+        # hand-written CHECK constraints (D1, D2, D13).
+        run: pnpm --filter @global-idle/domain run migrate:check
+
+      # ─────────────────────────────────────────── checks 10-11 — the database suites
+      #
+      # Testcontainers brings up PostgreSQL and Redis. The
+      # GLOBAL_IDLE_TEST_* escape hatch is deliberately NOT set here: with a
+      # Docker daemon present and the variables unset, the Testcontainers path
+      # is the only path (tests/support/global-setup.ts).
+      - name: '10 · Integration tests'
+        run: pnpm test:integration
+
+      - name: '11 · Economy invariant tests'
+        # A category of its own, not ordinary unit tests: currency
+        # double-spend under concurrency, non-idempotent replay, ledger
+        # mutation, reconciliation drift (§13).
+        run: pnpm test:invariants
+
+      # ─────────────────────────────────────────── check 12 — the apps build
+      - name: '12 · App builds (web, api, worker)'
+        # `next build` typechecks apps/web a second time.
+        run: pnpm build
+
+      # ─────────────────────────────────────────── the matrix is countable
+      - name: 'Test matrix — 92 cases'
+        # Not a §13 check; it is how "all 92 cases pass" stays a countable
+        # claim rather than an assertion (§14).
+        run: node scripts/count-matrix.mjs
