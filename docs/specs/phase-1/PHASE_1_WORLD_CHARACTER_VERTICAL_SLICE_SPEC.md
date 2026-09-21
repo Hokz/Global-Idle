@@ -38,6 +38,9 @@ browser
   → back to the Atlas, claim released
 ```
 
+Reload at any point re-reads the server. The Hunt the Character is in is **durable server state**
+(§9.6), not a URL segment and not client memory.
+
 That last stretch is the part that needs care, and §9 specifies it exactly.
 
 ### 1.2 Non-goals — Phase 1 does NOT include
@@ -48,11 +51,12 @@ That last stretch is the part that needs care, and §9 specifies it exactly.
 | Damage formulas, XP curves, gold, loot tables, supplies, death | Phase 2–3 |
 | Stamina **consumption** (activation is first qualifying XP — §9.4) | Phase 2 |
 | `ItemInstance`, inventory, equipment, custody | Phase 3 |
-| Party gameplay, Active Party editing | Phase 5 |
-| Dungeons, quests, bosses | Phase 6+ |
-| Market, Forge, Imbuements, Wheel, Skill Tree | Phase 7+ |
-| The other four vocations' kits and the Level-8 Oracle flow | Phase 8 |
-| Store / payment / Premium purchase flow | later |
+| Skills, Party gameplay, Active Party editing | Phase 4 |
+| The five vocations' kits and the Level-8 Oracle flow | Phase 4 |
+| Quests, dungeons, bosses | Phase 5 |
+| Market and the economy surface | Phase 6 |
+| Forge, Imbuements, Wheel, Skill Tree | Phase 7 |
+| Store / payment / Premium purchase flow | Phase 8 |
 | The rest of the world's regions and content | Phase 9 |
 | NPC dialogue, the tutorial script, tutorial gating | later |
 
@@ -99,10 +103,28 @@ phase that must create a Level-1 origin character, and it is the first phase whe
 
 ### 3.2 What Phase 1 adds — the smallest defensible thing
 
-**Decision P1-D1 — a first-party dev credential provider, session by signed HTTP-only cookie.**
+**Decision P1-D1 — a DEVELOPMENT-ONLY credential provider, session by signed HTTP-only cookie.**
 
-Phase 1 is a vertical slice, not an identity product. It needs exactly: a stable `accountId` per
-browser session, an authorization boundary that a test can breach, and reload survival.
+> ### ⚠ The `dev` provider is a TEST HARNESS, not authentication
+>
+> `subject` is a self-asserted handle with **no secret**, so typing another player's handle
+> *is* logging in as them. That is acceptable for a local slice and a CI fixture, and
+> unacceptable anywhere else.
+>
+> - the provider is registered **only** when `NODE_ENV !== 'production'` **and**
+>   `GLOBAL_IDLE_DEV_AUTH=1`. Both, not either;
+> - in production the route is **absent**, not merely hidden — a `404`, not a `403`, because a
+>   `403` still tells an attacker the mechanism exists;
+> - the API **refuses to start** if `NODE_ENV=production` and `GLOBAL_IDLE_DEV_AUTH=1` are set
+>   together. A misconfiguration must be a boot failure, not a silently open door;
+> - **Phase 1 is not deployable to production.** Real authentication is a later phase's work and
+>   this specification does not pretend otherwise;
+> - §19's security cases prove **account scoping and session integrity**. They do not, and must
+>   not be read to, prove that the dev provider is safe authentication.
+
+Phase 1 is a vertical slice, not an identity product. It needs exactly: a stable account per
+browser session, a **session identity distinct from it** (§3.2.1), an authorization boundary a
+test can breach, and reload survival.
 
 - provider `dev`, `subject` = a player-chosen handle. `POST /api/session` upserts the
   `AuthIdentity` and its `Account` in one transaction and sets the cookie.
@@ -112,6 +134,38 @@ browser session, an authorization boundary that a test can breach, and reload su
 - **no password, no email, no recovery, no OAuth.** Those arrive when the product needs them; a
   fake one now would have to be deleted.
 - `DELETE /api/session` clears it.
+
+#### 3.2.1 `accountId` is not `sessionId`
+
+**Decision P1-D14 — the cookie carries BOTH, and they mean different things.**
+
+Phase 0B's `SessionBoundActivity.claimHolderSessionId` is the connection that holds the activity
+claim (`ADR-008`: the newest connection evicts the previous one). The first draft of this
+specification defined no `sessionId` at all, so Enter Hunt had nothing truthful to pass — and the
+obvious shortcut, passing `accountId`, would have made two browsers on one account
+indistinguishable and silently broken eviction before Phase 2 ever got to implement it.
+
+```text
+accountId   WHO owns the characters      stable across logins, devices, time
+sessionId   WHICH login is acting now    minted per successful POST /api/session
+```
+
+| Rule | |
+|---|---|
+| Generation | `sessionId` is minted **server-side** (`newId<'SessionId'>()`) on session creation |
+| Client authority | **none.** It is inside the signed payload; a request body field named `sessionId` is ignored, and a forged cookie fails the signature |
+| Reload | same cookie → same `sessionId`. Reload is not a new login |
+| Second browser / second login | a **new** `sessionId` on the same `accountId` |
+| Logout | the cookie is cleared; that `sessionId` is never re-minted |
+| Enter Hunt | passes the **server-derived** `sessionId` as `claimHolderSessionId` |
+
+**No `Session` table.** The signed cookie *is* the session record: Phase 1 needs no server-side
+revocation, no session listing and no idle expiry, and a table would be durable state with no
+reader. What Phase 2 adds — eviction, the 5-minute grace, a realtime connection — needs the
+*identity* to be right, which this provides, and can add storage then if it needs it.
+
+*Alternative considered:* mint a fresh `sessionId` per request. Rejected — eviction would fire on
+every reload, which is precisely the bug `ADR-008` exists to prevent.
 
 *Alternatives:* OAuth/OIDC (real, but a whole product Phase 1 cannot review honestly);
 anonymous cookie-only accounts (no way to return to an account from another browser — makes
@@ -139,15 +193,21 @@ another account returns **404, not 403** — existence is itself information (§
 
 ## 4. Vocation interpretation — decision
 
-**Decision P1-D2 — "one vocation" means one vocation *implemented as data*, namely the
-**no-vocation origin state**, and Phase 1 ships **zero** playable vocation kits.**
+**Decision P1-D2 — Phase 1 implements the PRE-VOCATION ORIGIN CHARACTER state. Vocation
+selection stays deferred to the Level-8 Oracle flow, and Phase 1 ships zero vocation kits.**
+
+`null` means **"not chosen yet"**. It is a lifecycle state of the one Origin Character, **not a
+sixth vocation** and **not a reusable roster-slot type**. This specification does not describe
+"no vocation" as "one vocation"; the roadmap line is read below, but the phase does not adopt its
+wording.
 
 Read against the tutorial baseline, `ROADMAP.md`'s *"one vocation"* cannot mean "the player picks
 a vocation in Phase 1" — that would contradict a `LOCKED` flow and move the Oracle to Level 1.
 What it does mean, and what Phase 1 builds:
 
-1. `Character.vocation` becomes **nullable**, and a Phase 1 character is created with `null`
-   (§13.2). This is the *origin* character of `DOMAIN_MODEL.md` §5.5.
+1. `Character.vocation` becomes **nullable**, and the Origin Character is created with `null`
+   (§13.2). This is the *origin* character of `DOMAIN_MODEL.md` §5.5 — **at most one per
+   Account**, enforced by the database (§13.2), not by application logic.
 2. The `Vocation` enum keeps its five values. Nothing is removed.
 3. The character panel renders vocation as **"Not yet chosen — Oracle at Level 8"**, which is
    product-truthful and needs no balance number.
@@ -157,13 +217,23 @@ What it does mean, and what Phase 1 builds:
 
 | Alternative | Why not |
 |---|---|
-| Ship Knight as "the one vocation", assigned at creation | contradicts `TUTORIAL_ROOKGAARD_ROADMAP.md` §3 and §34, both `LOCKED`. Phase 8 would have to delete it. |
+| Ship Knight as "the one vocation", assigned at creation | contradicts `TUTORIAL_ROOKGAARD_ROADMAP.md` §3 and §34, both `LOCKED`. Phase 4 would have to delete it. |
 | Ship the Level-8 Oracle selection UI now | requires Base Level 8, which requires XP, which requires Phase 2's combat. Out of order. |
 | Keep `vocation` NOT NULL and add a sentinel `NONE` enum member | pollutes a product enum with a lifecycle state, and every future `switch` over `Vocation` must handle a member that is not a vocation. `null` already means "absent" and the partial unique index already treats NULLs as distinct (§13.2). |
 
+**The roster model this sits inside**, so the invariant is not read in isolation:
+
+| | |
+|---|---|
+| First Character on a new Account | the **Origin Character**: Level 1, Rookgaard, `vocation = null` |
+| Reaching Level 8 | the Oracle assigns a concrete vocation — **Phase 4**, not here |
+| Additional Characters | start at **Level 8**, represent a vocation **unlock**, and arrive through the future unlock flow — `DOMAIN_MODEL.md` §5.5 |
+| Roster slots 2–5 | bought with Gold — **Phase 6**; Phase 1 implements no unlock and no purchase |
+| Phase 1's creation endpoint | creates the Origin Character **only**. It is not a generic "make another no-vocation character" API |
+
 *Deferred:* the Oracle flow, the five identities in `TUTORIAL_ROOKGAARD_ROADMAP.md` §35, skill
-aptitudes, and vocation immutability enforcement at confirmation (`DOMAIN_MODEL.md` §5.5 already
-decides the rule; Phase 8 enforces it).
+aptitudes, Gold roster unlocks, and vocation immutability enforcement at confirmation
+(`DOMAIN_MODEL.md` §5.5 already decides the rule; Phase 4 enforces it).
 
 ---
 
@@ -178,7 +248,6 @@ decides the rule; Phase 8 enforces it).
 | `name` | client-proposed, server-validated | 2–20 chars, letters + single inner spaces, unique among playable characters account-wide |
 | `vocation` | server | **`null`** (§4) |
 | `baseLevel` | server | **1** (`TUTORIAL_ROOKGAARD_ROADMAP.md` §3) |
-| `locationKey` | server | `region.rookgaard.temple` (§7) |
 | `createdAt` | server clock (`ADR-010`) | — |
 | `retiredAt` | server | `null` |
 | Stamina | server | `CharacterStamina` row, `remainingMs = STAMINA_MAX` (42:00), mode `NEUTRAL` |
@@ -186,9 +255,14 @@ decides the rule; Phase 8 enforces it).
 The client sends **`{ name }`** and nothing else. Everything else is server-owned; a request
 carrying `baseLevel` or `vocation` is rejected by schema validation, not ignored.
 
+This endpoint creates the **Origin Character** and nothing else (§4). It is not a general
+"create a no-vocation Character" API: **I1b** (§13.2) allows one per Account, so a second attempt
+is refused by the database, surfaced as `409 ORIGIN_CHARACTER_EXISTS`.
+
 Creation runs in **one transaction** through the existing `character.createCharacter`, extended
 for the new fields, and inside it re-checks **I2** (`count(playable) ≤ rosterCapacity`) exactly as
-Phase 0B does.
+Phase 0B does. I1b is enforced by the index rather than by a read-then-write check, for the reason
+`DOMAIN_MODEL.md` §5.5 gives about I1: an application-only check loses to a concurrent request.
 
 ### 5.2 Selection and retirement
 
@@ -208,7 +282,32 @@ Phase 0B does.
 | Name too short/long/ill-formed | `NAME_INVALID` | inline under the field, no navigation |
 | Name taken on this account | `NAME_TAKEN` | inline |
 | Roster full | `ROSTER_FULL` | blocking message with the capacity |
+| Origin Character already exists | `ORIGIN_CHARACTER_EXISTS` | blocking; the account already has its one Level-1 Character (§4) |
 | No session | `UNAUTHENTICATED` | redirect to session entry |
+
+### 5.4 No durable location in Phase 1
+
+**Decision P1-D15 — `Character.locationKey` is NOT added. Phase 1 stores no location.**
+
+The first draft gave the Character `locationKey = "region.rookgaard.temple"`. The proposed content
+kinds are `region`, `atlas-marker` and `hunt` — there is no `location` kind — so that string would
+have been a **pseudo-content key with no build-time guarantee**: it looks like content, resolves
+against nothing, and the first typo would surface as a blank panel rather than a failed build.
+
+Two ways out, and the smaller one wins:
+
+| Option | Verdict |
+|---|---|
+| **A** — define a real `location` content kind, validated like the others | Correct, and premature. Nothing in Phase 1 *reads* location to decide anything: there is no movement, no travel, no location-gated content, and exactly one region |
+| **B** — **do not store location at all** ← chosen | The only need is displaying where the Character is. That is already derivable: the Atlas has one `AVAILABLE` region, and an occupied Character's Activity resolves to its Hunt (§9.6) |
+
+So the panel shows `Rookgaard` from the region definition, or the Hunt's label when the Character
+is in one. No new column, no new content kind, no unvalidated key anywhere — **every durable
+content reference in Phase 1 resolves through the content system.**
+
+When movement exists and a location is something the server *decides with*, a real `location` kind
+arrives with it, together with the rules that need it. Infrastructure follows the slice that
+requires it.
 
 ---
 
@@ -224,7 +323,7 @@ nothing authoritative (`CLIENT_SERVER_BOUNDARIES.md`).
 | Vocation | `Character.vocation` | `null` → *"Not yet chosen — Oracle at Level 8"* |
 | Stamina | `CharacterStamina` | `hh:mm` of 42:00 **plus the mode**, all server-derived |
 | Premium | account entitlements | `Free` / `Premium`, read-only, no purchase path |
-| Location / activity | `locationKey`, current activity | `Rookgaard Temple`, or the Hunt it is in |
+| Where the Character is | the **Atlas region** + current activity | `Rookgaard` when idle, or the Hunt's label when in one — both resolved from content (§10), neither from a durable location column (§5.4) |
 
 **Stamina is displayed, not ticked.** `deriveStaminaMode` is server-side and the mode in Phase 1 is
 always `NEUTRAL` (nothing consumes or recovers — §9.4). A client-side countdown would be the
@@ -353,6 +452,45 @@ Always `NEUTRAL`, always 42:00, for every character, in and out of a Hunt. Nothi
 consumes (no qualifying XP) and nothing recovers (recovery is a Skill-Training/offline concern
 Phase 1 does not surface). The *state machine* is exercised; the *transitions* are Phase 2's.
 
+### 9.6 The Activity must know WHICH Hunt it is — `Activity.contentKey`
+
+**Decision P1-D13 — `Activity` gains a durable, server-owned `contentKey`.**
+
+The first draft of this specification promised an `ActivityView.huntKey` and a reload that returns
+the player to the same Hunt. The Phase 0B `Activity` row stores `id`, `accountId`,
+`activityTypeKey`, `family`, `contentVersion`, `createdAt` — and **nothing that says which Hunt**.
+`activityTypeKey` is `"hunt"` for every Hunt ever run. So the promise could not be kept: after a
+reload the server could say *"you are in a Hunt"* and not *which one*.
+
+```text
+Activity
+  activityTypeKey  "hunt"                      WHICH CODE PATH runs
+  contentVersion   v2d9f9f15b4585df5           WHICH BUNDLE it was started against (ADR-011)
+  contentKey       "hunt.rookgaard.sewers"     WHICH DEFINITION it represents   ← new
+```
+
+**Generic on purpose.** It is `contentKey`, not `huntKey`: a Phase 5 Dungeon and a Phase 5 boss
+encounter are the same shape of fact — an Activity instance of a content definition — and a
+Hunt-only column would have to be replaced rather than reused.
+
+| Property | Rule |
+|---|---|
+| Ownership | **server**. Derived from the validated request body's `huntKey`, never copied blindly |
+| Durability | a column on `Activity`, written in the creating transaction |
+| Validity | must resolve **in the Activity's own pinned `contentVersion`** — not in "the current bundle" |
+| Kind compatibility | the definition's `kind` must match the activity type: `activityTypeKey = "hunt"` requires `kind: "hunt"` |
+| Mutability | **immutable after creation.** No endpoint updates it; reload reads it |
+| Reload | the pre-combat screen is reconstructed from `(contentVersion, contentKey)` alone |
+
+**Where it must NOT live:** client state, the URL, Redis, the idempotency result JSON, or a log
+line. Each of those loses the fact on the exact failure the durability exists for.
+
+**Creation transaction.** Inside the single transaction that already starts the Activity:
+resolve the bundle pinned for this Activity → look up `contentKey` in it → assert `kind` matches
+the activity type → assert `availability = AVAILABLE` → write the row. A key that does not resolve
+is `404 HUNT_NOT_FOUND`; one that resolves to the wrong kind is `422 CONTENT_KIND_MISMATCH`.
+Neither creates an Activity, and the occupancy claim is never taken.
+
 ### 9.5 Reload and Leave
 
 | Action | Server | Client |
@@ -407,7 +545,7 @@ kind: "hunt"
   availability   "AVAILABLE" | "LOCKED"
 ```
 
-Categories `DUNGEON`/`NPC`/`SERVICE` are accepted by the schema so Phase 6+ adds markers without a
+Categories `DUNGEON`/`NPC`/`SERVICE` are accepted by the schema so Phase 5+ adds markers without a
 schema migration, but **Phase 1 authors none** and the client renders an unknown category as a
 neutral pin rather than throwing.
 
@@ -472,15 +610,21 @@ where `code` is a stable `SCREAMING_SNAKE` identifier (the UI switches on `code`
 | `GET` | `/api/characters/:id` | → `CharacterDetail` | **404** if not owned (§19) |
 | `GET` | `/api/atlas` | → `{ contentVersion, regions[], markers[] }` | from the pinned bundle |
 | `GET` | `/api/hunts/:key` | → `HuntDetail` | `404` for an unknown or non-`hunt` key |
-| `POST` | `/api/characters/:id/hunt` | `{ huntKey }` → `ActivityView` | starts the Activity (§9.2); `409 OCCUPANCY_CONFLICT` |
+| `POST` | `/api/characters/:id/hunt` | `{ huntKey }` → `ActivityView` | starts the Activity (§9.2, §9.6); `404 HUNT_NOT_FOUND`, `422 CONTENT_KIND_MISMATCH`, `409 OCCUPANCY_CONFLICT` |
 | `GET` | `/api/characters/:id/activity` | → `ActivityView \| null` | what reload reads |
 | `DELETE` | `/api/characters/:id/activity` | → `204` | Leave |
 
 ```ts
 CharacterSummary = { id, name, baseLevel, vocation: VocationName | null, stamina: StaminaView }
-CharacterDetail  = CharacterSummary & { locationKey, premium: boolean, activity: ActivityView | null }
+CharacterDetail  = CharacterSummary & { premium: boolean, activity: ActivityView | null }
 StaminaView      = { remainingMs, maxMs, mode: 'CONSUMING' | 'NEUTRAL' | 'RECOVERING' }
-ActivityView     = { activityId, activityTypeKey, huntKey, state, startedAt }
+ActivityView     = {
+  activityId, activityTypeKey,
+  contentVersion,            // the bundle this Activity was pinned to (ADR-011)
+  contentKey,                // WHICH definition — durable, server-owned (§9.6)
+  hunt: HuntDetail,          // resolved from (contentVersion, contentKey) on read
+  state, startedAt,
+}
 ```
 
 `POST /api/characters/:id/hunt` carries an **idempotency key** and goes through the Phase 0B
@@ -501,30 +645,61 @@ than racing the occupancy constraint.
 
 ```sql
 ALTER TABLE "Character" ALTER COLUMN "vocation" DROP NOT NULL;
-ALTER TABLE "Character" ADD COLUMN "baseLevel"   INTEGER NOT NULL DEFAULT 1;
-ALTER TABLE "Character" ADD COLUMN "locationKey" TEXT    NOT NULL DEFAULT 'region.rookgaard.temple';
+ALTER TABLE "Character" ADD COLUMN "baseLevel" INTEGER NOT NULL DEFAULT 1;
 ALTER TABLE "Character" ADD CONSTRAINT "Character_baseLevel_check" CHECK ("baseLevel" >= 1);
+
+-- I1, UNCHANGED: at most one playable Character per CONCRETE vocation per account.
+-- (already present; shown for context)
+-- CREATE UNIQUE INDEX "Character_accountId_vocation_key"
+--     ON "Character" ("accountId", "vocation") WHERE "retiredAt" IS NULL;
+
+-- NEW INVARIANT I1b: at most ONE playable un-vocationalized ORIGIN Character
+-- per account. NULLs are distinct to the index above, so without this a second
+-- Origin Character would be accepted.
+CREATE UNIQUE INDEX "Character_accountId_origin_key"
+    ON "Character" ("accountId")
+ WHERE "retiredAt" IS NULL AND "vocation" IS NULL;
 ```
 
-**Why this does not weaken I1.** I1 is *"one playable Character per vocation per account"*. A
-character with **no** vocation does not hold a vocation, so it cannot violate it. The existing
-partial unique index `(accountId, vocation) WHERE retiredAt IS NULL` keeps working: PostgreSQL
-treats NULLs as **distinct** in a unique index by default, so any number of no-vocation origin
-characters coexist while two Knights still collide. D4 and D5 must keep passing **unchanged** —
-they are the control — and a new case (§16, D-group) asserts the NULL behaviour explicitly so the
-property is tested rather than assumed.
+**Invariant I1b — an Account may have at most one playable un-vocationalized Origin Character.**
 
-**This was measured, not recalled.** Against PostgreSQL 16 with the index declared exactly as
-above and `vocation` nullable:
+**Why I1 is untouched, and why I1b is needed.** I1 is *"one playable Character per **vocation**
+per account"*. A Character with no vocation holds no vocation, so it cannot violate I1 — and that
+is exactly the problem: PostgreSQL treats NULLs as **distinct** in a unique index, so I1 does not
+constrain Origin Characters **at all**. A second index must, because the product model allows
+exactly one.
+
+> **This reverses a claim the first draft made.** That draft cited the same NULL-distinctness
+> behaviour as evidence that *"any number of no-vocation origin characters coexist"*, and
+> presented it as the desired outcome. The database behaviour was measured correctly; the product
+> conclusion drawn from it was wrong. There is **one** Origin Character per Account — additional
+> Characters are vocation **unlocks** that start at Level 8 (`DOMAIN_MODEL.md` §5.5). I1b is the
+> constraint the first draft should have specified, and the matrix case that asserted coexistence
+> is **reversed**, not merely adjusted.
+
+**Measured against PostgreSQL 16**, with both indexes declared exactly as above:
 
 | Probe | Result |
 |---|---|
-| Two NULL-vocation rows, one account | **both accepted** — the origin characters coexist |
-| Two `KNIGHT` rows, one account | **refused**, `duplicate key value violates unique constraint` — D4's control holds |
-| Retire the first `KNIGHT`, insert another | **accepted**, one playable `KNIGHT` — D5's control holds |
+| First Origin Character on an account | **accepted** |
+| **Second** Origin Character, same account | **REFUSED** — `duplicate key value violates unique constraint "…_origin_key"` |
+| Origin Character on a **different** account | **accepted** — accounts are independent |
+| Two `KNIGHT` rows, one account | **REFUSED** by the I1 index — D4's control holds |
+| A `KNIGHT` and an Origin Character, one account | **both present** — I1b constrains only the un-vocationalized row |
+| Retire the Origin Character, create another | **accepted** — see the open item below |
 
-The implementing pass should still write D16 rather than trust this table: a probe on a scratch
-table proves the *index semantics*, not that the migration was applied to the real one.
+The implementing pass still owes the D-group cases: a probe on a scratch table proves *index
+semantics*, not that the migration was applied to the real table.
+
+**Retirement before vocation — `OPEN`, flagged rather than decided.** `ADR-007` makes deletion
+retirement, and I1b is scoped to playable rows, so retiring an Origin Character frees the slot and
+a new one can be created at Level 1. That is a **tutorial replay path**, and
+`TUTORIAL_ROOKGAARD_ROADMAP.md` §2 already says the account tracks `tutorialCompleted` and warns
+*"Do not determine tutorial eligibility only by counting existing characters."* Whether replay is
+allowed, offered with a SKIP, or refused is a **product decision that does not exist yet**. Phase 1
+neither implements retirement (§5.2) nor gates creation on tutorial state, so the path is
+unreachable in this phase — but the constraint permits it, and the reviewer should know that
+before it becomes a surprise in Phase 4.
 
 `baseLevel` is defaulted for the migration's sake and then always written explicitly by
 `createCharacter`; the `CHECK` is the constraint that actually holds the floor.
@@ -535,9 +710,11 @@ is **forward-only** and the rollback note says so plainly rather than pretending
 
 ### 13.3 Not added, deliberately
 
-No `Progression` table (Base Level is one integer until XP exists — a table now would be a second
-home for character state), no `session` table (the cookie is the session), no `location` table
-(a content key is enough until locations have behaviour).
+No `Progression` table — Base Level is one integer until XP exists, and a table now would be a
+second home for character state. No `Session` table — the signed cookie *is* the session (§3.2.1),
+and a table would be durable state with no reader. **No location column and no `location` content
+kind** — §5.4: nothing in Phase 1 decides anything from a location, so storing one would be an
+unvalidated key at worst and unread state at best.
 
 ---
 
@@ -577,7 +754,7 @@ Phase 1 is the first phase a reviewer must **look at**. It therefore ships a det
 state and an explicit visual checklist.
 
 **Demo seed** (`pnpm seed`, extended): one account `dev/reviewer`, one character `Rookie`,
-Level 1, no vocation, Stamina 42:00, `Free`, at the Rookgaard Temple, not in an activity.
+Level 1, no vocation, Stamina 42:00, `Free`, not in an activity.
 
 A reviewer running `pnpm install && pnpm dev` must be able to see, in a browser, at **1440×900**
 and **390×844** (iPhone-class) and with touch emulation on:
@@ -625,19 +802,20 @@ it**; the count is the consequence, not a target.
 
 | Group | Ids | Covers |
 |---|---|---|
-| **S** — session/auth | S1–S7 | create session; reload persists; no cookie → 401; logout clears; cookie for account A cannot read account B; `/health` and `/metrics` stay unauthenticated; tampered cookie signature rejected |
-| **CH** — character | CH1–CH9 | create with server-owned fields; `vocation` is NULL; `baseLevel` is 1; location is the Temple; Stamina row created at 42:00 NEUTRAL; name validation; duplicate name; roster capacity refusal; client-supplied `baseLevel`/`vocation` rejected |
-| **D** — database/invariant | D14–D18 | migration applies on a clean DB **and** over Phase 0B's; **two NULL-vocation characters coexist**; D4/D5 still pass (two Knights refused, retired vocation reusable); `baseLevel >= 1` CHECK holds |
+| **S** — session/auth | S1–S11 | create session; reload persists; no cookie → 401; logout clears; cookie for account A cannot read account B; `/health` and `/metrics` stay unauthenticated; tampered signature rejected; **`sessionId` is minted server-side**; **same cookie ⇒ same `sessionId`**; **a second login ⇒ a different `sessionId` on the same account**; **a client-supplied `sessionId` is ignored** |
+| **DEV** — dev-provider containment | DEV1–DEV4 | the provider is registered only when `NODE_ENV!==production` **and** `GLOBAL_IDLE_DEV_AUTH=1`; with either missing the route is **absent (404)**; `NODE_ENV=production` + `GLOBAL_IDLE_DEV_AUTH=1` **fails to boot**; the demo seed and E2E use the dev provider |
+| **CH** — character | CH1–CH9 | create with server-owned fields; `vocation` is NULL; `baseLevel` is 1; Stamina row created at 42:00 NEUTRAL; name validation; duplicate name; roster capacity refusal; client-supplied `baseLevel`/`vocation` rejected; **a second Origin Character is refused with `ORIGIN_CHARACTER_EXISTS`** |
+| **D** — database/invariant | D14–D20 | migration applies on a clean DB **and** over Phase 0B's; the **first** Origin Character is accepted; a **second** on the same account is **refused by I1b**; a **different account** may have its own; D4/D5 still pass (two Knights refused, retired vocation reusable); a Knight and an Origin Character coexist; `baseLevel >= 1` CHECK holds |
 | **AT** — atlas/content | AT1–AT7 | bundle validates; marker→region kind-check; marker→hunt kind-check; hunt's `activityTypeKey` resolves in the registry; position within bounds; exactly one AVAILABLE region; unknown asset id fails the build |
 | **API** — contracts | API1–API10 | each route's happy path and its documented error code, including `404`-not-`403` for a foreign character |
-| **AC** — activity boundary | AC1–AC8 | Enter creates a real Activity; claim acquired; `staminaActivatedAt` stays NULL; Stamina stays NEUTRAL; reload returns the same Activity; Leave ends it and releases the claim; second Enter → `OccupancyConflict`; double-submitted Enter is idempotent |
+| **AC** — activity boundary | AC1–AC13 | Enter creates a real Activity; claim acquired; `staminaActivatedAt` stays NULL; Stamina stays NEUTRAL; reload returns the same Activity; Leave ends it and releases the claim; second Enter → `OccupancyConflict`; double-submitted Enter is idempotent; **`contentKey` is persisted on the Activity**; **reload reconstructs the Hunt from `(contentVersion, contentKey)` alone**; **the key resolves against the Activity's OWN pinned version**; **a non-`hunt` kind is refused with `CONTENT_KIND_MISMATCH` and creates nothing**; **no endpoint can change `contentKey` after creation** |
 | **UI** — component/interaction | UI1–UI8 | Atlas pan/zoom; marker selection by click **and** by tap; `Escape` deselects; focus visible; locked region inert; bottom sheet at mobile width; no layout shift on load; error state renders with retry |
 | **E2E** — browser flow | E2E1–E2E10 | V1–V10 of §15, desktop and touch viewports |
 | **REG** — Phase 0B regression | REG1–REG5 | the 92-case matrix still passes; `pnpm dev` bootstrap still green; boundaries unchanged; occupancy/idempotency/content contracts Phase 1 consumes behave as Phase 0B proved |
 
-**Totals: 9 groups, 69 mandatory cases** — S 7, CH 9, D 5, AT 7, API 10, AC 8, UI 8, E2E 10,
-REG 5 —
-counted by a `scripts/count-matrix.mjs` extension, so "69/69" stays a countable claim rather than
+**Totals: 10 groups, 84 mandatory cases** — S 11, DEV 4, CH 9, D 7, AT 7, API 10, AC 13, UI 8,
+E2E 10, REG 5 —
+counted by a `scripts/count-matrix.mjs` extension, so "84/84" stays a countable claim rather than
 an assertion. Phase 0B's 92 cases remain in force and are **not** renumbered.
 
 ---
@@ -701,9 +879,9 @@ noise Phase 1 has no consumer for.
 | 1 | `pnpm install && pnpm build && pnpm test` succeeds from a clean checkout (W12 still passes) |
 | 2 | `pnpm dev` brings the stack up and serves the Phase 1 routes; the `dev-bootstrap` job is green |
 | 3 | The Phase 0B 92-case matrix passes **unchanged** |
-| 4 | The Phase 1 matrix is 69/69, counted by script |
+| 4 | The Phase 1 matrix is 84/84, counted by script |
 | 5 | The migration applies to a clean database **and** over an existing Phase 0B database |
-| 6 | D4/D5 still pass; two NULL-vocation characters coexist (D16) |
+| 6 | D4/D5 still pass; exactly **one** playable Origin Character per Account (I1b, D16–D18) |
 | 7 | A reviewer can complete V1→V10 in a browser at 1440×900 **and** 390×844 with touch |
 | 8 | One character is visible with Level 1, no vocation, 42:00 NEUTRAL, Free |
 | 9 | The Atlas shell renders, pans and zooms with mouse and touch |
@@ -726,8 +904,8 @@ noise Phase 1 has no consumer for.
 
 | # | Decision | Rationale |
 |---|---|---|
-| P1-D1 | Dev credential provider + signed `HttpOnly` cookie session | smallest thing that gives a real authorization boundary without building an identity product |
-| P1-D2 | "One vocation" = the **no-vocation origin state**; zero kits | the only reading that does not contradict the locked tutorial flow |
+| P1-D1 | **Dev/test-only** credential provider + signed `HttpOnly` cookie | smallest thing that gives a real authorization boundary without building an identity product. Registered only in dev, absent in production, and a boot failure if misconfigured (§3.2) |
+| P1-D2 | Phase 1 implements the **pre-vocation Origin Character state**; zero kits | the only reading that does not contradict the locked tutorial flow. `null` is "not chosen yet", never a sixth vocation |
 | P1-D3 | Inline SVG Atlas, no map library | one region and a few markers; SVG gives focusable, accessible markers for free |
 | P1-D4 | The region is Rookgaard | the only region the tutorial baseline permits at Level 1 |
 | P1-D5 | The hunt is `hunt.rookgaard.sewers`, creature label `Rat` | `TUTORIAL_ROOKGAARD_ROADMAP.md` §7 |
@@ -738,17 +916,32 @@ noise Phase 1 has no consumer for.
 | P1-D10 | `vocation` becomes nullable; forward-only migration | see §13.2 — the schema cannot otherwise represent the approved origin character |
 | P1-D11 | No retirement UI in Phase 1 | with capacity 1, a retire button strands the player |
 | P1-D12 | No server-side "selected character" | the Activity context already owns in-flight state; a second home would drift |
+| P1-D13 | `Activity.contentKey` — durable, server-owned, generic | the Activity row could not say **which** Hunt it was; a `huntKey` column would have to be replaced by Phase 5's Dungeons (§9.6) |
+| P1-D14 | `sessionId` distinct from `accountId`, both in the signed cookie | `claimHolderSessionId` needs a real session identity; passing `accountId` would make two browsers indistinguishable and break `ADR-008` eviction before Phase 2 implements it (§3.2.1) |
+| P1-D15 | **No** `Character.locationKey`, and no `location` content kind | nothing in Phase 1 decides anything from a location; the first draft's key resolved against nothing (§5.4) |
+| P1-D16 | **I1b** — one playable Origin Character per Account, by partial unique index | I1 does not constrain NULLs at all, so without a second index a second Origin Character is accepted (§13.2) |
 
 ---
 
 ## 22. Open items for the reviewer
 
-1. **§13.2 is the one finding that touches a `VERIFIED` artefact.** Making `vocation` nullable is,
-   in this author's reading, the *absence* of a vocation rather than a weakening of I1 — but it
-   changes a Phase 0B constraint's data domain and deserves an explicit yes.
-2. **§4's reading of "one vocation"** reinterprets a roadmap line. If the Product Owner meant
-   something else by it, this is the moment to say so — it is cheap now and expensive after §12.
-3. **§9.2's boundary** is the decision most likely to be argued. The alternative (stop before
+1. **§13.2 touches `VERIFIED` artefacts twice** — `vocation` becomes nullable, and a second
+   partial unique index (**I1b**) is added. Neither weakens I1, but both change a Phase 0B
+   constraint's shape and deserve an explicit yes.
+2. **`OPEN` — retirement before vocation is a tutorial replay path.** I1b is scoped to playable
+   rows, so retiring an Origin Character frees the slot and another Level-1 Character can be
+   created. `TUTORIAL_ROOKGAARD_ROADMAP.md` §2 anticipates the question (`tutorialCompleted`,
+   and the warning not to judge eligibility by counting characters) but **does not answer it**.
+   Phase 1 implements neither retirement nor tutorial gating, so the path is unreachable here —
+   this is flagged, not decided, and it belongs to whoever owns the replay rule.
+3. **§4's reading of the roadmap's "one vocation" line.** This specification declines that wording
+   and implements the pre-vocation Origin state instead. If the Product Owner meant something
+   else, this is the cheap moment to say so.
+4. **§9.2's boundary** is the decision most likely to be argued. The alternative (stop before
    creating an Activity) is written out in full so it can be chosen instead.
-4. **Session design (§3.2)** is deliberately minimal. If a real identity provider is wanted before
-   the slice is playable, it belongs here rather than as a Phase 1 surprise.
+5. **§5.4 removes durable location.** If the Product Owner expects the Character panel to show a
+   *place* finer than the region — a Temple, an inn, a depot — that is Option A and it changes
+   this phase's content schema. Cheaper to say now than after §12 is built.
+6. **Session design (§3.2) is dev-only and Phase 1 is not production-deployable.** If the slice is
+   meant to be reachable by real players, real authentication is a prerequisite and belongs in the
+   plan before implementation, not after.
