@@ -119,24 +119,29 @@ function redis(...args) {
 async function shutDown() {
   if (child && child.exitCode === null) {
     say('stopping the stack');
+    // SIGTERM to the whole group. Measured, rather than assumed:
+    //
+    // - SIGINT to the `pnpm` wrapper does not reach dev.mjs at all, so its own
+    //   handler never runs and the grace period is pure waiting;
+    // - SIGINT to the GROUP does reach everything, but `node --watch` answers
+    //   it with an FSWatcher assertion and a core dump. Harmless after the
+    //   verification has finished, and alarming in a green log.
+    //
+    // SIGTERM reaches dev.mjs and the three watchers directly and is the
+    // signal each of them handles. SIGKILL remains as a bounded fallback,
+    // because a verification that can hang on shutdown is a verification that
+    // can hang.
     try {
-      // Signal DEV.MJS, not the whole group. It installs its own SIGINT
-      // handler and stops the three apps it spawned, so this exercises the
-      // shutdown path a developer's Ctrl-C takes. Signalling the group
-      // instead tears `node --watch` out from under itself, which it answers
-      // with an FSWatcher assertion and a core dump — harmless after the
-      // verification has finished, and alarming in a green log.
-      child.kill('SIGINT');
+      process.kill(-child.pid, 'SIGTERM');
     } catch {
       /* already gone */
     }
 
-    // Bounded: if its own shutdown does not finish, take the group.
-    for (let waited = 0; waited < 15_000 && child.exitCode === null; waited += 250) {
+    for (let waited = 0; waited < 10_000 && child.exitCode === null; waited += 250) {
       await sleep(250);
     }
     if (child.exitCode === null) {
-      say('the stack did not stop on its own; signalling the process group');
+      say('the stack did not stop on SIGTERM; killing the process group');
       try {
         process.kill(-child.pid, 'SIGKILL');
       } catch {
