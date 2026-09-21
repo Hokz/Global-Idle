@@ -229,8 +229,20 @@ async function main() {
   );
   say(`  migration ${ready.info.migrations.version}, content ${ready.info.content.version}`);
 
-  // 8. web is actually serving, not merely compiled.
-  await waitFor('web responding', async () => (await get(WEB)).status === 200, { deadline });
+  // 8. web is actually serving THE SESSION ENTRY ROUTE, not merely compiled
+  //    (Phase 1 §17). A 200 from an error page is still a 200, and "the web
+  //    app is up" was true of a build that served nothing a player could use.
+  await waitFor(
+    'web serves the session entry route',
+    async () => {
+      const response = await get(WEB);
+      if (response.status !== 200) return false;
+      // The entry affordance itself, server-rendered: the handle field and the
+      // control that starts a session.
+      return /Handle/i.test(response.body) && /Enter/i.test(response.body);
+    },
+    { deadline },
+  );
 
   // 9. the worker booted AND did its boot work: the repeatable sweep is
   //    registered in the Redis the stack brought up (§11.2).

@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Global Idle — server-authoritative idle strategy RPG. Phase 0B technical foundation.",
+  "description": "Global Idle \u2014 server-authoritative idle strategy RPG. Phase 0B technical foundation.",
   "engines": {
     "node": ">=24.21.0 <25"
   },
@@ -23,6 +23,7 @@
     "test:fixtures": "vitest run --project fixtures",
     "test:integration": "vitest run --project integration",
     "test:invariants": "vitest run --project invariants",
+    "test:e2e": "playwright test",
     "lint": "eslint .",
     "format:check": "prettier --check .",
     "format": "prettier --write .",
