@@ -52,5 +52,28 @@ export type { Clock, ClockRegressionObserver } from './platform/clock/index.js';
 export { createTimerPort, remainingAt } from './platform/timer/index.js';
 export type { ActiveUseTimerState, TimerPort } from './platform/timer/index.js';
 
+export {
+  ConfigurationError,
+  LOG_LEVELS,
+  configSchema,
+  loadConfig,
+} from './platform/config/index.js';
+export type { AppConfig } from './platform/config/index.js';
+
+export {
+  DEFAULT_CACHE_TTL_SECONDS,
+  REDIS_KEY_FAMILIES,
+  UndocumentedRedisKey,
+  activityClaimKey,
+  assertRebuildable,
+  contentCacheKey,
+  createRedis,
+  createRedisPort,
+  familyOf,
+  rateLimitKey,
+  sessionPresenceKey,
+} from './platform/redis/index.js';
+export type { RedisKeyFamily, RedisPort } from './platform/redis/index.js';
+
 export { DomainError } from './platform/errors/index.js';
 export type { DomainErrorCode } from './platform/errors/index.js';

@@ -5,6 +5,9 @@
 // though rosterCapacity is stored on the Account row (DOMAIN_MODEL.md §5.4).
 export const CONTEXT_NAME = 'character' as const;
 
+export { createCharacter, retireCharacter } from './roster.js';
+export type { CreateCharacterInput, VocationName } from './roster.js';
+
 export {
   deriveStaminaMode,
   settleConsumption,

@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Global Idle — server-authoritative idle strategy RPG. Phase 0B technical foundation.",
+  "description": "Global Idle \u2014 server-authoritative idle strategy RPG. Phase 0B technical foundation.",
   "engines": {
     "node": ">=24.21.0 <25"
   },
@@ -13,6 +13,10 @@
     "generate": "pnpm --filter @global-idle/domain run prisma:generate",
     "typecheck": "tsc -b && pnpm --filter @global-idle/web run typecheck",
     "build": "pnpm run generate && tsc -b && pnpm --filter @global-idle/web run build",
+    "dev": "node --env-file-if-exists=.env ./scripts/dev.mjs",
+    "seed": "node --env-file-if-exists=.env ./scripts/seed.mjs",
+    "infra:up": "docker compose -f infra/docker-compose.yml up -d",
+    "infra:down": "docker compose -f infra/docker-compose.yml down",
     "test": "vitest run",
     "test:unit": "vitest run --project unit",
     "test:fixtures": "vitest run --project fixtures",

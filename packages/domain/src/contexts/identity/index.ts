@@ -5,6 +5,9 @@
 // Phase 1 owns the user-facing authentication and session flows (§19).
 export const CONTEXT_NAME = 'identity' as const;
 
+export { createAccount, linkIdentity } from './account.js';
+export type { CreateAccountInput, LinkIdentityInput } from './account.js';
+
 export { entitlementPort, grant, revoke } from './entitlement/index.js';
 export type {
   Entitlement,

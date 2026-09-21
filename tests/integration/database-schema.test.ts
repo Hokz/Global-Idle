@@ -10,7 +10,8 @@ import {
   truncateAll,
   T0,
 } from '../support/db.js';
-import { newId } from '@global-idle/shared';
+import { character, withTransaction } from '@global-idle/domain';
+import { accountId as toAccountId, newId } from '@global-idle/shared';
 import { run } from '../support/repo.js';
 
 const prisma = createClient();
@@ -135,35 +136,28 @@ describe('§14.2 database', () => {
     const account = await seedAccount(prisma, { rosterCapacity: 2 });
     const vocations = ['KNIGHT', 'PALADIN', 'SORCERER', 'DRUID', 'MONK'] as const;
 
-    // Five concurrent creations against a capacity of two. The count cannot be
-    // a column constraint, so it is verified INSIDE the creating transaction
-    // with the account row locked (§6.4).
+    // Five concurrent creations against a capacity of two, through the SAME
+    // service a player's action would use. The count cannot be a column
+    // constraint, so it is verified INSIDE the creating transaction with the
+    // Account row locked (§6.4) — and this asserts the application does that,
+    // not merely that the pattern works when a test writes it out.
     const attempts = vocations.map((vocation, index) =>
-      prisma
-        .$transaction(async (tx) => {
-          await tx.$queryRawUnsafe(`SELECT 1 FROM "Account" WHERE id = $1 FOR UPDATE`, account);
-          const playable = await tx.character.count({
-            where: { accountId: account, retiredAt: null },
-          });
-          const { rosterCapacity } = await tx.account.findUniqueOrThrow({
-            where: { id: account },
-            select: { rosterCapacity: true },
-          });
-          if (playable >= rosterCapacity) throw new Error('RosterCapacityExceeded');
-          await tx.character.create({
-            data: {
-              id: newId<'CharacterId'>(new Date(T0.getTime() + index)),
-              accountId: account,
-              vocation,
-              name: vocation,
-              createdAt: T0,
-            },
-          });
-        })
-        .then(
-          () => 'created' as const,
-          () => 'rejected' as const,
-        ),
+      withTransaction(prisma, (tx) =>
+        character.createCharacter(tx, {
+          accountId: toAccountId(account),
+          vocation,
+          name: vocation,
+          at: new Date(T0.getTime() + index),
+        }),
+      ).then(
+        () => 'created' as const,
+        (error: unknown) => {
+          // Rejected for the RIGHT reason: a serialization failure or a
+          // deadlock would also reject, and would not prove the invariant.
+          expect((error as { code?: string }).code).toBe('RosterCapacityExceeded');
+          return 'rejected' as const;
+        },
+      ),
     );
 
     const outcomes = await Promise.all(attempts);

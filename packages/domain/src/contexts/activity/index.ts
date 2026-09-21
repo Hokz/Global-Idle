@@ -38,6 +38,12 @@ export type {
 } from './lifecycle.js';
 
 export { currentHolder, findExpiredGrace, isGraceExpired, transferClaim } from './claim.js';
+
+export { invalidateClaim, readClaim, readClaimFromDatabase } from './claim-cache.js';
+export type { ClaimView } from './claim-cache.js';
+
+export { sweepExpiredGrace } from './sweeper.js';
+export type { SweepResult } from './sweeper.js';
 export type {
   ActivityFamily,
   ActivityTypeDescriptor,
