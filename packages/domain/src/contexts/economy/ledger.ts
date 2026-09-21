@@ -119,3 +119,29 @@ export async function reconcile(
   const ledgerSum = rows[0]?.sum ?? 0n;
   return { projected, ledgerSum, reconciles: projected === ledgerSum };
 }
+
+/**
+ * How many (account, currency) pairs disagree between the ledger and its
+ * projection, across the whole database. Feeds
+ * `ledger_reconciliation_mismatches`, which §12.3 says MUST BE ZERO — any
+ * non-zero value is a P1.
+ *
+ * A FULL OUTER JOIN, because drift runs both ways: a projection whose sum is
+ * wrong, and a projection that is missing for entries that exist.
+ */
+export async function countReconciliationMismatches(tx: UnitOfWork): Promise<number> {
+  const rows = await tx.$queryRawUnsafe<{ mismatches: number }[]>(
+    `WITH ledger AS (
+       SELECT "accountId", currency, SUM(amount)::bigint AS total
+         FROM "LedgerEntry" GROUP BY "accountId", currency
+     ), projection AS (
+       SELECT "accountId", currency, amount AS total FROM "CurrencyBalance"
+     )
+     SELECT count(*)::int AS mismatches
+       FROM ledger FULL OUTER JOIN projection
+         ON ledger."accountId" = projection."accountId"
+        AND ledger.currency = projection.currency
+      WHERE COALESCE(ledger.total, 0) <> COALESCE(projection.total, 0)`,
+  );
+  return rows[0]?.mismatches ?? 0;
+}

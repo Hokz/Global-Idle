@@ -7,21 +7,20 @@
 // Nothing here decides anything. The worker owns scheduling and shutdown; the
 // domain owns every decision, read from persisted state (§11.2).
 import { Worker } from 'bullmq';
-import { pino } from 'pino';
-import {
-  SystemClock,
-  activity,
-  createPrismaClient,
-  createRedis,
-  loadConfig,
-} from '@global-idle/domain';
-import { runGraceExpiry } from './jobs/grace-expiry.js';
 import {
   GRACE_SWEEP_INTERVAL_MS,
   MAINTENANCE_QUEUE,
-  createMaintenanceQueue,
-  scheduleGraceSweep,
-} from './queues.js';
+  SystemClock,
+  activity,
+  createLogger,
+  createPrismaClient,
+  createRedis,
+  loadConfig,
+  newCorrelationId,
+  withCorrelationId,
+} from '@global-idle/domain';
+import { runGraceExpiry } from './jobs/grace-expiry.js';
+import { createMaintenanceQueue, scheduleGraceSweep } from './queues.js';
 
 export function describeWorker(): string {
   return `worker ready; activity context surface: ${activity.CONTEXT_NAME}`;
@@ -31,7 +30,7 @@ export async function bootstrap(): Promise<() => Promise<void>> {
   // FAIL-FAST (§11.3): a worker that cannot see its configuration refuses to
   // start rather than failing on the first job.
   const config = loadConfig();
-  const logger = pino({ level: config.LOG_LEVEL, base: { app: 'worker' } });
+  const logger = createLogger({ level: config.LOG_LEVEL, app: 'worker' });
 
   const prisma = createPrismaClient({
     connectionString: config.DATABASE_APP_URL ?? config.DATABASE_URL,
@@ -49,11 +48,17 @@ export async function bootstrap(): Promise<() => Promise<void>> {
   const worker = new Worker(
     MAINTENANCE_QUEUE,
     async (job) => {
-      const result = await runGraceExpiry(prisma, clock);
-      if (result.ended.length > 0) {
-        logger.info({ job: job.name, ended: result.ended }, 'reconnect grace expired');
-      }
-      return result;
+      // The correlation id travels WITH the job (§12.2), so a job's log lines
+      // join up with the request that scheduled it. A job with none — the
+      // periodic sweep — gets a fresh one rather than logging without.
+      const correlationId = job.data.correlationId ?? newCorrelationId(clock.now());
+      return withCorrelationId(correlationId, async () => {
+        const result = await runGraceExpiry(prisma, clock);
+        if (result.ended.length > 0) {
+          logger.info({ job: job.name, ended: result.ended }, 'reconnect grace expired');
+        }
+        return result;
+      });
     },
     { connection: workerConnection },
   );

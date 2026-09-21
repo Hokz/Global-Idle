@@ -27,7 +27,9 @@ const redisUrl = z
     message: 'must be a redis:// or rediss:// connection string',
   });
 
-export const LOG_LEVELS = ['fatal', 'error', 'warn', 'info', 'debug', 'trace'] as const;
+// 'silent' is a real pino level, and the one a test needs: a health check
+// that prints a request line per case buries the failure it is reporting.
+export const LOG_LEVELS = ['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'] as const;
 
 export const configSchema = z.object({
   /** PostgreSQL is the sole durable truth (ADR-009). */

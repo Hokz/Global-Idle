@@ -15,6 +15,36 @@ export { createPrismaClient } from './platform/prisma/client.js';
 export type { PrismaClient, PrismaClientOptions } from './platform/prisma/client.js';
 
 export {
+  appliedMigrationVersion,
+  assertMigrationVersion,
+  checkMigrationVersion,
+  expectedMigrationVersion,
+} from './platform/prisma/migrations.js';
+export type { MigrationVersionReport } from './platform/prisma/migrations.js';
+
+export {
+  CORRELATION_ID_HEADER,
+  REDACTED_PATHS,
+  createLogger,
+  currentCorrelationId,
+  logDomainEvent,
+  newCorrelationId,
+  withCorrelationId,
+} from './platform/logging/index.js';
+export type { DomainLogEvent, Logger, LoggerConfig } from './platform/logging/index.js';
+
+export {
+  GRACE_EXPIRY_JOB,
+  GRACE_SWEEP_INTERVAL_MS,
+  GRACE_SWEEP_SCHEDULER,
+  MAINTENANCE_QUEUE,
+} from './platform/jobs/index.js';
+export type { GraceExpiryJobData } from './platform/jobs/index.js';
+
+export { createMetrics, setVersionGauge } from './platform/metrics/index.js';
+export type { Metrics } from './platform/metrics/index.js';
+
+export {
   withTransaction,
   isRetryable,
   lockAccount,

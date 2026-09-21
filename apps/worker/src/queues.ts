@@ -1,5 +1,5 @@
 /**
- * Queue wiring (§11.2). A queue is a TRIGGER, never a decision.
+ * Queue SETUP (§11.2). A queue is a TRIGGER, never a decision.
  *
  * Two ways in, one handler:
  *
@@ -10,23 +10,20 @@
  * Both call the same domain operation, which decides from persisted
  * timestamps. That is what makes a lost job a delay rather than a different
  * outcome (test R3).
+ *
+ * The NAMES live in packages/domain (§5.2: apps/api reports this queue's depth
+ * and may not import this file). What lives here is the construction, the
+ * scheduling and the shutdown.
  */
 import { Queue, type ConnectionOptions } from 'bullmq';
-
-export const MAINTENANCE_QUEUE = 'activity-maintenance';
-export const GRACE_EXPIRY_JOB = 'grace-expiry';
-export const GRACE_SWEEP_SCHEDULER = 'grace-expiry-sweep';
-
-/** How often the safety net runs. Frequent enough that a lost job is a small
- *  delay, cheap enough that running it forever costs nothing: the query reads
- *  an indexed predicate and usually returns no rows. */
-export const GRACE_SWEEP_INTERVAL_MS = 30_000;
-
-/** The job carries no decision — at most a hint about which activity
- *  prompted it. The handler re-derives everything from the database. */
-export interface GraceExpiryJobData {
-  readonly activityId?: string;
-}
+import {
+  GRACE_EXPIRY_JOB,
+  GRACE_SWEEP_INTERVAL_MS,
+  GRACE_SWEEP_SCHEDULER,
+  MAINTENANCE_QUEUE,
+  currentCorrelationId,
+  type GraceExpiryJobData,
+} from '@global-idle/domain';
 
 export function createMaintenanceQueue(connection: ConnectionOptions): Queue<GraceExpiryJobData> {
   return new Queue<GraceExpiryJobData>(MAINTENANCE_QUEUE, {
@@ -64,9 +61,10 @@ export async function scheduleGraceExpiryCheck(
   graceExpiresAt: Date,
   now: Date,
 ): Promise<void> {
+  const correlationId = currentCorrelationId();
   await queue.add(
     GRACE_EXPIRY_JOB,
-    { activityId },
+    correlationId ? { activityId, correlationId } : { activityId },
     {
       delay: Math.max(0, graceExpiresAt.getTime() - now.getTime()),
       // One pending check per activity: re-entering grace replaces it rather

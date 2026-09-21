@@ -10,4 +10,4 @@
 export const CONTEXT_NAME = 'economy' as const;
 
 export type { CurrencyKind, LedgerPosting, Reconciliation } from './ledger.js';
-export { post, readBalance, reconcile } from './ledger.js';
+export { countReconciliationMismatches, post, readBalance, reconcile } from './ledger.js';
