@@ -124,9 +124,16 @@ jobs:
       - name: '6 · Unit tests'
         run: pnpm test:unit
 
-      - name: '7 · Deterministic engine fixtures'
-        # Fails on non-reproducible output for the same seed (E1, E2), and on a
-        # forbidden import in the engine's module graph (E3).
+      - name: '7 · Deterministic engine fixtures and Canary fidelity'
+        # Fails on non-reproducible output for the same seed (E1, E2, SIM1,
+        # SIM2, SIM10), on a forbidden import in the engine's module graph
+        # (E3), and on authored content that has walked away from the Canary
+        # import record it cites (SRC1-SRC4).
+        #
+        # CANARY_SOURCE is deliberately NOT set: the record is the committed
+        # evidence, and CI proves the CONTENT matches it. Re-verifying the
+        # record against a real checkout is a local step, documented in
+        # tests/support/canary.ts.
         run: pnpm test:fixtures
 
       # ─────────────────────────────────────────── check 8 — content
@@ -154,6 +161,10 @@ jobs:
       # Docker daemon present and the variables unset, the Testcontainers path
       # is the only path (tests/support/global-setup.ts).
       - name: '10 · Integration tests'
+        # Includes Phase 2's ST, AU, RW, SU, DE, CX and PS groups, which drive
+        # the real domain against the real database. PS2, PS4 and PS5 spawn a
+        # SEPARATE NODE PROCESS against the same database, so restart safety is
+        # proven by a restart rather than by a second connection.
         run: pnpm test:integration
 
       - name: '11 · Economy invariant tests'
@@ -168,12 +179,13 @@ jobs:
         run: pnpm build
 
       # ─────────────────────────────────────────── the matrices are countable
-      - name: 'Test matrices — Phase 0B 92, Phase 1 87'
-        # Not a §13 check; it is how "all 92 pass" and "all 87 pass" stay
-        # countable claims rather than assertions (Phase 0B §14, Phase 1 §16).
-        # It fails on a missing id, a duplicate, and an id belonging to no
-        # matrix — which is what keeps the two id spaces from colliding now
-        # that Phase 1 continues the D group at D19.
+      - name: 'Test matrices — Phase 0B 92, Phase 1 87, Phase 2 74'
+        # Not a §13 check; it is how "all 92 pass", "all 87 pass" and "all 74
+        # pass" stay countable claims rather than assertions (Phase 0B §14,
+        # Phase 1 §16, Phase 2 §12). It fails on a missing id, a duplicate, and
+        # an id belonging to no matrix — which is what keeps three id spaces
+        # from colliding now that Phase 1 continues the D group at D19 and
+        # Phase 2 adds a second group starting with S.
         run: node scripts/count-matrix.mjs
 
   # ═══════════════════════════════════════════════════════════════════════════
@@ -267,7 +279,7 @@ jobs:
           pnpm --filter @global-idle/game-data run build:bundle
           pnpm seed
 
-      - name: 'Browser acceptance — E2E1-E2E10, UI1-UI8, desktop and touch'
+      - name: 'Browser acceptance — E2E1-E2E10, UI1-UI8, GW1-GW8, desktop and touch'
         # Playwright starts and stops the API and the web server itself; see
         # playwright.config.ts for why it owns them rather than trusting a
         # background process to still be alive.
