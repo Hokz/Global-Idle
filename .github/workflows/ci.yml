@@ -26,7 +26,7 @@ jobs:
   checks:
     name: 'Phase 0B — 13 blocking checks'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
 
     services:
       # Check 9 (`migrate:check`) applies migrations to real scratch databases
@@ -170,3 +170,50 @@ jobs:
         # Not a §13 check; it is how "all 92 cases pass" stays a countable
         # claim rather than an assertion (§14).
         run: node scripts/count-matrix.mjs
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  dev-bootstrap:
+    name: 'Developer bootstrap — `pnpm dev` end to end'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    # A JOB OF ITS OWN, deliberately. It runs `docker compose up`, so it cannot
+    # share a runner with the job whose PostgreSQL service already holds 5432,
+    # and it is not one of §13's thirteen checks — it is §16 criterion 1's
+    # orchestration half, which every other check verifies only in pieces.
+    env:
+      # `pnpm dev` reads the same variables a developer's .env supplies. They
+      # are spelled out here because CI has no .env, and the local application
+      # role's credential is what the migration deliberately does not hold.
+      DATABASE_URL: postgresql://globalidle:globalidle@127.0.0.1:5432/globalidle?schema=public
+      DATABASE_APP_URL: postgresql://globalidle_app:globalidle_app@127.0.0.1:5432/globalidle?schema=public
+      REDIS_URL: redis://127.0.0.1:6379
+      API_PORT: '3001'
+      LOG_LEVEL: info
+      CONTENT_BUNDLE_DIR: ./packages/game-data/bundles
+      CI: '1'
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+
+      - run: corepack enable
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.local/share/pnpm/store
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-store-${{ runner.os }}-
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: 'Verify the developer bootstrap'
+        # Spawns the REAL `pnpm dev`, waits for every acceptance signal —
+        # compose healthy, migrations applied, seed present in the database,
+        # bundle built, API ready on all four conditions, web serving, worker
+        # booted and its sweep registered in Redis — then tears the stack down.
+        run: pnpm verify:dev

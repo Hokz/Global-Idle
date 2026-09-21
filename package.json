@@ -15,6 +15,7 @@
     "build": "pnpm run generate && tsc -b && pnpm --filter @global-idle/web run build",
     "dev": "node --env-file-if-exists=.env ./scripts/dev.mjs",
     "seed": "node --env-file-if-exists=.env ./scripts/seed.mjs",
+    "verify:dev": "node --env-file-if-exists=.env ./scripts/verify-dev-bootstrap.mjs",
     "infra:up": "docker compose -f infra/docker-compose.yml up -d",
     "infra:down": "docker compose -f infra/docker-compose.yml down",
     "test": "vitest run",
