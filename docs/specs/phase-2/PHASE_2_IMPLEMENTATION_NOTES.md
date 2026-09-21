@@ -228,6 +228,12 @@ node scripts/count-matrix.mjs          # 92/92, 87/87, 74/74
 pnpm test:unit && pnpm test:fixtures   # includes SIM1-SIM10 and SRC1-SRC4
 pnpm test:integration                  # includes ST, AU, RW, SU, DE, CX, PS
 pnpm test:invariants
+# The integration and invariant suites TRUNCATE every table between cases,
+# including ContentBundle, so a local run leaves the database with no published
+# content. Re-seed before the browser suite, or it will enter a Hunt and be
+# told the content key is not a hunt. CI does not hit this: the browser job is
+# a job of its own, with its own database and its own seed step.
+pnpm --filter @global-idle/game-data run build:bundle && pnpm seed
 pnpm test:e2e                          # includes GW1-GW8, desktop and touch
 
 # Re-verify the Canary import record against a real checkout:
