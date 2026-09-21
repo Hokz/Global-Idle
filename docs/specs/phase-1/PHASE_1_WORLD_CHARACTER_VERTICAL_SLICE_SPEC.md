@@ -597,11 +597,24 @@ and **390×844** (iPhone-class) and with touch emulation on:
 
 **Decision P1-D9 — Playwright for the E2E flow; no pixel-diff visual regression in Phase 1.**
 
-Chromium and Playwright are already available in the CI environment, and `scripts/verify-dev-bootstrap.mjs`
-already proves the stack boots. Phase 1 adds a Playwright project driving V1→V10 against that
-stack, asserting **roles, names and state** — not pixels. Pixel-diffing placeholder art that is
-about to be replaced (§11) would produce brittle failures with no information; revisit when the
-real assets land.
+`scripts/verify-dev-bootstrap.mjs` already proves the stack boots, so the E2E job drives a real
+browser against that same stack and asserts **roles, names and state** — not pixels.
+Pixel-diffing placeholder art that is about to be replaced (§11) would produce brittle failures
+with no information; revisit when the real assets land.
+
+**Playwright is a NEW dependency.** It appears nowhere in the repository today, so the
+implementing pass owns its real cost, and the spec names it rather than discovering it in CI:
+
+- `@playwright/test` pinned in the root `package.json`, like every other tool (§3.10 of the 0B
+  spec) — no floating range;
+- **Chromium only** in Phase 1. Three engines triple the install and the runtime for a slice with
+  one flow;
+- the browser binary is installed explicitly (`npx playwright install --with-deps chromium`) and
+  **cached by version** in the workflow, because an uncached install on every run is a minute of
+  download that teaches nothing;
+- touch/mobile acceptance uses Playwright's device emulation against the 390×844 viewport of
+  §15 — emulation, not a real device, and the spec says so rather than implying coverage it
+  does not have.
 
 ---
 
@@ -640,7 +653,7 @@ New blocking checks, only where they add evidence:
 
 | Check | Why |
 |---|---|
-| `pnpm test:e2e` (Playwright, own job) | the only check that proves a human can play the slice |
+| `pnpm test:e2e` (Playwright, own job, Chromium only) | the only check that proves a human can play the slice. Its own job because it needs a browser install the other jobs do not |
 | content validation extended to the new kinds | already a check; the new rules ride it |
 | asset-manifest resolution | a missing asset must fail the build, not the browser |
 
