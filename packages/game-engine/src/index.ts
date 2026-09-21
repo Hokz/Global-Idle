@@ -2,6 +2,20 @@
 //
 // No I/O of any kind. Time is a parameter, randomness is injected and seeded,
 // content arrives already resolved, and output DESCRIBES change rather than
-// applying it. 0B.3's dependency-cruiser run and test E3 prove the module
-// graph contains no forbidden import; 0B.5 adds the deterministic proof.
+// applying it. Test E3 proves the module graph contains no forbidden import,
+// by running dependency-cruiser and ESLint and then introducing real
+// violations to show the rules bite; E1 and E2 prove determinism, including
+// across a process restart.
 export const GAME_ENGINE_PACKAGE = '@global-idle/game-engine' as const;
+
+export { createSeededRandom } from './random.js';
+export type { SeededRandom } from './random.js';
+
+export { simulateActivity } from './simulate.js';
+export type {
+  ActivityRunState,
+  ParticipantOutcome,
+  ParticipantProfile,
+  ResolvedContentSlice,
+  SimulationResult,
+} from './simulate.js';
