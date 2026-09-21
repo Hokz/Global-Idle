@@ -7,7 +7,12 @@
       "references": [],
       "label": "Rookgaard",
       "availability": "AVAILABLE",
-      "atlas": { "x": 120, "y": 140, "width": 360, "height": 260 },
+      "atlas": {
+        "x": 120,
+        "y": 140,
+        "width": 360,
+        "height": 260
+      },
       "minZoom": 0.6,
       "maxZoom": 3,
       "backdropAssetId": "atlas.region.rookgaard"
@@ -18,7 +23,12 @@
       "references": [],
       "label": "Mainland",
       "availability": "LOCKED",
-      "atlas": { "x": 540, "y": 90, "width": 420, "height": 300 },
+      "atlas": {
+        "x": 540,
+        "y": 90,
+        "width": 420,
+        "height": 300
+      },
       "minZoom": 0.6,
       "maxZoom": 3,
       "backdropAssetId": "atlas.region.locked"
@@ -29,7 +39,12 @@
       "references": [],
       "label": "Thais",
       "availability": "LOCKED",
-      "atlas": { "x": 560, "y": 420, "width": 220, "height": 170 },
+      "atlas": {
+        "x": 560,
+        "y": 420,
+        "width": 220,
+        "height": 170
+      },
       "minZoom": 0.6,
       "maxZoom": 3,
       "backdropAssetId": "atlas.region.locked"
@@ -40,7 +55,28 @@
       "references": [],
       "label": "Carlin",
       "availability": "LOCKED",
-      "atlas": { "x": 140, "y": 460, "width": 220, "height": 160 },
+      "atlas": {
+        "x": 140,
+        "y": 460,
+        "width": 220,
+        "height": 160
+      },
+      "minZoom": 0.6,
+      "maxZoom": 3,
+      "backdropAssetId": "atlas.region.locked"
+    },
+    {
+      "key": "region.edron",
+      "kind": "region",
+      "references": [],
+      "label": "Edron",
+      "availability": "LOCKED",
+      "atlas": {
+        "x": 820,
+        "y": 430,
+        "width": 180,
+        "height": 150
+      },
       "minZoom": 0.6,
       "maxZoom": 3,
       "backdropAssetId": "atlas.region.locked"
@@ -63,7 +99,10 @@
       "label": "Rookgaard Sewers",
       "category": "HUNT",
       "region": "region.rookgaard",
-      "position": { "x": 262, "y": 286 },
+      "position": {
+        "x": 262,
+        "y": 286
+      },
       "target": "hunt.rookgaard.sewers",
       "iconAssetId": "marker.hunt",
       "availability": "AVAILABLE"

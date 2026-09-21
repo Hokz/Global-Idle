@@ -15,7 +15,7 @@
  * is a descriptor.
  */
 import type { ActivityTypeKey } from '@global-idle/shared';
-import { activityTypeKey } from '@global-idle/shared';
+import { ACTIVITY_TYPE_KEYS, activityTypeKey } from '@global-idle/shared';
 
 export type ActivityFamily = 'SESSION_BOUND' | 'WALL_CLOCK';
 
@@ -120,6 +120,33 @@ export function validateRegistry(
         `Activity type "${key}" must occupy its Characters (ADR-013).`,
       );
     }
+  }
+}
+
+/**
+ * CONTENT/REGISTRY RECONCILIATION (Phase 1 §10.2).
+ *
+ * `packages/game-data` validates an authored `activityTypeKey` against
+ * `ACTIVITY_TYPE_KEYS` in `@global-idle/shared`, because it may not import
+ * this package (§5.2). That list is only worth anything if it cannot drift
+ * from the descriptors above — so drift is a BOOT FAILURE. A key content is
+ * allowed to name and nothing can run is precisely the failure the pair
+ * exists to prevent, and it would otherwise surface as a 500 on a player's
+ * first click.
+ *
+ * Separate from {@link validateRegistry} on purpose: that one validates
+ * whatever descriptors it is handed, including the deliberately broken ones a
+ * test constructs. This one is about the REAL registry and nothing else.
+ */
+export function assertRegistryCoversContentVocabulary(): void {
+  const undescribed = ACTIVITY_TYPE_KEYS.filter(
+    (key) => !ACTIVITY_TYPES.has(key as ActivityTypeKey),
+  );
+  if (undescribed.length > 0) {
+    throw new ActivityTypeRegistryError(
+      `ACTIVITY_TYPE_KEYS names ${undescribed.join(', ')}, which no descriptor describes. ` +
+        'Content could name an activity type nothing knows how to run.',
+    );
   }
 }
 
