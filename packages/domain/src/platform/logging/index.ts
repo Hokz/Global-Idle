@@ -103,6 +103,12 @@ export type DomainLogEvent =
     }
   | { readonly kind: 'occupancy.released'; readonly activityId: string; readonly released: number }
   | {
+      /** Phase 1 §18. A Character exists that did not before. */
+      readonly kind: 'character.created';
+      readonly characterId: string;
+      readonly accountId: string;
+    }
+  | {
       readonly kind: 'activity.transition';
       readonly activityId: string;
       readonly family: string;

@@ -179,6 +179,21 @@ export function isOriginCharacterViolation(error: unknown): boolean {
   return isUnique && refusal(error)?.constraint?.index === 'Character_accountId_key';
 }
 
+/**
+ * Did the database refuse this write because the account already has a
+ * NON-TERMINAL session-bound Activity (I9)?
+ *
+ * This fires BEFORE the occupancy claim is taken: `startSessionBound` writes
+ * the root and subtype first, so a second Hunt on one account trips I9's
+ * partial unique index rather than I13's claim. Without this it surfaced as a
+ * 500 — a user-visible bug found by driving the real API, not by reading it.
+ */
+export function isSessionBoundActivityViolation(error: unknown): boolean {
+  const candidate = error as DriverRefusal;
+  const isUnique = candidate?.code === 'P2002' || sqlState(error) === UNIQUE_VIOLATION;
+  return isUnique && refusal(error)?.constraint?.index === 'SessionBoundActivity_accountId_key';
+}
+
 export function isOccupancyUniqueViolation(error: unknown): boolean {
   const candidate = error as DriverRefusal;
   const isUnique = candidate?.code === 'P2002' || sqlState(error) === UNIQUE_VIOLATION;

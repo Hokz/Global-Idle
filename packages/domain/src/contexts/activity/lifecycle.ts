@@ -15,7 +15,11 @@ import {
   type Instant,
   type SessionId,
 } from '@global-idle/shared';
-import { activityTypeUnknown } from '../../platform/errors/index.js';
+import {
+  activityTypeUnknown,
+  isSessionBoundActivityViolation,
+  occupancyConflict,
+} from '../../platform/errors/index.js';
 import { recordDomainEvent } from '../../platform/observability/index.js';
 import type { UnitOfWork } from '../../platform/transaction/index.js';
 import { describe } from './types/registry.js';
@@ -73,6 +77,22 @@ export async function startSessionBound(
 
   const id = newId<'ActivityId'>(input.at);
 
+  try {
+    return await createSessionBound(tx, input, id);
+  } catch (error) {
+    // I9 -- one non-terminal session-bound Activity per account -- is a
+    // database index, and it trips before the occupancy claim is reached.
+    // Translating ONLY that constraint keeps every other failure's identity.
+    if (!isSessionBoundActivityViolation(error)) throw error;
+    throw occupancyConflict({ accountId: input.accountId, reason: 'already in an activity' });
+  }
+}
+
+async function createSessionBound(
+  tx: UnitOfWork,
+  input: StartSessionBoundInput,
+  id: ActivityId,
+): Promise<ActivityId> {
   // 1. the root, with the content version PINNED at start (ADR-011)
   await tx.activity.create({
     data: {

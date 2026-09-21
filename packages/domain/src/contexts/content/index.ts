@@ -13,6 +13,9 @@
 // `game-data` may not import Prisma.
 export const CONTEXT_NAME = 'content' as const;
 
+export { resolveHunt } from './hunts.js';
+export type { ResolvedHunt } from './hunts.js';
+
 export {
   assertCurrentBundleAvailable,
   defaultAuditLog,

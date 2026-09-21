@@ -47,6 +47,19 @@ export const configSchema = z.object({
   LOG_LEVEL: z.enum(LOG_LEVELS).default('info'),
   /** Local filesystem provider root for content bundles (§7.7). */
   CONTENT_BUNDLE_DIR: z.string().min(1).default('./packages/game-data/bundles'),
+  /**
+   * Signs the session cookie (Phase 1 §3.2). REQUIRED, with a default only
+   * outside production: a slice that refuses to boot locally teaches nothing,
+   * and a guessable secret in production is not a default, it is a hole.
+   */
+  SESSION_SECRET: z
+    .string()
+    .min(16, 'SESSION_SECRET must be at least 16 characters')
+    .default(
+      process.env['NODE_ENV'] === 'production'
+        ? ''
+        : 'development-session-secret-not-for-production',
+    ),
 });
 
 export type AppConfig = z.infer<typeof configSchema>;

@@ -119,4 +119,15 @@ export {
 export type { RedisKeyFamily, RedisPort } from './platform/redis/index.js';
 
 export { DomainError, isOccupancyUniqueViolation } from './platform/errors/index.js';
+
+export {
+  DevAuthMisconfigured,
+  SESSION_COOKIE,
+  assertDevAuthSafe,
+  devAuthEnabled,
+  mintSessionId,
+  openSession,
+  sealSession,
+} from './platform/session/index.js';
+export type { SessionPayload } from './platform/session/index.js';
 export type { DomainErrorCode } from './platform/errors/index.js';
