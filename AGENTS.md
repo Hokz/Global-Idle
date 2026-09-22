@@ -178,8 +178,10 @@ a phase marker copied into five documents is a phase marker that goes stale in f
 this file said *"Current phase: Phase 1"* for two entire phases.
 `scripts/check-project-state.mjs` fails CI if the two ever disagree again.
 
-Active phase: **Phase 3 — Itemization, inventory and loot logistics**
-(`IMPLEMENTATION_COMPLETE — PENDING INDEPENDENT REVIEW`, PR #8).
+Active phase: **Phase 3.5 — Tile / spatial Game Window**
+(`IMPLEMENTATION_COMPLETE — PENDING INDEPENDENT REVIEW`). It builds on **Phase 3 — Itemization,
+inventory and loot logistics** (`IMPLEMENTATION_COMPLETE — PENDING INDEPENDENT REVIEW`, PR #8),
+which is also still awaiting review: neither is VERIFIED, and neither may be treated as accepted.
 Last VERIFIED: **Phase 2 — Hunt simulator**, accepted 2026-09-22 at head `03058b5`.
 
 Phase 0A (`ARCHITECTURE_APPROVED`), Phase 0B, Phase 1 and Phase 2 are closed and VERIFIED. Their

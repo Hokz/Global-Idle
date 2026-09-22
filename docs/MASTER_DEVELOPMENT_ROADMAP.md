@@ -516,6 +516,18 @@ a disconnected character.
 - equipment;
 - loot storage.
 
+### Phase 3.5 — Tile / spatial Game Window
+
+> Status lives in [`PROJECT_STATE.json`](./PROJECT_STATE.json), not here.
+- implementation specification:
+  [`docs/specs/phase-3-5/PHASE_3_5_TILE_SPATIAL_GAME_WINDOW_SPEC.md`](specs/phase-3-5/PHASE_3_5_TILE_SPATIAL_GAME_WINDOW_SPEC.md);
+- maps as validated content;
+- tiles, collision and occupancy;
+- deterministic pathfinding;
+- adjacency-gated combat;
+- rooms as physical chambers;
+- a Canvas game window that renders and decides nothing.
+
 ### Phase 4 — Party/vocations
 - occupancy integration with dedicated Skill Training, and Stamina recovery while training;
 - character roster and Gold-based character unlocks;

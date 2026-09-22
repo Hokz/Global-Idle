@@ -2,14 +2,14 @@
   "$comment": "THE canonical project state. AGENTS.md, the roadmaps and the design index all point HERE rather than repeating it, because a phase marker copied into five documents is a phase marker that goes stale in four of them. `scripts/check-project-state.mjs` fails CI if AGENTS.md and this file disagree.",
   "activePhase": {
     "id": "phase-3-5",
-    "name": "Phase 3.5 \u2014 Tile / spatial Game Window",
-    "status": "IMPLEMENTATION_COMPLETE \u2014 PENDING INDEPENDENT REVIEW",
+    "name": "Phase 3.5 — Tile / spatial Game Window",
+    "status": "IMPLEMENTATION_COMPLETE — PENDING INDEPENDENT REVIEW",
     "pr": null,
     "spec": "docs/specs/phase-3-5/PHASE_3_5_TILE_SPATIAL_GAME_WINDOW_SPEC.md"
   },
   "lastVerifiedPhase": {
     "id": "phase-2",
-    "name": "Phase 2 \u2014 Hunt simulator and the first Game Window",
+    "name": "Phase 2 — Hunt simulator and the first Game Window",
     "verifiedAt": "2026-09-22",
     "acceptedHead": "03058b5",
     "pr": 7
@@ -41,18 +41,19 @@
     {
       "id": "phase-3",
       "name": "Itemization, inventory and loot logistics",
-      "status": "IMPLEMENTATION_COMPLETE \u2014 PENDING INDEPENDENT REVIEW",
-      "matrix": 156
+      "status": "IMPLEMENTATION_COMPLETE — PENDING INDEPENDENT REVIEW",
+      "matrix": 169
     },
     {
       "id": "phase-3-5",
       "name": "Tile / spatial Game Window",
-      "status": "IMPLEMENTATION_COMPLETE \u2014 PENDING INDEPENDENT REVIEW"
+      "status": "IMPLEMENTATION_COMPLETE — PENDING INDEPENDENT REVIEW",
+      "matrix": 39
     }
   ],
   "baseline": {
     "canary": "f6b81a855aa8e7e34cb98821ceb39ff97e3afa4e",
-    "multiplier": "1x \u2014 see docs/REFERENCES.md",
+    "multiplier": "1x — see docs/REFERENCES.md",
     "stackedPullRequests": [
       4,
       5,

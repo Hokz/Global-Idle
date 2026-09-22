@@ -256,4 +256,110 @@ describe('§20 SPC — the fight, with a map under it', () => {
     expect(step.events.some((event) => event.kind === 'move')).toBe(false);
     expect(Object.keys(step.state.creatures[0] ?? {})).toEqual(['key', 'health', 'nextAttackTick']);
   });
+
+  it('SPC9: clearing a room moves the fight into the NEXT chamber', () => {
+    // The progression this phase is for: room 2 is not a counter, it is a
+    // place. The Character clears the west chamber, the next encounter spawns
+    // in the east one, and getting there is a walk through the doorway.
+    const step = simulateHunt(
+      state({ position: at(2, 2), creatures: [rat('a', at(2, 1)), rat('b', at(2, 3))] }),
+      PROFILE,
+      PLAN,
+      400,
+      seeded(),
+      undefined,
+      spatial(),
+    );
+    expect(step.roomsCleared).toBeGreaterThan(0);
+    expect(step.state.room).toBe(2);
+    // Spawned in the EAST region, which is what room 2 names.
+    for (const creature of step.state.creatures) {
+      expect(creature.id).toContain(':east:');
+      expect(creature.position!.x).toBeGreaterThanOrEqual(4);
+    }
+    // And the Character went through the one-tile doorway to get to them.
+    expect(step.events.some((event) => event.kind === 'move')).toBe(true);
+  });
+
+  it('SPC10: the endless room cycles in place, with a new cycle of actors', () => {
+    const first = simulateHunt(
+      state({ room: 2, position: at(5, 2), creatures: [] }),
+      PROFILE,
+      PLAN,
+      1200,
+      seeded(),
+      undefined,
+      spatial(),
+    );
+    expect(first.state.room).toBe(2);
+    expect(first.state.cycle).toBeGreaterThan(1);
+    // The room never advances past the endless one, and the run-local ids
+    // carry the cycle — so a renderer never confuses cycle 3's rat with
+    // cycle 2's, and neither does a reload.
+    for (const creature of first.state.creatures) {
+      expect(creature.id).toContain(`:c${first.state.cycle}:`);
+    }
+  });
+});
+
+describe('§20 RND — space spends no randomness', () => {
+  // The claim this group defends: a spatial decision is a RULE, not a roll.
+  // If walking consumed draws, the fight after it would differ for a reason
+  // that had nothing to do with the fight — and a reload that re-walked the
+  // same path would produce a different battle.
+  const approach = () =>
+    state({ position: at(1, 2), creatures: [rat('a', at(5, 1)), rat('b', at(5, 3))] });
+
+  it('RND1: a different seed changes the fight and not one tile', () => {
+    const one = simulateHunt(
+      approach(),
+      PROFILE,
+      PLAN,
+      12,
+      createSeededRandom('seed-one'),
+      undefined,
+      spatial(),
+    );
+    const other = simulateHunt(
+      approach(),
+      PROFILE,
+      PLAN,
+      12,
+      createSeededRandom('seed-two'),
+      undefined,
+      spatial(),
+    );
+    expect(other.state.position).toEqual(one.state.position);
+    expect(other.state.creatures.map((creature) => creature.position)).toEqual(
+      one.state.creatures.map((creature) => creature.position),
+    );
+    expect(other.events.filter((event) => event.kind === 'move')).toEqual(
+      one.events.filter((event) => event.kind === 'move'),
+    );
+  });
+
+  it('RND2: a span spent walking consumes no draws at all', () => {
+    // One tick of approach from the far side of the room: nobody is in reach
+    // at either end of it, so nobody rolls anything.
+    const step = simulateHunt(approach(), PROFILE, PLAN, 1, seeded(), undefined, spatial());
+    expect(step.events.some((event) => event.kind === 'move')).toBe(true);
+    expect(step.events.some((event) => event.kind === 'hit')).toBe(false);
+    expect(step.events.some((event) => event.kind === 'taken')).toBe(false);
+    expect(step.drawsConsumed).toBe(0);
+  });
+
+  it('RND3: the same exchange costs the same draws with a map and without one', () => {
+    // Adjacent from the first tick, so space changes nothing about who swings.
+    const beside = state({ position: at(2, 2), creatures: [rat('a', at(2, 1))] });
+    const withMap = simulateHunt(beside, PROFILE, PLAN, 1, seeded(), undefined, spatial());
+    const without = simulateHunt(
+      state({ creatures: [{ key: 'creature.rat', health: RAT.maxHealth, nextAttackTick: 0 }] }),
+      PROFILE,
+      PLAN,
+      1,
+      seeded(),
+    );
+    expect(withMap.drawsConsumed).toBe(without.drawsConsumed);
+    expect(withMap.state.creatures[0]!.health).toBe(without.state.creatures[0]!.health);
+  });
 });

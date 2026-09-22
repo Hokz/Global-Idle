@@ -73,8 +73,6 @@ function hash(x: number, y: number): number {
   return n - Math.floor(n);
 }
 
-const KIND: Record<string, 'wall' | 'floor' | 'water'> = {};
-
 export function TileScene({ map, run, debug = false }: TileSceneProps) {
   const holder = useRef<HTMLDivElement | null>(null);
   const canvas = useRef<HTMLCanvasElement | null>(null);
@@ -83,7 +81,12 @@ export function TileScene({ map, run, debug = false }: TileSceneProps) {
   const eased = useRef(new Map<string, Eased>());
   const camera = useRef<{ x: number; y: number } | null>(null);
 
-  latest.current = { map, run, debug };
+  // AFTER render, not during it: the loop reads this ref on its own schedule,
+  // and mutating a ref in the render body is a side effect React is entitled
+  // to run twice.
+  useEffect(() => {
+    latest.current = { map, run, debug };
+  }, [map, run, debug]);
 
   useEffect(() => {
     const element = canvas.current;
@@ -218,7 +221,9 @@ export function TileScene({ map, run, debug = false }: TileSceneProps) {
         const row = rows[y] ?? '';
         for (let x = firstColumn; x <= lastColumn; x += 1) {
           const symbol = row[x] ?? '#';
-          const kind = current.legend[symbol] ?? KIND[symbol] ?? 'wall';
+          // An unknown symbol cannot reach here — `compileMap` refuses the
+          // bundle — so the fallback is a belt, not a policy.
+          const kind = current.legend[symbol] ?? 'wall';
           const px = Math.round(x * size - cam.x);
           const py = Math.round(y * size - cam.y);
           const noise = hash(x, y);
