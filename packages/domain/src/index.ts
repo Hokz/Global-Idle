@@ -9,6 +9,7 @@ export * as character from './contexts/character/index.js';
 export * as party from './contexts/party/index.js';
 export * as activity from './contexts/activity/index.js';
 export * as economy from './contexts/economy/index.js';
+export * as items from './contexts/items/index.js';
 export * as content from './contexts/content/index.js';
 export * as hunt from './contexts/hunt/index.js';
 

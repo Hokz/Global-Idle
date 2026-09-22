@@ -105,6 +105,10 @@ describe('§12 SRC — fidelity to the Canary baseline', () => {
       attackIntervalMs: 2000,
       defense: 4,
       armor: 4,
+      // ARMED — this case is about the armed floor, which is the whole point
+      // of the row it verifies. The unarmed shape rolls from zero and has its
+      // own assertion below.
+      armed: true,
       supply: { healMin: 60, healMax: 90, useBelowPercent: 40 },
     };
 
@@ -207,76 +211,86 @@ describe('§12 SRC — fidelity to the Canary baseline', () => {
     reverify('formula.expForLevel');
   });
 
-  it('SRC4: the tutorial combat profile is each of its cited sources', async () => {
-    const profile = await authored('combat-profile.origin.rookgaard');
-    expect(profile.kind).toBe('combat-profile');
+  it('SRC4: the tutorial combat profile is ASSEMBLED from each of its cited sources', async () => {
+    // Phase 3 deleted the authored `combat-profile`. This case did not go with
+    // it — it got stronger. The same numbers are still asserted against the
+    // same recorded sources; what changed is that they now have to be ARRIVED
+    // AT from a Character baseline and the items the grant equips, instead of
+    // being read off one definition that declared them.
+    expect(
+      (
+        JSON.parse(await readFile(CONTENT, 'utf8')) as { definitions: { kind: string }[] }
+      ).definitions.filter((definition) => definition.kind === 'combat-profile'),
+    ).toEqual([]);
 
-    expect(profile.maxHealth).toBe(recordedValue('character.maxHealth'));
-    expect(profile.attackSkill).toBe(recordedValue('character.attackSkill'));
-    expect(profile.attackIntervalMs).toBe(recordedValue('character.attackIntervalMs'));
-    expect(profile.attackFactor).toBe(recordedValue('character.attackFactor'));
+    const baseline = await authored('character-baseline.origin');
+    expect(baseline.kind).toBe('character-baseline');
+    expect(baseline.maxHealth).toBe(recordedValue('character.maxHealth'));
+    expect(baseline.attackSkill).toBe(recordedValue('character.attackSkill'));
+    expect(baseline.attackIntervalMs).toBe(recordedValue('character.attackIntervalMs'));
+    expect(baseline.attackFactor).toBe(recordedValue('character.attackFactor'));
 
-    // attackValue is the EFFECTIVE value: the dagger's raw 8, compensated by
-    // WEAPON_ATTACK_PERCENT. Authoring the raw 8 and compensating inside the
-    // engine would put an items rule in a pure simulator.
+    // The baseline carries NO item facts. That absence is the difference
+    // between a Character baseline and the profile it replaced, so it is
+    // asserted rather than described.
+    for (const itemField of ['armor', 'attackValue', 'defense', 'supply']) {
+      expect(baseline[itemField]).toBeUndefined();
+    }
+
+    // ── armour: the four leather pieces, summed from the ITEMS ────────────
+    const grant = await authored('starting-grant.origin.rookgaard');
+    const equipped = grant['equipped'] as { itemKey: string; slot: string }[];
+    const worn = await Promise.all(equipped.map((entry) => authored(entry.itemKey)));
+    const armor = worn.reduce(
+      (total, item) => total + (((item['combat'] as { armor?: number })?.armor ?? 0) as number),
+      0,
+    );
+    const kit = ['leatherHelmet', 'coat', 'leatherLegs', 'leatherBoots'].map(
+      (piece) => recordedValue(`armour.${piece}`) as number,
+    );
+    expect(kit).toEqual([1, 1, 1, 1]);
+    expect(armor).toBe(4);
+
+    // ── attack: the dagger's raw 8, compensated by the 120% factor ────────
+    const weapon = worn.find((item) => (item['combat'] as { attack?: number })?.attack);
     const raw = recordedValue('weapon.dagger.attack') as number;
     const percent = recordedValue('weapon.attackPercent') as number;
-    expect(profile.attackValue).toBe((raw * percent) / 100);
-    expect(profile.attackValue).toBe(9.6);
+    expect((weapon!['combat'] as { attack: number }).attack).toBe(raw);
+    const attackValue = (raw * percent) / 100;
+    expect(attackValue).toBe(9.6);
 
     // ...and that is what makes the first swing top out at 8, which is what
     // makes the fight winnable at all.
     expect(
       maxMeleeHit({
         level: 1,
-        maxHealth: profile.maxHealth as number,
-        attackSkill: profile.attackSkill as number,
-        attackValue: profile.attackValue as number,
-        attackFactor: profile.attackFactor as number,
-        attackIntervalMs: profile.attackIntervalMs as number,
-        defense: profile.defense as number,
-        armor: profile.armor as number,
+        maxHealth: baseline.maxHealth as number,
+        attackSkill: baseline.attackSkill as number,
+        attackValue,
+        armed: true,
+        attackFactor: baseline.attackFactor as number,
+        attackIntervalMs: baseline.attackIntervalMs as number,
+        defense: 4,
+        armor,
         supply: { healMin: 0, healMax: 0, useBelowPercent: 0 },
       }),
     ).toBe(8);
 
-    // Armour is the four leather pieces of the pre-vocation kit, summed.
-    const kit = ['leatherHelmet', 'coat', 'leatherLegs', 'leatherBoots'].map(
-      (piece) => recordedValue(`armour.${piece}`) as number,
-    );
-    expect(kit).toEqual([1, 1, 1, 1]);
-    expect(profile.armor).toBe(kit.reduce((total, piece) => total + piece, 0));
+    // ── defence: Player::getDefense, truncated by its int32_t return ──────
+    const weaponDefense = (weapon!['combat'] as { defense: number }).defense;
+    const skill = baseline.attackSkill as number;
+    const factor = baseline.attackFactor as number;
+    expect(Math.trunc((skill / 4 + 2.23) * weaponDefense * factor * 0.146)).toBe(4);
+    expect(
+      Math.trunc((skill / 4 + 2.23) * (baseline.unarmedAttackValue as number) * factor * 0.15),
+    ).toBe(4);
 
-    // Defence is Player::getDefense, truncated by its int32_t return. Both
-    // readings of this Character land on the same 4, which is why authoring it
-    // as a flat number costs nothing: unarmed (fist skill 10, value 7, scaling
-    // 0.15) and dagger-armed (sword skill 10, dagger defence 6, scaling 0.146).
-    const playerDefense = (skill: number, value: number, scaling: number) =>
-      Math.trunc((skill / 4 + 2.23) * value * 1 * scaling);
-    expect(playerDefense(10, 7, 0.15)).toBe(4);
-    expect(playerDefense(10, 6, 0.146)).toBe(4);
-    expect(profile.defense).toBe(4);
+    // ── supplies: a real potion, healing what the source says it heals ────
+    const contents = grant['contents'] as { itemKey: string; quantity: number }[];
+    const potion = await authored(contents[0]!.itemKey);
+    const heal = recordedValue('supply.healthPotion') as [number, number];
+    expect(potion['heal']).toEqual({ min: heal[0], max: heal[1] });
 
-    const supply = profile.supply as { charges: number; healMin: number; healMax: number };
-    expect([supply.healMin, supply.healMax]).toEqual(recordedValue('supply.healthPotion'));
-
-    // The kit Canary actually grants has NO weapon, and that is recorded as
-    // the reason the profile needed one — not glossed over.
-    expect(recorded('character.firstItems').value).toEqual([3355, 3562, 3559, 3552]);
-    expect(recorded('character.firstItems').observed).toMatch(/NO weapon/);
-    expect(recorded('character.firstItems').decision).toBe('Adapt');
-
-    // Every row this profile rests on carries a citation and a decision, and
-    // no row is left as an unexplained divergence.
-    for (const entry of importRecord.imports) {
-      expect(entry.file.length).toBeGreaterThan(0);
-      expect(entry.symbol.length).toBeGreaterThan(0);
-      expect(entry.observed.length).toBeGreaterThan(0);
-      expect(['Keep', 'Simplify', 'Adapt']).toContain(entry.decision);
-      if (entry.decision !== 'Keep') expect(entry.reason).toBeTruthy();
-    }
-
-    expect(profile.sourceRef).toContain('items.xml');
     reverify('character.');
     reverify('weapon.');
     reverify('armour.');

@@ -19,7 +19,12 @@ import { ACTIVITY_TYPE_KEYS, ASSET_IDS } from '@global-idle/shared';
 import {
   atlasMarkerSchema,
   bundleSourceSchema,
-  combatProfileSchema,
+  containerSlotsSchema,
+  itemSchema,
+  rarityTableSchema,
+  serviceSchema,
+  startingGrantSchema,
+  characterBaselineSchema,
   creatureSchema,
   huntSchema,
   regionSchema,
@@ -80,7 +85,12 @@ export function validateBundleSource(input: unknown): ValidationResult {
     'atlas-marker': atlasMarkerSchema,
     hunt: huntSchema,
     creature: creatureSchema,
-    'combat-profile': combatProfileSchema,
+    item: itemSchema,
+    'rarity-table': rarityTableSchema,
+    'container-slots': containerSlotsSchema,
+    service: serviceSchema,
+    'starting-grant': startingGrantSchema,
+    'character-baseline': characterBaselineSchema,
   } as const;
 
   for (const definition of source.definitions) {
@@ -145,7 +155,7 @@ export function validateBundleSource(input: unknown): ValidationResult {
       }
 
       // ── Phase 2: a Hunt a player can enter must be simulatable ─────────
-      const { rooms, combatProfile } = typed.data;
+      const { rooms, startingGrant } = typed.data;
       if (typed.data.availability === 'AVAILABLE' && (!rooms || rooms.length === 0)) {
         issues.push({
           severity: 'error',
@@ -153,14 +163,19 @@ export function validateBundleSource(input: unknown): ValidationResult {
           message: `${definition.key} is AVAILABLE but authors no rooms; there would be nothing to simulate`,
         });
       }
-      if (typed.data.availability === 'AVAILABLE' && !combatProfile) {
+      // Phase 3: combat comes from EQUIPMENT, so a Hunt no longer names a
+      // profile. What it may name is the grant a new Character receives before
+      // its first one — real items, in real slots.
+      if (startingGrant) expect(startingGrant, 'startingGrant', 'starting-grant');
+      const baseline = typed.data.characterBaseline;
+      if (typed.data.availability === 'AVAILABLE' && !baseline) {
         issues.push({
           severity: 'error',
           check: 'hunt-rooms',
-          message: `${definition.key} is AVAILABLE but names no combatProfile`,
+          message: `${definition.key} is AVAILABLE but names no characterBaseline`,
         });
       }
-      if (combatProfile) expect(combatProfile, 'combatProfile', 'combat-profile');
+      if (baseline) expect(baseline, 'characterBaseline', 'character-baseline');
 
       if (rooms && rooms.length > 0) {
         // Room numbers are 1..n with no gaps: a missing room is a run that

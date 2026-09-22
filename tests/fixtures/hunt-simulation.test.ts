@@ -66,6 +66,13 @@ async function authoredSewers(): Promise<{
       attackFactor?: number;
       attackIntervalMs?: number;
       supply?: { charges: number; healMin: number; healMax: number; useBelowPercent: number };
+      unarmedAttackValue?: number;
+      supplyUseBelowPercent?: number;
+      combat?: { armor?: number; attack?: number; defense?: number };
+      heal?: { min: number; max: number };
+      equipped?: { itemKey: string; slot: string }[];
+      contents?: { itemKey: string; quantity: number }[];
+      loot?: { itemKey: string; chance: number; min: number; max: number }[];
     }[];
   }
   const doc = JSON.parse(await readFile(CONTENT, 'utf8')) as Authored;
@@ -76,8 +83,20 @@ async function authoredSewers(): Promise<{
   };
   const hunt = find('hunt.rookgaard.sewers');
   const rat = find('creature.rat');
-  const authored = find('combat-profile.origin.rookgaard');
-  if (!hunt.rooms || !authored.supply) throw new Error('The Sewers have no Phase 2 simulation.');
+  if (!hunt.rooms) throw new Error('The Sewers have no simulation.');
+
+  // PHASE 3 — the profile is no longer authored; it is ASSEMBLED from the
+  // Character's own baseline and the items the tutorial grant equips. These
+  // cases assert exactly what they asserted before, against inputs that now
+  // have to be earned rather than declared — and SRC4 asserts the assembly
+  // lands on the very numbers the old profile carried.
+  const baseline = find('character-baseline.origin');
+  const grant = find('starting-grant.origin.rookgaard');
+  const equipped = (grant.equipped ?? []).map((entry) => find(entry.itemKey));
+  const armor = equipped.reduce((sum, item) => sum + (item.combat?.armor ?? 0), 0);
+  const weapon = equipped.find((item) => item.combat?.attack !== undefined);
+  const potion = find((grant.contents ?? [])[0]?.itemKey ?? 'item.small-health-potion');
+  const charges = (grant.contents ?? [])[0]?.quantity ?? 0;
 
   return {
     plan: {
@@ -98,20 +117,28 @@ async function authoredSewers(): Promise<{
     },
     profile: {
       level: 1,
-      maxHealth: authored.maxHealth!,
-      attackSkill: authored.attackSkill!,
-      attackValue: authored.attackValue!,
-      attackFactor: authored.attackFactor!,
-      attackIntervalMs: authored.attackIntervalMs!,
-      defense: authored.defense!,
-      armor: authored.armor!,
+      maxHealth: baseline.maxHealth!,
+      attackSkill: baseline.attackSkill!,
+      // The 120% weapon compensation, applied where the weapon is read.
+      attackValue: (weapon!.combat!.attack! * 120) / 100,
+      armed: true,
+      attackFactor: baseline.attackFactor!,
+      attackIntervalMs: baseline.attackIntervalMs!,
+      // `Player::getDefense`, truncated — 4 under both readings (source map §3.5).
+      defense: Math.trunc(
+        (baseline.attackSkill! / 4 + 2.23) *
+          weapon!.combat!.defense! *
+          baseline.attackFactor! *
+          0.146,
+      ),
+      armor,
       supply: {
-        healMin: authored.supply.healMin,
-        healMax: authored.supply.healMax,
-        useBelowPercent: authored.supply.useBelowPercent,
+        healMin: potion.heal!.min,
+        healMax: potion.heal!.max,
+        useBelowPercent: baseline.supplyUseBelowPercent!,
       },
     },
-    charges: authored.supply.charges,
+    charges,
   };
 }
 

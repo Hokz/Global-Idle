@@ -124,6 +124,41 @@ export type DomainLogEvent =
       readonly experienceLost?: string;
       readonly goldForfeited?: string;
       readonly levelAfter?: number;
+      /** Phase 3 — how many physical stacks the Loot Pouch lost. */
+      readonly itemsForfeited?: number;
+    }
+  | {
+      /**
+       * Phase 3. One physical item moved custody.
+       *
+       * Deliberately a LOG LINE and not an item ledger: the invariant this
+       * phase has to hold is "explain one event", and the constraints in §16
+       * hold the rest. Universal item event-sourcing would be a system nobody
+       * replays, bought with a write on every move.
+       */
+      readonly kind: 'item.moved';
+      readonly accountId: string;
+      readonly characterId: string;
+      readonly definitionKey: string;
+      readonly quantity: number;
+      readonly from: string;
+      readonly to: string;
+    }
+  | {
+      /** Phase 3. What a death destroyed, beside the experience and the Gold —
+       *  enough to answer "where did my loot go" for the one movement a player
+       *  is most likely to dispute. */
+      readonly kind: 'hunt.death.loot-forfeit';
+      readonly characterId: string;
+      readonly activityId: string;
+      readonly items: readonly { readonly definitionKey: string; readonly quantity: number }[];
+    }
+  | {
+      /** Phase 3. A Hunt Container Slot was bought, once, with Bank Gold. */
+      readonly kind: 'container-slot.unlocked';
+      readonly characterId: string;
+      readonly slotIndex: number;
+      readonly gold: string;
     }
   | {
       readonly kind: 'activity.transition';

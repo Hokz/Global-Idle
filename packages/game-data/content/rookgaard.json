@@ -84,7 +84,7 @@
     {
       "key": "creature.rat",
       "kind": "creature",
-      "references": [],
+      "references": ["item.cheese"],
       "label": "Rat",
       "maxHealth": 20,
       "experience": 5,
@@ -108,32 +108,25 @@
         "death": -10
       },
       "immunities": ["paralyze", "outfit", "invisible", "bleed"],
-      "sourceRef": "Hokz/canary@f6b81a8 data-otservbr-global/monster/mammals/rat.lua"
-    },
-    {
-      "key": "combat-profile.origin.rookgaard",
-      "kind": "combat-profile",
-      "references": [],
-      "label": "Rookgaard tutorial kit",
-      "maxHealth": 150,
-      "attackSkill": 10,
-      "attackValue": 9.6,
-      "attackFactor": 1.0,
-      "attackIntervalMs": 2000,
-      "defense": 4,
-      "armor": 4,
-      "supply": {
-        "charges": 20,
-        "healMin": 60,
-        "healMax": 90,
-        "useBelowPercent": 40
-      },
-      "sourceRef": "Hokz/canary@f6b81a8 schema.sql (health 150, skills 10); data/XML/vocations.xml id=0 None (attackspeed 2000); dawnport_vocation_trial.lua addFirstItems (leather kit, armor 4); items.xml dagger 3267 attack 8 x120% = 9.6; potions.lua [7876] heal 60-90"
+      "sourceRef": "Hokz/canary@f6b81a8 data-otservbr-global/monster/mammals/rat.lua; monster.loot { id = 3607, chance = 39410 } of MAX_LOOTCHANCE 100000",
+      "loot": [
+        {
+          "itemKey": "item.cheese",
+          "chance": 0.3941,
+          "min": 1,
+          "max": 1
+        }
+      ]
     },
     {
       "key": "hunt.rookgaard.sewers",
       "kind": "hunt",
-      "references": ["combat-profile.origin.rookgaard", "creature.rat", "region.rookgaard"],
+      "references": [
+        "character-baseline.origin",
+        "creature.rat",
+        "region.rookgaard",
+        "starting-grant.origin.rookgaard"
+      ],
       "label": "Rookgaard Sewers",
       "region": "region.rookgaard",
       "summary": "Damp tunnels beneath the town. Where every adventurer starts.",
@@ -242,7 +235,8 @@
           "endless": true
         }
       ],
-      "combatProfile": "combat-profile.origin.rookgaard"
+      "startingGrant": "starting-grant.origin.rookgaard",
+      "characterBaseline": "character-baseline.origin"
     },
     {
       "key": "marker.rookgaard.sewers",
@@ -258,6 +252,314 @@
       "target": "hunt.rookgaard.sewers",
       "iconAssetId": "marker.hunt",
       "availability": "AVAILABLE"
+    },
+    {
+      "key": "item.leather-helmet",
+      "kind": "item",
+      "references": [],
+      "label": "Leather helmet",
+      "sourceId": 3355,
+      "category": "EQUIPMENT",
+      "weight": 2200,
+      "stackable": false,
+      "maxStack": 1,
+      "stashEligible": false,
+      "sellable": false,
+      "rarityEligible": true,
+      "slot": "HEAD",
+      "combat": {
+        "armor": 1
+      },
+      "sourceRef": "Hokz/canary@f6b81a8 data/items/items.xml id=3355 (armor 1, weight 2200, slot head) + appearances.dat AppearanceFlags.cumulative = false"
+    },
+    {
+      "key": "item.coat",
+      "kind": "item",
+      "references": [],
+      "label": "Coat",
+      "sourceId": 3562,
+      "category": "EQUIPMENT",
+      "weight": 2700,
+      "stackable": false,
+      "maxStack": 1,
+      "stashEligible": false,
+      "sellable": false,
+      "rarityEligible": true,
+      "slot": "ARMOR",
+      "combat": {
+        "armor": 1
+      },
+      "sourceRef": "Hokz/canary@f6b81a8 data/items/items.xml id=3562 (armor 1, weight 2700, slot armor) + appearances.dat AppearanceFlags.cumulative = false"
+    },
+    {
+      "key": "item.leather-legs",
+      "kind": "item",
+      "references": [],
+      "label": "Leather legs",
+      "sourceId": 3559,
+      "category": "EQUIPMENT",
+      "weight": 1800,
+      "stackable": false,
+      "maxStack": 1,
+      "stashEligible": false,
+      "sellable": false,
+      "rarityEligible": true,
+      "slot": "LEGS",
+      "combat": {
+        "armor": 1
+      },
+      "sourceRef": "Hokz/canary@f6b81a8 data/items/items.xml id=3559 (armor 1, weight 1800, slot legs) + appearances.dat AppearanceFlags.cumulative = false"
+    },
+    {
+      "key": "item.leather-boots",
+      "kind": "item",
+      "references": [],
+      "label": "Leather boots",
+      "sourceId": 3552,
+      "category": "EQUIPMENT",
+      "weight": 900,
+      "stackable": false,
+      "maxStack": 1,
+      "stashEligible": false,
+      "sellable": false,
+      "rarityEligible": true,
+      "slot": "FEET",
+      "combat": {
+        "armor": 1
+      },
+      "sourceRef": "Hokz/canary@f6b81a8 data/items/items.xml id=3552 (armor 1, weight 900, slot feet) + appearances.dat AppearanceFlags.cumulative = false"
+    },
+    {
+      "key": "item.dagger",
+      "kind": "item",
+      "references": [],
+      "label": "Dagger",
+      "sourceId": 3267,
+      "category": "EQUIPMENT",
+      "weight": 950,
+      "stackable": false,
+      "maxStack": 1,
+      "stashEligible": false,
+      "sellable": true,
+      "rarityEligible": true,
+      "slot": "LEFT",
+      "combat": {
+        "attack": 8,
+        "defense": 6
+      },
+      "sourceRef": "Hokz/canary@f6b81a8 data/items/items.xml id=3267 (attack 8, defense 6, weight 950, slot hand) + appearances.dat AppearanceFlags.cumulative = false"
+    },
+    {
+      "key": "item.backpack",
+      "kind": "item",
+      "references": [],
+      "label": "Backpack",
+      "sourceId": 2854,
+      "category": "CONTAINER",
+      "weight": 1800,
+      "stackable": false,
+      "maxStack": 1,
+      "stashEligible": false,
+      "sellable": false,
+      "rarityEligible": false,
+      "slot": "BACKPACK",
+      "containerSpaces": 20,
+      "sourceRef": "Hokz/canary@f6b81a8 data/items/items.xml id=2854 (containersize 20, weight 1800, slot backpack) + appearances.dat AppearanceFlags.cumulative = false"
+    },
+    {
+      "key": "item.cheese",
+      "kind": "item",
+      "references": [],
+      "label": "Cheese",
+      "sourceId": 3607,
+      "category": "FOOD",
+      "weight": 400,
+      "stackable": true,
+      "maxStack": 255,
+      "stashEligible": true,
+      "sellable": true,
+      "rarityEligible": false,
+      "trade": {
+        "sellPrice": 2
+      },
+      "sourceRef": "Hokz/canary@f6b81a8 data/items/items.xml id=3607 (weight 400) + appearances.dat AppearanceFlags.cumulative = true; npc/willie.lua sell = 2"
+    },
+    {
+      "key": "item.small-health-potion",
+      "kind": "item",
+      "references": [],
+      "label": "Small health potion",
+      "sourceId": 7876,
+      "category": "POTION",
+      "weight": 265,
+      "stackable": true,
+      "maxStack": 255,
+      "stashEligible": true,
+      "sellable": false,
+      "rarityEligible": false,
+      "trade": {
+        "buyPrice": 20
+      },
+      "sourceRef": "Hokz/canary@f6b81a8 data/items/items.xml id=7876 (weight 265) + appearances.dat AppearanceFlags.cumulative = true; npc/lily.lua buy = 20; data/scripts/actions/items/potions.lua [7876] heal 60-90",
+      "heal": {
+        "min": 60,
+        "max": 90
+      }
+    },
+    {
+      "key": "rarity-table.default",
+      "kind": "rarity-table",
+      "references": [],
+      "label": "Default rarity distribution (INITIAL/TUNABLE)",
+      "tiers": [
+        {
+          "rarity": "COMMON",
+          "weight": 1000,
+          "affixes": 0
+        },
+        {
+          "rarity": "SEMI_RARE",
+          "weight": 100,
+          "affixes": 1
+        },
+        {
+          "rarity": "RARE",
+          "weight": 10,
+          "affixes": 1
+        },
+        {
+          "rarity": "MYSTIC",
+          "weight": 1,
+          "affixes": 2
+        },
+        {
+          "rarity": "LEGENDARY",
+          "weight": 0.1,
+          "affixes": 2
+        },
+        {
+          "rarity": "STELLAR",
+          "weight": 0.01,
+          "affixes": 3
+        }
+      ],
+      "affixes": [
+        {
+          "affix": "ARMOR_PLUS",
+          "min": 1,
+          "max": 3
+        },
+        {
+          "affix": "ATTACK_PLUS",
+          "min": 1,
+          "max": 3
+        }
+      ]
+    },
+    {
+      "key": "container-slots.default",
+      "kind": "container-slots",
+      "references": [],
+      "label": "Hunt Container Slot unlock prices (INITIAL/TUNABLE)",
+      "prices": [
+        {
+          "slot": 1,
+          "gold": 0
+        },
+        {
+          "slot": 2,
+          "gold": 10000
+        },
+        {
+          "slot": 3,
+          "gold": 100000
+        },
+        {
+          "slot": 4,
+          "gold": 1000000
+        },
+        {
+          "slot": 5,
+          "gold": 100000000
+        }
+      ]
+    },
+    {
+      "key": "service.rookgaard.counter",
+      "kind": "service",
+      "references": ["region.rookgaard", "item.small-health-potion", "item.cheese"],
+      "label": "Rookgaard trading post",
+      "region": "region.rookgaard",
+      "sells": [
+        {
+          "itemKey": "item.small-health-potion",
+          "price": 20
+        }
+      ],
+      "buys": [
+        {
+          "itemKey": "item.cheese",
+          "price": 2
+        }
+      ],
+      "sourceRef": "Hokz/canary@f6b81a8 data-otservbr-global/npc/lily.lua (small health potion buy = 20); data-otservbr-global/npc/willie.lua (cheese sell = 2). One counter rather than two NPCs with chat trees: Phase 3 builds the trade, not the town."
+    },
+    {
+      "key": "starting-grant.origin.rookgaard",
+      "kind": "starting-grant",
+      "references": [
+        "item.leather-helmet",
+        "item.coat",
+        "item.leather-legs",
+        "item.leather-boots",
+        "item.dagger",
+        "item.backpack",
+        "item.small-health-potion"
+      ],
+      "label": "Rookgaard tutorial grant",
+      "equipped": [
+        {
+          "itemKey": "item.leather-helmet",
+          "slot": "HEAD"
+        },
+        {
+          "itemKey": "item.coat",
+          "slot": "ARMOR"
+        },
+        {
+          "itemKey": "item.leather-legs",
+          "slot": "LEGS"
+        },
+        {
+          "itemKey": "item.leather-boots",
+          "slot": "FEET"
+        },
+        {
+          "itemKey": "item.dagger",
+          "slot": "LEFT"
+        }
+      ],
+      "container": "item.backpack",
+      "contents": [
+        {
+          "itemKey": "item.small-health-potion",
+          "quantity": 20
+        }
+      ],
+      "sourceRef": "Hokz/canary@f6b81a8 dawnport_vocation_trial.lua addFirstItems grants ONLY the four armour pieces (3355, 3562, 3559, 3552) to a vocation-less Character. The backpack 2854, the dagger 3267 and the potions 7876 are GLOBAL IDLE tutorial grants of real source items: Canary hands the dagger and the potions out at the KNIGHT trial, after a vocation is chosen, and never gives a starting container at all. Without a container there is nothing to carry loot in; without a weapon a Level-1 Character measurably loses to a Rat (Phase 2 source map §4)."
+    },
+    {
+      "key": "character-baseline.origin",
+      "kind": "character-baseline",
+      "references": [],
+      "label": "Pre-vocation Character",
+      "maxHealth": 150,
+      "attackSkill": 10,
+      "attackFactor": 1.0,
+      "attackIntervalMs": 2000,
+      "unarmedAttackValue": 7,
+      "supplyUseBelowPercent": 40,
+      "sourceRef": "Hokz/canary@f6b81a8 schema.sql players.healthmax 150 and skill_* 10; data/XML/vocations.xml vocation id=0 None attackspeed 2000 and meleeDamage 1.0; src/items/weapons/weapons.cpp Weapon::useFist attackValue 7. ARMOUR, ATTACK VALUE, DEFENCE and SUPPLY CHARGES are deliberately absent: every one of them now comes from an item the Character is wearing or carrying."
     }
   ],
   "unlockSets": []

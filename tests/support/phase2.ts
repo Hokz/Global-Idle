@@ -72,6 +72,9 @@ export interface StartHuntOptions {
   readonly name?: string;
   readonly huntKey?: string;
   readonly accountId?: string;
+  /** Phase 3 — the starting grant key, or `null` for a Character with nothing:
+   *  no equipment, no container, no supplies. */
+  readonly grant?: string | null;
 }
 
 /**
@@ -93,12 +96,19 @@ export async function startHunt(
       return id;
     }));
 
+  // Phase 3 — the Character arrives with the real tutorial kit, because that
+  // is what its combat inputs now come from. `grant: null` is how a case that
+  // wants an EMPTY Character (unarmed, no container) asks for one.
+  const bundle = await resolver.resolve(toContentVersion(version));
   const characterId = await withTransaction(prisma, (tx) =>
     characterContext.createCharacter(tx, {
       accountId: toAccountId(accountId),
       vocation: options.vocation ?? null,
       name: options.name ?? `hunter-${Math.random().toString(36).slice(2, 8)}`,
       baseLevel: 1,
+      ...(options.grant === null
+        ? {}
+        : { grant: { bundle, key: options.grant ?? 'starting-grant.origin.rookgaard' } }),
       at,
     }),
   );

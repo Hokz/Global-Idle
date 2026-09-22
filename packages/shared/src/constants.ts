@@ -60,3 +60,36 @@ export const ASSET_IDS = [
   'portrait.character',
 ] as const;
 export type KnownAssetId = (typeof ASSET_IDS)[number];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 3 — physical items (Phase 3 spec §7, §8, §10)
+//
+// Every number here is either source-backed or explicitly INITIAL/TUNABLE, and
+// the ones that are tunable say so rather than hiding behind a round figure.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Capacity is in HUNDREDTHS of an ounce, the unit item weights are authored
+ *  in — `Player::capacity = cap * 100` in the baseline. */
+export const CAPACITY_BASE_HUNDREDTHS = 40_000;
+
+/** Vocation "None" has `gaincap="10"`, i.e. 10.00 oz per level. Phase 4 owns
+ *  the other five vocations. */
+export const CAPACITY_PER_LEVEL_HUNDREDTHS = 1_000;
+
+/** INITIAL/TUNABLE. 20 is the source loot pouch's own `containersize`; the
+ *  long-term count is explicitly open, which is why it is a constant rather
+ *  than a literal in four places. */
+export const LOOT_POUCH_SPACES = 20;
+
+/** INITIAL/TUNABLE. The Depot is bounded and paginated rather than an
+ *  unbounded account blob. */
+export const DEPOT_SPACES = 200;
+
+/** INITIAL/TUNABLE. The Stash is the one place a quantity exceeds a stack. */
+export const STASH_MAX_PER_ENTRY = 100_000;
+
+/** The ceiling no item definition may exceed — Canary's own parser limit. */
+export const STACK_CEILING = 255;
+
+/** There are exactly five, and there is no sixth. LOCKED. */
+export const HUNT_CONTAINER_SLOTS = 5;

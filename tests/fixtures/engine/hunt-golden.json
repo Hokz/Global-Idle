@@ -31,25 +31,29 @@
         "tick": 99,
         "creatureKey": "creature.rat",
         "experience": 5,
-        "gold": 3
+        "gold": 3,
+        "loot": []
       },
       {
         "tick": 221,
         "creatureKey": "creature.rat",
         "experience": 5,
-        "gold": 2
+        "gold": 2,
+        "loot": []
       },
       {
         "tick": 365,
         "creatureKey": "creature.rat",
         "experience": 5,
-        "gold": 1
+        "gold": 1,
+        "loot": []
       },
       {
         "tick": 513,
         "creatureKey": "creature.rat",
         "experience": 5,
-        "gold": 2
+        "gold": 2,
+        "loot": []
       }
     ],
     "events": [

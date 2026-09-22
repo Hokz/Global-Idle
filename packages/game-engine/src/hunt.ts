@@ -28,6 +28,14 @@ export interface CreatureStats {
   /** Percent, as Canary stores it: `damage -= damage * mitigation / 100`. */
   readonly mitigation: number;
   readonly gold: { readonly chance: number; readonly min: number; readonly max: number };
+  /** PHYSICAL loot — Phase 3. Separate from `gold`, which is a currency scope
+   *  and never an item. A Rat's whole table is one entry. */
+  readonly loot?: readonly {
+    readonly itemKey: string;
+    readonly chance: number;
+    readonly min: number;
+    readonly max: number;
+  }[];
 }
 
 export interface SupplyProfile {
@@ -44,6 +52,14 @@ export interface CombatProfile {
   /** ALREADY the effective value — the 120% weapon compensation is applied
    *  where the profile is authored, not here (source map §3.3). */
   readonly attackValue: number;
+  /**
+   * Whether a WEAPON is in the hand.
+   *
+   * `WeaponMelee::getWeaponDamage` rolls from `level / 5`; `Weapon::useFist`
+   * rolls from zero. The two agree below Level 5 and diverge above it, so a
+   * Character that took its weapon off must not keep the armed floor.
+   */
+  readonly armed: boolean;
   readonly attackFactor: number;
   readonly attackIntervalMs: number;
   readonly defense: number;
@@ -87,6 +103,10 @@ export interface HuntReward {
   readonly creatureKey: string;
   readonly experience: number;
   readonly gold: number;
+  /** Phase 3 — what physically dropped. The DOMAIN decides what is collected;
+   *  the engine only says what fell, because policy, space and Capacity are
+   *  durable state a pure function must never see. */
+  readonly loot: readonly { readonly itemKey: string; readonly quantity: number }[];
 }
 
 export type HuntEvent =
@@ -104,6 +124,26 @@ export type HuntEvent =
       readonly damage: number;
     }
   | { readonly tick: number; readonly kind: 'kill'; readonly target: string }
+  | {
+      /** Phase 3 — a physical item was collected into the Loot Pouch. */
+      readonly tick: number;
+      readonly kind: 'loot';
+      readonly item: string;
+      readonly quantity: number;
+    }
+  | {
+      /**
+       * Phase 3 — something dropped and was NOT collected, with the reason.
+       *
+       * A skipped drop is not an error and never stops the Hunt; it is
+       * information the player needs in order to fix it, which is why it has
+       * an event rather than a silence.
+       */
+      readonly tick: number;
+      readonly kind: 'loot-skipped';
+      readonly item: string;
+      readonly reason: 'policy' | 'no-space' | 'over-capacity';
+    }
   | {
       readonly tick: number;
       readonly kind: 'room-cleared';
@@ -203,7 +243,7 @@ export function maxMeleeHit(profile: CombatProfile): number {
  * weaker than the baseline says it is.
  */
 export function minMeleeHit(profile: CombatProfile): number {
-  return Math.floor(profile.level / 5);
+  return profile.armed ? Math.floor(profile.level / 5) : 0;
 }
 
 /**
@@ -221,6 +261,19 @@ export function simulateHunt(
   plan: RoomPlan,
   ticks: number,
   rng: SeededRandom,
+  /**
+   * A SECOND stream, for physical loot only (Phase 3).
+   *
+   * Deliberately separate rather than more draws from `rng`. Phase 2 is
+   * `VERIFIED` against a golden fixture that pins its exact draw sequence, and
+   * interleaving loot rolls into the fight would change every subsequent hit
+   * for a reason that has nothing to do with combat. Two streams keep the
+   * fight identical AND make loot a pure function of the persisted position —
+   * both properties, instead of trading one for the other.
+   *
+   * Omitted, nothing drops, which is what every Phase 2 case expects.
+   */
+  lootRng?: SeededRandom,
 ): HuntStep {
   const before = rng.drawCount;
   const rewards: HuntReward[] = [];
@@ -281,7 +334,26 @@ export function simulateHunt(
             stats.gold.chance >= 1 || rng.next() < stats.gold.chance
               ? uniformRandom(rng, stats.gold.min, stats.gold.max)
               : 0;
-          rewards.push({ tick, creatureKey: target.key, experience: stats.experience, gold });
+          // Entries are rolled in AUTHORED ORDER with a FIXED draw count each —
+          // one for the chance unless it is certain, and one for the quantity
+          // unless min equals max — so whether a drop happened never changes
+          // how many numbers the next entry consumes.
+          const loot: { itemKey: string; quantity: number }[] = [];
+          if (lootRng) {
+            for (const entry of stats.loot ?? []) {
+              const dropped = entry.chance >= 1 || lootRng.next() < entry.chance;
+              const quantity =
+                entry.min === entry.max ? entry.min : uniformRandom(lootRng, entry.min, entry.max);
+              if (dropped) loot.push({ itemKey: entry.itemKey, quantity });
+            }
+          }
+          rewards.push({
+            tick,
+            creatureKey: target.key,
+            experience: stats.experience,
+            gold,
+            loot,
+          });
         }
       }
     }

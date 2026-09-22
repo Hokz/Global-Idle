@@ -108,6 +108,21 @@ export const creatureSchema = definitionSchema.extend({
       max: z.number().int().nonnegative(),
     })
     .refine((gold) => gold.min <= gold.max, { message: 'gold.min must not exceed gold.max' }),
+  /**
+   * PHYSICAL loot — Phase 3. Separate from `gold` above on purpose: a Rat kill
+   * produces two settlements of different kinds, a currency credit and, some
+   * of the time, an item. The Rat's whole table is one entry (source map §2).
+   */
+  loot: z
+    .array(
+      z.object({
+        itemKey: key,
+        chance: z.number().min(0).max(1),
+        min: z.number().int().positive().default(1),
+        max: z.number().int().positive().default(1),
+      }),
+    )
+    .default([]),
   /** Recorded so a later phase does not have to re-source them. Unused in
    *  Phase 2, which is physical-only. */
   elements: z.record(z.string(), z.number()).default({}),
@@ -115,32 +130,175 @@ export const creatureSchema = definitionSchema.extend({
   sourceRef,
 });
 
+// ─────────────────────────────────────────────────────────────────────────────────
+// Phase 3 — real items (Phase 3 spec §2)
+//
+// `ItemDefinition` is CONTENT, for the same reason a creature is: it is
+// authored, identical for everyone, and a retune must be a publish rather than
+// a migration. What an individual item IS lives here; what a particular one
+// has become lives in the database as an `ItemInstance`.
+//
+// Phase 2's `combat-profile` kind is GONE. Combat inputs now come from what the
+// Character is wearing, which is the whole point of this phase.
+// ─────────────────────────────────────────────────────────────────────────────────
+
+/** The ONE rarity vocabulary. There is no `Epic` and no second enum. */
+export const rarity = z.enum(['COMMON', 'SEMI_RARE', 'RARE', 'MYSTIC', 'LEGENDARY', 'STELLAR']);
+
+export const itemCategory = z.enum(['FOOD', 'POTION', 'EQUIPMENT', 'CONTAINER', 'VALUABLE']);
+
+/** `Slots_t`, imported whole so a later amulet or ring is content, not a
+ *  migration (source map §7). Phase 3 implements the six the tutorial uses. */
+export const equipmentSlot = z.enum([
+  'HEAD',
+  'NECKLACE',
+  'BACKPACK',
+  'ARMOR',
+  'RIGHT',
+  'LEFT',
+  'LEGS',
+  'FEET',
+  'RING',
+  'AMMO',
+]);
+
+/** The affixes Phase 3 can actually apply. Deliberately two: enough to prove
+ *  generation, persistence, a combat effect and non-merging; not an affix
+ *  system this phase does not own. */
+export const affixKind = z.enum(['ARMOR_PLUS', 'ATTACK_PLUS']);
+
+export const itemSchema = definitionSchema.extend({
+  kind: z.literal('item'),
+  label: z.string().min(1),
+  /** The Canary item id this came from, so a reviewer can find it again. */
+  sourceId: z.number().int().positive(),
+  category: itemCategory,
+  /** HUNDREDTHS of an ounce — the source's own unit, and the one Capacity is
+   *  compared in. */
+  weight: z.number().int().nonnegative(),
+  stackable: z.boolean(),
+  /** 1 for a non-stackable, 255 for an ordinary stackable (spec §4). */
+  maxStack: z.number().int().positive().max(255),
+  stashEligible: z.boolean().default(false),
+  sellable: z.boolean().default(false),
+  rarityEligible: z.boolean().default(false),
+  slot: equipmentSlot.optional(),
+  containerSpaces: z.number().int().positive().optional(),
+  combat: z
+    .object({
+      armor: z.number().int().nonnegative().optional(),
+      attack: z.number().nonnegative().optional(),
+      defense: z.number().int().nonnegative().optional(),
+    })
+    .optional(),
+  /** What drinking one restores. A supply CHARGE is now a real item in a real
+   *  container, so the number of charges is however many are carried. */
+  heal: z.object({ min: z.number().int().positive(), max: z.number().int().positive() }).optional(),
+  trade: z
+    .object({
+      /** What a counter CHARGES the player (source `buy`). */
+      buyPrice: z.number().int().positive().optional(),
+      /** What a counter PAYS the player (source `sell`). */
+      sellPrice: z.number().int().positive().optional(),
+    })
+    .optional(),
+  sourceRef,
+});
+
 /**
- * The Character's combat INPUTS — not an item, not equipment, not an
- * inventory.
+ * How rarity is rolled, and how many affixes each tier carries.
  *
- * Phase 2 needs a Level-1 pre-vocation Character that can actually fight, and
- * measurement says fists cannot (source map §4). This is the smallest honest
- * way to have a starting weapon without building Phase 3's itemization, and
- * **Phase 3 replaces it** with what the Character is really wearing.
+ * INITIAL/TUNABLE and deliberately conservative. Weights are relative, so
+ * "exponentially rarer" is a property of the authored numbers rather than a
+ * formula in code — which is what makes retuning a content publish.
  */
-export const combatProfileSchema = definitionSchema.extend({
-  kind: z.literal('combat-profile'),
+export const rarityTableSchema = definitionSchema.extend({
+  kind: z.literal('rarity-table'),
+  label: z.string().min(1),
+  tiers: z
+    .array(
+      z.object({
+        rarity,
+        weight: z.number().positive(),
+        affixes: z.number().int().nonnegative(),
+      }),
+    )
+    .min(1),
+  affixes: z
+    .array(
+      z.object({
+        affix: affixKind,
+        min: z.number().int().positive(),
+        max: z.number().int().positive(),
+      }),
+    )
+    .min(1),
+});
+
+/** The five top-level Hunt Container Slots and what they cost (spec §3.1). */
+export const containerSlotsSchema = definitionSchema.extend({
+  kind: z.literal('container-slots'),
+  label: z.string().min(1),
+  /** Exactly five, and slot 1 costs nothing. LOCKED. */
+  prices: z
+    .array(z.object({ slot: z.number().int().min(1).max(5), gold: z.number().int().nonnegative() }))
+    .length(5),
+});
+
+/**
+ * The Character's own combat facts — and ONLY those.
+ *
+ * This is deliberately not Phase 2's `combat-profile` under a new name. It
+ * carries what belongs to the Character and its vocation: maximum health, the
+ * weapon skill, the attack factor, the attack interval, and the value an
+ * EMPTY hand attacks with. It carries no armour, no attack value, no defence
+ * and no supply charges, because every one of those now comes from an item the
+ * Character is actually wearing or carrying. A test asserts the absence.
+ */
+export const characterBaselineSchema = definitionSchema.extend({
+  kind: z.literal('character-baseline'),
   label: z.string().min(1),
   maxHealth: z.number().int().positive(),
   attackSkill: z.number().int().positive(),
-  /** ALREADY compensated by the 120% weapon factor (source map §3.3). */
-  attackValue: z.number().positive(),
   attackFactor: z.number().positive(),
   attackIntervalMs: z.number().int().positive(),
-  defense: z.number().int().nonnegative(),
-  armor: z.number().int().nonnegative(),
-  supply: z.object({
-    charges: z.number().int().nonnegative(),
-    healMin: z.number().int().nonnegative(),
-    healMax: z.number().int().nonnegative(),
-    useBelowPercent: z.number().min(0).max(100),
-  }),
+  /** `Weapon::useFist` — an empty hand attacks with 7 and rolls from zero. */
+  unarmedAttackValue: z.number().int().positive(),
+  /** Below this fraction of health, a carried supply is drunk. Behaviour, not
+   *  an item stat: the item says how much it heals. */
+  supplyUseBelowPercent: z.number().min(0).max(100),
+  sourceRef,
+});
+
+/**
+ * What a new Character is given before its first Hunt.
+ *
+ * Canary's pre-vocation kit is four armour pieces and NOTHING else — no
+ * container and no weapon (source map §11). A Character with no container
+ * cannot carry loot and a Character with no weapon measurably loses to a Rat,
+ * so Global Idle grants a backpack, a dagger and potions as well. Every item is
+ * a real source item with real source stats; what is adapted is WHEN they are
+ * given, and this definition is where that adaptation is visible.
+ */
+export const startingGrantSchema = definitionSchema.extend({
+  kind: z.literal('starting-grant'),
+  label: z.string().min(1),
+  /** Worn from the first moment. */
+  equipped: z.array(z.object({ itemKey: key, slot: equipmentSlot })).default([]),
+  /** The container installed in Container Slot 1. */
+  container: key,
+  /** Placed inside that container. */
+  contents: z.array(z.object({ itemKey: key, quantity: z.number().int().positive() })).default([]),
+  sourceRef,
+});
+
+/** One service counter. Not an NPC, not a chat tree, not a city (spec §13). */
+export const serviceSchema = definitionSchema.extend({
+  kind: z.literal('service'),
+  label: z.string().min(1),
+  region: key,
+  buys: z.array(z.object({ itemKey: key, price: z.number().int().positive() })).default([]),
+  sells: z.array(z.object({ itemKey: key, price: z.number().int().positive() })).default([]),
   sourceRef,
 });
 
@@ -165,8 +323,12 @@ export const huntSchema = definitionSchema.extend({
   /** Phase 2. Absent means a Hunt that cannot be simulated yet, which content
    *  validation refuses for an AVAILABLE hunt. */
   rooms: z.array(huntRoomSchema).optional(),
-  /** The Character combat profile this Hunt runs with (Phase 2). */
-  combatProfile: key.optional(),
+  /** Phase 3 — the starting grant a Character receives before its first Hunt,
+   *  if this Hunt is the tutorial one. Real items, in real slots. */
+  startingGrant: key.optional(),
+  /** The Character's own combat facts. Armour, attack and defence are NOT here
+   *  — they come from what is equipped. */
+  characterBaseline: key.optional(),
 });
 
 export type Region = z.infer<typeof regionSchema>;
@@ -174,13 +336,33 @@ export type AtlasMarker = z.infer<typeof atlasMarkerSchema>;
 export type Hunt = z.infer<typeof huntSchema>;
 export type HuntRoom = z.infer<typeof huntRoomSchema>;
 export type Creature = z.infer<typeof creatureSchema>;
-export type CombatProfileDefinition = z.infer<typeof combatProfileSchema>;
+export type ItemDefinition = z.infer<typeof itemSchema>;
+export type RarityTable = z.infer<typeof rarityTableSchema>;
+export type ContainerSlots = z.infer<typeof containerSlotsSchema>;
+export type ServiceDefinition = z.infer<typeof serviceSchema>;
+export type StartingGrant = z.infer<typeof startingGrantSchema>;
+export type CharacterBaseline = z.infer<typeof characterBaselineSchema>;
+export type Rarity = z.infer<typeof rarity>;
+export type ItemCategory = z.infer<typeof itemCategory>;
+export type EquipmentSlot = z.infer<typeof equipmentSlot>;
+export type AffixKind = z.infer<typeof affixKind>;
 
 /** Parse a definition into its kind-specific shape, or return null when the
  *  kind carries no extra payload (Phase 0B's `placeholder`). */
 export function parseTyped(
   definition: Definition,
-): Region | AtlasMarker | Hunt | Creature | CombatProfileDefinition | null {
+):
+  | Region
+  | AtlasMarker
+  | Hunt
+  | Creature
+  | ItemDefinition
+  | RarityTable
+  | ContainerSlots
+  | ServiceDefinition
+  | StartingGrant
+  | CharacterBaseline
+  | null {
   switch (definition.kind) {
     case 'region':
       return regionSchema.parse(definition);
@@ -190,8 +372,18 @@ export function parseTyped(
       return huntSchema.parse(definition);
     case 'creature':
       return creatureSchema.parse(definition);
-    case 'combat-profile':
-      return combatProfileSchema.parse(definition);
+    case 'item':
+      return itemSchema.parse(definition);
+    case 'rarity-table':
+      return rarityTableSchema.parse(definition);
+    case 'container-slots':
+      return containerSlotsSchema.parse(definition);
+    case 'service':
+      return serviceSchema.parse(definition);
+    case 'starting-grant':
+      return startingGrantSchema.parse(definition);
+    case 'character-baseline':
+      return characterBaselineSchema.parse(definition);
     default:
       return null;
   }
