@@ -1,7 +1,7 @@
 # Phase 2 — Canary source map
 
 **Source repository:** `Hokz/canary` at `f6b81a855aa8e7e34cb98821ceb39ff97e3afa4e`
-**Machine-readable form:** [`tests/fixtures/canary/import-record.json`](../../../tests/fixtures/canary/import-record.json) — 39 rows, each carrying the file, the symbol, the observed meaning, the keep/simplify/adapt decision, the fixture that pins it, and the exact literal that was read. SRC1-SRC4 assert the authored content against it, and re-verify the record itself against a real checkout when `CANARY_SOURCE` points at one.
+**Machine-readable form:** [`tests/fixtures/canary/import-record.json`](../../../tests/fixtures/canary/import-record.json) — 56 rows, each carrying the file, the symbol, the observed meaning, the keep/simplify/adapt decision, the fixture that pins it, and the exact literal that was read. SRC1-SRC4 assert the authored content against it, and re-verify the record itself against a real checkout when `CANARY_SOURCE` points at one.
 **Purpose:** every formula and data element Phase 2 imports or adapts, recorded in the format
 `REFERENCES.md` requires. A formula copied without this record is guessed with extra steps.
 
@@ -222,6 +222,15 @@ now would be exactly the shadow itemization this phase refuses. What is kept is 
 the baseline gives Gold — that carrying it is a risk — without the machinery Phase 2 has no
 business building. The name collision with Tibia's store container is noted here so a later phase
 does not import that item and find the name already taken by a different idea.
+
+**What the adaptation gives up, and what it must not.** An item stack in a container has an owner
+by construction: it is IN something, and that something belongs to a Character. A number in a
+ledger has an owner only if the schema says so. The first version of this adaptation said so in
+prose and in TypeScript and nowhere else, which meant the baseline's strongest property — you
+cannot carry a coin that is in someone else's backpack — was the one thing the adaptation lost.
+ADR-019's composite foreign key `(characterId, accountId) -> Character(id, accountId)` puts it
+back: a pouch names a real Character owned by the account on the row, or the row does not exist.
+Cases GP10-GP15 drive the database directly to prove it.
 
 ---
 

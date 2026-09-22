@@ -12,6 +12,9 @@ Phase 2 at all, beyond a tiny primitive Phase 2 genuinely cannot avoid.
 
 ## 1. World / regional progression
 
+**Owner: Phase 9 — Content Expansion** (the primitive it leans on is Phase 5's Requirement /
+Cost / Reward).
+
 Rookgaard is the **first mandatory progression area**. Everything after it branches.
 
 - on reaching Mainland/Thais, regional objectives and tasks award **progression points**;
@@ -41,6 +44,9 @@ The intent is **item sinks and Market demand** — a reason for the economy to m
 for its own sake.
 
 ## 3. Bestiary and Charms
+
+**Owner: Phase 7 / 7A — Advanced Progression.** Not Phase 9: the content that feeds a kill counter
+is a consumer of this system, not its owner.
 
 Tibia identity is the baseline (`REFERENCES.md`).
 

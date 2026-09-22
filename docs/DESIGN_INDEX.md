@@ -58,6 +58,7 @@ documents exist, what each one covers and how far each one has been approved.
   - path: `docs/design/FUTURE_DIRECTIONS.md`
   - status: `FUTURE / NOT IMPLEMENTED`
   - scope: world and regional progression, requirement/cost/reward shapes, Bestiary and Charms, Imbuements, outfits and achievements.
+  - owners: requirement/cost/reward -> Phase 5 · Bestiary and Charms, outfits, achievements -> Phase 7 / 7A · world and regional progression rollout -> Phase 9.
 
 ---
 

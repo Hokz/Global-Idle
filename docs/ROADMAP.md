@@ -170,7 +170,14 @@ Recorded in full: [`design/INVENTORY_AND_LOGISTICS_FOUNDATION.md`](design/INVENT
 - the Requirement / Cost / Reward primitive, built when the first content slice actually needs it;
 - Reward Chest — persistent, and SAFE from Hunt death;
 - blessing acquisition and reacquisition, if this is the natural owning slice;
-- travel and access foundations.
+- travel and access foundations;
+- generic dungeon rooms;
+- basic puzzles;
+- unlock framework;
+- first-completion rules;
+- bosses;
+- daily limit;
+- boss rotation.
 
 ## Phase 5B — Multiplayer Activities
 
@@ -180,14 +187,6 @@ Recorded in full: [`design/INVENTORY_AND_LOGISTICS_FOUNDATION.md`](design/INVENT
 Recorded in full: [`design/MULTIPLAYER_ACTIVITIES_FOUNDATION.md`](design/MULTIPLAYER_ACTIVITIES_FOUNDATION.md).
 Nothing here is built early; the only architectural obligation is not to make Team A vs Team B
 impossible.
-
-- generic dungeon rooms;
-- basic puzzles;
-- unlock framework;
-- first-completion rules;
-- bosses;
-- daily limit;
-- boss rotation.
 
 ## Phase 6 — Economy
 
@@ -220,6 +219,15 @@ Recorded in full: [`design/ECONOMY_CUSTODY_AND_REWARD_DESTINATIONS.md`](design/E
 - gems;
 - vocation Skill Tree.
 
+### Phase 7A — Advanced Progression
+
+- **Bestiary and Charms** — kill counters, Bestiary entries, Charm Points, Charm Runes, and the
+  multi-stage Charm progression. Owned HERE, not by Phase 9: it is a progression system with its
+  own counters and unlocks, and the content that feeds it is a consumer rather than its owner;
+- outfits and achievements.
+
+Recorded in full: [`design/FUTURE_DIRECTIONS.md`](design/FUTURE_DIRECTIONS.md) §3.
+
 ## Phase 8 — Premium
 
 - Auto-Sell, with item / category / rarity / default rules and protected-state overrides;
@@ -240,6 +248,9 @@ Recorded in full: [`design/ECONOMY_CUSTODY_AND_REWARD_DESTINATIONS.md`](design/E
 
 ## Phase 9 — Content Expansion
 
+- **world and regional progression rollout** — regional objectives and tasks, progression points,
+  and the region-by-region gating they unlock. Owned HERE because it is the ROLLOUT of content
+  across regions; the requirement/cost/reward primitive it leans on is Phase 5's;
 - more regions;
 - more hunts;
 - more items;
@@ -247,6 +258,8 @@ Recorded in full: [`design/ECONOMY_CUSTODY_AND_REWARD_DESTINATIONS.md`](design/E
 - more bosses;
 - more puzzles;
 - endgame.
+
+Recorded in full: [`design/FUTURE_DIRECTIONS.md`](design/FUTURE_DIRECTIONS.md) §1.
 
 ## Phase 10 — Scale / Hardening
 

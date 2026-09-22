@@ -3,7 +3,7 @@
 **Status:** `IMPLEMENTATION_COMPLETE — PENDING INDEPENDENT REVIEW`
 **Spec:** [`PHASE_2_HUNT_SIMULATOR_SPEC.md`](./PHASE_2_HUNT_SIMULATOR_SPEC.md) ·
 **Evidence:** [`PHASE_2_CANARY_SOURCE_MAP.md`](./PHASE_2_CANARY_SOURCE_MAP.md)
-**Matrix:** Phase 2 **97/97**, with Phase 0B 92/92 and Phase 1 87/87 still passing.
+**Matrix:** Phase 2 **106/106**, with Phase 0B 92/92 and Phase 1 87/87 still passing.
 
 This document records what the implementation DECIDED, what it FOUND, and what it COST — the
 things a specification cannot know in advance. It is not a summary of the spec.
@@ -29,7 +29,8 @@ a mutable balance no ledger explains, and the one number a player will argue abo
 So custody became a **dimension of the ledger** instead
 ([ADR-019](../../architecture/decisions/ADR-019-currency-custody-scopes.md)): every entry and every
 projection row carries `(subjectId, custody, currency)`, where the subject is the Account for
-`BANK` and the **Character** for `POUCH`. A database CHECK enforces the pairing.
+`BANK` and the **Character** for `POUCH`. A composite foreign key and a CHECK enforce the pairing
+— see §0.5, which is where that claim was first made too loosely and then made true.
 
 Everything ADR-003 decided still holds — append-only, projection written only beside its entry,
 one operation id per movement, reconciliation recomputed from the entries — now **per scope**,
@@ -98,6 +99,53 @@ this correction exists to remove.
 
 **No Phase 0B or Phase 1 case was weakened.** The four that changed were changed because the row
 shape changed, and each still asserts exactly what it asserted before.
+
+---
+
+### 0.5 What independent review found afterwards, and what it cost to fix
+
+Two structural findings, both of the same shape: a guarantee that was **stated** rather than
+**held**.
+
+**POUCH ownership was a naming convention.** §0.1 claimed the database enforced that a pouch
+belongs to a real Character owned by the account on the row. What the migration actually wrote was
+`custody = 'POUCH' AND "subjectId" <> "accountId"` — which proves neither half. Measured rather
+than argued: with the new foreign key dropped and that CHECK restored, PostgreSQL **accepts** a
+ledger row naming a Character nobody ever created.
+
+The fix is referential rather than textual. Every ledger and balance row carries an explicit
+`characterId`; `Character` gains `UNIQUE (id, accountId)` purely as something to point at; and a
+COMPOSITE foreign key `(characterId, accountId) -> Character(id, accountId)` makes the pair the
+thing that is checked. A single-column key would have accepted Account A holding a pouch over
+Account B's Character, which is the case GP13 exists to fail on. `ON DELETE RESTRICT` rather than
+`SET NULL`, because nulling the carrier would silently produce a row the CHECK forbids. BANK rows
+keep `characterId IS NULL` and skip the foreign key entirely under `MATCH SIMPLE`, so they need no
+exemption. The migration moves no value: it fills the new column for POUCH rows and leaves every
+BANK row exactly as it was.
+
+**"Once only" was true of retries and not of concurrency.** `endRun` read `endedReason`, found
+`null`, and settled. DL11 proved that a REPLAY does nothing twice, which is the easy half. Under
+ReadCommitted — the isolation these transactions actually run at — two callers read `null` at the
+same instant and both settle, and the penalty at stake burns experience and empties a Gold Pouch.
+Measured: with the lock removed, DL12 fails with a second penalty of 501 experience on a run that
+had already been settled.
+
+The run row is now LOCKED and tested in one statement (`SELECT "endedReason" ... FOR UPDATE`),
+with the Character locked first so §8.5's order is obeyed rather than reordered. `advance` takes
+the same two locks before it simulates, which closes the second half of the same hole: without it a
+Leave can commit mid-settlement and the checkpoint is applied — experience, Gold, and possibly a
+death — to a run that is already over. DL14 fails without it, with `DIED` overwriting a committed
+`LEFT`.
+
+**Which terminal reason wins** therefore needs no ranking of reasons. The first transaction to take
+the run's lock writes its only ending, and the other finds it there and applies nothing. Neither
+ordering loses anything: a Leave that wins stops the settlement that would have produced the death,
+so there is no unpaid death; a death that wins leaves the Leave nothing to do.
+
+**Honest about which layer wins which race.** DL13 — two concurrent `advance` calls on a dying run
+— passes with or without the lock, because the checkpoint claim gets there first and the loser is
+already a no-op before it can reach the death branch. It is kept because the outcome it asserts is
+worth asserting end to end; DL12 is the case that isolates the guard.
 
 ---
 
@@ -249,7 +297,7 @@ record. Phase 0B's `golden.json` and `simulateActivity` are untouched.
 
 ### P2-D11 — the Canary import record is a transcription, not vendored source
 
-`tests/fixtures/canary/import-record.json` holds 39 rows in the format `REFERENCES.md` requires:
+`tests/fixtures/canary/import-record.json` holds 56 rows in the format `REFERENCES.md` requires:
 source file, symbol, observed meaning, keep/simplify/adapt decision, the fixture that pins it,
 and the exact literal that was read. No Canary code is copied into this repository. CI asserts
 that the authored content matches the record; pointing `CANARY_SOURCE` at a real checkout
@@ -323,12 +371,18 @@ elements answering to one test id is a test that passes by accident.
 
 ---
 
-## 7. Manual browser validation
+## 7. Instrumented browser walkthrough
 
 An instrumented walkthrough, run against the real stack — `pnpm build`, migrate, build the bundle,
 seed, the real API on 3001 and `next start` on 3000 — on **both** viewports. Instrumented rather
 than watched so the evidence is checkable: the console, page errors and every response status were
 recorded rather than glanced at.
+
+**Called what it is.** This section used to be headed "manual browser validation", which reads as a
+person at a screen and is not what happened. A script drove a real browser through the real flow
+and recorded what came back. That is strong evidence about state, flow and error channels, and it
+is no evidence at all about whether the scene looks right — so the name now says the first thing
+and stops implying the second.
 
 | Step | Desktop 1440×900 | Touch 390×844 |
 |---|---|---|
@@ -355,7 +409,8 @@ The death numbers are the formula, checkable by hand: an unblessed vocation-less
 The single gold coin is what one Rat happened to drop, and it is gone.
 
 **What this is not:** a person's eyes on the layout. It exercises the flow, the state and the
-error channels; it does not judge whether the scene looks good.
+error channels; it does not judge whether the scene looks good. A genuinely interactive visual pass
+is still owed, and it is a reviewer's to do, not this script's to claim.
 
 ---
 
@@ -364,7 +419,7 @@ error channels; it does not judge whether the scene looks good.
 ```sh
 pnpm install
 pnpm build
-node scripts/count-matrix.mjs          # 92/92, 87/87, 97/97
+node scripts/count-matrix.mjs          # 92/92, 87/87, 106/106
 pnpm test:unit && pnpm test:fixtures   # includes SIM, SRC and the pure DL cases
 pnpm test:integration                  # includes ST, AU, RW, SU, DE, CX, PS, DL, GP, BL
 pnpm test:invariants
