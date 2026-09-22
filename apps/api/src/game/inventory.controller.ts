@@ -18,6 +18,7 @@ import {
   Param,
   Post,
   Put,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -38,6 +39,18 @@ import { SessionGuard, type RequestWithSession } from './session.guard.js';
 import { asHttp, fail } from './errors.js';
 
 const SERVICE_KEY = 'service.rookgaard.counter';
+
+/**
+ * The Depot is bounded (spec §10.1) AND paged. Bounded is not the same
+ * promise: a 200-row account blob is still a 200-row response, and the phase
+ * that raises `DEPOT_SPACES` should not also have to discover that every
+ * client was reading the whole thing in one breath.
+ *
+ * The inventory read carries the FIRST page so the System UI has something to
+ * draw; everything past it comes from the dedicated route.
+ */
+const DEPOT_PAGE_DEFAULT = 50;
+const DEPOT_PAGE_MAX = 200;
 
 /**
  * The System UI's whole world, in one shape.
@@ -65,6 +78,14 @@ export interface ItemView {
   readonly stashEligible: boolean;
 }
 
+/** One window onto the Depot, with the whole beside it so a client can page. */
+export interface DepotPage {
+  readonly total: number;
+  readonly offset: number;
+  readonly limit: number;
+  readonly items: readonly ItemView[];
+}
+
 export interface InventoryView {
   readonly characterId: string;
   readonly inHunt: boolean;
@@ -81,7 +102,7 @@ export interface InventoryView {
     readonly contents: readonly ItemView[];
   }[];
   readonly lootPouch: { readonly spaces: number; readonly contents: readonly ItemView[] };
-  readonly depot: readonly ItemView[];
+  readonly depot: DepotPage;
   readonly stash: readonly {
     readonly definitionKey: string;
     readonly label: string;
@@ -93,6 +114,67 @@ export interface InventoryView {
     readonly sells: readonly { readonly itemKey: string; readonly price: number }[];
     readonly buys: readonly { readonly itemKey: string; readonly price: number }[];
   };
+}
+
+/** The fields a view needs, stated structurally so the ORM's generated row
+ *  type never becomes part of this module's shape. */
+interface ItemRow {
+  readonly id: string;
+  readonly definitionKey: string;
+  readonly quantity: number;
+  readonly rarity: string;
+  readonly affixes: unknown;
+  readonly slot: string | null;
+  readonly containerId: string | null;
+  readonly location: string;
+}
+
+function viewOf(bundle: ResolvedBundle, row: ItemRow): ItemView {
+  const definition = itemsContext.itemDefinition(bundle, row.definitionKey);
+  return {
+    id: row.id,
+    definitionKey: row.definitionKey,
+    label: definition.label,
+    category: definition.category,
+    quantity: row.quantity,
+    rarity: row.rarity,
+    affixes: row.affixes,
+    weight: definition.weight * (definition.stackable ? row.quantity : 1),
+    stackable: definition.stackable,
+    maxStack: definition.maxStack,
+    slot: row.slot,
+    containerId: row.containerId,
+    location: row.location,
+    sellable: definition.sellable,
+    stashEligible: definition.stashEligible,
+  };
+}
+
+/**
+ * A page, or a refusal. A nonsense window is NOT silently clamped to a
+ * sensible one: a client that asked for `limit=abc` is wrong about something,
+ * and answering it with page one hides that.
+ */
+function pageOf(offset?: string, limit?: string): { offset: number; limit: number } {
+  const read = (raw: string | undefined, fallback: number, max: number, name: string) => {
+    if (raw === undefined || raw === '') return fallback;
+    if (!/^\d+$/.test(raw)) {
+      throw fail(HttpStatus.BAD_REQUEST, 'INVALID_REQUEST', `${name} must be a whole number.`);
+    }
+    const value = Number(raw);
+    if (value > max) {
+      throw fail(HttpStatus.BAD_REQUEST, 'INVALID_REQUEST', `${name} may not exceed ${max}.`);
+    }
+    return value;
+  };
+  const window = {
+    offset: read(offset, 0, Number.MAX_SAFE_INTEGER, 'offset'),
+    limit: read(limit, DEPOT_PAGE_DEFAULT, DEPOT_PAGE_MAX, 'limit'),
+  };
+  if (window.limit < 1) {
+    throw fail(HttpStatus.BAD_REQUEST, 'INVALID_REQUEST', 'limit must be at least 1.');
+  }
+  return window;
 }
 
 interface MoveBody {
@@ -165,26 +247,7 @@ export class InventoryController {
       withTransaction(this.prisma, (tx) => itemsContext.carriedWeight(tx, bundle, characterId)),
     ]);
 
-    const view = (row: (typeof rows)[number]) => {
-      const definition = itemsContext.itemDefinition(bundle, row.definitionKey);
-      return {
-        id: row.id,
-        definitionKey: row.definitionKey,
-        label: definition.label,
-        category: definition.category,
-        quantity: row.quantity,
-        rarity: row.rarity,
-        affixes: row.affixes,
-        weight: definition.weight * (definition.stackable ? row.quantity : 1),
-        stackable: definition.stackable,
-        maxStack: definition.maxStack,
-        slot: row.slot,
-        containerId: row.containerId,
-        location: row.location,
-        sellable: definition.sellable,
-        stashEligible: definition.stashEligible,
-      };
-    };
+    const view = (row: ItemRow) => viewOf(bundle, row);
 
     const mine = rows.filter((row) => row.characterId === characterId || row.location === 'DEPOT');
     return {
@@ -214,7 +277,15 @@ export class InventoryController {
         spaces: LOOT_POUCH_SPACES,
         contents: mine.filter((row) => row.location === 'LOOT_POUCH').map(view),
       },
-      depot: mine.filter((row) => row.location === 'DEPOT').map(view),
+      depot: (() => {
+        const all = mine.filter((row) => row.location === 'DEPOT');
+        return {
+          total: all.length,
+          offset: 0,
+          limit: DEPOT_PAGE_DEFAULT,
+          items: all.slice(0, DEPOT_PAGE_DEFAULT).map(view),
+        };
+      })(),
       stash: stash.map((entry) => ({
         definitionKey: entry.definitionKey,
         label: itemsContext.itemDefinition(bundle, entry.definitionKey).label,
@@ -226,6 +297,42 @@ export class InventoryController {
         sells: itemsContext.serviceDefinition(bundle, SERVICE_KEY).sells,
         buys: itemsContext.serviceDefinition(bundle, SERVICE_KEY).buys,
       },
+    };
+  }
+
+  /**
+   * The Depot, a window at a time (spec §10.1).
+   *
+   * The window is applied by the DATABASE, not by slicing a full read, so the
+   * response size is bounded by what was asked for rather than by what the
+   * account happens to own. `total` is the whole, so a client can page without
+   * guessing where the end is.
+   */
+  @Get('characters/:characterId/depot')
+  async depot(
+    @Req() request: RequestWithSession,
+    @Param('characterId') characterId: string,
+    @Query('offset') offset?: string,
+    @Query('limit') limit?: string,
+  ): Promise<DepotPage> {
+    const character = await this.owned(request, characterId);
+    const bundle = await this.current();
+    const window = pageOf(offset, limit);
+    const where = { accountId: character.accountId, location: 'DEPOT' as const };
+    const [total, rows] = await Promise.all([
+      this.prisma.itemInstance.count({ where }),
+      this.prisma.itemInstance.findMany({
+        where,
+        orderBy: { id: 'asc' },
+        skip: window.offset,
+        take: window.limit,
+      }),
+    ]);
+    return {
+      total,
+      offset: window.offset,
+      limit: window.limit,
+      items: rows.map((row) => viewOf(bundle, row)),
     };
   }
 

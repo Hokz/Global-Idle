@@ -66,6 +66,26 @@ real potion in a real container, so the count is however many were brought —
 and drinking one has to REMOVE one, or the whole logistics loop is decorative.
 `HNT5` proves the consumption; `EQP2` proves the charges come from the grant.
 
+### 2.4 The Depot was bounded and not paged, and §10.1 claimed both
+
+`DEPOT_SPACES = 200` bounded the STORE. The API returned every Depot row
+inside the inventory read, so nothing bounded the RESPONSE — and §10.1 said
+"bounded and paginated … with the API paging", which is the same shape of
+defect as the two Phase 2 review found: **a guarantee that was stated rather
+than held**. It was found by reading the specification back against the
+controller before opening the PR, not by a test, because no test asked.
+
+`GET /api/characters/:id/depot?offset&limit` now applies the window in the
+DATABASE, with `total` beside it; the inventory read carries the first page
+(default 50, maximum 200) so the System UI still draws in one request. A
+nonsense window (`limit=abc`, `offset=-1`, `limit=0`, over the maximum) is
+**refused with `INVALID_REQUEST`**, not silently clamped to page one — a
+client that asked for it is wrong about something, and answering with page one
+hides that. Five unnumbered cases in `tests/integration/items-api.test.ts`
+cover it; **the §20 matrix stays at 125 with the same ids**.
+
+---
+
 ---
 
 ## 3. Decisions the implementation had to make

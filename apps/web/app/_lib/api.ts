@@ -224,7 +224,7 @@ export interface InventoryView {
   equipment: ItemView[];
   slots: ContainerSlotView[];
   lootPouch: { spaces: number; contents: ItemView[] };
-  depot: ItemView[];
+  depot: { total: number; offset: number; limit: number; items: ItemView[] };
   stash: { definitionKey: string; label: string; quantity: string }[];
   lootPolicy: { mode: string; rules: { itemKey?: string; accept: boolean }[] };
   service: {

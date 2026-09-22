@@ -401,7 +401,11 @@ leave something for another.
 - **account-scoped**, not Character Carry Capacity — Depot contents have no weight;
 - accessible only in a valid service/safe context, **never during an active Hunt**;
 - **bounded and paginated**, not an unbounded account blob: `DEPOT_SPACES`, **INITIAL 200**,
-  config-driven, with the API paging.
+  config-driven, with the API paging. Two different promises, and both are kept: the STORE is
+  bounded by `DEPOT_SPACES`, and the RESPONSE is bounded by a window — `GET …/depot?offset&limit`,
+  applied by the database with `total` beside it, default 50 and maximum 200. The inventory read
+  carries the first page so the System UI has something to draw. A nonsense window is refused
+  rather than clamped.
 
 ### 10.2 Stash — account-level fungible bulk
 

@@ -260,13 +260,20 @@ export function SystemWindow({ characterId }: { characterId: string }) {
         {view.inHunt ? (
           <p data-testid="depot-unavailable">Not reachable from a Hunt.</p>
         ) : (
-          <ul>
-            {view.depot.map((item) => (
-              <li key={item.id}>
-                <Item item={item} selected={selected?.id === item.id} onSelect={setSelected} />
-              </li>
-            ))}
-          </ul>
+          <>
+            <ul>
+              {view.depot.items.map((item) => (
+                <li key={item.id}>
+                  <Item item={item} selected={selected?.id === item.id} onSelect={setSelected} />
+                </li>
+              ))}
+            </ul>
+            {view.depot.total > view.depot.items.length ? (
+              <p data-testid="depot-more">
+                Showing {view.depot.items.length} of {view.depot.total}.
+              </p>
+            ) : null}
+          </>
         )}
       </section>
 
