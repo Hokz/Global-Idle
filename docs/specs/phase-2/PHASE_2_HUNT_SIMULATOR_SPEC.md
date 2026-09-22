@@ -404,12 +404,12 @@ the `HuntRun` alongside the Activity in the same transaction.
 | **PS** — persistence | PS1–PS5 | reload; process restart; identical deterministic state; no duplicate rewards; room advancement and rewards stay consistent |
 | **GW** — game window | GW1–GW8 | Atlas → Hunt → Game Window; visible combat progress; room changes; reload; grace is visible; resume; Leave; death — desktop and touch |
 | **SRC** — source fidelity | SRC1–SRC4 | the Rat fixture matches `rat.lua`; the damage formula matches its inputs/outputs; the XP curve matches `getExpForLevel`; the tutorial profile matches its cited sources |
-| **DL** — death loss | DL1–DL11 | the flat sub-24 base; blessings below the branch; the 40%→50% replacement; Promotion after it; the ≥24 formula; the vocation gate; the source's rounding including its floating point; the level walk-down; no negative XP; a pre-vocation Character cannot be promoted; the penalty settles once |
-| **GP** — gold pouch | GP1–GP9 | Gold lands in the Pouch and never the Bank; the Pouch is durable; zero Stamina credits nothing; a retry credits once; death without Full Bless forfeits it once; Full Bless keeps it; Leave and grace destroy nothing; the Bank is distinct and transfers are balanced; every scope reconciles |
+| **DL** — death loss | DL1–DL14 | the flat sub-24 base; blessings below the branch; the 40%→50% replacement; Promotion after it; the ≥24 formula; the vocation gate; the source's rounding including its floating point; the level walk-down; no negative XP; a pre-vocation Character cannot be promoted; the penalty settles once on retry; a second CONCURRENT caller blocks on the run's row lock and applies nothing; two concurrent settlements of a dying run cost exactly one death; a Leave racing a death yields one ending and nothing earned past it |
+| **GP** — gold pouch | GP1–GP15 | Gold lands in the Pouch and never the Bank; the Pouch is durable; zero Stamina credits nothing; a retry credits once; death without Full Bless forfeits it once; Full Bless keeps it; Leave and grace destroy nothing; the Bank is distinct and transfers are balanced; every scope reconciles; a BANK row cannot name a Character; a POUCH row for a real Character on its own Account is accepted; a POUCH for a Character that does not exist is refused by the DATABASE; one Account cannot hold a POUCH over another Account's Character; the constraints are in the catalog and the backfilled BANK rows are untouched; both scopes still reconcile exactly |
 | **BL** — bless policy | BL1–BL3 | partial Bless reduces XP loss and protects nothing carried; Full Bless is the binary carried-reward threshold; Skill loss is deferred explicitly and no shadow Skill exists |
 
-**Totals: 13 groups, 97 cases** — SIM 10, ST 24, AU 4, RW 6, SU 3, DE 4, CX 6, PS 5, GW 8, SRC 4,
-DL 11, GP 9, BL 3
+**Totals: 13 groups, 106 cases** — SIM 10, ST 24, AU 4, RW 6, SU 3, DE 4, CX 6, PS 5, GW 8, SRC 4,
+DL 14, GP 15, BL 3
 — counted by `scripts/count-matrix.mjs`, which already counts Phase 0B's 92 and Phase 1's 87.
 Those two remain in force and are not renumbered.
 
@@ -425,7 +425,7 @@ Those two remain in force and are not renumbered.
 ## 13. Definition of Done
 
 1. Phase 0B 92/92 and Phase 1 87/87 still pass, unmodified.
-2. Phase 2 97/97 pass.
+2. Phase 2 106/106 pass.
 3. A Level-1 pre-vocation Character can enter the Sewers and kill a Rat, with every number traced.
 4. The simulation is server-authoritative and deterministic from its seed.
 5. Rooms 1–10 advance; room 10 repeats and persists its cycle.

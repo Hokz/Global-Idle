@@ -77,8 +77,8 @@ const MATRICES = {
       // The correction pass. Death settlement and currency custody changed
       // what Phase 2 MEANS, so they are Phase 2's cases rather than a fourth
       // matrix: the phase is not done without them.
-      DL: [1, 11],
-      GP: [1, 9],
+      DL: [1, 14],
+      GP: [1, 15],
       BL: [1, 3],
     },
   },
