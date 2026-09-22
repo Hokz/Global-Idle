@@ -13,7 +13,7 @@ import { economy, items, withTransaction } from '@global-idle/domain';
 import { accountId as toAccountId, operationId as toOperationId } from '@global-idle/shared';
 import type { ContentBundleResolver, ResolvedBundle } from '@global-idle/game-data';
 import { createClient, truncateAll } from '../support/db.js';
-import { publishContent, readCharacter, startHunt } from '../support/phase2.js';
+import { publishContent, startHunt } from '../support/phase2.js';
 import {
   BACKPACK,
   CHEESE,

@@ -56,7 +56,17 @@ export interface CharacterDetail extends CharacterSummary {
  */
 export interface HuntEvent {
   tick: number;
-  kind: 'spawn' | 'hit' | 'taken' | 'kill' | 'room-cleared' | 'supply' | 'died';
+  kind:
+    | 'spawn'
+    | 'hit'
+    | 'taken'
+    | 'kill'
+    | 'room-cleared'
+    | 'supply'
+    | 'died'
+    // Phase 3 — physical loot, collected or explained.
+    | 'loot'
+    | 'loot-skipped';
   room?: number;
   cycle?: number;
   count?: number;
@@ -65,6 +75,9 @@ export interface HuntEvent {
   damage?: number;
   healed?: number;
   remaining?: number;
+  item?: string;
+  quantity?: number;
+  reason?: 'policy' | 'no-space' | 'over-capacity';
 }
 export interface RunCreature {
   key: string;
@@ -105,6 +118,8 @@ export interface RunView {
     fullBless: boolean;
   } | null;
   events: HuntEvent[];
+  /** Phase 3 — how full the Loot Pouch is right now. */
+  lootPouch?: { used: number; spaces: number };
 }
 
 export interface Region {
@@ -162,4 +177,59 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     );
   }
   return body as T;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 3 — physical items (Phase 3 spec §17, §18)
+//
+// The System UI's whole world in one shape, because the server decides all of
+// it: what is worn, what fits, what a slot costs, and whether a counter is
+// even reachable from where the Character is standing.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface ItemView {
+  id: string;
+  definitionKey: string;
+  label: string;
+  category: string;
+  quantity: number;
+  rarity: string;
+  affixes: { affix: string; value: number }[];
+  weight: number;
+  stackable: boolean;
+  maxStack: number;
+  slot: string | null;
+  containerId: string | null;
+  location: string;
+  sellable: boolean;
+  stashEligible: boolean;
+}
+
+export interface ContainerSlotView {
+  slotIndex: number;
+  unlocked: boolean;
+  containerInstanceId: string | null;
+  routingCategory: string | null;
+  price: number;
+  spaces: number;
+  contents: ItemView[];
+}
+
+export interface InventoryView {
+  characterId: string;
+  /** The server's answer to "can this Character reach a counter?". */
+  inHunt: boolean;
+  capacity: { carried: number; limit: number };
+  gold: { pouch: string; bank: string };
+  equipment: ItemView[];
+  slots: ContainerSlotView[];
+  lootPouch: { spaces: number; contents: ItemView[] };
+  depot: ItemView[];
+  stash: { definitionKey: string; label: string; quantity: string }[];
+  lootPolicy: { mode: string; rules: { itemKey?: string; accept: boolean }[] };
+  service: {
+    key: string;
+    sells: { itemKey: string; price: number }[];
+    buys: { itemKey: string; price: number }[];
+  };
 }

@@ -21,6 +21,15 @@ export type ErrorCode =
   | 'CONTENT_UNAVAILABLE'
   | 'IDEMPOTENCY_KEY_REQUIRED'
   | 'IDEMPOTENCY_CONFLICT'
+  // ── Phase 3 — physical items ──────────────────────────────────────────
+  | 'ITEM_NOT_FOUND'
+  | 'ILLEGAL_ITEM_MOVE'
+  | 'NO_ROOM_FOR_ITEM'
+  | 'OVER_CAPACITY'
+  | 'CONTAINER_SLOT_LOCKED'
+  | 'SERVICE_UNAVAILABLE_HERE'
+  | 'INSUFFICIENT_FUNDS'
+  | 'INVALID_REQUEST'
   | 'INTERNAL';
 
 export function fail(status: HttpStatus, code: ErrorCode, message: string, details?: unknown) {
@@ -46,6 +55,23 @@ const DOMAIN_TO_HTTP: Record<string, { status: HttpStatus; code: ErrorCode }> = 
     code: 'CONTENT_UNAVAILABLE',
   },
   IdempotencyConflict: { status: HttpStatus.CONFLICT, code: 'IDEMPOTENCY_CONFLICT' },
+  // ── Phase 3 — physical items ────────────────────────────────────────────
+  // An item that is not this account's is ABSENT, never forbidden: existence
+  // is information, and the domain already gives both the same answer.
+  ItemNotFound: { status: HttpStatus.NOT_FOUND, code: 'ITEM_NOT_FOUND' },
+  ItemDefinitionUnknown: {
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    code: 'CONTENT_KIND_MISMATCH',
+  },
+  IllegalItemMove: { status: HttpStatus.UNPROCESSABLE_ENTITY, code: 'ILLEGAL_ITEM_MOVE' },
+  NoRoomForItem: { status: HttpStatus.CONFLICT, code: 'NO_ROOM_FOR_ITEM' },
+  OverCapacity: { status: HttpStatus.CONFLICT, code: 'OVER_CAPACITY' },
+  ContainerSlotLocked: { status: HttpStatus.CONFLICT, code: 'CONTAINER_SLOT_LOCKED' },
+  ServiceUnavailableHere: {
+    status: HttpStatus.CONFLICT,
+    code: 'SERVICE_UNAVAILABLE_HERE',
+  },
+  InsufficientFunds: { status: HttpStatus.CONFLICT, code: 'INSUFFICIENT_FUNDS' },
 };
 
 /**

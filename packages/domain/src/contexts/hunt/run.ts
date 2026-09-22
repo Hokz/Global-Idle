@@ -12,6 +12,7 @@
  * so a retry is a no-op rather than a duplicate.
  */
 import {
+  LOOT_POUCH_SPACES,
   RECONNECT_GRACE,
   activityId as toActivityId,
   characterId as toCharacterId,
@@ -104,6 +105,8 @@ export interface HuntRunView {
   readonly connection: 'ONLINE_ACTIVE' | 'RECONNECT_GRACE_PAUSED' | 'ACTIVITY_ENDED';
   readonly graceExpiresAt: string | null;
   readonly endedReason: HuntEndReason | null;
+  /** Phase 3 — how full the Loot Pouch is. */
+  readonly lootPouch: { readonly used: number; readonly spaces: number };
   /** Present only on the settlement that KILLED the Character. What death
    *  cost, so the window can say it rather than leaving the player to work it
    *  out from two numbers that both went down. */
@@ -113,6 +116,11 @@ export interface HuntRunView {
     readonly levelBefore: number;
     readonly levelAfter: number;
     readonly fullBless: boolean;
+    /** Phase 3 — the physical stacks the death destroyed. */
+    readonly lootForfeited: readonly {
+      readonly definitionKey: string;
+      readonly quantity: number;
+    }[];
   } | null;
   readonly events: readonly HuntEvent[];
 }
@@ -351,6 +359,9 @@ export async function advance(
       connection,
       graceExpiresAt: graceExpiresAt ? graceExpiresAt.toISOString() : null,
       endedReason: state.endedReason,
+      // Phase 3 — how full the Loot Pouch is. "Nothing is being picked up" is
+      // a state the player has to be able to SEE before they can fix it.
+      lootPouch: { used: pouchUsed, spaces: LOOT_POUCH_SPACES },
       penalty: penalty
         ? {
             experienceLost: penalty.experienceLost.toString(),
@@ -358,6 +369,7 @@ export async function advance(
             levelBefore: penalty.levelBefore,
             levelAfter: penalty.levelAfter,
             fullBless: penalty.fullBless,
+            lootForfeited: penalty.lootForfeited,
           }
         : null,
       events,
@@ -372,6 +384,7 @@ export async function advance(
     pouchOf(character.accountId as never, run.characterId),
     'GOLD',
   );
+  const pouchUsed = await items.pouchSpaces(tx, run.characterId);
 
   const stored = {
     room: run.room,

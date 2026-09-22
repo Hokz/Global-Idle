@@ -19,6 +19,7 @@ import {
 import { HealthModule } from '../health/health.module.js';
 import { COOKIE_POLICY, SESSION_SECRET } from './tokens.js';
 import { GameController } from './game.controller.js';
+import { InventoryController } from './inventory.controller.js';
 import { WorldController } from './world.controller.js';
 
 @Module({})
@@ -30,7 +31,9 @@ export class GameModule {
     return {
       module: GameModule,
       imports: [health],
-      controllers: devAuthEnabled() ? [GameController, WorldController] : [WorldController],
+      controllers: devAuthEnabled()
+        ? [GameController, WorldController, InventoryController]
+        : [WorldController, InventoryController],
       providers: [
         { provide: SESSION_SECRET, useValue: config.SESSION_SECRET },
         // Decided once, here, from configuration — never per request.
