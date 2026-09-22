@@ -1,6 +1,10 @@
 # Phase 2 — Hunt Simulator: Implementation Specification
 
-**Document status:** `IMPLEMENTATION_SPEC_READY`
+**Document status:** `VERIFIED` — implemented, independently reviewed, and accepted by the
+Product Owner on 2026-09-22 at head `03058b5bd337900d08bc253c35b8825e06b35af7`. Evidence:
+106/106 contractual matrix, 299 tests across 33 files, 36 Playwright cases (desktop 1440×900 and
+touch 390×844), 17 migration assertions, CI run #29 green on all three jobs, `pnpm dev` verified
+end to end. No Phase 2 blockers remain.
 **Phase:** 2 — the Hunt simulator, rooms, Stamina, XP, Gold, supplies, death, and the first
 Game Window.
 **Baseline:** Phase 0A `ARCHITECTURE_APPROVED` (ADR-001–ADR-018) · Phase 0B `VERIFIED` at

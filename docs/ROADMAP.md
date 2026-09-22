@@ -60,7 +60,7 @@ Deliverables:
 
 No full gameplay yet.
 
-## Phase 1 — Character + World Map — current phase
+## Phase 1 — Character + World Map — `IMPLEMENTATION_SPEC_READY`
 
 **Specification:**
 [`docs/specs/phase-1/PHASE_1_WORLD_CHARACTER_VERTICAL_SLICE_SPEC.md`](specs/phase-1/PHASE_1_WORLD_CHARACTER_VERTICAL_SLICE_SPEC.md)
@@ -79,7 +79,21 @@ No full gameplay yet.
 - hunt marker;
 - activity selection.
 
-## Phase 2 — Hunt Simulation
+## Phase 2 — Hunt Simulation — `VERIFIED`
+
+**Specification:**
+[`docs/specs/phase-2/PHASE_2_HUNT_SIMULATOR_SPEC.md`](specs/phase-2/PHASE_2_HUNT_SIMULATOR_SPEC.md)
+— **`VERIFIED`**. Implemented, independently reviewed, and accepted by the Product Owner on
+2026-09-22 at head `03058b5`. Evidence:
+[`PHASE_2_IMPLEMENTATION_NOTES.md`](specs/phase-2/PHASE_2_IMPLEMENTATION_NOTES.md) and
+[`PHASE_2_CANARY_SOURCE_MAP.md`](specs/phase-2/PHASE_2_CANARY_SOURCE_MAP.md) — 106/106 contractual
+matrix, 299 tests across 33 files, 36 Playwright cases on desktop and touch, 17 migration
+assertions, CI run #29 green on all three jobs, and `pnpm dev` verified end to end. No Phase 2
+blockers remain.
+
+The functional evidence includes an INSTRUMENTED browser walkthrough — a script drove a real
+browser and recorded the console, page errors and every response status. A human aesthetic review
+of the layout is not claimed and was not part of this acceptance.
 
 - room system;
 - rooms 1-10;
@@ -117,7 +131,7 @@ At least one timer path should exercise the reusable `ActiveUseTimer` foundation
 Mandatory tests: cases 1–28 in
 [`docs/architecture/ACTIVITY_OCCUPANCY_AND_TIMERS.md`](architecture/ACTIVITY_OCCUPANCY_AND_TIMERS.md) §7.
 
-## Phase 3 — Loot + Itemization + Inventory/Logistics
+## Phase 3 — Loot + Itemization + Inventory/Logistics — current phase
 
 - loot tables;
 - BaseItem;

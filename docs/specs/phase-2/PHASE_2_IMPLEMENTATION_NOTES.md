@@ -1,9 +1,16 @@
 # Phase 2 — Implementation notes
 
-**Status:** `IMPLEMENTATION_COMPLETE — PENDING INDEPENDENT REVIEW`
+**Status:** `VERIFIED` — accepted by the Product Owner on 2026-09-22 at head
+`03058b5bd337900d08bc253c35b8825e06b35af7`, after independent review.
 **Spec:** [`PHASE_2_HUNT_SIMULATOR_SPEC.md`](./PHASE_2_HUNT_SIMULATOR_SPEC.md) ·
 **Evidence:** [`PHASE_2_CANARY_SOURCE_MAP.md`](./PHASE_2_CANARY_SOURCE_MAP.md)
 **Matrix:** Phase 2 **106/106**, with Phase 0B 92/92 and Phase 1 87/87 still passing.
+**Accepted evidence:** 299 tests across 33 files · 36 Playwright cases, desktop and touch ·
+17 migration assertions · CI run #29 green on all three jobs · `pnpm dev` green.
+
+The functional evidence includes the INSTRUMENTED browser walkthrough of §7. A human aesthetic
+review of the layout is **not** claimed and was not part of this acceptance; §7 still records it
+as owed.
 
 This document records what the implementation DECIDED, what it FOUND, and what it COST — the
 things a specification cannot know in advance. It is not a summary of the spec.
