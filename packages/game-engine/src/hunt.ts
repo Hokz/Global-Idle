@@ -434,27 +434,49 @@ export function simulateHunt(
     // With a map it must first BE somewhere it can reach from. Walking is what
     // it does with a tick it cannot attack in, so approach and attack are the
     // same decision rather than two systems taking turns.
-    const engaged = creatures.findIndex((creature) => creature.health > 0);
-    if (space && position && engaged >= 0) {
-      const enemy = creatures[engaged]!;
-      if (enemy.position && !isAdjacent(position, enemy.position)) {
-        const stepped = stepActor(CHARACTER, position, enemy.position);
-        if (stepped) {
+    //
+    // WHAT SPACE CHANGES is the candidate set, never the arbitration. Index
+    // order still decides which of several creatures is hit; it no longer
+    // decides which one is *considered*. A Character fixated on the lowest
+    // index regardless of reach stands still forever the moment that creature
+    // is unreachable — one rat in a one-tile doorway is enough — while the two
+    // biting it go unanswered. Reach first, then index.
+    if (space && position) {
+      const engagedNow = creatures.some(
+        (creature) =>
+          creature.health > 0 && creature.position && isAdjacent(position!, creature.position),
+      );
+      if (!engagedNow) {
+        // Approach the first creature a step exists toward. An unreachable one
+        // is SKIPPED rather than waited on: it is walking toward the Character
+        // anyway, and standing still is not a decision a fight should make.
+        for (let index = 0; index < creatures.length; index += 1) {
+          const enemy = creatures[index]!;
+          if (enemy.health <= 0 || !enemy.position) continue;
+          const stepped = stepActor(CHARACTER, position, enemy.position);
+          if (!stepped) continue;
           position = stepped.to;
           leg = stepped.leg;
+          break;
         }
       }
     }
 
-    const inRange =
-      !space ||
-      engaged < 0 ||
-      (!!position &&
-        !!creatures[engaged]?.position &&
-        isAdjacent(position, creatures[engaged]!.position!));
+    // Recomputed AFTER the step, so a step that lands in melee range attacks in
+    // the same tick — walking and swinging are separate cooldowns in the source
+    // engine, not alternating turns.
+    const engaged = space
+      ? creatures.findIndex(
+          (creature) =>
+            creature.health > 0 &&
+            !!creature.position &&
+            !!position &&
+            isAdjacent(position, creature.position),
+        )
+      : creatures.findIndex((creature) => creature.health > 0);
 
-    if (tick >= characterNextAttackTick && inRange) {
-      const index = creatures.findIndex((creature) => creature.health > 0);
+    if (tick >= characterNextAttackTick) {
+      const index = engaged;
       if (index >= 0) {
         const target = creatures[index]!;
         const stats = plan.creatures[target.key]!;
@@ -504,12 +526,19 @@ export function simulateHunt(
     // Index order is the deterministic arbitration when two want one tile: the
     // earlier actor moves first and the later one sees it standing there.
     if (space && position) {
-      creatures = creatures.map((creature) => {
-        if (creature.health <= 0 || !creature.position || !creature.id) return creature;
-        if (isAdjacent(creature.position, position!)) return creature;
-        const stepped = stepActor(creature.id, creature.position, position!);
-        return stepped ? { ...creature, position: stepped.to, leg: stepped.leg } : creature;
-      });
+      // The array being stepped through IS the one `occupied` reads, so the
+      // second creature to move sees the first one already standing on its new
+      // tile. Mapping into a fresh array would have every creature decide
+      // against the same stale snapshot and two of them walk onto one tile.
+      const moving = creatures.slice();
+      creatures = moving;
+      for (let index = 0; index < moving.length; index += 1) {
+        const creature = moving[index]!;
+        if (creature.health <= 0 || !creature.position || !creature.id) continue;
+        if (isAdjacent(creature.position, position)) continue;
+        const stepped = stepActor(creature.id, creature.position, position);
+        if (stepped) moving[index] = { ...creature, position: stepped.to, leg: stepped.leg };
+      }
     }
 
     for (const creature of creatures) {
