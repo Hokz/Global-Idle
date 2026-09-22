@@ -39,6 +39,9 @@ function asClock(ms: number): string {
   return `${hours}:${String(minutes).padStart(2, '0')}`;
 }
 
+/** `item.small-health-potion` reads badly in a combat log. */
+const label = (key: string): string => key.replace(/^item\./, '').replace(/-/g, ' ');
+
 /** One line of combat log, from one server event. */
 function describe(event: HuntEvent): string {
   switch (event.kind) {
@@ -56,6 +59,17 @@ function describe(event: HuntEvent): string {
         : `Room ${event.room} cleared`;
     case 'supply':
       return `You drink a potion (+${event.healed}), ${event.remaining} left`;
+    // Phase 3 — what physically dropped, and what did NOT get picked up.
+    case 'loot': {
+      const many = (event.quantity ?? 1) > 1 ? `${event.quantity} ` : '';
+      return `You pick up ${many}${label(event.item ?? '')}`;
+    }
+    case 'loot-skipped': {
+      const what = label(event.item ?? '');
+      if (event.reason === 'policy') return `${what} left behind — your filter skips it`;
+      if (event.reason === 'no-space') return `${what} left behind — the Loot Pouch is full`;
+      return `${what} left behind — too heavy to carry`;
+    }
     case 'died':
       return 'You have died.';
     default:
@@ -289,6 +303,18 @@ export function GameWindow({ characterId, label, summary, onEnded }: GameWindowP
             <span className="muted small" data-testid="session-gold">
               {run.sessionGold} this run
             </span>
+          </dd>
+        </div>
+        <div className="stat">
+          {/* Phase 3 — how full the Loot Pouch is, because "nothing is being
+              picked up" is a state the player has to be able to SEE before
+              they can fix it. */}
+          <dt>Loot pouch</dt>
+          {/* `run-pouch-occupancy`, not `pouch-occupancy`: the System UI owns
+              that id. Two elements answering to one test id is a test that
+              passes by accident. */}
+          <dd data-testid="run-pouch-occupancy" data-used={run.lootPouch?.used ?? 0}>
+            {run.lootPouch ? `${run.lootPouch.used} / ${run.lootPouch.spaces}` : '—'}
           </dd>
         </div>
         <div className="stat">

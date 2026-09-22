@@ -18,7 +18,9 @@ import {
   originCharacterExists,
   rosterCapacityExceeded,
 } from '../../platform/errors/index.js';
+import type { ResolvedBundle } from '@global-idle/game-data';
 import { lockAccount, type UnitOfWork } from '../../platform/transaction/index.js';
+import * as items from '../items/index.js';
 import { STAMINA_MAX } from './stamina/index.js';
 import { deriveStaminaMode } from './stamina/index.js';
 
@@ -36,6 +38,15 @@ export interface CreateCharacterInput {
   /** Origin Characters start at 1; an unlocked one will start at 8
    *  (DOMAIN_MODEL.md §5.5). Phase 1 only creates origins. */
   readonly baseLevel: number;
+  /**
+   * Phase 3 — the real items a new Character arrives with.
+   *
+   * Passed in rather than resolved here, because the character context has no
+   * content resolver and should not grow one: the caller already has a bundle,
+   * and a Character created in a test that does not care about items simply
+   * omits it.
+   */
+  readonly grant?: { readonly bundle: ResolvedBundle; readonly key: string };
   readonly at: Instant;
 }
 
@@ -103,6 +114,20 @@ export async function createCharacter(
       updatedAt: input.at,
     },
   });
+
+  // Phase 3 — the five Hunt Container Slots exist from the first moment, with
+  // slot 1 unlocked. Created here for the same reason the Stamina row is: a
+  // Character without them is a state nothing else has an answer for.
+  await items.createSlots(tx, String(id), input.at);
+  if (input.grant) {
+    await items.applyStartingGrant(tx, {
+      bundle: input.grant.bundle,
+      accountId: String(input.accountId),
+      characterId: String(id),
+      grantKey: input.grant.key,
+      at: input.at,
+    });
+  }
   return id;
 }
 

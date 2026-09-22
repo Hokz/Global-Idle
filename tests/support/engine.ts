@@ -76,6 +76,11 @@ export const HUNT_FIXTURE_INPUT: HuntFixtureInput = {
     maxHealth: 150,
     attackSkill: 10,
     attackValue: 9.6,
+    // Phase 3 — the fixture Character is ARMED, which is what 9.6 means. At
+    // Level 1 the armed floor and the unarmed zero agree, so this changes no
+    // number in the golden file; it says which of the two shapes is being
+    // pinned, which used to be implicit.
+    armed: true,
     attackFactor: 1,
     attackIntervalMs: 2000,
     defense: 4,

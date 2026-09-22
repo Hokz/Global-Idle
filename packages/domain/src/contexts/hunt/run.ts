@@ -12,6 +12,7 @@
  * so a retry is a no-op rather than a duplicate.
  */
 import {
+  LOOT_POUCH_SPACES,
   RECONNECT_GRACE,
   activityId as toActivityId,
   characterId as toCharacterId,
@@ -41,6 +42,7 @@ import {
 import { endActivity, occupancyFor, pauseForGrace, resumeFromGrace } from '../activity/index.js';
 import { settleStamina } from '../character/index.js';
 import { pouchOf, post, readBalance } from '../economy/index.js';
+import * as items from '../items/index.js';
 import { entitlementPort } from '../identity/index.js';
 import { createTimerPort } from '../../platform/timer/index.js';
 import { levelForXp, levelProgress } from './progression.js';
@@ -103,6 +105,8 @@ export interface HuntRunView {
   readonly connection: 'ONLINE_ACTIVE' | 'RECONNECT_GRACE_PAUSED' | 'ACTIVITY_ENDED';
   readonly graceExpiresAt: string | null;
   readonly endedReason: HuntEndReason | null;
+  /** Phase 3 — how full the Loot Pouch is. */
+  readonly lootPouch: { readonly used: number; readonly spaces: number };
   /** Present only on the settlement that KILLED the Character. What death
    *  cost, so the window can say it rather than leaving the player to work it
    *  out from two numbers that both went down. */
@@ -112,6 +116,11 @@ export interface HuntRunView {
     readonly levelBefore: number;
     readonly levelAfter: number;
     readonly fullBless: boolean;
+    /** Phase 3 — the physical stacks the death destroyed. */
+    readonly lootForfeited: readonly {
+      readonly definitionKey: string;
+      readonly quantity: number;
+    }[];
   } | null;
   readonly events: readonly HuntEvent[];
 }
@@ -136,7 +145,19 @@ export async function startRun(
   },
 ): Promise<void> {
   const bundle = await input.resolver.resolve(input.contentVersion);
-  const { plan, profile, supplyCharges } = buildHuntPlan(bundle, input.contentKey, input.level);
+  // The run's opening state comes from what the Character IS WEARING and what
+  // it actually brought — not from a content profile and a content charge
+  // count, which is the whole difference Phase 3 makes.
+  const equipped = await items.equippedItems(tx, input.characterId);
+  const supplies = await items.broughtSupplies(tx, bundle, input.characterId);
+  const { plan, profile, supplyCharges } = buildHuntPlan({
+    bundle,
+    huntKey: input.contentKey,
+    level: input.level,
+    equipped,
+    supplyCharges: supplies.charges,
+    supplyHeal: supplies.heal,
+  });
   const state = initialState(profile, plan, supplyCharges);
 
   await tx.huntRun.create({
@@ -258,11 +279,16 @@ export async function advance(
   });
 
   const bundle = await input.resolver.resolve(activity.contentVersion);
-  const { plan, profile } = buildHuntPlan(
+  const equipped = await items.equippedItems(tx, run.characterId);
+  const supplies = await items.broughtSupplies(tx, bundle, run.characterId);
+  const { plan, profile } = buildHuntPlan({
     bundle,
-    activity.contentKey,
-    levelForXp(character.baseXp),
-  );
+    huntKey: activity.contentKey,
+    level: levelForXp(character.baseXp),
+    equipped,
+    supplyCharges: supplies.charges,
+    supplyHeal: supplies.heal,
+  });
 
   // Stamina is brought up to `now` FIRST, through the character context's own
   // settlement. A Hunt that ended or is in grace leaves the Character
@@ -333,6 +359,9 @@ export async function advance(
       connection,
       graceExpiresAt: graceExpiresAt ? graceExpiresAt.toISOString() : null,
       endedReason: state.endedReason,
+      // Phase 3 — how full the Loot Pouch is. "Nothing is being picked up" is
+      // a state the player has to be able to SEE before they can fix it.
+      lootPouch: { used: pouchUsed, spaces: LOOT_POUCH_SPACES },
       penalty: penalty
         ? {
             experienceLost: penalty.experienceLost.toString(),
@@ -340,6 +369,7 @@ export async function advance(
             levelBefore: penalty.levelBefore,
             levelAfter: penalty.levelAfter,
             fullBless: penalty.fullBless,
+            lootForfeited: penalty.lootForfeited,
           }
         : null,
       events,
@@ -354,6 +384,7 @@ export async function advance(
     pouchOf(character.accountId as never, run.characterId),
     'GOLD',
   );
+  const pouchUsed = await items.pouchSpaces(tx, run.characterId);
 
   const stored = {
     room: run.room,
@@ -446,7 +477,12 @@ export async function advance(
     // persisted position: a rolled-back attempt replays identically, and a
     // restart resumes the same future.
     const rng = createSeededRandom(`${bound.rngSeed}:${state.tick}`);
-    const step = simulateHunt(state, profile, plan, ticks, rng);
+    // A SECOND stream for physical loot, so the fight's draw sequence is
+    // exactly what Phase 2 was verified against. Both are pure functions of
+    // the persisted position, so a replay reproduces the drops as well as the
+    // hits.
+    const lootRng = createSeededRandom(`${bound.rngSeed}:${state.tick}:loot`);
+    const step = simulateHunt(state, profile, plan, ticks, rng, lootRng);
     events = step.events;
 
     const participant = await tx.activityParticipant.findUniqueOrThrow({
@@ -522,6 +558,65 @@ export async function advance(
         operationId: toOperationId(`${operation}:gold`),
         at: input.now,
       });
+    }
+
+    // ── physical loot ───────────────────────────────────────────────────
+    //
+    // The engine said what fell; this decides what is COLLECTED. Policy first,
+    // then space, then Capacity — and a refusal at any of them is a reason the
+    // Game Window can show, never an error and never an end to the Hunt.
+    const collected: { definitionKey: string; quantity: number }[] = [];
+    if (step.rewards.length > 0) {
+      const policy = await items.readPolicy(tx, run.characterId);
+      const identityRng = createSeededRandom(`${bound.rngSeed}:${state.tick}:identity`);
+      const rewarded = new Set(settled.rewardedTicks);
+      for (const reward of step.rewards) {
+        // Zero Stamina drops the WHOLE reward, loot included (§2.3, §14).
+        if (!rewarded.has(reward.tick)) continue;
+        for (const drop of reward.loot) {
+          const identity = items.rollIdentity(bundle, drop.itemKey, identityRng);
+          if (!items.accepts(policy, bundle, drop.itemKey, identity.rarity)) {
+            events = [
+              ...events,
+              { tick: reward.tick, kind: 'loot-skipped', item: drop.itemKey, reason: 'policy' },
+            ];
+            continue;
+          }
+          const placed = await items.placeInPouch(tx, {
+            bundle,
+            accountId: character.accountId,
+            characterId: run.characterId,
+            baseLevel: levelForXp(character.baseXp + settled.experience),
+            definitionKey: drop.itemKey,
+            quantity: drop.quantity,
+            rarity: identity.rarity,
+            affixes: identity.affixes,
+            at: input.now,
+          });
+          if (placed.collected > 0) {
+            collected.push({ definitionKey: drop.itemKey, quantity: placed.collected });
+            events = [
+              ...events,
+              { tick: reward.tick, kind: 'loot', item: drop.itemKey, quantity: placed.collected },
+            ];
+          } else if (placed.reason !== 'ok') {
+            events = [
+              ...events,
+              {
+                tick: reward.tick,
+                kind: 'loot-skipped',
+                item: drop.itemKey,
+                reason: placed.reason,
+              },
+            ];
+          }
+        }
+      }
+    }
+
+    // A supply charge is a real potion now, so drinking one has to remove one.
+    if (step.suppliesUsed > 0 && supplies.definitionKey) {
+      await items.consumeSupplies(tx, run.characterId, supplies.definitionKey, step.suppliesUsed);
     }
 
     next = {
@@ -714,7 +809,8 @@ export async function endRun(
   // connection are not punished: §8 already ends the run, and inventing a
   // penalty for them would make the reconnect grace a trap rather than a
   // mercy.
-  const penalty = reason === 'DIED' ? await settleDeathPenalty(tx, run.characterId, at) : null;
+  const penalty =
+    reason === 'DIED' ? await settleDeathPenalty(tx, run.characterId, at, activityId) : null;
 
   await tx.huntRun.update({
     where: { activityId },
@@ -733,6 +829,7 @@ export async function endRun(
           experienceLost: penalty.experienceLost.toString(),
           goldForfeited: penalty.goldForfeited.toString(),
           levelAfter: penalty.levelAfter,
+          itemsForfeited: penalty.lootForfeited.length,
         }
       : {}),
   });
@@ -744,6 +841,12 @@ export interface DeathPenalty {
   readonly levelBefore: number;
   readonly levelAfter: number;
   readonly goldForfeited: bigint;
+  /** Phase 3 — the PHYSICAL loot the death destroyed, item by item. Enough to
+   *  answer "where did my loot go" without an item ledger nobody replays. */
+  readonly lootForfeited: readonly {
+    readonly definitionKey: string;
+    readonly quantity: number;
+  }[];
   readonly fullBless: boolean;
 }
 
@@ -759,6 +862,7 @@ async function settleDeathPenalty(
   tx: UnitOfWork,
   characterId: string,
   at: Instant,
+  activityId: ActivityId,
 ): Promise<DeathPenalty> {
   const character = await tx.character.findUniqueOrThrow({
     where: { id: characterId },
@@ -783,6 +887,23 @@ async function settleDeathPenalty(
   }
 
   let goldForfeited = 0n;
+  // Phase 3 — the Loot Pouch goes with the Gold Pouch, and on the same
+  // condition. Carried-reward protection stays BINARY: six blessings lose
+  // both, seven keep both. Equipment, the Hunt containers, the supplies that
+  // were brought, the Depot and the Stash are untouched by this rule, which is
+  // why the delete names `LOOT_POUCH` and nothing else.
+  let lootForfeited: readonly { definitionKey: string; quantity: number }[] = [];
+  if (settled.forfeitsCarried) {
+    lootForfeited = await items.emptyPouch(tx, characterId);
+    if (lootForfeited.length > 0) {
+      recordDomainEvent({
+        kind: 'hunt.death.loot-forfeit',
+        characterId,
+        activityId: String(activityId),
+        items: lootForfeited,
+      });
+    }
+  }
   if (settled.forfeitsCarried) {
     const pouch = pouchOf(character.accountId as never, characterId);
     const carried = await readBalance(tx, pouch, 'GOLD');
@@ -804,6 +925,7 @@ async function settleDeathPenalty(
     levelBefore: settled.levelBefore,
     levelAfter: settled.levelAfter,
     goldForfeited,
+    lootForfeited,
     fullBless: !settled.forfeitsCarried,
   };
 }

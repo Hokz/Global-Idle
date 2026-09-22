@@ -107,6 +107,8 @@ model Account {
   activities     Activity[]
   balances       CurrencyBalance[]
   ledgerEntries  LedgerEntry[]
+  items          ItemInstance[]
+  stash          StashEntry[]
 
   @@map("Account")
 }
@@ -200,6 +202,9 @@ model Character {
   huntRuns     HuntRun[]
   pouchEntries LedgerEntry[]
   pouchBalance CurrencyBalance[]
+  items        ItemInstance[]
+  slots        CharacterContainerSlot[]
+  lootPolicy   CharacterLootPolicy?
 
   /// I1 — one PLAYABLE (non-retired) Character per vocation per account.
   /// Object form: the pinned Prisma accepts null equality here, so no raw()
@@ -548,6 +553,183 @@ enum CurrencyCustody {
   BANK
   /// Character-scoped and CARRIED. Forfeited on death without Full Bless.
   POUCH
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Phase 3 — physical items (Phase 3 spec §2, §3)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// WHERE a physical thing is. Exactly one of these, enforced by a CHECK that
+/// also fixes which of `characterId`, `containerId` and `slot` may be set — so
+/// "equipped AND in a backpack" is unrepresentable rather than merely refused.
+enum ItemLocation {
+  /// Worn. Drives combat. Safe from the Global Idle death rule.
+  EQUIPPED
+  /// INSTALLED in one of the five top-level Hunt Container Slots. Not worn
+  /// gear: a Character wears one backpack and installs up to five containers,
+  /// so EQUIPPED could never have represented all five.
+  HUNT_CONTAINER
+  /// Inside one of the five top-level Hunt containers.
+  CHARACTER_CONTAINER
+  /// Collected by a Hunt. AT RISK on death without Full Bless.
+  LOOT_POUCH
+  /// Account storage. Weightless, safe, and unreachable during a Hunt.
+  DEPOT
+}
+
+/// THE rarity vocabulary. One enum, six values, no `Epic`.
+enum ItemRarity {
+  COMMON
+  SEMI_RARE
+  RARE
+  MYSTIC
+  LEGENDARY
+  STELLAR
+}
+
+/// `Slots_t`, imported whole (Phase 3 source map §7). Phase 3 uses HEAD,
+/// ARMOR, LEGS, FEET, LEFT and BACKPACK; the rest exist so a later amulet or
+/// ring is content rather than a migration.
+enum EquipmentSlot {
+  HEAD
+  NECKLACE
+  BACKPACK
+  ARMOR
+  RIGHT
+  LEFT
+  LEGS
+  FEET
+  RING
+  AMMO
+}
+
+enum LootPolicyMode {
+  COLLECT_ALL_EXCEPT_SKIPPED
+  ACCEPTED_ONLY
+}
+
+/// ONE ROW IS ONE PHYSICAL THING.
+///
+/// A row of a stackable definition is one STACK of an interchangeable item, so
+/// 600 potions are three rows and not six hundred. A row of a non-stackable
+/// definition is one individual, and its id is the durable identity its rarity
+/// and affixes hang on. That single rule is what makes every constraint in
+/// spec §16 expressible as a database constraint.
+model ItemInstance {
+  id            String         @id
+  /// Always present, for account-wide queries and for the ownership pair.
+  accountId     String
+  /// Null ONLY for DEPOT, which is account storage.
+  characterId   String?
+  /// Into the content bundle. Content owns what an item IS.
+  definitionKey String
+  /// 1..maxStack, CHECKed against the definition's value at write time.
+  quantity      Int
+  location      ItemLocation
+  /// EQUIPPED only.
+  slot          EquipmentSlot?
+  /// CHARACTER_CONTAINER only — the container instance this sits inside.
+  containerId   String?
+  /// HUNT_CONTAINER only — WHICH of the five slots this container occupies.
+  /// It lives on the instance so the slot's foreign key can name it, which is
+  /// what makes "installed" a database fact instead of a service's opinion.
+  slotIndex     Int?
+  rarity        ItemRarity     @default(COMMON)
+  affixes       Json           @default("[]")
+  /// Reserved for Phase 7's Forge. Nothing in Phase 3 reads it; it exists so
+  /// adding it later is not a migration of every item anyone owns.
+  forgeTier     Int            @default(0)
+  createdAt     DateTime
+
+  account   Account    @relation(fields: [accountId], references: [id])
+  /// The same composite pair ADR-019 uses for currency: an item cannot name a
+  /// Character that does not exist, or one belonging to another Account.
+  character Character? @relation(fields: [characterId, accountId], references: [id, accountId], onDelete: Restrict, onUpdate: Restrict)
+
+  /// Contents name their parent AND their owner. The pair is what refuses a
+  /// Character-B potion inside a Character-A backpack, and what refuses moving
+  /// a still-loaded container out of its slot: the parent's characterId would
+  /// have to become null while its contents still point at it.
+  container ItemInstance?           @relation("ContainerContents", fields: [containerId, characterId], references: [id, characterId], onDelete: Restrict, onUpdate: Restrict)
+  contents  ItemInstance[]          @relation("ContainerContents")
+  installed CharacterContainerSlot? @relation("InstalledContainer")
+
+  /// One item per equipment slot per Character.
+  @@unique([characterId, slot], where: { location: "EQUIPPED" }, name: "equippedSlot")
+  /// One active container per Hunt Container Slot per Character.
+  @@unique([characterId, slotIndex], where: { location: "HUNT_CONTAINER" }, name: "huntContainerSlot")
+  /// Targets for the two composite foreign keys above and on the slot. They
+  /// are unique for free — `id` is the primary key — and exist only so the
+  /// PAIR and the TRIPLE can be pointed at.
+  @@unique([id, characterId], name: "instanceOwner")
+  @@unique([id, characterId, slotIndex], name: "instanceInstalled")
+  @@index([accountId, location])
+  @@index([characterId, location])
+  @@index([containerId])
+  @@index([accountId, definitionKey])
+  @@map("ItemInstance")
+}
+
+/// EXACTLY FIVE top-level Hunt Container Slots per Character. Slot 1 is free;
+/// 2 to 5 are bought with Gold by THAT Character, so five vocation Characters
+/// can hold up to 25 independent unlocks.
+model CharacterContainerSlot {
+  characterId         String
+  /// 1..5, CHECKed. There is no slot 6.
+  slotIndex           Int
+  /// Null means locked. Slot 1 is created unlocked with the Character.
+  unlockedAt          DateTime?
+  /// The ONE active container in this slot.
+  containerInstanceId String?   @unique
+  /// Manage Containers: where purchases, refills and withdrawals prefer to go.
+  /// Never where ordinary creature loot goes — that is the Loot Pouch only.
+  routingCategory     String?
+
+  character Character     @relation(fields: [characterId], references: [id])
+  /// The installed container must be THIS Character's, and its own row must
+  /// agree that it sits in THIS slot. Three columns, one foreign key: a Depot
+  /// container (characterId null) cannot be installed, another Character's
+  /// container cannot be installed, and a container that was moved away
+  /// cannot be left behind as a dangling active slot.
+  container ItemInstance? @relation("InstalledContainer", fields: [containerInstanceId, characterId, slotIndex], references: [id, characterId, slotIndex])
+
+  @@id([characterId, slotIndex])
+  /// The defining side of the one-to-one: one slot row per installed
+  /// container. `containerInstanceId` is already unique on its own; this is
+  /// the triple the foreign key is declared over.
+  @@unique([containerInstanceId, characterId, slotIndex], name: "installedContainer")
+  @@map("CharacterContainerSlot")
+}
+
+/// The Stash: account-level, fungible, and an AGGREGATE rather than rows.
+///
+/// It is the one place a quantity may exceed `maxStack`, which is exactly why
+/// it is not an `ItemInstance`: withdrawing materializes legal stacks instead.
+model StashEntry {
+  accountId     String
+  definitionKey String
+  quantity      BigInt
+  updatedAt     DateTime
+
+  account Account @relation(fields: [accountId], references: [id])
+
+  @@id([accountId, definitionKey])
+  @@map("StashEntry")
+}
+
+/// Server-authoritative pickup policy. It answers "pick it up?" and nothing
+/// else; what happens after collection is Phase 8's Auto-Sell.
+model CharacterLootPolicy {
+  characterId String         @id
+  mode        LootPolicyMode @default(COLLECT_ALL_EXCEPT_SKIPPED)
+  /// Ordered overrides: item, then category, then rarity. Shaped so an
+  /// account-level preset can point at the same rules without a migration.
+  rules       Json           @default("[]")
+  updatedAt   DateTime
+
+  character Character @relation(fields: [characterId], references: [id])
+
+  @@map("CharacterLootPolicy")
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

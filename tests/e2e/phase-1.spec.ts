@@ -120,11 +120,10 @@ test.describe('Phase 1 vertical slice', () => {
   });
 
   test('no LATER phase leaks into the Hunt surface', async ({ page }) => {
-    // The Phase 1 version of this guard named Phase 2's vocabulary, because
-    // Phase 2 had not happened. It has, so the guard moves forward with the
-    // code rather than being deleted: the surface must not ship Phase 3's
-    // itemization — inventory, equipment, loot, rarity — nor any shadow
-    // version of it. Phase 2 §1.2 creates none of them.
+    // This guard has moved forward TWICE now, which is the point of it: it
+    // named Phase 2's vocabulary at Phase 1 and Phase 3's at Phase 2. Phase 3
+    // has shipped and the Hunt surface legitimately shows a Loot Pouch, so it
+    // now refuses Phase 4's and Phase 7's. What it asserts is unchanged.
     const who = handle();
     await signIn(page, who);
     await createCharacter(page, 'Scout');
@@ -133,7 +132,16 @@ test.describe('Phase 1 vertical slice', () => {
     await expect(page.getByTestId('game-window')).toBeVisible();
 
     const body = (await page.locator('body').innerText()).toLowerCase();
-    for (const forbidden of ['inventory', 'equip', 'loot', 'rarity', 'backpack', 'affix']) {
+    for (const forbidden of [
+      'party',
+      'shared xp',
+      'promotion',
+      'skill tree',
+      'forge',
+      'imbuement',
+      'bestiary',
+      'charm',
+    ]) {
       expect(body, `a later phase's vocabulary leaked: ${forbidden}`).not.toContain(forbidden);
     }
     await page.getByTestId('leave').click();

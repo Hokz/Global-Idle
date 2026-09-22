@@ -131,7 +131,16 @@ At least one timer path should exercise the reusable `ActiveUseTimer` foundation
 Mandatory tests: cases 1–28 in
 [`docs/architecture/ACTIVITY_OCCUPANCY_AND_TIMERS.md`](architecture/ACTIVITY_OCCUPANCY_AND_TIMERS.md) §7.
 
-## Phase 3 — Loot + Itemization + Inventory/Logistics — current phase
+## Phase 3 — Loot + Itemization + Inventory/Logistics
+
+> Status lives in [`PROJECT_STATE.json`](./PROJECT_STATE.json), not here.
+
+**Specification:**
+[`docs/specs/phase-3/PHASE_3_ITEMIZATION_INVENTORY_LOGISTICS_SPEC.md`](specs/phase-3/PHASE_3_ITEMIZATION_INVENTORY_LOGISTICS_SPEC.md)
+— `IMPLEMENTATION_SPEC_READY`. Implementation is on its own branch and pull
+request, stacked on Phase 2, with status
+`IMPLEMENTATION_COMPLETE — PENDING INDEPENDENT REVIEW`.
+
 
 - loot tables;
 - BaseItem;

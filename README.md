@@ -51,12 +51,9 @@ Development agents must read:
 
 ## Current phase
 
-**Phase 1 — World / Character vertical slice**
-
-Phase 0A is `ARCHITECTURE_APPROVED` and Phase 0B is `VERIFIED` — the technical foundation is
-implemented, independently reviewed and accepted. Phase 1 is the first phase with a visible
-game surface; its specification is
-[`docs/specs/phase-1/PHASE_1_WORLD_CHARACTER_VERTICAL_SLICE_SPEC.md`](docs/specs/phase-1/PHASE_1_WORLD_CHARACTER_VERTICAL_SLICE_SPEC.md).
+**[`docs/PROJECT_STATE.json`](docs/PROJECT_STATE.json) is the canonical answer** — which phase is
+active, which was last independently VERIFIED, and which pull requests are stacked. It is checked
+in CI against `AGENTS.md`, so it cannot quietly go stale the way a hand-written marker here did.
 
 ## Working process
 

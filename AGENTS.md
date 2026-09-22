@@ -171,19 +171,35 @@ Mechanics research and internal prototypes are separate from public-release asse
 
 ## 10. Immediate focus
 
-Current phase: **Phase 1 — World / Character vertical slice**.
+**The canonical project state is [`docs/PROJECT_STATE.json`](docs/PROJECT_STATE.json).** Read it
+first. It names the active phase, the last independently VERIFIED phase, and the stacked pull
+requests in flight. This section explains what that state MEANS; it does not duplicate it, because
+a phase marker copied into five documents is a phase marker that goes stale in four of them — and
+this file said *"Current phase: Phase 1"* for two entire phases.
+`scripts/check-project-state.mjs` fails CI if the two ever disagree again.
 
-Phase 0A (`ARCHITECTURE_APPROVED`) and Phase 0B (`VERIFIED`, accepted 2026-09-21) are closed.
-Phase 0B's primitives — occupancy, Stamina, active-use timers, entitlements, idempotency,
-content bundles, transactions — are implemented and independently reviewed. **Reuse them; do
-not build parallel replacements.**
+Active phase: **Phase 3 — Itemization, inventory and loot logistics**
+(`IMPLEMENTATION_COMPLETE — PENDING INDEPENDENT REVIEW`, PR #8).
+Last VERIFIED: **Phase 2 — Hunt simulator**, accepted 2026-09-22 at head `03058b5`.
 
-Do not import the entire content universe or build the entire game at once. In particular,
-Phase 1 specification (**`IMPLEMENTATION_SPEC_READY`** — build against it, and do not silently
-redesign it while coding):
-`docs/specs/phase-1/PHASE_1_WORLD_CHARACTER_VERTICAL_SLICE_SPEC.md`.
+Phase 0A (`ARCHITECTURE_APPROVED`), Phase 0B, Phase 1 and Phase 2 are closed and VERIFIED. Their
+primitives — occupancy, Stamina, active-use timers, entitlements, idempotency, content bundles,
+transactions, the deterministic Hunt simulator, currency custody, the physical item model —
+are implemented and independently reviewed. **Reuse them; do not build parallel replacements.**
 
-Phase 1 does **not** include the Hunt simulator, combat, loot, itemization, party gameplay or
-the five vocation kits — those are Phase 2 and later.
+A phase's own specification is the thing to build against, and the one in
+`docs/specs/<phase>/` is authoritative over any summary. Do not silently redesign an approved
+specification while coding: record the refinement in that phase's implementation notes instead.
+
+Status vocabulary, and who owns each transition:
+
+| Status | Meaning | Who sets it |
+|---|---|---|
+| `PLANNED` | named in a roadmap, nothing built | whoever plans |
+| `IMPLEMENTATION_SPEC_READY` | the spec is accepted, build against it | the Product Owner |
+| `IMPLEMENTATION_COMPLETE — PENDING INDEPENDENT REVIEW` | the implementer's end state | the implementing agent |
+| `VERIFIED` | independently reviewed and accepted | **the Product Owner only** |
+
+An implementing agent never writes `VERIFIED` and never merges its own pull request.
 
 The first playable target is the vertical slice described in `docs/MVP_SCOPE.md`.

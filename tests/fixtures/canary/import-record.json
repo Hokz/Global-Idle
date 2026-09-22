@@ -763,6 +763,505 @@
         "pattern": "TwistOfFate = 1,\\s*\\n\\s*TheWisdomOfSolitude = (2),",
         "captured": "2"
       }
+    },
+    {
+      "id": "loot.maxChance",
+      "file": "src/utils/const.hpp",
+      "symbol": "MAX_LOOTCHANCE",
+      "observed": "A loot entry’s chance is out of 100000, not 100 and not 1000.",
+      "decision": "Keep",
+      "fixture": "loot.rookgaard.rat.cheese chance denominator",
+      "value": 100000,
+      "probe": {
+        "pattern": "constexpr uint32_t MAX_LOOTCHANCE = (\\d+);",
+        "captured": "100000"
+      }
+    },
+    {
+      "id": "rat.cheese.chance",
+      "file": "data-otservbr-global/monster/mammals/rat.lua",
+      "symbol": "monster.loot → { id = 3607, chance = 39410 }",
+      "observed": "A Rat drops exactly one cheese on 39410/100000 of kills, and the entry carries no maxCount, so the quantity is 1.",
+      "decision": "Keep",
+      "fixture": "loot.rookgaard.rat.cheese",
+      "value": 39410,
+      "probe": {
+        "pattern": "\\{ id = (3607), chance = (\\d+) \\}",
+        "captured": ["3607", "39410"]
+      }
+    },
+    {
+      "id": "rat.loot.entries",
+      "file": "data-otservbr-global/monster/mammals/rat.lua",
+      "symbol": "monster.loot",
+      "observed": "The Rat’s ENTIRE loot table is two entries: gold coin and cheese. There is no third drop to find.",
+      "decision": "Keep",
+      "fixture": "loot.rookgaard.rat — exactly one physical entry",
+      "value": ["gold coin", 3607],
+      "probe": {
+        "pattern": "monster\\.loot = \\{\\s*\\n\\s*\\{ name = \"(gold coin)\", chance = \\d+, maxCount = \\d+ \\},\\s*\\n\\s*\\{ id = (\\d+), chance = \\d+ \\}, -- cheese\\s*\\n\\s*\\}",
+        "captured": ["gold coin", "3607"]
+      }
+    },
+    {
+      "id": "item.cheese.weight",
+      "file": "data/items/items.xml",
+      "symbol": "item id=\"3607\" (cheese) → attribute weight",
+      "observed": "Cheese weighs 400 hundredths of an ounce, i.e. 4.00 oz.",
+      "decision": "Keep",
+      "fixture": "item.cheese.weight",
+      "value": 400,
+      "probe": {
+        "pattern": "<item id=\"3607\"[\\s\\S]{0,400}?<attribute key=\"weight\" value=\"(\\d+)\"/>",
+        "captured": "400"
+      }
+    },
+    {
+      "id": "item.smallHealthPotion.weight",
+      "file": "data/items/items.xml",
+      "symbol": "item id=\"7876\" (small health potion) → attribute weight",
+      "observed": "A small health potion weighs 265 hundredths of an ounce, i.e. 2.65 oz.",
+      "decision": "Keep",
+      "fixture": "item.small-health-potion.weight",
+      "value": 265,
+      "probe": {
+        "pattern": "<item id=\"7876\"[\\s\\S]{0,400}?<attribute key=\"weight\" value=\"(\\d+)\"/>",
+        "captured": "265"
+      }
+    },
+    {
+      "id": "item.backpack.containerSize",
+      "file": "data/items/items.xml",
+      "symbol": "item id=\"2854\" (backpack) → attribute containersize",
+      "observed": "A regular backpack holds 20 spaces. VERIFIED rather than remembered.",
+      "decision": "Keep",
+      "fixture": "item.backpack.capacity",
+      "value": 20,
+      "probe": {
+        "pattern": "<item id=\"2854\"[\\s\\S]{0,400}?<attribute key=\"containersize\" value=\"(\\d+)\"/>",
+        "captured": "20"
+      }
+    },
+    {
+      "id": "item.backpack.weight",
+      "file": "data/items/items.xml",
+      "symbol": "item id=\"2854\" (backpack) → attribute weight",
+      "observed": "A regular backpack weighs 1800 hundredths of an ounce, i.e. 18.00 oz, before anything is in it.",
+      "decision": "Keep",
+      "fixture": "item.backpack.weight",
+      "value": 1800,
+      "probe": {
+        "pattern": "<item id=\"2854\"[\\s\\S]{0,400}?<attribute key=\"weight\" value=\"(\\d+)\"/>",
+        "captured": "1800"
+      }
+    },
+    {
+      "id": "item.dagger.weight",
+      "file": "data/items/items.xml",
+      "symbol": "item id=\"3267\" (dagger) → attribute weight",
+      "observed": "A dagger weighs 950 hundredths of an ounce, i.e. 9.50 oz.",
+      "decision": "Keep",
+      "fixture": "item.dagger.weight",
+      "value": 950,
+      "probe": {
+        "pattern": "<item id=\"3267\"[\\s\\S]{0,400}?<attribute key=\"weight\" value=\"(\\d+)\"/>",
+        "captured": "950"
+      }
+    },
+    {
+      "id": "item.dagger.defense",
+      "file": "data/items/items.xml",
+      "symbol": "item id=\"3267\" (dagger) → attribute defense",
+      "observed": "A dagger contributes 6 defence when it is the equipped weapon.",
+      "decision": "Keep",
+      "fixture": "item.dagger.defense",
+      "value": 6,
+      "probe": {
+        "pattern": "<item id=\"3267\"[\\s\\S]{0,400}?<attribute key=\"defense\" value=\"(\\d+)\"/>",
+        "captured": "6"
+      }
+    },
+    {
+      "id": "item.leatherHelmet.weight",
+      "file": "data/items/items.xml",
+      "symbol": "item id=\"3355\" → attribute weight",
+      "observed": "The leather helmet weighs 22.00 oz.",
+      "decision": "Keep",
+      "fixture": "item.leather-helmet.weight",
+      "value": 2200,
+      "probe": {
+        "pattern": "<item id=\"3355\"[\\s\\S]{0,400}?<attribute key=\"weight\" value=\"(\\d+)\"/>",
+        "captured": "2200"
+      }
+    },
+    {
+      "id": "item.coat.weight",
+      "file": "data/items/items.xml",
+      "symbol": "item id=\"3562\" → attribute weight",
+      "observed": "The coat weighs 27.00 oz.",
+      "decision": "Keep",
+      "fixture": "item.coat.weight",
+      "value": 2700,
+      "probe": {
+        "pattern": "<item id=\"3562\"[\\s\\S]{0,400}?<attribute key=\"weight\" value=\"(\\d+)\"/>",
+        "captured": "2700"
+      }
+    },
+    {
+      "id": "item.leatherLegs.weight",
+      "file": "data/items/items.xml",
+      "symbol": "item id=\"3559\" → attribute weight",
+      "observed": "The leather legs weigh 18.00 oz.",
+      "decision": "Keep",
+      "fixture": "item.leather-legs.weight",
+      "value": 1800,
+      "probe": {
+        "pattern": "<item id=\"3559\"[\\s\\S]{0,400}?<attribute key=\"weight\" value=\"(\\d+)\"/>",
+        "captured": "1800"
+      }
+    },
+    {
+      "id": "item.leatherBoots.weight",
+      "file": "data/items/items.xml",
+      "symbol": "item id=\"3552\" → attribute weight",
+      "observed": "The leather boots weigh 9.00 oz.",
+      "decision": "Keep",
+      "fixture": "item.leather-boots.weight",
+      "value": 900,
+      "probe": {
+        "pattern": "<item id=\"3552\"[\\s\\S]{0,400}?<attribute key=\"weight\" value=\"(\\d+)\"/>",
+        "captured": "900"
+      }
+    },
+    {
+      "id": "item.stackable.flagSource",
+      "file": "src/items/items.cpp",
+      "symbol": "Items::loadFromProtobuf",
+      "observed": "Stackability is NOT in items.xml. It comes from the client appearance protobuf flag `cumulative`, which is why this record carries appearance probes.",
+      "decision": "Keep",
+      "fixture": "the appearance.* rows below",
+      "value": "flags().cumulative()",
+      "probe": {
+        "pattern": "iType\\.stackable = object\\.flags\\(\\)\\.(cumulative)\\(\\);",
+        "captured": "cumulative"
+      }
+    },
+    {
+      "id": "item.stack.defaultSize",
+      "file": "src/items/items.hpp",
+      "symbol": "ItemType::stackSize default",
+      "observed": "The engine’s DEFAULT stack size is 100, and no item in data/items/items.xml overrides it.",
+      "decision": "Adapt",
+      "fixture": "item.stack.maxStack — Global Idle uses 255",
+      "value": 100,
+      "probe": {
+        "pattern": "uint8_t stackSize = (\\d+);",
+        "captured": "100"
+      },
+      "reason": "The Product Owner locked maxStack 255 for an ordinary stackable. 255 is not invented: it is the ceiling this engine’s own parser enforces (item.stack.ceiling), so the override stays inside the source’s range. Recorded here so the divergence is visible rather than assumed."
+    },
+    {
+      "id": "item.stack.ceiling",
+      "file": "src/items/functions/item/item_parse.cpp",
+      "symbol": "ItemParse::parseStackSize",
+      "observed": "The engine clamps any authored stack size to 255 and says so: \"Stack size must be between 1 and 255.\"",
+      "decision": "Keep",
+      "fixture": "item.stack.maxStack = 255",
+      "value": 255,
+      "probe": {
+        "pattern": "if \\(stackSize > 255\\) \\{\\s*\\n\\s*stackSize = (255);",
+        "captured": "255"
+      }
+    },
+    {
+      "id": "item.weight.stackable",
+      "file": "src/items/item.cpp",
+      "symbol": "Item::getWeight",
+      "observed": "A stackable item weighs its base weight TIMES its count; a non-stackable weighs its base weight once.",
+      "decision": "Keep",
+      "fixture": "capacity.carriedWeight",
+      "value": "baseWeight * count",
+      "probe": {
+        "pattern": "if \\(isStackable\\(\\)\\) \\{\\s*\\n\\s*return baseWeight \\* std::max<uint32_t>\\((\\d+), getItemCount\\(\\)\\);",
+        "captured": "1"
+      }
+    },
+    {
+      "id": "capacity.gainCap.none",
+      "file": "data/XML/vocations.xml",
+      "symbol": "vocation id=\"0\" name=\"None\" → gaincap",
+      "observed": "A vocation-less Character gains 10 oz of Capacity per level.",
+      "decision": "Keep",
+      "fixture": "capacity.perLevelOz",
+      "value": 10,
+      "probe": {
+        "pattern": "<vocation id=\"0\"[^>]*gaincap=\"(\\d+)\"",
+        "captured": "10"
+      }
+    },
+    {
+      "id": "capacity.storageUnit",
+      "file": "src/io/functions/iologindata_load_player.cpp",
+      "symbol": "players.cap -> Player::capacity",
+      "observed": "Capacity is stored in whole ounces and used in HUNDREDTHS, the same unit item weights are authored in.",
+      "decision": "Keep",
+      "fixture": "capacity.unit",
+      "value": 100,
+      "probe": {
+        "pattern": "player->capacity = result->getNumber<uint32_t>\\(\"cap\"\\) \\* (\\d+);",
+        "captured": "100"
+      }
+    },
+    {
+      "id": "capacity.level1.none",
+      "file": "schema.sql",
+      "symbol": "players sample 'Rook Sample' → level, vocation, cap",
+      "observed": "The sample Rookgaard character is level 2, vocation 0, cap 410. One gaincap of 10 below it puts a LEVEL 1 vocation-less Character at 400 oz — which is also the engine’s member default of 40000 hundredths.",
+      "decision": "Keep",
+      "fixture": "capacity.baseOz = 400",
+      "value": 400,
+      "probe": {
+        "pattern": "\\(1, 'Rook Sample', 1, 1, (2), 0,[\\s\\S]{0,200}?'', (410),",
+        "captured": ["2", "410"]
+      }
+    },
+    {
+      "id": "capacity.memberDefault",
+      "file": "src/creatures/players/player.hpp",
+      "symbol": "Player::capacity default",
+      "observed": "The engine’s in-memory default Capacity is 40000 hundredths = 400.00 oz, which agrees with the level-1 arithmetic above.",
+      "decision": "Keep",
+      "fixture": "capacity.baseOz = 400",
+      "value": 40000,
+      "probe": {
+        "pattern": "uint32_t capacity = (\\d+);",
+        "captured": "40000"
+      }
+    },
+    {
+      "id": "slots.enum",
+      "file": "src/creatures/creatures_definitions.hpp",
+      "symbol": "Slots_t",
+      "observed": "The equipment slot vocabulary: HEAD 1, NECKLACE 2, BACKPACK 3, ARMOR 4, RIGHT 5, LEFT 6, LEGS 7, FEET 8, RING 9, AMMO 10.",
+      "decision": "Simplify",
+      "fixture": "equipment.slots",
+      "value": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+      "probe": {
+        "pattern": "CONST_SLOT_HEAD = (\\d+),\\s*\\n\\s*CONST_SLOT_NECKLACE = (\\d+),\\s*\\n\\s*CONST_SLOT_BACKPACK = (\\d+),\\s*\\n\\s*CONST_SLOT_ARMOR = (\\d+),\\s*\\n\\s*CONST_SLOT_RIGHT = (\\d+),\\s*\\n\\s*CONST_SLOT_LEFT = (\\d+),\\s*\\n\\s*CONST_SLOT_LEGS = (\\d+),\\s*\\n\\s*CONST_SLOT_FEET = (\\d+),\\s*\\n\\s*CONST_SLOT_RING = (\\d+),\\s*\\n\\s*CONST_SLOT_AMMO = (\\d+),",
+        "captured": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]
+      },
+      "reason": "Phase 3 implements HEAD, ARMOR, LEGS, FEET, LEFT (weapon hand) and BACKPACK — the slots the tutorial actually uses. The rest are imported as vocabulary so a later amulet or ring needs no schema change. STORE_INBOX has no Global Idle meaning and is not imported."
+    },
+    {
+      "id": "lootPouch.containerSize",
+      "file": "data/items/items.xml",
+      "symbol": "item id=\"23721\" (gold pouch) → attribute containersize",
+      "observed": "The source’s loot pouch is a 20-space container.",
+      "decision": "Adapt",
+      "fixture": "lootPouch.spaces = 20 (INITIAL/TUNABLE)",
+      "value": 20,
+      "probe": {
+        "pattern": "<item id=\"23721\"[\\s\\S]{0,400}?<attribute key=\"containersize\" value=\"(\\d+)\"/>",
+        "captured": "20"
+      },
+      "reason": "Global Idle takes the SHAPE, not the name: the name \"Gold Pouch\" is already the currency custody scope (ADR-019), so the physical one is the Loot Pouch. It is a per-Character custody rather than an item, and 20 is config-driven because the brief leaves the long-term count open."
+    },
+    {
+      "id": "lootPouch.maxLimit",
+      "file": "config.lua.dist",
+      "symbol": "lootPouchMaxLimit",
+      "observed": "The engine carries a server-configurable ceiling of 2000 on the loot pouch.",
+      "decision": "Simplify",
+      "fixture": "recorded; the Phase 3 limit is the 20 spaces",
+      "value": 2000,
+      "probe": {
+        "pattern": "lootPouchMaxLimit = (\\d+)",
+        "captured": "2000"
+      },
+      "reason": "Phase 3’s Loot Pouch is bounded by its spaces, which is the binding constraint at 20 spaces x 255 per stack. The 2000 is recorded so a later phase does not rediscover it."
+    },
+    {
+      "id": "lootPouch.isContainer",
+      "file": "src/creatures/players/player.cpp",
+      "symbol": "Player::getLootPouch",
+      "observed": "The source resolves the loot pouch by looking for ITEM_GOLD_POUCH in the inventory, i.e. it is an ordinary container item.",
+      "decision": "Adapt",
+      "fixture": "lootPouch is a CUSTODY, not an item",
+      "value": "ITEM_GOLD_POUCH",
+      "probe": {
+        "pattern": "const auto &inventoryItems = getInventoryItemsFromId\\((ITEM_GOLD_POUCH)\\);",
+        "captured": "ITEM_GOLD_POUCH"
+      },
+      "reason": "Global Idle’s Loot Pouch cannot be moved, equipped, dropped or manually filled, so modelling it as an item in a slot would create five illegal states the server would then have to forbid. It is a custody instead."
+    },
+    {
+      "id": "npc.lily.smallHealthPotion.buy",
+      "file": "data-otservbr-global/npc/lily.lua",
+      "symbol": "npcConfig.shop → small health potion",
+      "observed": "Rookgaard’s potion brewer sells a small health potion for 20 gold.",
+      "decision": "Keep",
+      "fixture": "service.rookgaard.buy.small-health-potion",
+      "value": 20,
+      "probe": {
+        "pattern": "\\{ itemName = \"small health potion\", clientId = 7876, buy = (\\d+) \\}",
+        "captured": "20"
+      }
+    },
+    {
+      "id": "npc.alDee.backpack.buy",
+      "file": "data-otservbr-global/npc/al_dee.lua",
+      "symbol": "npcConfig.shop → backpack",
+      "observed": "Al Dee's general shop sells a backpack (clientId 2854) for 10 gold. Dixi's own line — \"Ask {Al Dee} or {Lee'Delle} for it!\" — is the source naming these two as the backpack vendors.",
+      "decision": "Keep",
+      "fixture": "service.rookgaard.buy.backpack",
+      "value": 10,
+      "probe": {
+        "pattern": "\\{ itemName = \"backpack\", clientId = 2854, buy = (\\d+) \\}",
+        "captured": "10"
+      }
+    },
+    {
+      "id": "npc.leeDelle.backpack.buy",
+      "file": "data-otservbr-global/npc/lee_delle.lua",
+      "symbol": "npcConfig.shop → backpack",
+      "observed": "Lee'Delle sells the same backpack for 9 gold. Recorded so the choice of 10 is visible as a choice: the dearer of the two source prices is the conservative Gold sink.",
+      "decision": "Simplify",
+      "fixture": "service.rookgaard.buy.backpack",
+      "value": 9,
+      "probe": {
+        "pattern": "\\{ itemName = \"backpack\", clientId = 2854, buy = (\\d+) \\}",
+        "captured": "9"
+      }
+    },
+    {
+      "id": "npc.willie.cheese.sell",
+      "file": "data-otservbr-global/npc/willie.lua",
+      "symbol": "npcConfig.shop → cheese",
+      "observed": "The food shop pays 2 gold for a cheese.",
+      "decision": "Keep",
+      "fixture": "service.rookgaard.sell.cheese",
+      "value": 2,
+      "probe": {
+        "pattern": "\\{ itemName = \"cheese\", clientId = 3607, sell = (\\d+), count = \\d+ \\}",
+        "captured": "2"
+      }
+    },
+    {
+      "id": "npc.buy.direction",
+      "file": "src/creatures/npcs/npc.cpp",
+      "symbol": "Npc::onPlayerBuyItem",
+      "observed": "A shop entry’s `buy` is itemBuyPrice and is CHARGED TO the player: totalCost = buyPrice * amount.",
+      "decision": "Keep",
+      "fixture": "service.buy charges the player",
+      "value": "buyPrice * amount",
+      "probe": {
+        "pattern": "const uint64_t totalCost = static_cast<uint64_t>\\((buyPrice)\\) \\* amount;",
+        "captured": "buyPrice"
+      }
+    },
+    {
+      "id": "npc.sell.direction",
+      "file": "src/creatures/npcs/npc.cpp",
+      "symbol": "Npc::onPlayerSellItem",
+      "observed": "A shop entry’s `sell` is sellPrice and is PAID TO the player: totalCost = sellPrice * soldAmount.",
+      "decision": "Keep",
+      "fixture": "service.sell pays the player",
+      "value": "sellPrice * soldAmount",
+      "probe": {
+        "pattern": "totalCost = static_cast<uint64_t>\\((sellPrice)\\) \\* soldAmount;",
+        "captured": "sellPrice"
+      }
+    },
+    {
+      "id": "appearance.cheese.cumulative",
+      "file": "data/items/appearances.dat",
+      "symbol": "Appearances.object[id=3607] (cheese) -> AppearanceFlags.cumulative",
+      "observed": "cheese is cumulative, which is what Items::loadFromProtobuf reads into ItemType::stackable.",
+      "decision": "Keep",
+      "fixture": "item.cheese.stackable",
+      "value": true,
+      "probe": {
+        "kind": "appearance",
+        "appearanceId": 3607,
+        "flag": "cumulative",
+        "captured": "true"
+      }
+    },
+    {
+      "id": "appearance.smallHealthPotion.cumulative",
+      "file": "data/items/appearances.dat",
+      "symbol": "Appearances.object[id=7876] (small health potion) -> AppearanceFlags.cumulative",
+      "observed": "small health potion is cumulative, which is what Items::loadFromProtobuf reads into ItemType::stackable.",
+      "decision": "Keep",
+      "fixture": "item.small-health-potion.stackable",
+      "value": true,
+      "probe": {
+        "kind": "appearance",
+        "appearanceId": 7876,
+        "flag": "cumulative",
+        "captured": "true"
+      }
+    },
+    {
+      "id": "appearance.goldCoin.cumulative",
+      "file": "data/items/appearances.dat",
+      "symbol": "Appearances.object[id=3031] (gold coin) -> AppearanceFlags.cumulative",
+      "observed": "gold coin is cumulative, which is what Items::loadFromProtobuf reads into ItemType::stackable.",
+      "decision": "Adapt",
+      "fixture": "not materialised — Gold is a currency custody scope (ADR-019)",
+      "value": true,
+      "probe": {
+        "kind": "appearance",
+        "appearanceId": 3031,
+        "flag": "cumulative",
+        "captured": "true"
+      },
+      "reason": "Phase 2 decided Gold is a ledger scope and Phase 3 does not reopen it. The flag is recorded so the decision stays visible: the source DOES stack gold coins, and Global Idle deliberately does not have them."
+    },
+    {
+      "id": "appearance.dagger.cumulative",
+      "file": "data/items/appearances.dat",
+      "symbol": "Appearances.object[id=3267] (dagger) -> AppearanceFlags.cumulative",
+      "observed": "dagger is NOT cumulative, which is what Items::loadFromProtobuf reads into ItemType::stackable.",
+      "decision": "Keep",
+      "fixture": "item.dagger.stackable = false",
+      "value": false,
+      "probe": {
+        "kind": "appearance",
+        "appearanceId": 3267,
+        "flag": "cumulative",
+        "captured": "false"
+      }
+    },
+    {
+      "id": "appearance.backpack.cumulative",
+      "file": "data/items/appearances.dat",
+      "symbol": "Appearances.object[id=2854] (backpack) -> AppearanceFlags.cumulative",
+      "observed": "backpack is NOT cumulative, which is what Items::loadFromProtobuf reads into ItemType::stackable.",
+      "decision": "Keep",
+      "fixture": "item.backpack.stackable = false",
+      "value": false,
+      "probe": {
+        "kind": "appearance",
+        "appearanceId": 2854,
+        "flag": "cumulative",
+        "captured": "false"
+      }
+    },
+    {
+      "id": "appearance.leatherHelmet.cumulative",
+      "file": "data/items/appearances.dat",
+      "symbol": "Appearances.object[id=3355] (leather helmet) -> AppearanceFlags.cumulative",
+      "observed": "leather helmet is NOT cumulative, which is what Items::loadFromProtobuf reads into ItemType::stackable.",
+      "decision": "Keep",
+      "fixture": "item.leather-helmet.stackable = false",
+      "value": false,
+      "probe": {
+        "kind": "appearance",
+        "appearanceId": 3355,
+        "flag": "cumulative",
+        "captured": "false"
+      }
     }
   ]
 }

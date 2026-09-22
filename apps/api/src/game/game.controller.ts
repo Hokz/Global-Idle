@@ -220,12 +220,18 @@ export class GameController {
     // server-owned; a request that tries to set them is ignored by shape, not
     // trusted and overwritten (§19).
     try {
+      // Phase 3 — a new Character arrives WEARING things. The grant is resolved
+      // from the CURRENT bundle, so what it hands out is content and changing
+      // it is a publish rather than a deploy.
+      const bundle = await this.resolver.current();
+      const grantKey = 'starting-grant.origin.rookgaard';
       const id = await withTransaction(this.prisma, (tx) =>
         characterContext.createCharacter(tx, {
           accountId: toAccountId(accountId),
           vocation: null,
           name,
           baseLevel: 1,
+          ...(bundle.definitions.has(grantKey) ? { grant: { bundle, key: grantKey } } : {}),
           at: new Date(),
         }),
       );

@@ -247,11 +247,25 @@ test.describe('§12 GW — the Game Window', () => {
     await page.keyboard.press('Space');
     await expect(page.getByTestId('game-window')).toBeVisible();
 
-    // Nor any Phase 3 itemization: no inventory, no equipment, no loot, no
-    // rarity. Phase 2 creates none of them and no shadow version of any.
+    // This guard MOVES FORWARD with the code rather than being deleted. It
+    // named Phase 3's itemization while Phase 3 had not happened; Phase 3 has
+    // happened, and the Game Window now legitimately shows a Loot Pouch. So it
+    // refuses the NEXT phases' vocabulary instead: Phase 4's party and
+    // vocation progression, and Phase 7's Forge and Bestiary. What the case
+    // asserts is unchanged — the Hunt surface does not ship a later phase.
     const text = (await page.getByTestId('game-window').innerText()).toLowerCase();
-    for (const forbidden of ['inventory', 'equip', 'loot', 'rarity', 'backpack', 'slot']) {
-      expect(text, `Phase 3 vocabulary leaked: ${forbidden}`).not.toContain(forbidden);
+    for (const forbidden of [
+      'party',
+      'shared xp',
+      'promotion',
+      'skill tree',
+      'forge',
+      'imbuement',
+      'bestiary',
+      'charm',
+      'auto-sell',
+    ]) {
+      expect(text, `a later phase's vocabulary leaked: ${forbidden}`).not.toContain(forbidden);
     }
 
     const prisma = connect();

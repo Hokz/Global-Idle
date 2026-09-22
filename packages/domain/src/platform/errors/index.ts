@@ -17,7 +17,15 @@ export type DomainErrorCode =
   | 'OriginCharacterExists'
   | 'CharacterNameTaken'
   | 'ContentKindMismatch'
-  | 'HuntNotFound';
+  | 'HuntNotFound'
+  // ── Phase 3 — physical items ────────────────────────────────────────────
+  | 'ItemNotFound'
+  | 'ItemDefinitionUnknown'
+  | 'IllegalItemMove'
+  | 'NoRoomForItem'
+  | 'OverCapacity'
+  | 'ContainerSlotLocked'
+  | 'ServiceUnavailableHere';
 
 export class DomainError extends Error {
   constructor(
@@ -98,6 +106,42 @@ export const characterNameTaken = (details: Record<string, unknown> = {}) =>
  *  required. Shape is a database CHECK; kind lives in a bundle (§9.5). */
 export const contentKindMismatch = (details: Record<string, unknown> = {}) =>
   new DomainError('ContentKindMismatch', 'That content key is not a hunt.', details);
+
+/** The instance does not exist, or does not belong to this Account. Both are
+ *  the same answer on purpose: a caller must not learn that someone else's
+ *  item id is real. */
+export const itemNotFound = (details: Record<string, unknown> = {}) =>
+  new DomainError('ItemNotFound', 'No such item.', details);
+
+export const itemDefinitionUnknown = (details: Record<string, unknown> = {}) =>
+  new DomainError(
+    'ItemDefinitionUnknown',
+    'The content bundle carries no item definition under that key.',
+    details,
+  );
+
+/** The move is not legal: a wrong slot, a forbidden destination, a manual
+ *  inbound to the Loot Pouch, a nested container, a non-stashable definition. */
+export const illegalItemMove = (details: Record<string, unknown> = {}) =>
+  new DomainError('IllegalItemMove', 'That is not a legal place for that item.', details);
+
+export const noRoomForItem = (details: Record<string, unknown> = {}) =>
+  new DomainError('NoRoomForItem', 'There is no space for that item.', details);
+
+export const overCapacity = (details: Record<string, unknown> = {}) =>
+  new DomainError('OverCapacity', 'That would exceed the Character\u2019s Capacity.', details);
+
+export const containerSlotLocked = (details: Record<string, unknown> = {}) =>
+  new DomainError('ContainerSlotLocked', 'That Hunt Container Slot is not unlocked.', details);
+
+/** Depot, Stash, Bank movement and every counter are unreachable while the
+ *  Character is in an active Hunt. This is the whole no-remote-supplies rule. */
+export const serviceUnavailableHere = (details: Record<string, unknown> = {}) =>
+  new DomainError(
+    'ServiceUnavailableHere',
+    'That is not available while the Character is in a Hunt.',
+    details,
+  );
 
 export const huntNotFound = (details: Record<string, unknown> = {}) =>
   new DomainError('HuntNotFound', 'No such hunt in the pinned content bundle.', details);

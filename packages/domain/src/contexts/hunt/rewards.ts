@@ -40,6 +40,15 @@ export interface RewardSettlement {
   readonly activatedAtTick: number | null;
   /** Rewards dropped because Stamina was exactly zero (§2.3). */
   readonly rewardsDropped: number;
+  /**
+   * The ticks whose kill was actually REWARDED.
+   *
+   * Phase 3 needs this per kill rather than as a single flag, because physical
+   * loot obeys exactly the same gate as XP and Gold: at zero Stamina a kill
+   * yields nothing at all, and combat continues. A span that crossed zero part
+   * way through must credit the loot of the kills before it and none after.
+   */
+  readonly rewardedTicks: readonly number[];
 }
 
 /**
@@ -72,6 +81,7 @@ export function settleRewards(input: RewardSettlementInput): RewardSettlement {
     consumed += taken;
   };
 
+  const rewardedTicks: number[] = [];
   const ordered = [...input.rewards].sort((a, b) => a.tick - b.tick);
   for (const reward of ordered) {
     // Consumption covers the ticks STRICTLY AFTER activation: the tick that
@@ -91,6 +101,7 @@ export function settleRewards(input: RewardSettlementInput): RewardSettlement {
     // Floor, so a multiplier can never invent a fraction of a point.
     experience += BigInt(Math.floor(reward.experience * multiplier));
     gold += BigInt(reward.gold);
+    rewardedTicks.push(reward.tick);
 
     if (!activated) {
       activated = true;
@@ -107,5 +118,6 @@ export function settleRewards(input: RewardSettlementInput): RewardSettlement {
     staminaConsumed: durationMs(consumed),
     activatedAtTick,
     rewardsDropped,
+    rewardedTicks,
   };
 }
