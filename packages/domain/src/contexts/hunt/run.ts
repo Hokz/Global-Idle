@@ -33,7 +33,11 @@ import {
 import type { ContentBundleResolver } from '@global-idle/game-data';
 import { claimSettlement, settlementOperationId } from '../../platform/idempotency/index.js';
 import { recordDomainEvent } from '../../platform/observability/index.js';
-import type { UnitOfWork } from '../../platform/transaction/index.js';
+import {
+  lockCharactersInOrder,
+  lockHuntRun,
+  type UnitOfWork,
+} from '../../platform/transaction/index.js';
 import { endActivity, occupancyFor, pauseForGrace, resumeFromGrace } from '../activity/index.js';
 import { settleStamina } from '../character/index.js';
 import { pouchOf, post, readBalance } from '../economy/index.js';
@@ -180,6 +184,27 @@ export async function advance(
     readonly activeUseTimerIds?: readonly string[];
   },
 ): Promise<HuntRunView | null> {
+  // LOCK BEFORE READING, in §8.5's order: Character, then the Activity's run.
+  //
+  // Not a formality. Without it a Leave can commit between this read and the
+  // checkpoint write, and the settlement goes on to simulate, award and
+  // possibly KILL inside a run that is already over — a checkpoint applied
+  // past the ending, and a death the ending has no way to charge for. Holding
+  // the row for the whole settlement makes the terminal transition a race
+  // nobody can tie: whichever transaction takes this lock first decides how
+  // the run ended, and the other one sees that decision instead of making a
+  // second one.
+  //
+  // The first read is for the Character id alone, which is immutable, so it
+  // does not need the lock it is about to take.
+  const identity = await tx.huntRun.findUnique({
+    where: { activityId: input.activityId },
+    select: { characterId: true },
+  });
+  if (!identity) return null;
+  await lockCharactersInOrder(tx, [identity.characterId]);
+  await lockHuntRun(tx, String(input.activityId));
+
   const run = await tx.huntRun.findUnique({ where: { activityId: input.activityId } });
   if (!run) return null;
 
@@ -645,9 +670,27 @@ export async function endRunOrActivity(
 /**
  * End a run and the Activity with it, releasing the occupancy claim.
  *
- * ONCE ONLY, and the run row is what makes it so: a run that already carries
- * an `endedReason` returns immediately, so a death cannot be settled twice
- * however many times this is reached.
+ * ONCE ONLY, and it is the ROW LOCK that makes it so rather than the read.
+ *
+ * Testing `endedReason` on an unlocked read is only safe against SEQUENTIAL
+ * retries: two concurrent callers both see `null`, both settle, and a death
+ * burns the experience and the Gold Pouch twice. Under ReadCommitted that is
+ * not a theoretical interleaving — it is the default one. So the run row is
+ * locked and tested in one statement, and everything after that point runs
+ * with the ending held.
+ *
+ * WHICH ENDING WINS is therefore decided by the lock: the first transaction to
+ * take it writes the run's only `endedReason`, and a later caller — a Leave
+ * that raced a death, a sweep that raced a Leave — returns here having applied
+ * nothing. That is the whole precedence rule, and it needs no ranking of
+ * reasons because a death is only ever DETERMINED inside this lock: a Leave
+ * that wins the race stops the simulation that would have produced one, so
+ * there is no death left unpaid, and a death that wins leaves the Leave
+ * nothing to do.
+ *
+ * The Character is locked first, per §8.5. A caller that already holds both
+ * rows — `advance`, which takes them before it simulates — re-acquires them
+ * without waiting.
  */
 export async function endRun(
   tx: UnitOfWork,
@@ -655,8 +698,17 @@ export async function endRun(
   reason: HuntEndReason,
   at: Instant,
 ): Promise<DeathPenalty | null> {
-  const run = await tx.huntRun.findUnique({ where: { activityId } });
-  if (!run || run.endedReason !== null) return null;
+  const identity = await tx.huntRun.findUnique({
+    where: { activityId },
+    select: { characterId: true },
+  });
+  if (!identity) return null;
+  await lockCharactersInOrder(tx, [identity.characterId]);
+
+  const held = await lockHuntRun(tx, String(activityId));
+  if (!held.present || held.endedReason !== null) return null;
+
+  const run = await tx.huntRun.findUniqueOrThrow({ where: { activityId } });
 
   // DEATH IS THE ONLY ENDING THAT COSTS ANYTHING. Leaving and losing a
   // connection are not punished: §8 already ends the run, and inventing a
