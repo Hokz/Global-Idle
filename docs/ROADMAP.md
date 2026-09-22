@@ -60,7 +60,7 @@ Deliverables:
 
 No full gameplay yet.
 
-## Phase 1 — Character + World Map — current phase
+## Phase 1 — Character + World Map — `IMPLEMENTATION_SPEC_READY`
 
 **Specification:**
 [`docs/specs/phase-1/PHASE_1_WORLD_CHARACTER_VERTICAL_SLICE_SPEC.md`](specs/phase-1/PHASE_1_WORLD_CHARACTER_VERTICAL_SLICE_SPEC.md)
@@ -79,16 +79,32 @@ No full gameplay yet.
 - hunt marker;
 - activity selection.
 
-## Phase 2 — Hunt Simulation
+## Phase 2 — Hunt Simulation — `VERIFIED`
+
+**Specification:**
+[`docs/specs/phase-2/PHASE_2_HUNT_SIMULATOR_SPEC.md`](specs/phase-2/PHASE_2_HUNT_SIMULATOR_SPEC.md)
+— **`VERIFIED`**. Implemented, independently reviewed, and accepted by the Product Owner on
+2026-09-22 at head `03058b5`. Evidence:
+[`PHASE_2_IMPLEMENTATION_NOTES.md`](specs/phase-2/PHASE_2_IMPLEMENTATION_NOTES.md) and
+[`PHASE_2_CANARY_SOURCE_MAP.md`](specs/phase-2/PHASE_2_CANARY_SOURCE_MAP.md) — 106/106 contractual
+matrix, 299 tests across 33 files, 36 Playwright cases on desktop and touch, 17 migration
+assertions, CI run #29 green on all three jobs, and `pnpm dev` verified end to end. No Phase 2
+blockers remain.
+
+The functional evidence includes an INSTRUMENTED browser walkthrough — a script drove a real
+browser and recorded the console, page errors and every response status. A human aesthetic review
+of the layout is not claimed and was not part of this acceptance.
 
 - room system;
 - rooms 1-10;
 - room-10 infinite loop;
 - monster encounters;
 - supplies;
-- death;
+- death — and what it COSTS: Base XP by Canary's own formula, and the whole Gold Pouch without
+  Full Bless;
 - XP;
-- gold;
+- gold, into a **Gold Pouch** that is carried and at risk — the Bank is a different, safe number
+  ([ADR-019](architecture/decisions/ADR-019-currency-custody-scopes.md));
 - server-side activity state, persisted across reloads and the grace period;
 - connection/session lifecycle;
 - background/minimized online continuity;
@@ -115,7 +131,7 @@ At least one timer path should exercise the reusable `ActiveUseTimer` foundation
 Mandatory tests: cases 1–28 in
 [`docs/architecture/ACTIVITY_OCCUPANCY_AND_TIMERS.md`](architecture/ACTIVITY_OCCUPANCY_AND_TIMERS.md) §7.
 
-## Phase 3 — Loot + Itemization
+## Phase 3 — Loot + Itemization + Inventory/Logistics — current phase
 
 - loot tables;
 - BaseItem;
@@ -124,9 +140,27 @@ Mandatory tests: cases 1–28 in
 - affix generation;
 - inventory;
 - equipment;
-- sell loop.
+- weight, stacking and `maxStack`;
+- the five Character Hunt container slots, and their Gold unlocks;
+- container space;
+- Loot Pouch, and the physical Loot-Pouch death loss;
+- Loot Filter;
+- Depot;
+- Stash;
+- item movement, desktop and touch;
+- Manage Containers routing;
+- sell loop;
+- basic NPC purchase and refill.
+
+Recorded in full: [`design/INVENTORY_AND_LOGISTICS_FOUNDATION.md`](design/INVENTORY_AND_LOGISTICS_FOUNDATION.md).
 
 ## Phase 4 — Skills + Party + Vocations
+
+- real Skills representation, and **durable Skill death loss** (deferred from Phase 2 on purpose:
+  inventing a Skill so that death could delete it would have been a shadow system);
+- vocation Capacity from the baseline;
+- aggregated Party logistics;
+- Promotion acquisition, if this is the natural owning slice.
 
 - final skill progression model;
 - character roster with unique vocations;
@@ -147,6 +181,10 @@ Mandatory tests: cases 1–28 in
 
 ## Phase 5 — Quest/Dungeon/Boss Framework
 
+- the Requirement / Cost / Reward primitive, built when the first content slice actually needs it;
+- Reward Chest — persistent, and SAFE from Hunt death;
+- blessing acquisition and reacquisition, if this is the natural owning slice;
+- travel and access foundations;
 - generic dungeon rooms;
 - basic puzzles;
 - unlock framework;
@@ -155,7 +193,22 @@ Mandatory tests: cases 1–28 in
 - daily limit;
 - boss rotation.
 
+## Phase 5B — Multiplayer Activities
+
+- cross-account Expeditions and Warzones;
+- PvP Arena, matchmaking, rating and ranking.
+
+Recorded in full: [`design/MULTIPLAYER_ACTIVITIES_FOUNDATION.md`](design/MULTIPLAYER_ACTIVITIES_FOUNDATION.md).
+Nothing here is built early; the only architectural obligation is not to make Team A vs Team B
+impossible.
+
 ## Phase 6 — Economy
+
+- full Bank services and history;
+- player-to-player transfer;
+- Market, escrow, fees and price history.
+
+Recorded in full: [`design/ECONOMY_CUSTODY_AND_REWARD_DESTINATIONS.md`](design/ECONOMY_CUSTODY_AND_REWARD_DESTINATIONS.md).
 
 - gold sinks;
 - market;
@@ -180,7 +233,20 @@ Mandatory tests: cases 1–28 in
 - gems;
 - vocation Skill Tree.
 
+### Phase 7A — Advanced Progression
+
+- **Bestiary and Charms** — kill counters, Bestiary entries, Charm Points, Charm Runes, and the
+  multi-stage Charm progression. Owned HERE, not by Phase 9: it is a progression system with its
+  own counters and unlocks, and the content that feeds it is a consumer rather than its owner;
+- outfits and achievements.
+
+Recorded in full: [`design/FUTURE_DIRECTIONS.md`](design/FUTURE_DIRECTIONS.md) §3.
+
 ## Phase 8 — Premium
+
+- Auto-Sell, with item / category / rarity / default rules and protected-state overrides;
+- advanced loot management;
+- approved remote services.
 
 - Premium purchase, renewal and expiry;
 - entitlement transitions, segmenting any unsettled interval at the transition;
@@ -196,6 +262,9 @@ Mandatory tests: cases 1–28 in
 
 ## Phase 9 — Content Expansion
 
+- **world and regional progression rollout** — regional objectives and tasks, progression points,
+  and the region-by-region gating they unlock. Owned HERE because it is the ROLLOUT of content
+  across regions; the requirement/cost/reward primitive it leans on is Phase 5's;
 - more regions;
 - more hunts;
 - more items;
@@ -203,6 +272,8 @@ Mandatory tests: cases 1–28 in
 - more bosses;
 - more puzzles;
 - endgame.
+
+Recorded in full: [`design/FUTURE_DIRECTIONS.md`](design/FUTURE_DIRECTIONS.md) §1.
 
 ## Phase 10 — Scale / Hardening
 

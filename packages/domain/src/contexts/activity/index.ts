@@ -24,13 +24,25 @@ export {
   acquire,
   isSessionBoundLive,
   isSkillTrainingLive,
+  occupancyFor,
   reconcileStranded,
   release,
   reserveForGrace,
 } from './occupancy.js';
-export type { ReleasedClaim, SessionBoundState, SkillTrainingStatus } from './occupancy.js';
+export type {
+  CharacterOccupancy,
+  ReleasedClaim,
+  SessionBoundState,
+  SkillTrainingStatus,
+} from './occupancy.js';
 
-export { endActivity, pauseForGrace, startSessionBound, startSkillTraining } from './lifecycle.js';
+export {
+  endActivity,
+  pauseForGrace,
+  resumeFromGrace,
+  startSessionBound,
+  startSkillTraining,
+} from './lifecycle.js';
 export type {
   EndResult,
   SkillTrainingTerminal,

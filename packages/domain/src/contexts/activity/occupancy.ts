@@ -7,10 +7,12 @@
  * claims, so the sweeper reads the trainee through the participant row rather
  * than from a column that could have drifted.
  */
-import type { CharacterId, Instant } from '@global-idle/shared';
+import type { ActivityTypeKey, CharacterId, Instant } from '@global-idle/shared';
 import { isOccupancyUniqueViolation, occupancyConflict } from '../../platform/errors/index.js';
 import { metrics, recordDomainEvent } from '../../platform/observability/index.js';
 import { lockCharactersInOrder, type UnitOfWork } from '../../platform/transaction/index.js';
+import { describe } from './types/registry.js';
+import type { StaminaClassification } from './types/registry.js';
 
 export interface ReleasedClaim {
   readonly characterId: string;
@@ -217,4 +219,54 @@ export async function reconcileStranded(tx: UnitOfWork): Promise<ReleasedClaim[]
   }
 
   return actual;
+}
+
+/**
+ * What a Character's claim classifies it as, for Stamina (§7.4).
+ *
+ * The activity context answers this because it owns every table the answer
+ * comes from. `deriveStaminaMode` then turns it into a mode; nothing else is
+ * allowed to decide one, and nothing outside this context should be joining
+ * OccupancyClaim to Activity to find out.
+ *
+ * `null` means the Character holds no claim at all, which derives as
+ * RECOVERING — a Character doing nothing is resting.
+ */
+export interface CharacterOccupancy {
+  readonly activityId: string;
+  readonly stamina: StaminaClassification;
+  readonly sessionState: SessionBoundState | null;
+  readonly staminaActivatedAt: Instant | null;
+}
+
+export async function occupancyFor(
+  tx: UnitOfWork,
+  characterId: string,
+): Promise<CharacterOccupancy | null> {
+  const claim = await tx.occupancyClaim.findUnique({
+    where: { characterId },
+    select: { activityId: true, participant: { select: { staminaActivatedAt: true } } },
+  });
+  if (!claim) return null;
+
+  const activity = await tx.activity.findUniqueOrThrow({
+    where: { id: claim.activityId },
+    select: { activityTypeKey: true, sessionBound: { select: { state: true } } },
+  });
+
+  // OCCUPANCY IS NOT CONSUMPTION. Skill Training occupies the Character AND is
+  // recovery-eligible; the registry is what says which, never the call site.
+  const descriptor = describe(activity.activityTypeKey as ActivityTypeKey);
+  if (!descriptor) {
+    // The registry and the database disagree, which reconciliation refuses at
+    // boot (test T16). Reaching it at runtime is a broken deploy, not a state
+    // to guess a Stamina classification for.
+    throw new Error(`No activity type is registered under ${activity.activityTypeKey}.`);
+  }
+  return {
+    activityId: claim.activityId,
+    stamina: descriptor.stamina,
+    sessionState: (activity.sessionBound?.state as SessionBoundState | undefined) ?? null,
+    staminaActivatedAt: claim.participant?.staminaActivatedAt ?? null,
+  };
 }

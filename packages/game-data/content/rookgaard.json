@@ -82,15 +82,167 @@
       "backdropAssetId": "atlas.region.locked"
     },
     {
+      "key": "creature.rat",
+      "kind": "creature",
+      "references": [],
+      "label": "Rat",
+      "maxHealth": 20,
+      "experience": 5,
+      "attack": {
+        "intervalMs": 2000,
+        "maxDamage": 8
+      },
+      "defense": 5,
+      "armor": 1,
+      "mitigation": 0.07,
+      "speed": 67,
+      "gold": {
+        "chance": 1,
+        "min": 1,
+        "max": 4
+      },
+      "elements": {
+        "earth": 20,
+        "ice": -10,
+        "holy": 20,
+        "death": -10
+      },
+      "immunities": ["paralyze", "outfit", "invisible", "bleed"],
+      "sourceRef": "Hokz/canary@f6b81a8 data-otservbr-global/monster/mammals/rat.lua"
+    },
+    {
+      "key": "combat-profile.origin.rookgaard",
+      "kind": "combat-profile",
+      "references": [],
+      "label": "Rookgaard tutorial kit",
+      "maxHealth": 150,
+      "attackSkill": 10,
+      "attackValue": 9.6,
+      "attackFactor": 1.0,
+      "attackIntervalMs": 2000,
+      "defense": 4,
+      "armor": 4,
+      "supply": {
+        "charges": 20,
+        "healMin": 60,
+        "healMax": 90,
+        "useBelowPercent": 40
+      },
+      "sourceRef": "Hokz/canary@f6b81a8 schema.sql (health 150, skills 10); data/XML/vocations.xml id=0 None (attackspeed 2000); dawnport_vocation_trial.lua addFirstItems (leather kit, armor 4); items.xml dagger 3267 attack 8 x120% = 9.6; potions.lua [7876] heal 60-90"
+    },
+    {
       "key": "hunt.rookgaard.sewers",
       "kind": "hunt",
-      "references": ["region.rookgaard"],
+      "references": ["combat-profile.origin.rookgaard", "creature.rat", "region.rookgaard"],
       "label": "Rookgaard Sewers",
       "region": "region.rookgaard",
       "summary": "Damp tunnels beneath the town. Where every adventurer starts.",
       "primaryCreature": "Rat",
       "activityTypeKey": "hunt",
-      "availability": "AVAILABLE"
+      "availability": "AVAILABLE",
+      "rooms": [
+        {
+          "number": 1,
+          "creatures": [
+            {
+              "key": "creature.rat",
+              "count": 1
+            }
+          ],
+          "endless": false
+        },
+        {
+          "number": 2,
+          "creatures": [
+            {
+              "key": "creature.rat",
+              "count": 1
+            }
+          ],
+          "endless": false
+        },
+        {
+          "number": 3,
+          "creatures": [
+            {
+              "key": "creature.rat",
+              "count": 2
+            }
+          ],
+          "endless": false
+        },
+        {
+          "number": 4,
+          "creatures": [
+            {
+              "key": "creature.rat",
+              "count": 2
+            }
+          ],
+          "endless": false
+        },
+        {
+          "number": 5,
+          "creatures": [
+            {
+              "key": "creature.rat",
+              "count": 2
+            }
+          ],
+          "endless": false
+        },
+        {
+          "number": 6,
+          "creatures": [
+            {
+              "key": "creature.rat",
+              "count": 3
+            }
+          ],
+          "endless": false
+        },
+        {
+          "number": 7,
+          "creatures": [
+            {
+              "key": "creature.rat",
+              "count": 3
+            }
+          ],
+          "endless": false
+        },
+        {
+          "number": 8,
+          "creatures": [
+            {
+              "key": "creature.rat",
+              "count": 3
+            }
+          ],
+          "endless": false
+        },
+        {
+          "number": 9,
+          "creatures": [
+            {
+              "key": "creature.rat",
+              "count": 4
+            }
+          ],
+          "endless": false
+        },
+        {
+          "number": 10,
+          "creatures": [
+            {
+              "key": "creature.rat",
+              "count": 4
+            }
+          ],
+          "endless": true
+        }
+      ],
+      "combatProfile": "combat-profile.origin.rookgaard"
     },
     {
       "key": "marker.rookgaard.sewers",

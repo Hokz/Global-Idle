@@ -442,7 +442,7 @@ describe('§12.2 always-logged events are emitted by the flows that cause them',
 
     await withTransaction(prisma, (tx) =>
       economy.post(tx, {
-        accountId: toAccountId(account),
+        subject: economy.bankOf(toAccountId(account)),
         currency: 'GOLD',
         amount: 250n,
         reasonCode: 'TEST_CREDIT',
@@ -568,7 +568,7 @@ describe('§12.2 always-logged events are emitted by the flows that cause them',
     await expect(
       withTransaction(prisma, async (tx) => {
         await economy.post(tx, {
-          accountId: toAccountId(account),
+          subject: economy.bankOf(toAccountId(account)),
           currency: 'GOLD',
           amount: 100n,
           reasonCode: 'TEST_CREDIT',

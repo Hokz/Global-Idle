@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * Count the implemented matrix cases and compare them with what the approved
- * specifications fix: Phase 0B §14 at **92**, Phase 1 §16 at **87**.
+ * specifications fix: Phase 0B §14 at **92**, Phase 1 §16 at **87**, Phase 2
+ * §12 at **97**.
  *
  * The convention this relies on: every matrix case is exactly ONE test whose
  * title begins with its id and a colon — `it('W1: ...')` for a Vitest case,
@@ -56,6 +57,31 @@ const MATRICES = {
       REG: [1, 5],
     },
   },
+  'phase-2': {
+    spec: 'docs/specs/phase-2/PHASE_2_HUNT_SIMULATOR_SPEC.md §12',
+    groups: {
+      SIM: [1, 10],
+      // ST and AU are `ACTIVITY_OCCUPANCY_AND_TIMERS.md` §7's own numbering,
+      // kept rather than renumbered: the active-use cases are 25 to 28 there,
+      // and a matrix that renamed them to AU1-AU4 would need a translation
+      // table for the one document they exist to satisfy.
+      ST: [1, 24],
+      AU: [25, 28],
+      RW: [1, 6],
+      SU: [1, 3],
+      DE: [1, 4],
+      CX: [1, 6],
+      PS: [1, 5],
+      GW: [1, 8],
+      SRC: [1, 4],
+      // The correction pass. Death settlement and currency custody changed
+      // what Phase 2 MEANS, so they are Phase 2's cases rather than a fourth
+      // matrix: the phase is not done without them.
+      DL: [1, 14],
+      GP: [1, 15],
+      BL: [1, 3],
+    },
+  },
 };
 
 // Longest-first so `AC13` is not read as `A` + `C13`, and `E2E1` is not `E` +
@@ -65,9 +91,22 @@ const PREFIXES = [
   'REG',
   'API',
   'E2E',
+  'SIM',
+  'SRC',
+  'BL',
   'CH',
+  'DL',
+  'GP',
   'AC',
   'AT',
+  'AU',
+  'CX',
+  'DE',
+  'GW',
+  'PS',
+  'RW',
+  'ST',
+  'SU',
   'UI',
   'A',
   'C',

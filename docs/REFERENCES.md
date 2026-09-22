@@ -29,6 +29,34 @@ Tibia / Canary  =  baseline BEHAVIOUR and DATA
 Global Idle     =  adaptation to AUTOMATIC / IDLE execution
 ```
 
+### The baseline is 1x
+
+Global Idle starts from the CURRENT Tibia Global / Canary baseline **at 1x**. Unless a deliberate
+override is documented, the source's own numbers are the numbers:
+
+creature HP · creature Base XP · creature attacks and damage · defences, armour, resistances and
+immunities · ordinary loot identity and baseline chance · vocation baseline parameters · item
+weight · spells, runes and cooldowns · combat formulas, their ORDER and their rounding · the
+experience curve · the death-loss formula · blessing protection · Promotion protection.
+
+**Do not globally scale HP, XP, damage or loot chance because this is an idle game.** An idle game
+changes how often a fight happens and who presses the buttons. It does not change what a Rat is.
+A server that multiplied everything by two would not be a faithful baseline with a knob on it; it
+would be a different game that had stopped being able to check itself against anything.
+
+What Global Idle IS free to adapt, and adapts deliberately:
+
+- room composition and encounter pacing;
+- autonomous target and action selection;
+- automation itself;
+- new Global-Idle-only items, resources and currencies;
+- economy-specific drop overrides, sinks and sources;
+- access and progression systems.
+
+Every divergence records four things — **source baseline, Global Idle override, reason, and the
+fixture that pins it** — in the same import record the formulas use. A divergence with no record
+is not a design decision; it is a defect that has not been found yet.
+
 | Question | Whose answer |
 |---|---|
 | A Rat's HP, XP, melee damage, resistances | **Canary** |

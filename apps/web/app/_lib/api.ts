@@ -44,6 +44,69 @@ export interface CharacterDetail extends CharacterSummary {
   premium: boolean;
   activity: ActivityView | null;
 }
+/**
+ * The Hunt run, exactly as `GET /api/characters/:id/hunt` returns it.
+ *
+ * EVERY FIELD IS THE SERVER'S. The browser renders this and computes nothing
+ * from it that could disagree: not the tick, not the damage, not who is alive,
+ * not how much Stamina is left. The big integers arrive as strings because a
+ * total this curve produces outgrows a JavaScript number, and a UI that
+ * quietly lost the last digits of someone's XP would be worse than one that
+ * could not display it at all.
+ */
+export interface HuntEvent {
+  tick: number;
+  kind: 'spawn' | 'hit' | 'taken' | 'kill' | 'room-cleared' | 'supply' | 'died';
+  room?: number;
+  cycle?: number;
+  count?: number;
+  target?: string;
+  source?: string;
+  damage?: number;
+  healed?: number;
+  remaining?: number;
+}
+export interface RunCreature {
+  key: string;
+  health: number;
+  maxHealth: number;
+}
+export interface RunView {
+  activityId: string;
+  characterId: string;
+  room: number;
+  cycle: number;
+  tick: number;
+  health: number;
+  maxHealth: number;
+  supplyCharges: number;
+  creatures: RunCreature[];
+  sessionXp: string;
+  /** What THIS RUN earned. The carried total is `pouchGold`. */
+  sessionGold: string;
+  /** The Gold Pouch — CARRIED, and lost on death without Full Bless. Not the
+   *  Bank, which is safe and is a different number. */
+  pouchGold: string;
+  baseLevel: number;
+  baseXp: string;
+  levelStartXp: string;
+  nextLevelXp: string;
+  staminaRemainingMs: number;
+  staminaMode: 'CONSUMING' | 'NEUTRAL' | 'RECOVERING';
+  connection: 'ONLINE_ACTIVE' | 'RECONNECT_GRACE_PAUSED' | 'ACTIVITY_ENDED';
+  graceExpiresAt: string | null;
+  endedReason: 'DIED' | 'LEFT' | 'GRACE_EXPIRED' | null;
+  /** Only on the settlement that killed the Character. */
+  penalty: {
+    experienceLost: string;
+    goldForfeited: string;
+    levelBefore: number;
+    levelAfter: number;
+    fullBless: boolean;
+  } | null;
+  events: HuntEvent[];
+}
+
 export interface Region {
   key: string;
   label: string;

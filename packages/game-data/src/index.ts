@@ -11,7 +11,10 @@ export type { ContentKey } from './keys.js';
 export {
   atlasMarkerSchema,
   bundleSourceSchema,
+  combatProfileSchema,
+  creatureSchema,
   definitionSchema,
+  huntRoomSchema,
   huntSchema,
   markerCategory,
   parseTyped,
@@ -21,9 +24,12 @@ export {
 export type {
   AtlasMarker,
   BundleSource,
+  CombatProfileDefinition,
   ContentBundleArtifact,
+  Creature,
   Definition,
   Hunt,
+  HuntRoom,
   Region,
   UnlockSet,
 } from './schema.js';

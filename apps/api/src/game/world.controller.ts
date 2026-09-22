@@ -23,6 +23,7 @@ import {
 import {
   activity as activityContext,
   content,
+  hunt as huntContext,
   createIdempotencyPort,
   fingerprintOf,
   observability,
@@ -187,6 +188,11 @@ export class WorldController {
             toContentKey(key),
           );
 
+          const character = await tx.character.findUniqueOrThrow({
+            where: { id },
+            select: { baseXp: true },
+          });
+
           const activityId = await activityContext.startSessionBound(tx, {
             accountId: toAccountId(session.accountId),
             activityTypeKey: activityContext.HUNT,
@@ -198,6 +204,19 @@ export class WorldController {
             // between connections, and accountId would make two browsers one.
             claimHolderSessionId: toSessionId(session.sessionId),
             rngSeed: hunt.key,
+            at: new Date(),
+          });
+
+          // The run is created BESIDE the Activity, in the same transaction:
+          // an Activity without a run would be a Hunt nothing can simulate,
+          // and the two must exist or not exist together (§11).
+          await huntContext.startRun(tx, {
+            activityId,
+            characterId: id,
+            resolver: this.resolver,
+            contentVersion: bundle.version,
+            contentKey: hunt.key,
+            level: huntContext.levelForXp(character.baseXp),
             at: new Date(),
           });
           return { activityId: String(activityId) };
@@ -235,8 +254,51 @@ export class WorldController {
     });
     if (!claim) return;
     try {
+      // A Hunt LEAVES; anything else just ends. Either way there is NO GRACE —
+      // a deliberate exit is not a lost connection (§8).
       await withTransaction(this.prisma, (tx) =>
-        activityContext.endActivity(tx, toActivityId(claim.activityId), new Date()),
+        huntContext.endRunOrActivity(tx, toActivityId(claim.activityId), 'LEFT', new Date()),
+      );
+    } catch (error) {
+      throw asHttp(error);
+    }
+  }
+
+  /**
+   * The Hunt run, advanced to now (§11).
+   *
+   * A GET that mutates, deliberately: advance-on-read is the whole model
+   * (P2-D1), and a separate "tick" command would just be this endpoint with a
+   * different verb and an extra round trip.
+   */
+  @Get('characters/:id/hunt')
+  async run(@Req() request: RequestWithSession, @Param('id') id: string) {
+    await this.own(request, id);
+    return this.advanceRun(id, true);
+  }
+
+  /** Liveness. A session is ONLINE_ACTIVE while these keep arriving (P2-D7). */
+  @Post('characters/:id/hunt/heartbeat')
+  @HttpCode(HttpStatus.OK)
+  async heartbeat(@Req() request: RequestWithSession, @Param('id') id: string) {
+    await this.own(request, id);
+    return this.advanceRun(id, true);
+  }
+
+  private async advanceRun(characterId: string, seen: boolean) {
+    const claim = await this.prisma.occupancyClaim.findUnique({
+      where: { characterId },
+      select: { activityId: true },
+    });
+    if (!claim) return null;
+    try {
+      return await withTransaction(this.prisma, (tx) =>
+        huntContext.advance(tx, {
+          activityId: toActivityId(claim.activityId),
+          resolver: this.resolver,
+          now: new Date(),
+          seen,
+        }),
       );
     } catch (error) {
       throw asHttp(error);

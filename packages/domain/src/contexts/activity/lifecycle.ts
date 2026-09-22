@@ -276,6 +276,27 @@ export async function endActivity(
   return { claimsReleased, participantsRetained };
 }
 
+/**
+ * Reconnect INSIDE the grace window: back to `ONLINE_ACTIVE`, same Activity,
+ * same claims, deadline cleared (Phase 2 spec §8).
+ *
+ * The claims were never released, so there is nothing to re-acquire — which
+ * is the whole point of grace, and the reason resuming cannot fail on an
+ * occupancy conflict with itself.
+ */
+export async function resumeFromGrace(tx: UnitOfWork, activityId: ActivityId): Promise<void> {
+  await tx.sessionBoundActivity.update({
+    where: { activityId },
+    data: { state: 'ONLINE_ACTIVE', graceExpiresAt: null },
+  });
+  recordDomainEvent({
+    kind: 'activity.transition',
+    activityId,
+    family: 'SESSION_BOUND',
+    to: 'ONLINE_ACTIVE',
+  });
+}
+
 /** Reconnect grace: pause, set the deadline, KEEP the claims (§7.2). */
 export async function pauseForGrace(
   tx: UnitOfWork,

@@ -1,7 +1,8 @@
 'use client';
 
 /**
- * The play surface: panel + Atlas, or the pre-combat Hunt (spec §6, §7, §9).
+ * The play surface: panel + Atlas, or the Game Window (Phase 1 §6, §7, §9;
+ * Phase 2 §10).
  *
  * WHICH SCREEN IS SHOWN IS THE SERVER'S ANSWER, not the URL's. On load, and
  * after every action, the character's durable activity decides — so a reload
@@ -19,6 +20,7 @@ import {
 } from '../../_lib/api';
 import { Atlas } from '../../_components/Atlas';
 import { CharacterPanel } from '../../_components/CharacterPanel';
+import { GameWindow } from '../../_components/GameWindow';
 
 export default function Play() {
   const router = useRouter();
@@ -103,18 +105,6 @@ export default function Play() {
     }
   }
 
-  async function leave() {
-    setBusy(true);
-    try {
-      await api(`/api/characters/${characterId}/activity`, { method: 'DELETE' });
-      await refresh();
-      setSelected(null);
-      setHunt(null);
-    } finally {
-      setBusy(false);
-    }
-  }
-
   if (failed) {
     return (
       <main className="shell">
@@ -141,36 +131,27 @@ export default function Play() {
     );
   }
 
-  // The server says the character is in a Hunt, so that is the screen.
+  // The server says the character is in a Hunt, so that is the screen — and
+  // in Phase 2 that screen is the GAME WINDOW. The Atlas is a different
+  // surface with a different job (UI_SURFACE_ARCHITECTURE.md §1, §2); it is
+  // not hidden behind a tab here, it is simply not where the Character is.
   if (character.activity) {
     return (
       <main className="shell stack">
         <CharacterPanel character={character} />
-        <section className="panel stack" data-testid="pre-combat" aria-labelledby="hunt-heading">
-          <div>
-            <h2 id="hunt-heading">{character.activity.hunt.label}</h2>
-            <p className="muted small">
-              {character.activity.hunt.summary} · Primary creature:{' '}
-              {character.activity.hunt.primaryCreature}
-            </p>
-          </div>
-          <div
-            className="panel"
-            style={{ background: '#14161a', textAlign: 'center', padding: '40px 16px' }}
-          >
-            <p style={{ margin: 0 }}>Your character is in the hunt.</p>
-            <p className="muted small" style={{ margin: '6px 0 0' }}>
-              Combat arrives in Phase 2. Stamina is {character.stamina.mode} and has not started
-              being spent.
-            </p>
-          </div>
-          <div className="row">
-            <button onClick={leave} disabled={busy} data-testid="leave">
-              {busy ? 'Leaving…' : 'Leave hunt'}
-            </button>
-            <span className="muted small">Activity {character.activity.state}</span>
-          </div>
-        </section>
+        <GameWindow
+          characterId={characterId}
+          label={character.activity.hunt.label}
+          summary={`${character.activity.hunt.summary} · Primary creature: ${character.activity.hunt.primaryCreature}`}
+          onEnded={async () => {
+            // Ask the server which screen this is now, rather than assuming
+            // the Atlas: the run may have ended for a reason this client did
+            // not cause.
+            await refresh();
+            setSelected(null);
+            setHunt(null);
+          }}
+        />
       </main>
     );
   }

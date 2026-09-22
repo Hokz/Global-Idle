@@ -4,7 +4,13 @@
  * Every field here is SERVER-DERIVED. The client renders them; it never sends
  * them back as authority (§19).
  */
-import { character as characterContext, content, type PrismaClient } from '@global-idle/domain';
+import {
+  activity as activityContext,
+  character as characterContext,
+  content,
+  withTransaction,
+  type PrismaClient,
+} from '@global-idle/domain';
 
 type ResolvedHunt = Awaited<ReturnType<typeof content.resolveHunt>>;
 import type { ContentKey, ContentVersion } from '@global-idle/shared';
@@ -66,37 +72,29 @@ export const huntView = (hunt: ResolvedHunt): HuntView => ({
  * shows that transition rather than asserting one value.
  */
 export async function staminaView(prisma: PrismaClient, characterId: string): Promise<StaminaView> {
-  const row = await prisma.characterStamina.findUniqueOrThrow({ where: { characterId } });
-  const claim = await prisma.occupancyClaim.findUnique({
-    where: { characterId },
-    select: {
-      activityId: true,
-      participant: { select: { staminaActivatedAt: true } },
-    },
+  // ADVANCE ON READ. Recovery is a POSITION, not a job: reading a Character's
+  // Stamina is what moves it forward, which is why an account that was offline
+  // all night comes back with the Stamina that night was worth and no
+  // scheduled worker had to be alive to grant it.
+  const { accountId } = await prisma.character.findUniqueOrThrow({
+    where: { id: characterId },
+    select: { accountId: true },
   });
 
-  let occupancy: Parameters<typeof characterContext.deriveStaminaMode>[0] = { claim: null };
-  if (claim) {
-    const activity = await prisma.activity.findUniqueOrThrow({
-      where: { id: claim.activityId },
-      select: { activityTypeKey: true, sessionBound: { select: { state: true } } },
+  const settled = await withTransaction(prisma, async (tx) => {
+    const occupancy = await activityContext.occupancyFor(tx, characterId);
+    return characterContext.settleStamina(tx, {
+      characterId,
+      accountId: accountId as never,
+      occupancy: { claim: occupancy },
+      now: new Date(),
     });
-    occupancy = {
-      claim: {
-        stamina:
-          activity.activityTypeKey === 'skill-training'
-            ? 'STAMINA_RECOVERY_ELIGIBLE'
-            : 'STAMINA_CONSUMING',
-        sessionState: (activity.sessionBound?.state ?? 'ONLINE_ACTIVE') as never,
-        staminaActivatedAt: claim.participant?.staminaActivatedAt ?? null,
-      },
-    };
-  }
+  });
 
   return {
-    remainingMs: row.remainingMs,
+    remainingMs: settled.remaining,
     maxMs: characterContext.STAMINA_MAX,
-    mode: characterContext.deriveStaminaMode(occupancy),
+    mode: settled.mode,
   };
 }
 

@@ -11,6 +11,23 @@ export const GAME_ENGINE_PACKAGE = '@global-idle/game-engine' as const;
 export { createSeededRandom } from './random.js';
 export type { SeededRandom } from './random.js';
 
+export { normalRandom, uniformRandom } from './distributions.js';
+
+export { TICK_MS, initialState, maxMeleeHit, minMeleeHit, simulateHunt } from './hunt.js';
+export type {
+  CombatProfile,
+  CreatureStats,
+  HuntCreatureState,
+  HuntEndReason,
+  HuntEvent,
+  HuntReward,
+  HuntState,
+  HuntStep,
+  RoomDefinition,
+  RoomPlan,
+  SupplyProfile,
+} from './hunt.js';
+
 export { simulateActivity } from './simulate.js';
 export type {
   ActivityRunState,

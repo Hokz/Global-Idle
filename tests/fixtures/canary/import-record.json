@@ -1,0 +1,768 @@
+{
+  "$comment": "A TRANSCRIPTION RECORD, not vendored source. Every row names where a value or a formula came from, what it means, what Global Idle decided about it, and where that decision is pinned - the format REFERENCES.md requires. No Canary code is copied into this repository; `probe` carries only the pattern that locates the value and the exact literal that was read, so the record can be re-verified against a real checkout.",
+  "sourceRepository": "Hokz/canary",
+  "commit": "f6b81a855aa8e7e34cb98821ceb39ff97e3afa4e",
+  "verification": "Point CANARY_SOURCE at a checkout of the repository above, at that commit, and the SRC cases re-run every probe against the real files. Without it they still assert that the authored content matches this record, which is what CI proves.",
+  "imports": [
+    {
+      "id": "rat.maxHealth",
+      "file": "data-otservbr-global/monster/mammals/rat.lua",
+      "symbol": "monster.health / monster.maxHealth",
+      "observed": "A Rat has 20 hit points.",
+      "decision": "Keep",
+      "fixture": "creature.rat.maxHealth",
+      "value": 20,
+      "probe": {
+        "pattern": "monster\\.maxHealth = (\\d+)",
+        "captured": "20"
+      }
+    },
+    {
+      "id": "rat.experience",
+      "file": "data-otservbr-global/monster/mammals/rat.lua",
+      "symbol": "monster.experience",
+      "observed": "Killing a Rat awards 5 experience.",
+      "decision": "Keep",
+      "fixture": "creature.rat.experience",
+      "value": 5,
+      "probe": {
+        "pattern": "monster\\.experience = (\\d+)",
+        "captured": "5"
+      }
+    },
+    {
+      "id": "rat.speed",
+      "file": "data-otservbr-global/monster/mammals/rat.lua",
+      "symbol": "monster.speed",
+      "observed": "A Rat's movement speed is 67.",
+      "decision": "Keep",
+      "fixture": "creature.rat.speed",
+      "value": 67,
+      "probe": {
+        "pattern": "monster\\.speed = (\\d+)",
+        "captured": "67"
+      },
+      "reason": "Carried as presentation/pacing data. Phase 2 simulates no positions, so nothing reads it yet."
+    },
+    {
+      "id": "rat.attack.intervalMs",
+      "file": "data-otservbr-global/monster/mammals/rat.lua",
+      "symbol": "monster.attacks[1].interval",
+      "observed": "A Rat swings every 2000 ms.",
+      "decision": "Keep",
+      "fixture": "creature.rat.attack.intervalMs",
+      "value": 2000,
+      "probe": {
+        "pattern": "\\{ name = \"melee\", interval = (\\d+), chance = \\d+, minDamage = \\d+, maxDamage = -\\d+ \\}",
+        "captured": "2000"
+      }
+    },
+    {
+      "id": "rat.attack.maxDamage",
+      "file": "data-otservbr-global/monster/mammals/rat.lua",
+      "symbol": "monster.attacks[1].maxDamage",
+      "observed": "A Rat's melee tops out at 8 damage; Canary stores damage dealt as a negative number.",
+      "decision": "Adapt",
+      "fixture": "creature.rat.attack.maxDamage",
+      "value": 8,
+      "probe": {
+        "pattern": "\\{ name = \"melee\", interval = \\d+, chance = \\d+, minDamage = \\d+, maxDamage = (-\\d+) \\}",
+        "captured": "-8"
+      },
+      "reason": "The sign is Canary's convention for damage on a health delta, not part of the value. Global Idle stores the magnitude and subtracts it."
+    },
+    {
+      "id": "rat.defense",
+      "file": "data-otservbr-global/monster/mammals/rat.lua",
+      "symbol": "monster.defenses.defense",
+      "observed": "A Rat's defence value is 5, the input to the uniform_random(defense/2, defense) block roll.",
+      "decision": "Keep",
+      "fixture": "creature.rat.defense",
+      "value": 5,
+      "probe": {
+        "pattern": "monster\\.defenses = \\{\\s*\\n\\s*defense = (\\d+),",
+        "captured": "5"
+      }
+    },
+    {
+      "id": "rat.armor",
+      "file": "data-otservbr-global/monster/mammals/rat.lua",
+      "symbol": "monster.defenses.armor",
+      "observed": "A Rat's armour value is 1, which under blockHit means a flat --damage rather than a roll.",
+      "decision": "Keep",
+      "fixture": "creature.rat.armor",
+      "value": 1,
+      "probe": {
+        "pattern": "monster\\.defenses = \\{\\s*\\n\\s*defense = \\d+,\\s*\\n\\s*armor = (\\d+),",
+        "captured": "1"
+      }
+    },
+    {
+      "id": "rat.mitigation",
+      "file": "data-otservbr-global/monster/mammals/rat.lua",
+      "symbol": "monster.defenses.mitigation",
+      "observed": "A Rat's authored mitigation is 0.07; Monster::getMitigation multiplies it by the defence multiplier (1.0) and the configurable monsterMitigationMultiplier (default 1.5) before use.",
+      "decision": "Simplify",
+      "fixture": "creature.rat.mitigation",
+      "value": 0.07,
+      "probe": {
+        "pattern": "monster\\.defenses = \\{\\s*\\n\\s*defense = \\d+,\\s*\\n\\s*armor = \\d+,\\s*\\n\\s*mitigation = ([\\d.]+),",
+        "captured": "0.07"
+      },
+      "reason": "The configurable 1.5 is a server tunable, not creature data. It changes nothing Phase 2 can observe: for every integer damage below 953 the truncation in mitigateDamage lands on the same integer at 0.07 and at 0.105. SRC2 proves that over the whole range this phase can produce."
+    },
+    {
+      "id": "rat.gold.chance",
+      "file": "data-otservbr-global/monster/mammals/rat.lua",
+      "symbol": "monster.loot → { name = \"gold coin\", chance = 100000 }",
+      "observed": "Gold drops with chance 100000 out of Canary's 100000 denominator: every kill.",
+      "decision": "Adapt",
+      "fixture": "creature.rat.gold.chance",
+      "value": 1,
+      "probe": {
+        "pattern": "\\{ name = \"gold coin\", chance = (\\d+), maxCount = \\d+ \\}",
+        "captured": "100000"
+      },
+      "reason": "Phase 2 has no loot table, no BaseItem and no ItemInstance (Phase 3 owns all three). The same entry is modelled as a CURRENCY reward, and the denominator is normalised to a probability."
+    },
+    {
+      "id": "rat.gold.max",
+      "file": "data-otservbr-global/monster/mammals/rat.lua",
+      "symbol": "monster.loot → { name = \"gold coin\", maxCount = 4 }",
+      "observed": "A gold coin stack from a Rat is at most 4.",
+      "decision": "Adapt",
+      "fixture": "creature.rat.gold.max",
+      "value": 4,
+      "probe": {
+        "pattern": "\\{ name = \"gold coin\", chance = \\d+, maxCount = (\\d+) \\}",
+        "captured": "4"
+      },
+      "reason": "Same adaptation as rat.gold.chance. The minimum is 1, which is Canary's implicit floor for a dropped stack."
+    },
+    {
+      "id": "rat.elements.earth",
+      "file": "data-otservbr-global/monster/mammals/rat.lua",
+      "symbol": "monster.elements → COMBAT_EARTHDAMAGE",
+      "observed": "A Rat takes 20% more earth damage.",
+      "decision": "Keep",
+      "fixture": "creature.rat.elements.earth",
+      "value": 20,
+      "probe": {
+        "pattern": "\\{ type = COMBAT_EARTHDAMAGE, percent = (-?\\d+) \\}",
+        "captured": "20"
+      },
+      "reason": "Recorded, unused: Phase 2 is physical-only. Carried in content so a later phase does not re-source it."
+    },
+    {
+      "id": "rat.elements.ice",
+      "file": "data-otservbr-global/monster/mammals/rat.lua",
+      "symbol": "monster.elements → COMBAT_ICEDAMAGE",
+      "observed": "A Rat takes 10% less ice damage.",
+      "decision": "Keep",
+      "fixture": "creature.rat.elements.ice",
+      "value": -10,
+      "probe": {
+        "pattern": "\\{ type = COMBAT_ICEDAMAGE, percent = (-?\\d+) \\}",
+        "captured": "-10"
+      },
+      "reason": "Recorded, unused."
+    },
+    {
+      "id": "rat.elements.holy",
+      "file": "data-otservbr-global/monster/mammals/rat.lua",
+      "symbol": "monster.elements → COMBAT_HOLYDAMAGE",
+      "observed": "A Rat takes 20% more holy damage.",
+      "decision": "Keep",
+      "fixture": "creature.rat.elements.holy",
+      "value": 20,
+      "probe": {
+        "pattern": "\\{ type = COMBAT_HOLYDAMAGE, percent = (-?\\d+) \\}",
+        "captured": "20"
+      },
+      "reason": "Recorded, unused."
+    },
+    {
+      "id": "rat.elements.death",
+      "file": "data-otservbr-global/monster/mammals/rat.lua",
+      "symbol": "monster.elements → COMBAT_DEATHDAMAGE",
+      "observed": "A Rat takes 10% less death damage.",
+      "decision": "Keep",
+      "fixture": "creature.rat.elements.death",
+      "value": -10,
+      "probe": {
+        "pattern": "\\{ type = COMBAT_DEATHDAMAGE, percent = (-?\\d+) \\}",
+        "captured": "-10"
+      },
+      "reason": "Recorded, unused."
+    },
+    {
+      "id": "character.startingLevel",
+      "file": "schema.sql",
+      "symbol": "players.level DEFAULT",
+      "observed": "A new Character starts at Level 1.",
+      "decision": "Keep",
+      "fixture": "Origin Character baseLevel",
+      "value": 1,
+      "probe": {
+        "pattern": "`level` int\\(11\\) NOT NULL DEFAULT '(\\d+)'",
+        "captured": "1"
+      }
+    },
+    {
+      "id": "character.maxHealth",
+      "file": "schema.sql",
+      "symbol": "players.healthmax DEFAULT",
+      "observed": "A new Character has 150 maximum hit points.",
+      "decision": "Keep",
+      "fixture": "combat-profile.origin.rookgaard.maxHealth",
+      "value": 150,
+      "probe": {
+        "pattern": "`healthmax` int\\(11\\) NOT NULL DEFAULT '(\\d+)'",
+        "captured": "150"
+      }
+    },
+    {
+      "id": "character.attackSkill",
+      "file": "schema.sql",
+      "symbol": "players.skill_fist DEFAULT (every weapon skill shares it)",
+      "observed": "A new Character's weapon skills start at 10.",
+      "decision": "Keep",
+      "fixture": "combat-profile.origin.rookgaard.attackSkill",
+      "value": 10,
+      "probe": {
+        "pattern": "`skill_fist` int\\(10\\) UNSIGNED NOT NULL DEFAULT '(\\d+)'",
+        "captured": "10"
+      }
+    },
+    {
+      "id": "character.attackIntervalMs",
+      "file": "data/XML/vocations.xml",
+      "symbol": "vocation id=\"0\" name=\"None\" → attackspeed",
+      "observed": "A Character with no vocation attacks every 2000 ms.",
+      "decision": "Keep",
+      "fixture": "combat-profile.origin.rookgaard.attackIntervalMs",
+      "value": 2000,
+      "probe": {
+        "pattern": "<vocation id=\"0\"[^>]*attackspeed=\"(\\d+)\"",
+        "captured": "2000"
+      }
+    },
+    {
+      "id": "character.meleeDamageMultiplier",
+      "file": "data/XML/vocations.xml",
+      "symbol": "vocation id=\"0\" → formula meleeDamage",
+      "observed": "The no-vocation melee damage multiplier is 1.0, so it drops out of the formula.",
+      "decision": "Keep",
+      "fixture": "not authored — a multiplier of 1 is not a field",
+      "value": 1.0,
+      "probe": {
+        "pattern": "<formula meleeDamage=\"([\\d.]+)\"",
+        "captured": "1.0"
+      }
+    },
+    {
+      "id": "character.attackFactor",
+      "file": "src/creatures/players/player.cpp",
+      "symbol": "Player::getAttackFactor",
+      "observed": "Under the modern combat model the attack factor is 1.0 regardless of fight mode.",
+      "decision": "Keep",
+      "fixture": "combat-profile.origin.rookgaard.attackFactor",
+      "value": 1.0,
+      "probe": {
+        "pattern": "float Player::getAttackFactor\\(\\) const \\{\\s*\\n\\s*if \\(usesModernCombatModel\\(\\)\\) \\{\\s*\\n\\s*return ([\\d.]+)f;",
+        "captured": "1.0"
+      },
+      "reason": "Phase 2 has no fight-mode selector. Inventing one would be a product rule created by a technical module."
+    },
+    {
+      "id": "character.mitigation",
+      "file": "src/creatures/players/player.cpp",
+      "symbol": "Player::getMitigation",
+      "observed": "A Player's mitigation comes entirely from the Wheel of Destiny, which a Level-1 Character has none of.",
+      "decision": "Keep",
+      "fixture": "the engine passes 0 for the Character's mitigation",
+      "value": 0,
+      "probe": {
+        "pattern": "float Player::getMitigation\\(\\) const \\{\\s*\\n\\s*return (wheel\\(\\)\\.calculateMitigation\\(\\));",
+        "captured": "wheel().calculateMitigation()"
+      }
+    },
+    {
+      "id": "weapon.attackPercent",
+      "file": "src/creatures/combat/effective_combat_values.hpp",
+      "symbol": "EffectiveCombatValues::WEAPON_ATTACK_PERCENT",
+      "observed": "A weapon's Attack counts 20% higher than the raw items.xml value before it enters any damage formula.",
+      "decision": "Keep",
+      "fixture": "folded into combat-profile.origin.rookgaard.attackValue",
+      "value": 120,
+      "probe": {
+        "pattern": "inline constexpr int32_t WEAPON_ATTACK_PERCENT = (\\d+);",
+        "captured": "120"
+      }
+    },
+    {
+      "id": "weapon.dagger.attack",
+      "file": "data/items/items.xml",
+      "symbol": "item id=\"3267\" (dagger) → attribute attack",
+      "observed": "The dagger's raw Attack is 8.",
+      "decision": "Adapt",
+      "fixture": "combat-profile.origin.rookgaard.attackValue = 8 x 120% = 9.6",
+      "value": 8,
+      "probe": {
+        "pattern": "<item id=\"3267\"[\\s\\S]{0,400}?<attribute key=\"attack\" value=\"(\\d+)\"/>",
+        "captured": "8"
+      },
+      "reason": "The profile authors the EFFECTIVE value (9.6), because that is what Canary feeds getMaxWeaponDamage. Authoring the raw 8 and compensating in the engine would put an items rule inside a pure simulator."
+    },
+    {
+      "id": "armour.leatherHelmet",
+      "file": "data/items/items.xml",
+      "symbol": "item id=\"3355\" (leather helmet) → attribute armor",
+      "observed": "Each piece of the pre-vocation leather kit is worth 1 armour.",
+      "decision": "Keep",
+      "fixture": "combat-profile.origin.rookgaard.armor (1 of 4)",
+      "value": 1,
+      "probe": {
+        "pattern": "<item id=\"3355\"[\\s\\S]{0,400}?<attribute key=\"armor\" value=\"(\\d+)\"/>",
+        "captured": "1"
+      }
+    },
+    {
+      "id": "armour.coat",
+      "file": "data/items/items.xml",
+      "symbol": "item id=\"3562\" (coat) → attribute armor",
+      "observed": "Each piece of the pre-vocation leather kit is worth 1 armour.",
+      "decision": "Keep",
+      "fixture": "combat-profile.origin.rookgaard.armor (2 of 4)",
+      "value": 1,
+      "probe": {
+        "pattern": "<item id=\"3562\"[\\s\\S]{0,400}?<attribute key=\"armor\" value=\"(\\d+)\"/>",
+        "captured": "1"
+      }
+    },
+    {
+      "id": "armour.leatherLegs",
+      "file": "data/items/items.xml",
+      "symbol": "item id=\"3559\" (leather legs) → attribute armor",
+      "observed": "Each piece of the pre-vocation leather kit is worth 1 armour.",
+      "decision": "Keep",
+      "fixture": "combat-profile.origin.rookgaard.armor (3 of 4)",
+      "value": 1,
+      "probe": {
+        "pattern": "<item id=\"3559\"[\\s\\S]{0,400}?<attribute key=\"armor\" value=\"(\\d+)\"/>",
+        "captured": "1"
+      }
+    },
+    {
+      "id": "armour.leatherBoots",
+      "file": "data/items/items.xml",
+      "symbol": "item id=\"3552\" (leather boots) → attribute armor",
+      "observed": "Each piece of the pre-vocation leather kit is worth 1 armour.",
+      "decision": "Keep",
+      "fixture": "combat-profile.origin.rookgaard.armor (4 of 4)",
+      "value": 1,
+      "probe": {
+        "pattern": "<item id=\"3552\"[\\s\\S]{0,400}?<attribute key=\"armor\" value=\"(\\d+)\"/>",
+        "captured": "1"
+      }
+    },
+    {
+      "id": "character.firstItems",
+      "file": "data-otservbr-global/scripts/movements/others/dawnport_vocation_trial.lua",
+      "symbol": "addFirstItems",
+      "observed": "The pre-vocation starting kit is four armour pieces (3355, 3562, 3559, 3552) and NO weapon.",
+      "decision": "Adapt",
+      "fixture": "docs/specs/phase-2/PHASE_2_CANARY_SOURCE_MAP.md §4",
+      "value": [3355, 3562, 3559, 3552],
+      "probe": {
+        "pattern": "local firstItems = \\{\\s*\\n\\s*slots = \\{\\s*\\n\\s*\\[CONST_SLOT_HEAD\\] = Game\\.createItem\\((\\d+)\\),\\s*\\n\\s*\\[CONST_SLOT_ARMOR\\] = Game\\.createItem\\((\\d+)\\),\\s*\\n\\s*\\[CONST_SLOT_LEGS\\] = Game\\.createItem\\((\\d+)\\),\\s*\\n\\s*\\[CONST_SLOT_FEET\\] = Game\\.createItem\\((\\d+)\\),",
+        "captured": ["3355", "3562", "3559", "3552"]
+      },
+      "reason": "This is the record of WHY the profile needed a weapon added: the faithful kit has none, and a fists Character measurably loses to a Rat (source map §4). The dagger is the smallest addition that makes the first fight winnable."
+    },
+    {
+      "id": "character.defense",
+      "file": "src/creatures/players/player.cpp",
+      "symbol": "Player::getDefense",
+      "observed": "Defence is ((defenseSkill / 4.0 + 2.23) * defenseValue * defenseFactor * scaling) * vocation->defenseMultiplier, truncated by the int32_t return.",
+      "decision": "Simplify",
+      "fixture": "combat-profile.origin.rookgaard.defense",
+      "value": 4,
+      "probe": {
+        "pattern": "(return \\(\\(defenseSkill / 4\\.0 \\+ 2\\.23\\) \\* defenseValue \\* getDefenseFactor\\(sendToClient\\) \\* defenseScalingFactor\\) \\* vocation->defenseMultiplier;)",
+        "captured": "return ((defenseSkill / 4.0 + 2.23) * defenseValue * getDefenseFactor(sendToClient) * defenseScalingFactor) * vocation->defenseMultiplier;"
+      },
+      "reason": "Authored as a flat profile number because Phase 2 has no equipment to recompute it from. Both readings of the tutorial Character truncate to the same 4: unarmed (skill 10, value 7, scaling 0.15) gives 4.9665, and dagger-armed (sword skill 10, dagger defence 6, scaling 0.146) gives 4.14348. SRC4 computes both."
+    },
+    {
+      "id": "supply.healthPotion",
+      "file": "data/scripts/actions/items/potions.lua",
+      "symbol": "[7876] = { health = { 60, 90 } }",
+      "observed": "A health potion restores 60-90.",
+      "decision": "Simplify",
+      "fixture": "combat-profile.origin.rookgaard.supply.healMin / healMax",
+      "value": [60, 90],
+      "probe": {
+        "pattern": "\\[7876\\] = \\{ health = \\{ (\\d+), (\\d+) \\}",
+        "captured": ["60", "90"]
+      },
+      "reason": "Modelled as charges on the combat profile: no item, no flask, no inventory. Phase 3 replaces it with real items."
+    },
+    {
+      "id": "formula.expForLevel",
+      "file": "src/creatures/players/player.cpp",
+      "symbol": "Player::getExpForLevel",
+      "observed": "Total experience required to BE a level.",
+      "decision": "Keep",
+      "fixture": "packages/domain/src/contexts/hunt/progression.ts → xpForLevel",
+      "value": "(((level - 6) * level + 17) * level - 12) / 6 * 100",
+      "probe": {
+        "pattern": "uint64_t Player::getExpForLevel\\(const uint32_t level\\) \\{\\s*\\n\\s*(return \\(\\(\\(level - 6ULL\\) \\* level \\+ 17ULL\\) \\* level - 12ULL\\) / 6ULL \\* 100ULL;)",
+        "captured": "return (((level - 6ULL) * level + 17ULL) * level - 12ULL) / 6ULL * 100ULL;"
+      },
+      "reason": "Transcribed into bigint. The integer division is Canary's and is kept: an algebraic inverse would disagree by one exactly where a level-up happens."
+    },
+    {
+      "id": "formula.maxWeaponDamage",
+      "file": "src/items/weapons/weapons.cpp",
+      "symbol": "Weapons::getMaxWeaponDamage (isMelee)",
+      "observed": "The maximum a melee swing can roll.",
+      "decision": "Keep",
+      "fixture": "packages/game-engine/src/hunt.ts → maxMeleeHit",
+      "value": "round(0.085 * attackFactor * attackValue * attackSkill + level / 5)",
+      "probe": {
+        "pattern": "(return attackValue > 0 \\? static_cast<int32_t>\\(std::round\\(\\(0\\.085 \\* attackFactor \\* attackValue \\* attackSkill\\) \\+ \\(level / 5\\)\\)\\) : 0;)",
+        "captured": "return attackValue > 0 ? static_cast<int32_t>(std::round((0.085 * attackFactor * attackValue * attackSkill) + (level / 5))) : 0;"
+      },
+      "reason": "level / 5 is integer division on uint32_t, so it is Math.floor here."
+    },
+    {
+      "id": "formula.meleeRoll",
+      "file": "src/items/weapons/weapons.cpp",
+      "symbol": "WeaponMelee::getWeaponDamage",
+      "observed": "An ARMED melee swing rolls normal_random(level / 5, maxDamage) — the floor is not zero.",
+      "decision": "Keep",
+      "fixture": "packages/game-engine/src/hunt.ts → minMeleeHit",
+      "value": "normal_random(level / 5, maxDamage)",
+      "probe": {
+        "pattern": "const int32_t minDamage = (level / 5);",
+        "captured": "level / 5"
+      },
+      "reason": "Weapon::useFist rolls normal_random(0, maxDamage) instead. The tutorial profile is armed, so the armed floor applies; the two agree below Level 5 and diverge from Level 5 up."
+    },
+    {
+      "id": "formula.blockHit.defense",
+      "file": "src/creatures/creature.cpp",
+      "symbol": "Creature::blockHit, step 2",
+      "observed": "Defence subtracts a uniform roll between half the defence value and the defence value.",
+      "decision": "Keep",
+      "fixture": "packages/game-engine/src/hunt.ts → applyReduction",
+      "value": "damage -= uniform_random(defense / 2, defense)",
+      "probe": {
+        "pattern": "(damage -= uniform_random\\(defense / 2, defense\\);)",
+        "captured": "damage -= uniform_random(defense / 2, defense);"
+      }
+    },
+    {
+      "id": "formula.blockHit.armor",
+      "file": "src/creatures/creature.cpp",
+      "symbol": "Creature::blockHit, step 3",
+      "observed": "Armour above 3 subtracts a uniform roll; armour of 1 to 3 subtracts exactly 1.",
+      "decision": "Keep",
+      "fixture": "packages/game-engine/src/hunt.ts → applyReduction",
+      "value": "armor > 3 ? damage -= uniform_random(armor / 2, armor - (armor % 2 + 1)) : armor > 0 ? --damage : 0",
+      "probe": {
+        "pattern": "(damage -= uniform_random\\(armor / 2, armor - \\(armor % 2 \\+ 1\\)\\);)",
+        "captured": "damage -= uniform_random(armor / 2, armor - (armor % 2 + 1));"
+      }
+    },
+    {
+      "id": "formula.mitigateDamage",
+      "file": "src/creatures/creature.cpp",
+      "symbol": "Creature::mitigateDamage",
+      "observed": "Mitigation subtracts a percentage and the int32_t assignment truncates, so any non-zero mitigation costs at least one point.",
+      "decision": "Keep",
+      "fixture": "packages/game-engine/src/hunt.ts → applyReduction",
+      "value": "damage -= (damage * mitigation) / 100",
+      "probe": {
+        "pattern": "(damage -= \\(damage \\* getMitigation\\(\\)\\) / 100\\.;)",
+        "captured": "damage -= (damage * getMitigation()) / 100.;"
+      }
+    },
+    {
+      "id": "rng.normalRandom",
+      "file": "src/utils/tools.cpp",
+      "symbol": "normal_random",
+      "observed": "A normal distribution centred on 0.5 with sigma 0.25, rejection-sampled into [0, 1], then scaled onto [min, max] with lround.",
+      "decision": "Adapt",
+      "fixture": "packages/game-engine/src/distributions.ts → normalRandom",
+      "value": "N(0.5, 0.25) truncated to [0, 1]",
+      "probe": {
+        "pattern": "(static std::normal_distribution<float> normalRand\\(0\\.5f, 0\\.25f\\);)",
+        "captured": "static std::normal_distribution<float> normalRand(0.5f, 0.25f);"
+      },
+      "reason": "The DISTRIBUTION is transcribed exactly; the SAMPLING METHOD is not. Rejection sampling consumes a variable number of draws, and this engine's replay contract requires a fixed one, so the same truncated normal is produced by inverse transform in a single draw. The entropy source is the Phase 0B seeded generator rather than std::mt19937, because a run must be reproducible from a durable seed."
+    },
+    {
+      "id": "rng.uniformRandom",
+      "file": "src/utils/tools.cpp",
+      "symbol": "uniform_random",
+      "observed": "A uniform integer distribution, inclusive of both bounds, swapping them if given out of order.",
+      "decision": "Adapt",
+      "fixture": "packages/game-engine/src/distributions.ts → uniformRandom",
+      "value": "uniform on [min, max]",
+      "probe": {
+        "pattern": "(return uniformRand\\(getRandomGenerator\\(\\), std::uniform_int_distribution<int32_t>::param_type\\(minNumber, maxNumber\\)\\);)",
+        "captured": "return uniformRand(getRandomGenerator(), std::uniform_int_distribution<int32_t>::param_type(minNumber, maxNumber));"
+      },
+      "reason": "Distribution kept, entropy source replaced, as above."
+    },
+    {
+      "id": "blockHit.blockCount",
+      "file": "src/creatures/creature.cpp",
+      "symbol": "Creature::onThink → blockCount",
+      "observed": "A creature regains one block per 1000 ms, capped at 2, and spends one per blocked hit.",
+      "decision": "Simplify",
+      "fixture": "packages/game-engine/src/hunt.ts → applyReduction applies defence unconditionally",
+      "value": "always available at Phase 2's cadence",
+      "probe": {
+        "pattern": "(blockCount)",
+        "captured": "blockCount"
+      },
+      "reason": "At 2000 ms between swings, 2 blocks regenerate per interval against a cap of 2, so a block is always available and the counter can never bind. A faster attacker would need it modelled; this phase has none."
+    },
+    {
+      "id": "death.blessingRange",
+      "file": "src/creatures/players/player.cpp",
+      "symbol": "Player::getLostPercent, the blessing loop",
+      "observed": "Death-loss reduction counts blessings 2 through 8 — SEVEN regular blessings. Twist of Fate (1) is not one of them; it is the PvP skull protection.",
+      "decision": "Keep",
+      "fixture": "packages/domain/src/contexts/hunt/death.ts → FULL_BLESS_COUNT",
+      "value": 7,
+      "probe": {
+        "pattern": "for \\(int i = (2); i <= maxBlessing; i\\+\\+\\) \\{",
+        "captured": "2"
+      }
+    },
+    {
+      "id": "death.blessingFactor",
+      "file": "src/creatures/players/player.cpp",
+      "symbol": "Player::getLostPercent → factor",
+      "observed": "Each regular blessing is worth 8 percentage points of reduction on a non-retro server.",
+      "decision": "Keep",
+      "fixture": "packages/domain/src/contexts/hunt/death.ts → BLESSING_FACTOR",
+      "value": 8,
+      "probe": {
+        "pattern": "const auto factor = \\(isRetro \\? 6\\.31 : (8)\\);",
+        "captured": "8"
+      }
+    },
+    {
+      "id": "death.lowLevelLoss",
+      "file": "src/creatures/players/player.cpp",
+      "symbol": "Player::getLostPercent, the level < 24 branch",
+      "observed": "Below level 24 the base loss is a flat 10 percent of total experience, not the level formula.",
+      "decision": "Keep",
+      "fixture": "packages/domain/src/contexts/hunt/death.ts → LOW_LEVEL_LOSS_PERCENT",
+      "value": 10,
+      "probe": {
+        "pattern": "percentReduction = \\(percentReduction >= 0\\.40 \\? 0\\.50 : percentReduction\\);\\s*\\n\\s*lossPercent = (10);",
+        "captured": "10"
+      }
+    },
+    {
+      "id": "death.lowLevelBlessingBranch",
+      "file": "src/creatures/players/player.cpp",
+      "symbol": "Player::getLostPercent, the level < 24 branch",
+      "observed": "Below level 24, a blessing reduction of 40 percent or more is REPLACED by a flat 50 percent — before Promotion is added. Five, six and seven blessings therefore all reduce by the same 50 percent at low level.",
+      "decision": "Keep",
+      "fixture": "packages/domain/src/contexts/hunt/death.ts → lostPercent, and DL2/DL3",
+      "value": "percentReduction >= 0.40 -> 0.50",
+      "probe": {
+        "pattern": "(percentReduction = \\(percentReduction >= 0\\.40 \\? 0\\.50 : percentReduction\\);)",
+        "captured": "percentReduction = (percentReduction >= 0.40 ? 0.50 : percentReduction);"
+      }
+    },
+    {
+      "id": "death.highLevelLoss",
+      "file": "src/creatures/players/player.cpp",
+      "symbol": "Player::getLostPercent, the level >= 24 branch",
+      "observed": "From level 24 the base loss is a function of the fractional level and the total experience, which makes the ABSOLUTE experience lost depend on level alone.",
+      "decision": "Keep",
+      "fixture": "packages/domain/src/contexts/hunt/death.ts → lostPercent",
+      "value": "((tmpLevel + 50) * 50 * ((tmpLevel * tmpLevel) - (5 * tmpLevel) + 8)) / experience",
+      "probe": {
+        "pattern": "(lossPercent = \\(\\(tmpLevel \\+ 50\\) \\* 50 \\* \\(\\(tmpLevel \\* tmpLevel\\) - \\(5 \\* tmpLevel\\) \\+ 8\\)\\) / experience;)",
+        "captured": "lossPercent = ((tmpLevel + 50) * 50 * ((tmpLevel * tmpLevel) - (5 * tmpLevel) + 8)) / experience;"
+      }
+    },
+    {
+      "id": "death.promotion",
+      "file": "src/creatures/players/player.cpp",
+      "symbol": "Player::getLostPercent → isPromoted",
+      "observed": "Promotion adds 30 percentage points of reduction, AFTER the blessing handling and after the low-level replacement.",
+      "decision": "Keep",
+      "fixture": "packages/domain/src/contexts/hunt/death.ts → PROMOTION_REDUCTION",
+      "value": 30,
+      "probe": {
+        "pattern": "percentReduction \\+= (30) / 100\\.;",
+        "captured": "30"
+      }
+    },
+    {
+      "id": "death.result",
+      "file": "src/creatures/players/player.cpp",
+      "symbol": "Player::getLostPercent, the return",
+      "observed": "The result is a FRACTION of total experience: the base loss percent scaled by what the reductions left, divided by 100.",
+      "decision": "Keep",
+      "fixture": "packages/domain/src/contexts/hunt/death.ts → lostPercent",
+      "value": "(lossPercent * (1 - percentReduction)) / 100",
+      "probe": {
+        "pattern": "(return \\(lossPercent \\* \\(1 - percentReduction\\)\\) / 100\\.;)",
+        "captured": "return (lossPercent * (1 - percentReduction)) / 100.;"
+      }
+    },
+    {
+      "id": "death.expLossRounding",
+      "file": "src/creatures/players/player.cpp",
+      "symbol": "Player::death → expLoss",
+      "observed": "Experience lost is rounded UP. A death that would cost a fraction of a point costs a whole one.",
+      "decision": "Keep",
+      "fixture": "packages/domain/src/contexts/hunt/death.ts → experienceLost, and DL7",
+      "value": "ceil(experience * deathLossPercent)",
+      "probe": {
+        "pattern": "(auto expLoss = static_cast<uint64_t>\\(std::ceil\\(experience \\* deathLossPercent\\)\\);)",
+        "captured": "auto expLoss = static_cast<uint64_t>(std::ceil(experience * deathLossPercent));"
+      }
+    },
+    {
+      "id": "death.expLossGate",
+      "file": "src/creatures/players/player.cpp",
+      "symbol": "Player::death, the subtraction guard",
+      "observed": "Experience is only subtracted when the Character has NO vocation, or is above level 7. A vocationed Character at level 7 or below loses nothing.",
+      "decision": "Keep",
+      "fixture": "packages/domain/src/contexts/hunt/death.ts → losesExperience, and DL8",
+      "value": "vocation == NONE || level > 7",
+      "probe": {
+        "pattern": "(if \\(vocation->getId\\(\\) == VOCATION_NONE \\|\\| level > 7\\) \\{)",
+        "captured": "if (vocation->getId() == VOCATION_NONE || level > 7) {"
+      },
+      "reason": "Global Idle's Origin Character is vocation-less until the Level-8 Oracle, so it is on the FIRST side of this guard: it loses experience at every level. Recorded because reading only the 'level > 7' half would make the Origin Character immune to its own death penalty."
+    },
+    {
+      "id": "death.levelDown",
+      "file": "src/creatures/players/player.cpp",
+      "symbol": "Player::death, the level-down loop",
+      "observed": "After the loss, the level is walked down while the remaining experience is below the level's requirement. Level 1 is the floor.",
+      "decision": "Keep",
+      "fixture": "packages/domain/src/contexts/hunt/progression.ts → levelForXp, and DL9",
+      "value": "while (level > 1 && experience < getExpForLevel(level)) --level",
+      "probe": {
+        "pattern": "(while \\(level > 1 && experience < Player::getExpForLevel\\(level\\)\\) \\{)",
+        "captured": "while (level > 1 && experience < Player::getExpForLevel(level)) {"
+      }
+    },
+    {
+      "id": "death.unfairFight",
+      "file": "src/creatures/players/player.cpp",
+      "symbol": "Player::death → unfairFightReduction",
+      "observed": "The unfair-fight reduction is 100 (a multiplier of 1.0) for every death that is not PvP against higher levels.",
+      "decision": "Simplify",
+      "fixture": "packages/domain/src/contexts/hunt/death.ts",
+      "value": 100,
+      "probe": {
+        "pattern": "uint8_t unfairFightReduction = (100);",
+        "captured": "100"
+      },
+      "reason": "Phase 2 has no PvP, so the multiplier is always 1.0 and is not modelled as an input. The seam is the death policy's own parameters; PvP attaches there when it exists."
+    },
+    {
+      "id": "death.configOverride",
+      "file": "config.lua.dist",
+      "symbol": "deathLosePercent",
+      "observed": "The configuration override is disabled by default, so the formula branch above is the live one.",
+      "decision": "Keep",
+      "fixture": "docs/specs/phase-2/PHASE_2_CANARY_SOURCE_MAP.md §8",
+      "value": -1,
+      "probe": {
+        "pattern": "deathLosePercent = (-1)",
+        "captured": "-1"
+      }
+    },
+    {
+      "id": "death.isPromoted",
+      "file": "src/creatures/players/player.cpp",
+      "symbol": "Player::isPromoted",
+      "observed": "A Character is promoted when its vocation has no further promotion AND is not itself the unpromoted entry — which is FALSE for a vocation-less Character.",
+      "decision": "Keep",
+      "fixture": "packages/domain/src/contexts/hunt/death.ts, and DL10",
+      "value": "promotedVocation == VOCATION_NONE && vocation->getId() != promotedVocation",
+      "probe": {
+        "pattern": "(return promotedVocation == VOCATION_NONE && vocation->getId\\(\\) != promotedVocation;)",
+        "captured": "return promotedVocation == VOCATION_NONE && vocation->getId() != promotedVocation;"
+      }
+    },
+    {
+      "id": "death.promotedVocationLookup",
+      "file": "src/creatures/players/vocations/vocation.cpp",
+      "symbol": "Vocations::getPromotedVocation",
+      "observed": "The promoted vocation of a vocation id is the one whose fromVocation names it. Nothing names vocation 0, so vocation 0 has no promotion and is therefore not promoted.",
+      "decision": "Keep",
+      "fixture": "DL10 — a pre-vocation Character receives no Promotion reduction",
+      "value": "VOCATION_NONE for vocation 0",
+      "probe": {
+        "pattern": "(if \\(vocationPtr->fromVocation == vocationId && currentVocationId != vocationId\\) \\{)",
+        "captured": "if (vocationPtr->fromVocation == vocationId && currentVocationId != vocationId) {"
+      }
+    },
+    {
+      "id": "death.levelPercent",
+      "file": "src/creatures/players/player.cpp",
+      "symbol": "Player::getPercentLevel",
+      "observed": "Progress into the current level, as a percentage with two decimals; it feeds the fractional level the >= 24 formula uses.",
+      "decision": "Keep",
+      "fixture": "packages/domain/src/contexts/hunt/death.ts → levelPercent",
+      "value": "round(((count * 100) / nextLevelCount) * 100) / 100",
+      "probe": {
+        "pattern": "(const double_t result = round\\(\\(\\(count \\* 100\\.\\) / nextLevelCount\\) \\* 100\\.\\) / 100\\.;)",
+        "captured": "const double_t result = round(((count * 100.) / nextLevelCount) * 100.) / 100.;"
+      }
+    },
+    {
+      "id": "death.skillLossRounding",
+      "file": "src/creatures/players/player.cpp",
+      "symbol": "Player::death, the skill loop",
+      "observed": "Skill tries lost are TRUNCATED, not rounded up — the opposite of the experience loss in the same function.",
+      "decision": "Simplify",
+      "fixture": "recorded only; Phase 4 owns durable Skills",
+      "value": "static_cast<uint32_t>(sumSkillTries * deathLossPercent)",
+      "probe": {
+        "pattern": "(auto lostSkillTries = static_cast<uint32_t>\\(sumSkillTries \\* deathLossPercent\\);)",
+        "captured": "auto lostSkillTries = static_cast<uint32_t>(sumSkillTries * deathLossPercent);"
+      },
+      "reason": "Phase 2 has no durable Skill representation, and inventing one to delete it would be a shadow system. The rounding is recorded now so the phase that owns Skills does not re-derive it — and so the difference from the experience path is not mistaken for a transcription error later."
+    },
+    {
+      "id": "blessings.enum",
+      "file": "src/enums/player_blessings.hpp",
+      "symbol": "enum class Blessings",
+      "observed": "Eight blessings. Twist of Fate is 1; the seven that reduce death loss are 2 through 8.",
+      "decision": "Keep",
+      "fixture": "packages/domain/src/contexts/hunt/death.ts → BLESSING_NAMES",
+      "value": [
+        "TwistOfFate",
+        "TheWisdomOfSolitude",
+        "TheSparkOfThePhoenix",
+        "TheFireOfTheSuns",
+        "TheSpiritualShielding",
+        "TheEmbraceOfTibia",
+        "HearthOfTheMountain",
+        "BloodOfTheMountain"
+      ],
+      "probe": {
+        "pattern": "TwistOfFate = 1,\\s*\\n\\s*TheWisdomOfSolitude = (2),",
+        "captured": "2"
+      }
+    }
+  ]
+}

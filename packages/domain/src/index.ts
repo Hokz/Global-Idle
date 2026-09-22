@@ -10,6 +10,7 @@ export * as party from './contexts/party/index.js';
 export * as activity from './contexts/activity/index.js';
 export * as economy from './contexts/economy/index.js';
 export * as content from './contexts/content/index.js';
+export * as hunt from './contexts/hunt/index.js';
 
 export { createPrismaClient } from './platform/prisma/client.js';
 export type { PrismaClient, PrismaClientOptions } from './platform/prisma/client.js';

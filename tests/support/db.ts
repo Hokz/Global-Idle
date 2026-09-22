@@ -46,7 +46,7 @@ export const T0 = AT('2026-01-01T00:00:00.000Z');
 export async function truncateAll(prisma: PrismaClient): Promise<void> {
   await prisma.$executeRawUnsafe(`
     TRUNCATE TABLE
-      "OccupancyClaim", "SkillTrainingActivity", "SessionBoundActivity",
+      "HuntRun", "OccupancyClaim", "SkillTrainingActivity", "SessionBoundActivity",
       "ActivityParticipant", "Activity", "CharacterStamina", "Character",
       "EntitlementAudit", "Entitlement", "AuthIdentity",
       "LedgerEntry", "CurrencyBalance", "ActiveUseTimer",

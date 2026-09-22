@@ -178,3 +178,169 @@ input {
   border-radius: 8px;
   min-height: 60vh;
 }
+
+/* ── the Game Window (Phase 2 §10) ──────────────────────────────────────────
+   A surface of its own, not a variation on the Atlas. Health bars and the
+   creature row TRANSITION between server states so movement reads smoothly;
+   nothing here originates a value, and no rule is expressed in CSS. */
+.game {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px;
+}
+.game-head {
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.game-head h2 {
+  margin: 0;
+}
+.badge {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.connection-ONLINE_ACTIVE {
+  border-color: #3f7a55;
+  color: #8fd4a6;
+}
+.connection-RECONNECT_GRACE_PAUSED {
+  border-color: #8a6a2f;
+  color: var(--accent-2);
+}
+.connection-ACTIVITY_ENDED {
+  border-color: #7a3f3f;
+  color: #e08a8a;
+}
+
+.scene {
+  background: linear-gradient(#1a1d23, #121418);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.scene-room {
+  font-weight: 600;
+}
+.scene-floor {
+  display: flex;
+  gap: 24px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  flex: 1;
+}
+.actors {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+.actor {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 72px;
+}
+.actor figcaption {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.actor.dead {
+  opacity: 0.35;
+}
+.sprite {
+  border-radius: 8px;
+  border: 2px solid;
+}
+.character-sprite {
+  width: 48px;
+  height: 64px;
+  background: #3a3f4b;
+  border-color: #6b7385;
+}
+.creature-sprite {
+  width: 36px;
+  height: 36px;
+  background: #4a3a30;
+  border-color: #8a6a55;
+}
+.bar {
+  display: block;
+  width: 64px;
+  height: 6px;
+  background: #2a2e36;
+  border-radius: 999px;
+  overflow: hidden;
+}
+.bar-fill {
+  display: block;
+  height: 100%;
+  /* PRESENTATION ONLY: the width comes from the server's numbers; this just
+     stops it snapping between polls. */
+  transition: width 400ms linear;
+}
+.bar-fill.health {
+  background: #6fbf8a;
+}
+.bar-fill.creature-health {
+  background: #c2703a;
+}
+.bar-fill.level {
+  background: var(--focus);
+}
+
+.readouts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+.readouts .stat {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+.readouts dt {
+  color: var(--muted);
+  font-size: 13px;
+}
+.readouts dd {
+  margin: 2px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.readouts .bar {
+  width: 100%;
+}
+.warn {
+  color: var(--accent-2);
+}
+
+.log {
+  list-style: none;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+  max-height: 150px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}

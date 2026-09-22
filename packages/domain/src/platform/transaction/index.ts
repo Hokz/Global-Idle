@@ -81,10 +81,13 @@ export async function withTransaction<T>(
 /**
  * Lock rows in the ONE global order of §8.5:
  *
- *   Account -> Character (ascending id) -> Activity
+ *   Account -> Character (ascending id) -> Activity (and its HuntRun)
  *           -> ActivityParticipant (ascending characterId)
  *           -> OccupancyClaim (ascending characterId)
- *           -> CurrencyBalance (ascending accountId) -> LedgerEntry
+ *           -> CurrencyBalance (ascending subjectId) -> LedgerEntry
+ *
+ * HuntRun is keyed BY its Activity and is a 1:1 extension of it, so it locks
+ * at the Activity position rather than getting a position of its own.
  *
  * Two party starts touching the same Characters therefore cannot deadlock.
  * This helper exists so the order is obeyed by construction rather than by
@@ -106,14 +109,54 @@ export async function lockAccount(tx: UnitOfWork, accountId: string): Promise<vo
   await tx.$queryRawUnsafe(`SELECT id FROM "Account" WHERE id = $1 FOR UPDATE`, accountId);
 }
 
+/**
+ * What a locked HuntRun row says about whether it is already over.
+ *
+ * `present: false` means there is no run for that Activity at all, which is a
+ * different thing from a run that has ended and must not be collapsed into it.
+ */
+export type HuntRunLock =
+  { readonly present: false } | { readonly present: true; readonly endedReason: string | null };
+
+/**
+ * Lock a HuntRun row and report the ending it already carries.
+ *
+ * This is what makes a run's TERMINAL TRANSITION once-only against concurrent
+ * callers rather than against sequential retries. Two requests that both want
+ * to end the same run — a poll that has just simulated a death and a Leave
+ * that arrived at the same instant — serialize here, and the second one sees
+ * the first one's ending instead of settling a second penalty.
+ *
+ * The lock and the test are ONE statement on purpose. `FOR UPDATE` followed by
+ * a separate read is two statements, and under ReadCommitted each takes its
+ * own snapshot: the row this returns is the version the lock was granted on,
+ * so there is no window between proving the run is live and acting on it.
+ *
+ * Callers take the Character lock FIRST (§8.5 above). Locking a HuntRun is
+ * cheap to repeat: a caller that already holds the row re-acquires it without
+ * waiting, so `endRun` can guard itself without knowing who called it.
+ */
+export async function lockHuntRun(tx: UnitOfWork, activityId: string): Promise<HuntRunLock> {
+  const rows = await tx.$queryRawUnsafe<{ endedReason: string | null }[]>(
+    `SELECT "endedReason" FROM "HuntRun" WHERE "activityId" = $1 FOR UPDATE`,
+    activityId,
+  );
+  const row = rows[0];
+  return row === undefined ? { present: false } : { present: true, endedReason: row.endedReason };
+}
+
 export async function lockBalance(
   tx: UnitOfWork,
-  accountId: string,
+  subjectId: string,
+  custody: string,
   currency: string,
 ): Promise<void> {
   await tx.$queryRawUnsafe(
-    `SELECT "accountId" FROM "CurrencyBalance" WHERE "accountId" = $1 AND currency = $2::"CurrencyKind" FOR UPDATE`,
-    accountId,
+    `SELECT "subjectId" FROM "CurrencyBalance"
+      WHERE "subjectId" = $1 AND custody = $2::"CurrencyCustody" AND currency = $3::"CurrencyKind"
+      FOR UPDATE`,
+    subjectId,
+    custody,
     currency,
   );
 }

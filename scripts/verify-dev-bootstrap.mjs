@@ -18,7 +18,9 @@
  * reach a signal prints everything the stack said before giving up.
  */
 import { spawn, spawnSync } from 'node:child_process';
-import { dirname, resolve } from 'node:path';
+import { statSync } from 'node:fs';
+import { readdir } from 'node:fs/promises';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -228,6 +230,30 @@ async function main() {
     { deadline },
   );
   say(`  migration ${ready.info.migrations.version}, content ${ready.info.content.version}`);
+
+  // 7b. the CURRENT bundle is the one this bootstrap just built.
+  //
+  //     Readiness only says that SOME bundle resolves. `currentVersion` breaks
+  //     a tie on `publishedAt` by version string, so a stale bundle left in the
+  //     output directory by an earlier build could become the world while every
+  //     health check stayed green — and the symptom was the game quietly
+  //     serving older content. Publication is now ordered by build time; this
+  //     is the assertion that keeps it that way.
+  {
+    const directory = resolve(ROOT, process.env.CONTENT_BUNDLE_DIR ?? 'packages/game-data/bundles');
+    const built = (await readdir(directory))
+      .filter((name) => name.endsWith('.json'))
+      .map((name) => ({ name, at: statSync(join(directory, name)).mtimeMs }))
+      .sort((a, b) => b.at - a.at);
+    const newest = built[0]?.name.replace(/\.json$/, '');
+    if (!newest) throw new Error(`no content bundle was built into ${directory}`);
+    if (ready.info.content.version !== newest) {
+      throw new Error(
+        `the current bundle is ${ready.info.content.version}, but this bootstrap built ${newest}`,
+      );
+    }
+    say(`  current bundle is the one just built (${newest})`);
+  }
 
   // 8. web is actually serving THE SESSION ENTRY ROUTE, not merely compiled
   //    (Phase 1 §17). A 200 from an error page is still a 200, and "the web

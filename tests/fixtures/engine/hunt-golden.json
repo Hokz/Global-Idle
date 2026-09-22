@@ -1,0 +1,4073 @@
+{
+  "start": {
+    "tick": 0,
+    "room": 1,
+    "cycle": 0,
+    "health": 150,
+    "supplyCharges": 20,
+    "creatures": [],
+    "characterNextAttackTick": 0,
+    "ended": null
+  },
+  "step": {
+    "state": {
+      "tick": 600,
+      "room": 3,
+      "cycle": 1,
+      "health": 122,
+      "supplyCharges": 19,
+      "creatures": [
+        {
+          "key": "creature.rat",
+          "health": 5,
+          "nextAttackTick": 602
+        }
+      ],
+      "characterNextAttackTick": 601,
+      "ended": null
+    },
+    "rewards": [
+      {
+        "tick": 99,
+        "creatureKey": "creature.rat",
+        "experience": 5,
+        "gold": 3
+      },
+      {
+        "tick": 221,
+        "creatureKey": "creature.rat",
+        "experience": 5,
+        "gold": 2
+      },
+      {
+        "tick": 365,
+        "creatureKey": "creature.rat",
+        "experience": 5,
+        "gold": 1
+      },
+      {
+        "tick": 513,
+        "creatureKey": "creature.rat",
+        "experience": 5,
+        "gold": 2
+      }
+    ],
+    "events": [
+      {
+        "tick": 1,
+        "kind": "spawn",
+        "room": 1,
+        "count": 1
+      },
+      {
+        "tick": 1,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 3,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 3,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 5,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 5,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 7,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 7,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 9,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 3
+      },
+      {
+        "tick": 9,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 11,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 11,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 13,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 13,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 15,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 15,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 2
+      },
+      {
+        "tick": 17,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 17,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 19,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 19,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 2
+      },
+      {
+        "tick": 21,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 21,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 2
+      },
+      {
+        "tick": 23,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 23,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 25,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 25,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 27,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 27,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 29,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 29,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 31,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 31,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 33,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 33,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 35,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 35,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 37,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 37,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 39,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 39,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 41,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 41,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 43,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 43,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 45,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 2
+      },
+      {
+        "tick": 45,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 47,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 47,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 49,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 49,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 51,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 51,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 53,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 53,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 55,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 55,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 57,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 57,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 59,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 59,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 61,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 61,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 63,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 63,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 65,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 65,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 67,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 3
+      },
+      {
+        "tick": 67,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 69,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 69,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 71,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 71,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 73,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 2
+      },
+      {
+        "tick": 73,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 75,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 75,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 77,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 77,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 79,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 79,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 3
+      },
+      {
+        "tick": 81,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 81,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 83,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 83,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 85,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 85,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 87,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 87,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 89,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 89,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 91,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 91,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 93,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 93,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 95,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 95,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 97,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 97,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 99,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 2
+      },
+      {
+        "tick": 99,
+        "kind": "kill",
+        "target": "creature.rat"
+      },
+      {
+        "tick": 99,
+        "kind": "room-cleared",
+        "room": 1,
+        "cycle": 0
+      },
+      {
+        "tick": 100,
+        "kind": "spawn",
+        "room": 2,
+        "count": 2
+      },
+      {
+        "tick": 101,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 102,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 102,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 103,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 2
+      },
+      {
+        "tick": 104,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 104,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 105,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 106,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 106,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 107,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 108,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 108,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 109,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 110,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 2
+      },
+      {
+        "tick": 110,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 111,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 112,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 112,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 113,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 114,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 114,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 115,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 116,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 2
+      },
+      {
+        "tick": 116,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 117,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 118,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 3
+      },
+      {
+        "tick": 118,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 119,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 120,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 120,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 121,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 122,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 122,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 2
+      },
+      {
+        "tick": 123,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 124,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 124,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 125,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 126,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 126,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 127,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 128,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 128,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 129,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 2
+      },
+      {
+        "tick": 130,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 130,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 131,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 132,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 132,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 133,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 134,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 134,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 135,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 136,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 136,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 137,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 138,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 138,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 139,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 140,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 140,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 141,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 142,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 2
+      },
+      {
+        "tick": 142,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 143,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 144,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 4
+      },
+      {
+        "tick": 144,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 145,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 146,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 146,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 147,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 148,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 148,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 149,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 150,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 150,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 151,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 2
+      },
+      {
+        "tick": 152,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 152,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 153,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 154,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 154,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 155,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 156,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 156,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 157,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 158,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 158,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 159,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 160,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 160,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 161,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 162,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 162,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 163,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 164,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 164,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 165,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 166,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 166,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 3
+      },
+      {
+        "tick": 167,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 168,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 168,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 169,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 170,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 170,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 171,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 3
+      },
+      {
+        "tick": 172,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 172,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 173,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 174,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 174,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 175,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 176,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 2
+      },
+      {
+        "tick": 176,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 177,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 178,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 178,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 179,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 180,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 180,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 181,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 182,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 182,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 183,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 184,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 184,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 185,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 186,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 186,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 187,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 188,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 188,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 189,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 190,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 190,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 191,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 192,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 192,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 193,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 194,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 194,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 195,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 196,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 196,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 197,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 4
+      },
+      {
+        "tick": 198,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 198,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 199,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 200,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 200,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 201,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 202,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 202,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 203,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 204,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 204,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 205,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 206,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 206,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 207,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 208,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 208,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 209,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 210,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 210,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 211,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 212,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 212,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 213,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 214,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 214,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 215,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 216,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 2
+      },
+      {
+        "tick": 216,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 217,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 218,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 218,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 219,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 220,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 220,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 221,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 3
+      },
+      {
+        "tick": 221,
+        "kind": "kill",
+        "target": "creature.rat"
+      },
+      {
+        "tick": 222,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 2
+      },
+      {
+        "tick": 223,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 224,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 225,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 226,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 227,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 228,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 2
+      },
+      {
+        "tick": 229,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 230,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 231,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 232,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 233,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 234,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 235,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 236,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 237,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 238,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 239,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 240,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 241,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 242,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 243,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 244,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 245,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 246,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 247,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 248,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 249,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 2
+      },
+      {
+        "tick": 250,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 251,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 252,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 253,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 254,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 255,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 256,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 257,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 258,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 259,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 260,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 261,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 262,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 263,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 264,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 265,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 266,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 267,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 268,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 269,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 270,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 271,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 272,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 273,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 274,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 275,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 276,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 277,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 3
+      },
+      {
+        "tick": 278,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 279,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 280,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 281,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 282,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 283,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 284,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 285,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 286,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 287,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 288,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 2
+      },
+      {
+        "tick": 289,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 2
+      },
+      {
+        "tick": 290,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 3
+      },
+      {
+        "tick": 291,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 292,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 293,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 294,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 295,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 2
+      },
+      {
+        "tick": 296,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 297,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 298,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 299,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 300,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 301,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 302,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 303,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 304,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 305,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 306,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 3
+      },
+      {
+        "tick": 307,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 308,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 3
+      },
+      {
+        "tick": 309,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 310,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 2
+      },
+      {
+        "tick": 311,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 312,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 313,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 314,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 315,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 316,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 317,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 318,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 2
+      },
+      {
+        "tick": 319,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 320,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 321,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 322,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 323,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 324,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 325,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 326,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 327,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 328,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 329,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 2
+      },
+      {
+        "tick": 330,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 331,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 332,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 333,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 334,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 335,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 336,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 337,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 338,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 2
+      },
+      {
+        "tick": 339,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 340,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 341,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 342,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 343,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 344,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 345,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 346,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 347,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 348,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 2
+      },
+      {
+        "tick": 349,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 2
+      },
+      {
+        "tick": 350,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 351,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 352,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 353,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 354,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 355,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 356,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 357,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 358,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 2
+      },
+      {
+        "tick": 359,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 360,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 361,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 362,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 363,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 364,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 365,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 365,
+        "kind": "kill",
+        "target": "creature.rat"
+      },
+      {
+        "tick": 365,
+        "kind": "room-cleared",
+        "room": 2,
+        "cycle": 0
+      },
+      {
+        "tick": 366,
+        "kind": "spawn",
+        "room": 3,
+        "count": 1
+      },
+      {
+        "tick": 367,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 368,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 369,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 370,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 371,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 2
+      },
+      {
+        "tick": 372,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 373,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 374,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 4
+      },
+      {
+        "tick": 375,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 2
+      },
+      {
+        "tick": 376,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 377,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 378,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 379,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 380,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 381,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 382,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 383,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 384,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 385,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 386,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 387,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 388,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 389,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 390,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 391,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 392,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 2
+      },
+      {
+        "tick": 393,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 394,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 395,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 396,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 397,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 398,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 399,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 400,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 401,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 402,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 403,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 404,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 405,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 406,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 407,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 2
+      },
+      {
+        "tick": 408,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 409,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 410,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 411,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 412,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 413,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 2
+      },
+      {
+        "tick": 414,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 4
+      },
+      {
+        "tick": 415,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 416,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 417,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 418,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 419,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 420,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 421,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 422,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 423,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 424,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 425,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 426,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 427,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 428,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 429,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 430,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 431,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 432,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 433,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 434,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 435,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 436,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 437,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 438,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 439,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 440,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 441,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 442,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 443,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 444,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 445,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 446,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 447,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 448,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 449,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 450,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 451,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 3
+      },
+      {
+        "tick": 452,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 453,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 454,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 455,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 456,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 457,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 458,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 459,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 460,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 461,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 462,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 463,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 464,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 465,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 466,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 467,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 468,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 469,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 470,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 471,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 472,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 473,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 474,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 2
+      },
+      {
+        "tick": 474,
+        "kind": "supply",
+        "healed": 74,
+        "remaining": 19
+      },
+      {
+        "tick": 475,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 476,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 477,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 478,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 479,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 2
+      },
+      {
+        "tick": 480,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 481,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 482,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 483,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 484,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 485,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 486,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 487,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 488,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 489,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 490,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 491,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 492,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 493,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 494,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 495,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 496,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 497,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 498,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 499,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 500,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 501,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 502,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 503,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 504,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 505,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 506,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 507,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 508,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 509,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 510,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 511,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 512,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 513,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 3
+      },
+      {
+        "tick": 513,
+        "kind": "kill",
+        "target": "creature.rat"
+      },
+      {
+        "tick": 513,
+        "kind": "room-cleared",
+        "room": 3,
+        "cycle": 1
+      },
+      {
+        "tick": 514,
+        "kind": "spawn",
+        "room": 3,
+        "count": 1
+      },
+      {
+        "tick": 515,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 516,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 517,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 518,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 519,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 520,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 521,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 522,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 523,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 524,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 525,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 526,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 527,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 528,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 529,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 2
+      },
+      {
+        "tick": 530,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 531,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 532,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 533,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 534,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 535,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 536,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 537,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 538,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 539,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 540,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 541,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 542,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 543,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 544,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 545,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 546,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 547,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 548,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 549,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 550,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 551,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 552,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 553,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 554,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 555,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 556,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 557,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 558,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 559,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 560,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 561,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 562,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 563,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 564,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 565,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 566,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 567,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 2
+      },
+      {
+        "tick": 568,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 569,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 570,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 571,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 572,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 573,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 574,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 575,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 576,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 577,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 578,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 579,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 580,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 581,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 582,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 1
+      },
+      {
+        "tick": 583,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 584,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 585,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 586,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 587,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 588,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 589,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 590,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 591,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 592,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 593,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 594,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 595,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 596,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 597,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 598,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 0
+      },
+      {
+        "tick": 599,
+        "kind": "hit",
+        "target": "creature.rat",
+        "damage": 2
+      },
+      {
+        "tick": 600,
+        "kind": "taken",
+        "source": "creature.rat",
+        "damage": 1
+      }
+    ],
+    "roomsCleared": 3,
+    "suppliesUsed": 1,
+    "drawsConsumed": 1539
+  },
+  "tail": [
+    0.3907769052311778,
+    0.08363376487977803,
+    0.23320496338419616,
+    0.6057699462398887,
+    0.5792986862361431
+  ],
+  "drawCount": 1544
+}
