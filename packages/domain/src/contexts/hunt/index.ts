@@ -13,6 +13,7 @@ export {
   endForSession,
   endRun,
   endRunOrActivity,
+  snapshot,
   startRun,
 } from './run.js';
 export type { DeathPenalty, HuntEndReason, HuntRunView } from './run.js';

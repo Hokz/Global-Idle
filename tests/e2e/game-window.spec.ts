@@ -144,7 +144,7 @@ test.describe('§12 GW — the Game Window', () => {
     // The connection goes away. The window must not tear itself down or
     // pretend combat is still resolving: the run is held on the server, and
     // the player is told so.
-    await page.route('**/api/characters/*/hunt', (route) => route.abort('failed'));
+    await page.route('**/api/characters/*/hunt/advance', (route) => route.abort('failed'));
     await expect(page.getByTestId('poll-error')).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId('poll-error')).toContainText('five minutes');
 
@@ -158,8 +158,8 @@ test.describe('§12 GW — the Game Window', () => {
     // the server set. The response is shaped here rather than waited for,
     // because a client that is reading is by definition connected and its own
     // read resumes the run; CX3 to CX5 own that behaviour server-side.
-    await page.unroute('**/api/characters/*/hunt');
-    await page.route('**/api/characters/*/hunt', async (route) => {
+    await page.unroute('**/api/characters/*/hunt/advance');
+    await page.route('**/api/characters/*/hunt/advance', async (route) => {
       const response = await route.fetch();
       const body = (await response.json()) as Record<string, unknown>;
       await route.fulfill({
@@ -187,10 +187,10 @@ test.describe('§12 GW — the Game Window', () => {
     try {
       const before = await runOf(prisma, characterId);
 
-      await page.route('**/api/characters/*/hunt', (route) => route.abort('failed'));
+      await page.route('**/api/characters/*/hunt/advance', (route) => route.abort('failed'));
       await expect(page.getByTestId('poll-error')).toBeVisible({ timeout: 15_000 });
 
-      await page.unroute('**/api/characters/*/hunt');
+      await page.unroute('**/api/characters/*/hunt/advance');
 
       // Back to Live, on the SAME run: the room and the totals continue from
       // where they were rather than restarting.

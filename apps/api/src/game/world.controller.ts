@@ -11,6 +11,7 @@ import {
   Controller,
   Delete,
   Get,
+  Header,
   HttpCode,
   HttpStatus,
   Inject,
@@ -40,6 +41,7 @@ import {
 } from '@global-idle/shared';
 import {
   atlasMarkerSchema,
+  mapSchema,
   regionSchema,
   type ContentBundleResolver,
 } from '@global-idle/game-data';
@@ -48,9 +50,10 @@ import { SessionGuard, type RequestWithSession } from './session.guard.js';
 import { asHttp, codeOf, fail, notFound } from './errors.js';
 import { currentActivity, huntView } from './views.js';
 
-/** The one response this controller writes itself; see `activity` below. */
+/** The responses this controller writes itself; see `activity` below. */
 interface JsonReply {
   json(body: unknown): void;
+  setHeader(name: string, value: string): void;
 }
 
 @Controller('api')
@@ -265,24 +268,94 @@ export class WorldController {
   }
 
   /**
-   * The Hunt run, advanced to now (§11).
+   * The Hunt run as it stands. PURE (Phase 3.5 §6).
    *
-   * A GET that mutates, deliberately: advance-on-read is the whole model
-   * (P2-D1), and a separate "tick" command would just be this endpoint with a
-   * different verb and an extra round trip.
+   * This used to be the endpoint that advanced the simulation, and that was a
+   * GET the whole stack is entitled to repeat: a retry, a prefetch, a strict
+   * mode double-render, a proxy revalidating. Each repetition was a
+   * settlement. Advance-on-read survives — `POST .../hunt/advance` is the read
+   * that advances — and this one answers with durable state and writes nothing.
+   *
+   * `no-store`, because a Hunt snapshot is never valid a second time.
    */
   @Get('characters/:id/hunt')
-  async run(@Req() request: RequestWithSession, @Param('id') id: string) {
+  async run(
+    @Req() request: RequestWithSession,
+    @Param('id') id: string,
+    @Res() reply: JsonReply,
+  ): Promise<void> {
     await this.own(request, id);
-    return this.advanceRun(id, true);
+    // `HuntRunView | null`, and the null has to be on the wire. Returning it
+    // through Nest sends an EMPTY 200, which a client cannot tell from a
+    // truncated response — the same reason `activity` writes its own answer.
+    reply.setHeader('Cache-Control', 'no-store');
+    const claim = await this.prisma.occupancyClaim.findUnique({
+      where: { characterId: id },
+      select: { activityId: true },
+    });
+    if (!claim) {
+      reply.json(null);
+      return;
+    }
+    try {
+      reply.json(
+        (await withTransaction(this.prisma, (tx) =>
+          huntContext.snapshot(tx, {
+            activityId: toActivityId(claim.activityId),
+            resolver: this.resolver,
+          }),
+        )) ?? null,
+      );
+    } catch (error) {
+      throw asHttp(error);
+    }
   }
 
-  /** Liveness. A session is ONLINE_ACTIVE while these keep arriving (P2-D7). */
+  /**
+   * Bring the run up to now, and prove the connection alive doing it (§11).
+   *
+   * The ONE route that settles. A client drives it on its own clock; the
+   * server still decides how far "now" reaches, because only the span proven
+   * live is simulated.
+   */
+  @Post('characters/:id/hunt/advance')
+  @HttpCode(HttpStatus.OK)
+  async advance(
+    @Req() request: RequestWithSession,
+    @Param('id') id: string,
+    @Res() reply: JsonReply,
+  ): Promise<void> {
+    await this.own(request, id);
+    reply.setHeader('Cache-Control', 'no-store');
+    reply.json((await this.advanceRun(id, true)) ?? null);
+  }
+
+  /** Liveness. A session is ONLINE_ACTIVE while these keep arriving (P2-D7).
+   *  The same settlement as `advance`, under the name Phase 2 gave it. */
   @Post('characters/:id/hunt/heartbeat')
   @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'no-store')
   async heartbeat(@Req() request: RequestWithSession, @Param('id') id: string) {
     await this.own(request, id);
-    return this.advanceRun(id, true);
+    return (await this.advanceRun(id, true)) ?? null;
+  }
+
+  /**
+   * The static tile map a Hunt is played on (Phase 3.5 §5).
+   *
+   * CONTENT, not state: rows, a legend and regions, immutable for the life of
+   * a bundle version. It is fetched once and cached hard, which is the whole
+   * reason the map is not part of the run snapshot — sending 61 by 11 tiles
+   * with every poll would be the same bytes, every second, forever.
+   */
+  @Get('maps/:key')
+  @Header('Cache-Control', 'public, max-age=31536000, immutable')
+  async map(@Param('key') key: string) {
+    const bundle = await this.current();
+    const definition = bundle.definitions.get(key);
+    const parsed = definition ? mapSchema.safeParse(definition) : undefined;
+    if (!parsed?.success) throw notFound();
+    return { contentVersion: bundle.version, map: parsed.data };
   }
 
   private async advanceRun(characterId: string, seen: boolean) {
