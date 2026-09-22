@@ -504,7 +504,9 @@ a disconnected character.
 - XP/gold;
 - session persistence, connection lifecycle and the 5-minute reconnect grace.
 
-### Phase 3 — Itemization — current phase
+### Phase 3 — Itemization
+
+> Status lives in [`PROJECT_STATE.json`](./PROJECT_STATE.json), not here.
 - implementation specification:
   [`docs/specs/phase-3/PHASE_3_ITEMIZATION_INVENTORY_LOGISTICS_SPEC.md`](specs/phase-3/PHASE_3_ITEMIZATION_INVENTORY_LOGISTICS_SPEC.md);
 - BaseItem;

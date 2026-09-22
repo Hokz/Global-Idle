@@ -380,3 +380,262 @@ describe('§20 ITM — the stack limit is the DEFINITION’s', () => {
     );
   });
 });
+
+describe('§20 OWN — one Character cannot reach into another', () => {
+  /** A and B on the SAME account, each with the tutorial grant. */
+  async function pair() {
+    const a = await idle();
+    const b = await idle({ accountId: a.accountId, vocation: 'KNIGHT' });
+    return { a, b };
+  }
+
+  const bItem = (characterId: string, definitionKey: string) =>
+    prisma.itemInstance.findFirstOrThrow({ where: { characterId, definitionKey } });
+
+  it('OWN1: Character A cannot SELL Character B’s item', async () => {
+    const { a, b } = await pair();
+    const cheese = await withTransaction(prisma, (tx) =>
+      items.createItem(tx, {
+        bundle,
+        accountId: a.accountId,
+        characterId: b.characterId,
+        definitionKey: 'item.cheese',
+        quantity: 3,
+        location: 'LOOT_POUCH',
+        at: T0,
+      }),
+    );
+
+    await expectDomainError(
+      () =>
+        withTransaction(prisma, (tx) =>
+          items.sell(tx, {
+            bundle,
+            serviceKey: 'service.rookgaard.counter',
+            accountId: a.accountId,
+            characterId: a.characterId,
+            instanceId: cheese.id,
+            operationId: 'own1' as never,
+            at: T0,
+          }),
+        ),
+      'ItemNotFound',
+    );
+
+    // Still there, still B's, and nothing was credited.
+    const after = await prisma.itemInstance.findUniqueOrThrow({ where: { id: cheese.id } });
+    expect(after.quantity).toBe(3);
+    expect(after.characterId).toBe(b.characterId);
+  });
+
+  it('OWN2: Character A cannot STASH Character B’s item', async () => {
+    const { a, b } = await pair();
+    const cheese = await withTransaction(prisma, (tx) =>
+      items.createItem(tx, {
+        bundle,
+        accountId: a.accountId,
+        characterId: b.characterId,
+        definitionKey: 'item.cheese',
+        quantity: 2,
+        location: 'LOOT_POUCH',
+        at: T0,
+      }),
+    );
+
+    await expectDomainError(
+      () =>
+        withTransaction(prisma, (tx) =>
+          items.stow(tx, {
+            bundle,
+            accountId: a.accountId,
+            characterId: a.characterId,
+            instanceId: cheese.id,
+            at: T0,
+          }),
+        ),
+      'ItemNotFound',
+    );
+    expect(await prisma.stashEntry.count({ where: { accountId: a.accountId } })).toBe(0);
+  });
+
+  it('OWN3: a SAFE Character cannot touch a HUNTING one’s carried state', async () => {
+    // The safe-context check is asked about the ACTING Character, so A is
+    // safe and the check passes — which is precisely why ownership has to be
+    // the thing that refuses. B is mid-Hunt and must be untouchable.
+    const a = await idle();
+    const hunting = await startHunt(prisma, resolver, version, T0, {
+      accountId: a.accountId,
+      vocation: 'KNIGHT',
+    });
+    const potion = await bItem(hunting.characterId, POTION);
+    const before = potion.quantity;
+
+    await expectDomainError(
+      () =>
+        withTransaction(prisma, (tx) =>
+          items.sell(tx, {
+            bundle,
+            serviceKey: 'service.rookgaard.counter',
+            accountId: a.accountId,
+            characterId: a.characterId,
+            instanceId: potion.id,
+            operationId: 'own3' as never,
+            at: T0,
+          }),
+        ),
+      'ItemNotFound',
+    );
+    await expectDomainError(
+      () =>
+        withTransaction(prisma, (tx) =>
+          items.moveItem(tx, {
+            bundle,
+            accountId: a.accountId,
+            characterId: a.characterId,
+            baseLevel: 1,
+            instanceId: potion.id,
+            to: { kind: 'DEPOT' },
+            at: T0,
+          }),
+        ),
+      'ItemNotFound',
+    );
+
+    const after = await prisma.itemInstance.findUniqueOrThrow({ where: { id: potion.id } });
+    expect(after.quantity).toBe(before);
+    expect(after.characterId).toBe(hunting.characterId);
+  });
+
+  it('OWN4: an EQUIPPED item cannot be sold or stashed — unequip it first', async () => {
+    const hero = await idle();
+    const dagger = await bItem(hero.characterId, DAGGER);
+    expect(dagger.location).toBe('EQUIPPED');
+
+    await expectDomainError(
+      () =>
+        withTransaction(prisma, (tx) =>
+          items.sell(tx, {
+            bundle,
+            serviceKey: 'service.rookgaard.counter',
+            accountId: hero.accountId,
+            characterId: hero.characterId,
+            instanceId: dagger.id,
+            operationId: 'own4' as never,
+            at: T0,
+          }),
+        ),
+      'IllegalItemMove',
+    );
+    await expectDomainError(
+      () =>
+        withTransaction(prisma, (tx) =>
+          items.stow(tx, {
+            bundle,
+            accountId: hero.accountId,
+            characterId: hero.characterId,
+            instanceId: dagger.id,
+            at: T0,
+          }),
+        ),
+      'IllegalItemMove',
+    );
+    // Still worn. A sale must never be a way for equipment to vanish.
+    expect(
+      (await prisma.itemInstance.findUniqueOrThrow({ where: { id: dagger.id } })).location,
+    ).toBe('EQUIPPED');
+  });
+
+  it('OWN5: an INSTALLED container cannot be sold or stashed', async () => {
+    const hero = await idle();
+    const containerId = await firstContainer(prisma, hero.characterId);
+
+    await expectDomainError(
+      () =>
+        withTransaction(prisma, (tx) =>
+          items.sell(tx, {
+            bundle,
+            serviceKey: 'service.rookgaard.counter',
+            accountId: hero.accountId,
+            characterId: hero.characterId,
+            instanceId: containerId,
+            operationId: 'own5' as never,
+            at: T0,
+          }),
+        ),
+      'IllegalItemMove',
+    );
+
+    const slot = await prisma.characterContainerSlot.findUniqueOrThrow({
+      where: { characterId_slotIndex: { characterId: hero.characterId, slotIndex: 1 } },
+    });
+    expect(slot.containerInstanceId).toBe(containerId);
+  });
+
+  it('OWN6: the Character’s OWN carried item still sells, stashes and leaves the Depot', async () => {
+    const hero = await idle();
+    const cheese = await withTransaction(prisma, (tx) =>
+      items.createItem(tx, {
+        bundle,
+        accountId: hero.accountId,
+        characterId: hero.characterId,
+        definitionKey: 'item.cheese',
+        quantity: 4,
+        location: 'LOOT_POUCH',
+        at: T0,
+      }),
+    );
+
+    await withTransaction(prisma, (tx) =>
+      items.sell(tx, {
+        bundle,
+        serviceKey: 'service.rookgaard.counter',
+        accountId: hero.accountId,
+        characterId: hero.characterId,
+        instanceId: cheese.id,
+        quantity: 1,
+        operationId: 'own6-sell' as never,
+        at: T0,
+      }),
+    );
+    await withTransaction(prisma, (tx) =>
+      items.stow(tx, {
+        bundle,
+        accountId: hero.accountId,
+        characterId: hero.characterId,
+        instanceId: cheese.id,
+        quantity: 1,
+        at: T0,
+      }),
+    );
+
+    // And an account-level Depot round trip is untouched: a Depot row belongs
+    // to nobody in particular, which is the one case the ownership test lets
+    // through on purpose.
+    const container = await firstContainer(prisma, hero.characterId);
+    await withTransaction(prisma, (tx) =>
+      items.moveItem(tx, {
+        bundle,
+        accountId: hero.accountId,
+        characterId: hero.characterId,
+        baseLevel: 1,
+        instanceId: cheese.id,
+        to: { kind: 'DEPOT' },
+        at: T0,
+      }),
+    );
+    await withTransaction(prisma, (tx) =>
+      items.moveItem(tx, {
+        bundle,
+        accountId: hero.accountId,
+        characterId: hero.characterId,
+        baseLevel: 1,
+        instanceId: cheese.id,
+        to: { kind: 'CONTAINER', containerId: container },
+        at: T0,
+      }),
+    );
+    const back = await prisma.itemInstance.findUniqueOrThrow({ where: { id: cheese.id } });
+    expect(back.location).toBe('CHARACTER_CONTAINER');
+    expect(back.quantity).toBe(2);
+  });
+});

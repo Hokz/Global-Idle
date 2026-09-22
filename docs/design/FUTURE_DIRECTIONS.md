@@ -66,6 +66,61 @@ neither levelled nor earned still has something advancing.
 
 ---
 
+## 5. Engineering deadlines the retrospective audit found — GATED, NOT OPEN
+
+An audit across PR #1 to PR #8 found no reason to rewrite the architecture and a set of things
+that must land **before a named gate**. They are written with their gate so they cannot become
+forgotten OPEN notes.
+
+### Before Phase 4 (roster)
+
+- **Character retirement, properly.** Retirement must settle occupancy, move item custody safely,
+  prevent a repeated tutorial starting-grant, and preserve history. Phase 3 only stopped a retired
+  Character from being treated as playable by the inventory surface (`RET1`, `RET2`); that is a
+  filter, not a flow.
+- **`baseLevel` projection vs `baseXp` truth.** Two representations of the same fact. Reconcile
+  which is authoritative and make the other derived, before a second system reads the wrong one.
+
+### Before Market / Forge / Imbuement
+
+- **An ADR for `ItemDefinition` version semantics.** What happens to live `ItemInstance` rows when
+  a definition's weight, stackability or slot changes in a new content bundle. Phase 3 pins the
+  bundle per Activity; a traded or forged item outlives one Activity.
+- **Validate impossible rarity/affix identities.** Today an affix array is JSON the domain writes
+  and trusts. A market lets someone else's row reach your inventory.
+
+### Before Phase 5B (multiplayer)
+
+- **Multi-account Activity membership**, the Character→membership invariant, and competitive
+  liveness semantics. `MULTIPLAYER_ACTIVITIES_FOUNDATION.md` has the design; the invariants are
+  the part that must exist before two accounts share one Activity.
+
+### Before beta / scale
+
+- `IdempotencyRecord` retention; `SettlementOperation` retention and a compaction proof; content
+  bundle archival policy; an object-storage provider; a backup/restore rehearsal; production rate
+  limiting and auth hardening; load profiling.
+
+---
+
+## 6. Product directions the audit surfaced — RECORDED, NOT IMPLEMENTED
+
+Each shapes Phase 4+ design. None expands Phase 3.5.
+
+| Direction | What it is | Likely owner |
+|---|---|---|
+| **Tactical Automation Profiles** | target priorities, movement policy, supply thresholds, risk/retreat behaviour — the player's *strategy* rather than their *reflexes* | Phase 4 |
+| **Hunt Route Strategy** | Safe / Balanced / Aggressive / Loot-oriented route policy over a real map | after Phase 3.5 gives routes a map |
+| **Spatial Party Formation** | frontline, range, support radius, vocation positioning | Phase 5B |
+| **Run Analyzer** | XP/h, Gold/h, loot, supply burn, movement vs combat time, damage/healing, capacity utilisation | Phase 4 |
+| **Balance Simulation Laboratory** | a headless bulk-run tool for balancing, over the deterministic simulator that already exists | Phase 4 |
+| **Deterministic Run Replay / Debug Inspector** | reproduce one Activity from seed + content + state | Phase 4 |
+
+The last two are nearly free: the simulator is already deterministic from `(seed, content, state,
+elapsed)`. What is missing is a harness, not an engine.
+
+---
+
 ## Why this is written down now
 
 Each of these changes what a *later* phase's data needs to carry. A creature that will one day

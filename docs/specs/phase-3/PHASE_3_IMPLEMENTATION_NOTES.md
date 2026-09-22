@@ -148,6 +148,72 @@ anything else is asserted.
 
 ---
 
+## 0.8 The second correction pass — a retrospective audit's four findings
+
+A retrospective audit from PR #1 through PR #8 found no reason to rewrite the
+architecture and four things that were real NOW.
+
+### 0.8.1 Two operations still asked the ACCOUNT's permission, not the Character's
+
+`moveItem` was corrected to refuse a cross-Character source. `sell()` and
+`stow()` were not: both resolved the source with `readItem(accountId, …)`
+while the safe-context check was asked about the ACTING Character. So a safe
+Character A could sell or stash a potion out of Character B's backpack — while
+B was in the Hunt that needed it.
+
+The question now has one place to be asked:
+`readItemForCharacterAction(accountId, characterId, instanceId, allow)`. It
+refuses another Character's item as **NOT FOUND** (whose it is, is not
+information the asker is entitled to) and refuses a source in the wrong custody
+BY NAME — *"unequip it first"*, *"take the container out of its slot first"* —
+which is also what stops worn equipment and an installed container from
+vanishing through a sale that never went past the slot holding it.
+
+**The source-state rule, settled and written down:** a Character may sell or
+stash only from `CHARACTER_CONTAINER` and `LOOT_POUCH`. Equipment is unequipped
+first, an installed container is taken out first, and the Depot is account
+storage reached by an explicitly Depot-based move. `OWN1`–`OWN6` pin it,
+including that the legitimate same-Character and account-Depot paths still work.
+
+### 0.8.2 One player-facing loader did not filter retirement
+
+`world.controller.ts` and `game.controller.ts` both scoped their Character
+lookups with `retiredAt: null`. `InventoryController.owned()` did not, so a
+retired Character still had a live inventory surface. Normalized; `RET1` and
+`RET2` assert that every surface now agrees.
+
+**Deliberately NOT built here:** the retirement product flow. Retirement must
+eventually settle occupancy, move item custody safely, prevent repeated
+tutorial-grant abuse and preserve history — that is roster work, and it is
+recorded as a Phase 4 gate rather than half-built now.
+
+### 0.8.3 Malformed input could become a 500
+
+`BigInt("abc")` throws; `Number("abc")` is `NaN` and reaches the database as a
+parameter; an unbounded JSON array reached a `Json` column intact. A client
+that sends nonsense should be told so.
+
+`apps/api/src/game/input.ts` is six functions, not a DTO framework: a whole
+number in a range, an optional one, a positive amount, a bounded identifier, a
+value from a closed set, and loot rules bounded in shape and count. Zod lives
+in `@global-idle/game-data` and validates CONTENT; pulling it into the API for
+six bounds would be a dependency for a decision rather than for a problem.
+`VAL1`–`VAL5` drive each one from outside.
+
+### 0.8.4 The mandatory agent instructions were two phases stale
+
+`AGENTS.md` — the one file an agent is REQUIRED to read — said *"Current phase:
+Phase 1"* while Phase 3 was being implemented. That is not a documentation nit;
+it is the first thing a new agent believes.
+
+There is now exactly one canonical statement of project state,
+`docs/PROJECT_STATE.json`, and `scripts/check-project-state.mjs` **fails CI**
+when `AGENTS.md` stops pointing at it or stops naming the active phase. The
+roadmaps and README point at it rather than repeating it, because a marker
+copied into five documents is a marker that goes stale in four.
+
+---
+
 ## 2. What the implementation found
 
 ### 2.1 A whole-stack move was destroying the item's identity
@@ -318,7 +384,7 @@ config so tuning is a publish rather than a deploy:
 ```sh
 pnpm install
 pnpm build
-node scripts/count-matrix.mjs          # 92/92, 87/87, 106/106, 156/156
+node scripts/count-matrix.mjs          # 92/92, 87/87, 106/106, 169/169
 pnpm test:unit && pnpm test:fixtures   # includes ISR and ITM
 pnpm test:integration                  # includes EQP, ACT, CSL, STK, CAP, LPH,
                                        # POL, DTH, DPT, STH, MOV, RTE, BNK, NPC,

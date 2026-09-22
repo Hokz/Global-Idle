@@ -707,16 +707,20 @@ exactly — no id is renumbered and no case is deleted.**
 | **BNK** — bank and gold | BNK1–BNK6 | balanced deposit, Pouch-first/Bank-fallback, slot unlock debit, sale to Bank, zero reconciliation mismatches |
 | **NPC** — service | NPC1–NPC5 | buy, refill, sell, and no remote service during a Hunt |
 | **HNT** — hunt integration | HNT1–HNT6 | deterministic loot, zero Stamina, retry without duplicate, reload and restart, Room 10 continues |
+| **OWN** — who may act on an item | OWN1–OWN6 | A cannot sell or stash B's item, nor touch it while B hunts; equipped and installed must be released first; the Character's own carried items and the account Depot still work |
+| **RET** — retirement | RET1–RET2 | a retired Character is not playable, and every player-facing surface agrees |
+| **VAL** — the input edge | VAL1–VAL5 | a non-numeric amount, a NaN quantity or slot, an unknown routing category, malformed or oversized loot rules, and an over-long idempotency key are all **4xx**, never 500 |
 | **IDM** — idempotency | IDM1–IDM7 | a key is required; duplicate buy, deposit and partial sell each apply once; the same key with a different command conflicts; a retry returns the durable result; every mutating route swept, not sampled |
 | **LCK** — the last free space | LCK1–LCK4 | two concurrent arrivals, the loser not charged, concurrent Stash withdrawals, concurrent drops into the last Pouch space |
 | **SYS** — System UI and E2E | SYS1–SYS16 | the System UI, equipment, five slots, desktop drag, touch move, the Loot Pouch, a filter change affecting future loot, Depot/Stash context, purchase and refill, Hunt physical loot, death loot loss, reload, **unlock-and-install, taking a container back out, a touch Stash round trip, and a routing preference that survives a reload** |
 | **MIG** — migration and invariants | MIG1–MIG6 | empty database, previous state, no drift, the custody constraints, no duplication |
 
-**Totals: 21 groups, 156 cases** — ISR 8, ITM 11, EQP 8, ACT 7, CSL 11, STK 7, CAP 5, LPH 9,
-POL 6, DTH 6, DPT 4, STH 8, MOV 10, RTE 6, BNK 6, NPC 5, HNT 6, IDM 7, LCK 4, SYS 16, MIG 6.
+**Totals: 24 groups, 169 cases** — ISR 8, ITM 11, EQP 8, ACT 7, CSL 11, STK 7, CAP 5, LPH 9,
+POL 6, DTH 6, DPT 4, STH 8, MOV 10, RTE 6, BNK 6, NPC 5, HNT 6, IDM 7, LCK 4, **OWN 6**,
+**RET 2**, **VAL 5**, SYS 16, MIG 6.
 
-The correction pass added 31 cases and **renumbered none**: every id from the reviewed 125 means
-what it meant, and the new ones continue their groups or open new ones.
+Two correction passes added 44 cases and **renumbered none**: every id from the reviewed 125
+means what it meant, and the new ones continue their groups or open new ones.
 
 Every prefix is three letters and none of them collides with an existing group: the counter routes
 an id by its longest matching prefix, and `STK`/`STH` win over Phase 2's `ST`, `SYS` over Phase 1's

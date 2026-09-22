@@ -16,6 +16,7 @@ export {
 } from './catalogue.js';
 
 export {
+  CARRIED_SOURCES,
   assertStackLimit,
   capacityFor,
   carried,
@@ -27,6 +28,7 @@ export {
   lockItems,
   pouchSpaces,
   readItem,
+  readItemForCharacterAction,
   usedSpaces,
   weightOf,
 } from './custody.js';

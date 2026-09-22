@@ -127,6 +127,69 @@ export async function readItem(
 }
 
 /**
+ * Read an instance a CHARACTER is about to act on.
+ *
+ * `readItem` answers "does this Account own it", which is the right question
+ * for an account-scoped operation and the WRONG one for everything a Character
+ * does. Two Characters on one Account are two people as far as their carried
+ * state is concerned: one must not be able to sell the other's dagger, stash
+ * the other's potions, or empty the other's backpack while they are hunting.
+ *
+ * So every Character-scoped operation resolves its source HERE, and says which
+ * custodies it will accept. A source in the wrong custody is refused by NAME —
+ * "unequip it first" is a sentence a player can act on, and it is also what
+ * stops an equipped item or an installed container from vanishing through a
+ * sale that never went past the slot that held it.
+ */
+export async function readItemForCharacterAction(
+  tx: UnitOfWork,
+  input: {
+    readonly accountId: string;
+    readonly characterId: string;
+    readonly instanceId: string;
+    readonly allow: readonly ItemLocation[];
+  },
+): Promise<StoredItem> {
+  const item = await readItem(tx, input.accountId, input.instanceId);
+
+  // Another CHARACTER's item is NOT FOUND, never FORBIDDEN: whose it is, is
+  // not information the asker is entitled to. Account storage (characterId
+  // null) belongs to nobody in particular and passes this test — which is why
+  // the caller still has to say whether DEPOT is a custody it accepts.
+  if (item.characterId !== null && item.characterId !== input.characterId) {
+    throw itemNotFound({ instanceId: input.instanceId });
+  }
+  if (!input.allow.includes(item.location)) {
+    throw illegalItemMove({
+      instanceId: item.id,
+      location: item.location,
+      reason: REFUSAL[item.location],
+    });
+  }
+  return item;
+}
+
+const REFUSAL: Record<ItemLocation, string> = {
+  EQUIPPED: 'unequip it first',
+  HUNT_CONTAINER: 'take the container out of its slot first',
+  CHARACTER_CONTAINER: 'that custody is not a source for this operation',
+  LOOT_POUCH: 'that custody is not a source for this operation',
+  DEPOT: 'the Depot is account storage — move it to a container first',
+};
+
+/** What a Character may sell or stash from: what it is CARRYING loose. */
+export const CARRIED_SOURCES: readonly ItemLocation[] = ['CHARACTER_CONTAINER', 'LOOT_POUCH'];
+
+/** Every custody, for the one primitive whose job is moving between them. */
+export const ALL_SOURCES: readonly ItemLocation[] = [
+  'EQUIPPED',
+  'HUNT_CONTAINER',
+  'CHARACTER_CONTAINER',
+  'LOOT_POUCH',
+  'DEPOT',
+];
+
+/**
  * Lock instances in ascending id order, which is §8.5's rule applied to the
  * new table: `ItemInstance` sits after the occupancy claim and before the
  * balances, so an operation that moves an item AND money always moves the item

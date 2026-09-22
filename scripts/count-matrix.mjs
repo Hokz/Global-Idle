@@ -2,7 +2,7 @@
 /**
  * Count the implemented matrix cases and compare them with what the approved
  * specifications fix: Phase 0B §14 at **92**, Phase 1 §16 at **87**, Phase 2
- * §12 at **106**, Phase 3 §20 at **156**.
+ * §12 at **106**, Phase 3 §20 at **169**.
  *
  * The convention this relies on: every matrix case is exactly ONE test whose
  * title begins with its id and a colon — `it('W1: ...')` for a Vitest case,
@@ -112,6 +112,11 @@ const MATRICES = {
       HNT: [1, 6],
       IDM: [1, 7],
       LCK: [1, 4],
+      // The final integrity correction: who may act on an item, what a
+      // retired Character is, and where external input stops being arbitrary.
+      OWN: [1, 6],
+      RET: [1, 2],
+      VAL: [1, 5],
       SYS: [1, 16],
       MIG: [1, 6],
     },
@@ -127,6 +132,9 @@ const PREFIXES = [
   'ACT',
   'IDM',
   'LCK',
+  'OWN',
+  'RET',
+  'VAL',
   'CSL',
   'STK',
   'CAP',

@@ -34,14 +34,41 @@ import {
 import {
   accountId as toAccountId,
   operationId as toOperationId,
+  HUNT_CONTAINER_SLOTS,
   LOOT_POUCH_SPACES,
+  STASH_MAX_PER_ENTRY,
 } from '@global-idle/shared';
 import type { ContentBundleResolver, ResolvedBundle } from '@global-idle/game-data';
 import { CONTENT_RESOLVER, PRISMA } from './tokens.js';
 import { SessionGuard, type RequestWithSession } from './session.guard.js';
 import { asHttp, fail } from './errors.js';
+import {
+  identifier,
+  lootRules,
+  oneOf,
+  optionalWholeNumber,
+  positiveAmount,
+  wholeNumber,
+} from './input.js';
 
 const SERVICE_KEY = 'service.rookgaard.counter';
+
+/** The closed sets the routes validate against. The server owns every one. */
+const EQUIPMENT_SLOTS = [
+  'HEAD',
+  'NECKLACE',
+  'BACKPACK',
+  'ARMOR',
+  'RIGHT',
+  'LEFT',
+  'LEGS',
+  'FEET',
+  'RING',
+  'AMMO',
+] as const;
+const POLICY_MODES = ['COLLECT_ALL_EXCEPT_SKIPPED', 'ACCEPTED_ONLY'] as const;
+/** The physical ceiling a single row may hold — the database's own CHECK. */
+const MAX_STACK = 255;
 
 /**
  * The Depot is bounded (spec §10.1) AND paged. Bounded is not the same
@@ -208,12 +235,18 @@ export class InventoryController {
     return session;
   }
 
-  /** The Character, confirmed to belong to this account. A Character someone
-   *  else owns is NOT FOUND, never FORBIDDEN. */
+  /** The Character, confirmed to belong to this account and to be PLAYABLE.
+   *
+   *  A Character someone else owns is NOT FOUND, never FORBIDDEN — and a
+   *  RETIRED one is the same answer for the same reason: retirement is
+   *  non-playable historical state, so an ordinary gameplay endpoint has no
+   *  business treating it as a live Character. The world and game paths
+   *  already filtered it; this one did not, and the inconsistency was the
+   *  whole finding. */
   private async owned(request: RequestWithSession, characterId: string) {
     const { accountId } = this.session(request);
     const character = await this.prisma.character.findFirst({
-      where: { id: characterId, accountId },
+      where: { id: characterId, accountId, retiredAt: null },
       select: { id: true, accountId: true, baseLevel: true, baseXp: true },
     });
     if (!character) throw fail(HttpStatus.NOT_FOUND, 'NOT_FOUND', 'No such character.');
@@ -381,6 +414,14 @@ export class InventoryController {
         'This request must carry an Idempotency-Key header.',
       );
     }
+    // Bounded, because it becomes half of a primary key.
+    if (clientKey.length > 200) {
+      throw fail(
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        'INVALID_REQUEST',
+        'Idempotency-Key may not exceed 200 characters.',
+      );
+    }
     const operationId = toOperationId(`${namespace}:${session.accountId}:${clientKey}`);
     const port = createIdempotencyPort((run) => withTransaction(this.prisma, run));
     let outcome;
@@ -426,11 +467,17 @@ export class InventoryController {
     const to = body.to ?? {};
     const destination =
       to.kind === 'EQUIPPED'
-        ? { kind: 'EQUIPPED' as const, slot: to.slot as never }
+        ? { kind: 'EQUIPPED' as const, slot: oneOf(to.slot, 'to.slot', EQUIPMENT_SLOTS) as never }
         : to.kind === 'HUNT_CONTAINER'
-          ? { kind: 'HUNT_CONTAINER' as const, slotIndex: Number(to.slotIndex) }
+          ? {
+              kind: 'HUNT_CONTAINER' as const,
+              slotIndex: wholeNumber(to.slotIndex, 'to.slotIndex', 1, HUNT_CONTAINER_SLOTS),
+            }
           : to.kind === 'CONTAINER'
-            ? { kind: 'CONTAINER' as const, containerId: String(to.containerId) }
+            ? {
+                kind: 'CONTAINER' as const,
+                containerId: identifier(to.containerId, 'to.containerId'),
+              }
             : to.kind === 'DEPOT'
               ? { kind: 'DEPOT' as const }
               : null;
@@ -441,21 +488,23 @@ export class InventoryController {
         'Name an item and a destination.',
       );
     }
+    const instanceId = identifier(body.instanceId, 'instanceId');
+    const quantity = optionalWholeNumber(body.quantity, 'quantity', 1, MAX_STACK);
 
     // The Hunt access rule is NOT checked here. It lives inside `moveItem`,
     // where a job or a future caller cannot forget it.
     await this.idempotent(
       request,
       'items.move',
-      { characterId, instanceId: body.instanceId, quantity: body.quantity ?? null, to },
+      { characterId, instanceId, quantity: quantity ?? null, to },
       (tx) =>
         itemsContext.moveItem(tx, {
           bundle,
           accountId: character.accountId,
           characterId,
           baseLevel: character.baseLevel,
-          instanceId: body.instanceId!,
-          ...(body.quantity === undefined ? {} : { quantity: body.quantity }),
+          instanceId,
+          ...(quantity === undefined ? {} : { quantity }),
           to: destination,
           at: new Date(),
         }),
@@ -471,16 +520,17 @@ export class InventoryController {
   ): Promise<InventoryView> {
     const character = await this.owned(request, characterId);
     const bundle = await this.current();
+    const index = wholeNumber(slotIndex, 'slotIndex', 1, HUNT_CONTAINER_SLOTS);
     await this.idempotent(
       request,
       'slots.unlock',
-      { characterId, slotIndex: Number(slotIndex) },
+      { characterId, slotIndex: index },
       (tx, operationId) =>
         itemsContext.unlockSlot(tx, {
           bundle,
           accountId: character.accountId,
           characterId,
-          slotIndex: Number(slotIndex),
+          slotIndex: index,
           operationId,
           at: new Date(),
         }),
@@ -497,12 +547,21 @@ export class InventoryController {
     @Body() body: { category?: string | null },
   ): Promise<InventoryView> {
     await this.owned(request, characterId);
-    const category = typeof body.category === 'string' && body.category ? body.category : null;
+    const index = wholeNumber(slotIndex, 'slotIndex', 1, HUNT_CONTAINER_SLOTS);
+    // The category must be one the SERVER knows, not any string a client
+    // invents: routing that can never match is a setting that silently does
+    // nothing.
+    const bundle = await this.current();
+    const known = [...new Set(itemsContext.allItems(bundle).map((item) => item.category))].sort();
+    const category =
+      typeof body.category === 'string' && body.category
+        ? oneOf(body.category, 'category', known)
+        : null;
     await this.idempotent(
       request,
       'slots.routing',
-      { characterId, slotIndex: Number(slotIndex), category },
-      (tx) => itemsContext.setRouting(tx, { characterId, slotIndex: Number(slotIndex), category }),
+      { characterId, slotIndex: index, category },
+      (tx) => itemsContext.setRouting(tx, { characterId, slotIndex: index, category }),
     );
     return this.inventory(request, characterId);
   }
@@ -514,8 +573,8 @@ export class InventoryController {
     @Body() body: { mode?: string; rules?: unknown[] },
   ): Promise<InventoryView> {
     await this.owned(request, characterId);
-    const mode = body.mode === 'ACCEPTED_ONLY' ? 'ACCEPTED_ONLY' : 'COLLECT_ALL_EXCEPT_SKIPPED';
-    const rules = (body.rules ?? []) as never;
+    const mode = oneOf(body.mode ?? 'COLLECT_ALL_EXCEPT_SKIPPED', 'mode', POLICY_MODES);
+    const rules = lootRules(body.rules) as never;
     await this.idempotent(request, 'loot-policy.write', { characterId, mode, rules }, (tx) =>
       itemsContext.writePolicy(tx, characterId, { mode, rules }, new Date()),
     );
@@ -530,8 +589,8 @@ export class InventoryController {
   ): Promise<InventoryView> {
     const character = await this.owned(request, characterId);
     const bundle = await this.current();
-    const definitionKey = String(body.definitionKey);
-    const quantity = Number(body.quantity ?? 1);
+    const definitionKey = identifier(body.definitionKey, 'definitionKey');
+    const quantity = wholeNumber(body.quantity ?? 1, 'quantity', 1, MAX_STACK);
     await this.idempotent(
       request,
       'service.buy',
@@ -560,11 +619,12 @@ export class InventoryController {
   ): Promise<InventoryView> {
     const character = await this.owned(request, characterId);
     const bundle = await this.current();
-    const instanceId = String(body.instanceId);
+    const instanceId = identifier(body.instanceId, 'instanceId');
+    const sold = optionalWholeNumber(body.quantity, 'quantity', 1, MAX_STACK);
     await this.idempotent(
       request,
       'service.sell',
-      { characterId, instanceId, quantity: body.quantity ?? null },
+      { characterId, instanceId, quantity: sold ?? null },
       (tx, operationId) =>
         itemsContext.sell(tx, {
           bundle,
@@ -572,7 +632,7 @@ export class InventoryController {
           accountId: character.accountId,
           characterId,
           instanceId,
-          ...(body.quantity === undefined ? {} : { quantity: body.quantity }),
+          ...(sold === undefined ? {} : { quantity: sold }),
           operationId,
           at: new Date(),
         }),
@@ -588,18 +648,19 @@ export class InventoryController {
   ): Promise<InventoryView> {
     const character = await this.owned(request, characterId);
     const bundle = await this.current();
-    const instanceId = String(body.instanceId);
+    const instanceId = identifier(body.instanceId, 'instanceId');
+    const stowed = optionalWholeNumber(body.quantity, 'quantity', 1, MAX_STACK);
     await this.idempotent(
       request,
       'stash.deposit',
-      { characterId, instanceId, quantity: body.quantity ?? null },
+      { characterId, instanceId, quantity: stowed ?? null },
       (tx) =>
         itemsContext.stow(tx, {
           bundle,
           accountId: character.accountId,
           characterId,
           instanceId,
-          ...(body.quantity === undefined ? {} : { quantity: body.quantity }),
+          ...(stowed === undefined ? {} : { quantity: stowed }),
           at: new Date(),
         }),
     );
@@ -614,9 +675,9 @@ export class InventoryController {
   ): Promise<InventoryView> {
     const character = await this.owned(request, characterId);
     const bundle = await this.current();
-    const definitionKey = String(body.definitionKey);
-    const quantity = Number(body.quantity ?? 0);
-    const containerId = String(body.containerId);
+    const definitionKey = identifier(body.definitionKey, 'definitionKey');
+    const quantity = wholeNumber(body.quantity, 'quantity', 1, STASH_MAX_PER_ENTRY);
+    const containerId = identifier(body.containerId, 'containerId');
     await this.idempotent(
       request,
       'stash.withdraw',
@@ -643,9 +704,9 @@ export class InventoryController {
     @Body() body: { amount?: string | number },
   ): Promise<InventoryView> {
     const character = await this.owned(request, characterId);
-    const amount = BigInt(body.amount ?? 0);
-    if (amount <= 0n)
-      throw fail(HttpStatus.UNPROCESSABLE_ENTITY, 'INVALID_REQUEST', 'Deposit a positive amount.');
+    // `BigInt("abc")` THROWS, and an uncaught throw here is a 500 for a
+    // request the client got wrong. It is a 422 now.
+    const amount = positiveAmount(body.amount, 'amount');
     await this.idempotent(
       request,
       'gold.deposit',

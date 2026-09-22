@@ -17,7 +17,7 @@ import type { UnitOfWork } from '../../platform/transaction/index.js';
 import { bankOf, post, pouchOf, readBalance } from '../economy/index.js';
 import { assertSafeContext } from './access.js';
 import { itemDefinition, serviceDefinition } from './catalogue.js';
-import { lockItems, readItem } from './custody.js';
+import { CARRIED_SOURCES, lockItems, readItemForCharacterAction } from './custody.js';
 import { route } from './routing.js';
 
 export interface Purchase {
@@ -145,7 +145,14 @@ export async function sell(
 ): Promise<{ readonly quantity: number; readonly proceeds: bigint }> {
   await assertSafeContext(tx, input.characterId, 'sell');
   await lockItems(tx, [input.instanceId]);
-  const item = await readItem(tx, input.accountId, input.instanceId);
+  // The ACTING Character's own carried item, and nothing else: not another
+  // Character's, not something still worn, not a container still installed.
+  const item = await readItemForCharacterAction(tx, {
+    accountId: input.accountId,
+    characterId: input.characterId,
+    instanceId: input.instanceId,
+    allow: CARRIED_SOURCES,
+  });
   const definition = itemDefinition(input.bundle, item.definitionKey);
   if (!definition.sellable) {
     throw illegalItemMove({ instanceId: item.id, reason: 'the definition is not sellable' });

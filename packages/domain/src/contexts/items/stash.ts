@@ -11,7 +11,14 @@ import { illegalItemMove, noRoomForItem } from '../../platform/errors/index.js';
 import type { UnitOfWork } from '../../platform/transaction/index.js';
 import { assertSafeContext } from './access.js';
 import { itemDefinition } from './catalogue.js';
-import { assertCapacity, createItem, freeSpacesIn, lockDestination, readItem } from './custody.js';
+import {
+  CARRIED_SOURCES,
+  assertCapacity,
+  createItem,
+  freeSpacesIn,
+  lockDestination,
+  readItemForCharacterAction,
+} from './custody.js';
 
 export interface StashRow {
   readonly definitionKey: string;
@@ -46,7 +53,12 @@ export async function stow(
   },
 ): Promise<number> {
   await assertSafeContext(tx, input.characterId, 'stash');
-  const item = await readItem(tx, input.accountId, input.instanceId);
+  const item = await readItemForCharacterAction(tx, {
+    accountId: input.accountId,
+    characterId: input.characterId,
+    instanceId: input.instanceId,
+    allow: CARRIED_SOURCES,
+  });
   const definition = itemDefinition(input.bundle, item.definitionKey);
   if (!definition.stashEligible) {
     throw illegalItemMove({ instanceId: item.id, reason: 'the definition is not stashable' });

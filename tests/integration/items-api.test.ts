@@ -520,3 +520,127 @@ describe('§20 RTE / STH — routing and the Stash, through the API', () => {
     expect(entry.quantity).toBe(100n);
   });
 });
+
+// ───────────────────────────────────────────────────────────────────────────
+// §20 RET / VAL — retirement, and the edge where input stops being arbitrary
+// ───────────────────────────────────────────────────────────────────────────
+
+describe('§20 RET — a retired Character is not a live one', () => {
+  it('RET1: the inventory surface stops treating a retired Character as playable', async () => {
+    const before = await call(base, `/api/characters/${characterId}/inventory`, { cookie });
+    expect(before.status).toBe(200);
+
+    await prisma.character.update({
+      where: { id: characterId },
+      data: { retiredAt: new Date() },
+    });
+
+    const after = await call<ErrorBody>(base, `/api/characters/${characterId}/inventory`, {
+      cookie,
+    });
+    expect(after.status).toBe(404);
+    expect(after.body.error.code).toBe('NOT_FOUND');
+  });
+
+  it('RET2: every player-facing surface agrees — not one filtered and one not', async () => {
+    await prisma.character.update({
+      where: { id: characterId },
+      data: { retiredAt: new Date() },
+    });
+
+    // The world and game paths already filtered `retiredAt`; the inventory one
+    // did not, and an inconsistency between them was the whole finding.
+    for (const path of [
+      `/api/characters/${characterId}/inventory`,
+      `/api/characters/${characterId}/depot`,
+      `/api/characters/${characterId}`,
+    ]) {
+      const response = await call<ErrorBody>(base, path, { cookie });
+      expect(response.status, path).toBe(404);
+    }
+
+    // And a mutation is refused for the same reason, before any validation.
+    const refused = await send<ErrorBody>('/gold/deposit', 'ret2', { amount: '1' });
+    expect(refused.status).toBe(404);
+  });
+});
+
+describe('§20 VAL — malformed input is a client error, not a server error', () => {
+  it('VAL1: a non-numeric Gold amount is REFUSED, not a 500', async () => {
+    // `BigInt("abc")` throws. An uncaught throw at the edge is a 500 for a
+    // request the client got wrong.
+    for (const amount of ['abc', '', '1.5', '-5', '0', null]) {
+      const response = await send<ErrorBody>('/gold/deposit', `val1-${amount}`, { amount });
+      expect(response.status, String(amount)).toBe(422);
+      expect(response.body.error.code, String(amount)).toBe('INVALID_REQUEST');
+    }
+  });
+
+  it('VAL2: NaN quantities and slot indexes never reach the database', async () => {
+    const nonsense = await send<ErrorBody>('/service/buy', 'val2-a', {
+      definitionKey: POTION,
+      quantity: 'lots',
+    });
+    expect(nonsense.status).toBe(422);
+
+    const slot = await call<ErrorBody>(
+      base,
+      `/api/characters/${characterId}/slots/not-a-number/unlock`,
+      { method: 'POST', cookie, headers: { 'Idempotency-Key': 'val2-b' } },
+    );
+    expect(slot.status).toBe(422);
+
+    const sixth = await send<ErrorBody>('/slots/6/unlock', 'val2-c');
+    expect(sixth.status).toBe(422);
+  });
+
+  it('VAL3: an unknown routing category is refused rather than silently stored', async () => {
+    const refused = await send<ErrorBody>(
+      '/slots/1/routing',
+      'val3',
+      { category: 'NOT_A_CATEGORY' },
+      'PUT',
+    );
+    expect(refused.status).toBe(422);
+    expect((await read()).slots[0]!.routingCategory).toBeNull();
+  });
+
+  it('VAL4: loot rules are bounded in SHAPE and in COUNT', async () => {
+    const shapes: unknown[] = [
+      'not-an-array',
+      [{ accept: 'yes' }],
+      [{ accept: true, rarity: 'EPIC' }],
+      [{ accept: true, itemKey: 'x'.repeat(400) }],
+      Array.from({ length: 65 }, () => ({ accept: true })),
+    ];
+    for (const [index, rules] of shapes.entries()) {
+      const response = await send<ErrorBody>(
+        '/loot-policy',
+        `val4-${index}`,
+        { mode: 'ACCEPTED_ONLY', rules },
+        'PUT',
+      );
+      expect(response.status, JSON.stringify(rules).slice(0, 40)).toBe(422);
+    }
+
+    // A well-formed rule still goes through.
+    const ok = await send(
+      '/loot-policy',
+      'val4-ok',
+      { mode: 'ACCEPTED_ONLY', rules: [{ accept: true, itemKey: CHEESE }] },
+      'PUT',
+    );
+    expect(ok.status).toBeLessThan(300);
+  });
+
+  it('VAL5: an over-long Idempotency-Key is refused — it becomes half a primary key', async () => {
+    const response = await call<ErrorBody>(base, `/api/characters/${characterId}/gold/deposit`, {
+      method: 'POST',
+      cookie,
+      headers: { 'Idempotency-Key': 'k'.repeat(300) },
+      body: JSON.stringify({ amount: '1' }),
+    });
+    expect(response.status).toBe(422);
+    expect(response.body.error.code).toBe('INVALID_REQUEST');
+  });
+});

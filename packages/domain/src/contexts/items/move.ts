@@ -14,11 +14,12 @@
 import type { ResolvedBundle } from '@global-idle/game-data';
 import type { Instant } from '@global-idle/shared';
 import { recordDomainEvent } from '../../platform/observability/index.js';
-import { illegalItemMove, itemNotFound, noRoomForItem } from '../../platform/errors/index.js';
+import { illegalItemMove, noRoomForItem } from '../../platform/errors/index.js';
 import type { UnitOfWork } from '../../platform/transaction/index.js';
 import { assertSafeContext } from './access.js';
 import { itemDefinition } from './catalogue.js';
 import {
+  ALL_SOURCES,
   addToStack,
   assertCapacity,
   carried,
@@ -31,6 +32,7 @@ import {
   lockSlot,
   planPlacement,
   readItem,
+  readItemForCharacterAction,
   usedSpaces,
   weightOf,
   type Affix,
@@ -130,16 +132,15 @@ export async function moveItem(tx: UnitOfWork, input: MoveItem): Promise<void> {
   }
   await lockItems(tx, [peek.id, input.to.kind === 'CONTAINER' ? input.to.containerId : '']);
 
-  const fresh = await readItem(tx, input.accountId, input.instanceId);
-
-  // Another CHARACTER on the same account is still another Character. Its
-  // backpack, its potions and its worn armour are not a shared shelf, and the
-  // answer is NOT FOUND rather than FORBIDDEN because whose it is, is not
-  // information the asker is entitled to. Account storage is the exception
-  // that proves it: a Depot row belongs to nobody in particular.
-  if (fresh.characterId !== null && fresh.characterId !== input.characterId) {
-    throw itemNotFound({ instanceId: fresh.id });
-  }
+  // The general mover accepts every custody as a SOURCE — moving things
+  // between them is what it is for — but it asks the same ownership question
+  // every Character-scoped operation asks, in the same place.
+  const fresh = await readItemForCharacterAction(tx, {
+    accountId: input.accountId,
+    characterId: input.characterId,
+    instanceId: input.instanceId,
+    allow: ALL_SOURCES,
+  });
 
   const quantity = input.quantity ?? fresh.quantity;
   if (quantity <= 0 || quantity > fresh.quantity) {
