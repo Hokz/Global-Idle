@@ -54,3 +54,11 @@ export { createSlots, installContainer, readSlots, setRouting, unlockSlot } from
 export type { ContainerSlot } from './slots.js';
 
 export { applyStartingGrant } from './grant.js';
+
+export { assertSafeContext, inActiveHunt } from './access.js';
+export { readStash, stow, withdraw } from './stash.js';
+export type { StashRow } from './stash.js';
+export { route } from './routing.js';
+export type { RouteResult } from './routing.js';
+export { buy, sell } from './service.js';
+export type { Purchase } from './service.js';

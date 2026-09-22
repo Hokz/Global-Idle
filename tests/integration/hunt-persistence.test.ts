@@ -11,7 +11,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { createSeededRandom, simulateHunt, type HuntState } from '@global-idle/game-engine';
-import { hunt as huntContext, withTransaction } from '@global-idle/domain';
+import { items, hunt as huntContext, withTransaction } from '@global-idle/domain';
 import { minutes, seconds } from '@global-idle/shared';
 import type { ContentBundleResolver } from '@global-idle/game-data';
 import { createClient, databaseUrl, truncateAll } from '../support/db.js';
@@ -130,14 +130,22 @@ describe('§12 PS — persistence', () => {
       characterNextAttackTick: stored.characterNextAttackTick,
       ended: null,
     };
-    const { plan, profile } = await withTransaction(prisma, async () => {
+    const { plan, profile } = await withTransaction(prisma, async (tx) => {
       const bundle = await resolver.resolve(version);
       const character = await readCharacter(prisma, hunt.characterId);
-      return huntContext.buildHuntPlan(
+      // Phase 3 — the profile is assembled from what the Character wears and
+      // what it brought, so the plan needs both. The property this case pins
+      // is unchanged: the same PERSISTED POSITION produces the same future.
+      const equipped = await items.equippedItems(tx, hunt.characterId);
+      const supplies = await items.broughtSupplies(tx, bundle, hunt.characterId);
+      return huntContext.buildHuntPlan({
         bundle,
-        'hunt.rookgaard.sewers',
-        huntContext.levelForXp(character.baseXp),
-      );
+        huntKey: 'hunt.rookgaard.sewers',
+        level: huntContext.levelForXp(character.baseXp),
+        equipped,
+        supplyCharges: supplies.charges,
+        supplyHeal: supplies.heal,
+      });
     });
 
     const first = simulateHunt(
