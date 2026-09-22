@@ -43,7 +43,11 @@ test.describe('§12 GW — the Game Window', () => {
     await expect(page.getByTestId('run-stamina')).toHaveAttribute('data-mode', 'NEUTRAL');
     await expect(page.getByTestId('run-stamina')).toContainText('42:00');
     await expect(page.getByTestId('session-xp')).toHaveText('0');
-    await expect(page.getByTestId('session-gold')).toHaveText('0');
+    // The CARRIED total, which is the number at risk — and the run's own
+    // earnings beside it. They start equal and stop being equal the moment a
+    // Character carries anything in from an earlier Hunt.
+    await expect(page.getByTestId('pouch-gold')).toContainText('0');
+    await expect(page.getByTestId('session-gold')).toContainText('0 this run');
     await expect(page.getByTestId('base-level')).toContainText('1');
     await expect(page.getByTestId('base-xp')).toContainText('0 / 100');
     await expect(page.getByTestId('supplies')).toContainText('20');
@@ -264,6 +268,14 @@ test.describe('§12 GW — the Game Window', () => {
       await expect(ended).toBeVisible({ timeout: 60_000 });
       await expect(ended).toHaveAttribute('data-reason', 'DIED');
       await expect(ended).toContainText('You have died');
+
+      // WHAT IT COST, said plainly. Two numbers going down without an
+      // explanation is how a player concludes the game ate their gold.
+      await expect(page.getByTestId('penalty')).toBeVisible();
+      await expect(page.getByTestId('penalty-xp')).toContainText('experience');
+      await expect(page.getByTestId('penalty-gold')).toContainText(/pouch|blessings/);
+      // The Pouch is gone with it: this Character had no blessings.
+      await expect(page.getByTestId('pouch-gold')).toContainText('0');
       await expect(page.getByTestId('connection')).toHaveAttribute(
         'data-connection',
         'ACTIVITY_ENDED',

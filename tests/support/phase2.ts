@@ -278,11 +278,53 @@ export const readStamina = (prisma: PrismaClient, characterId: string) =>
 export const readCharacter = (prisma: PrismaClient, characterId: string) =>
   prisma.character.findUniqueOrThrow({ where: { id: characterId } });
 
-/** Every Gold entry an account has, oldest first. */
+/** Every Gold entry an account has, in any scope, oldest first. */
 export const readLedger = (prisma: PrismaClient, accountId: string) =>
   prisma.ledgerEntry.findMany({
     where: { accountId, currency: 'GOLD' },
     orderBy: { createdAt: 'asc' },
   });
+
+/**
+ * What a Character is CARRYING (ADR-019). Zero when no entry has ever been
+ * posted to the scope, which is not the same as a row holding zero — GP1
+ * cares about the difference.
+ */
+export async function readPouch(prisma: PrismaClient, characterId: string): Promise<bigint> {
+  const row = await prisma.currencyBalance.findUnique({
+    where: {
+      subjectId_custody_currency: {
+        subjectId: characterId,
+        custody: 'POUCH',
+        currency: 'GOLD',
+      },
+    },
+  });
+  return row?.amount ?? 0n;
+}
+
+/** What an Account has SAFELY STORED. A different number, deliberately. */
+export async function readBank(prisma: PrismaClient, accountId: string): Promise<bigint> {
+  const row = await prisma.currencyBalance.findUnique({
+    where: {
+      subjectId_custody_currency: { subjectId: accountId, custody: 'BANK', currency: 'GOLD' },
+    },
+  });
+  return row?.amount ?? 0n;
+}
+
+/**
+ * Set a Character's death protection.
+ *
+ * THE SEAM, driven directly. Phase 2 ships no blessing shop and no Oracle, so
+ * there is no player-facing way to reach these — which is exactly why the
+ * policy has to read them from durable state rather than assume them, and why
+ * a test can set them without inventing a fake NPC to do it.
+ */
+export const setProtection = (
+  prisma: PrismaClient,
+  characterId: string,
+  protection: { blessings?: number; promoted?: boolean },
+) => prisma.character.update({ where: { id: characterId }, data: protection });
 
 export const asActivityId = toActivityId;

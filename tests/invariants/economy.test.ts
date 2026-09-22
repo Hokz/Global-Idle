@@ -37,7 +37,7 @@ describe('economy invariants', () => {
 
     await withTransaction(prisma, (tx) =>
       economy.post(tx, {
-        accountId: account,
+        subject: economy.bankOf(account),
         currency: 'GOLD',
         amount: 1_000n,
         reasonCode: 'SEED',
@@ -47,7 +47,7 @@ describe('economy invariants', () => {
     );
     await withTransaction(prisma, (tx) =>
       economy.post(tx, {
-        accountId: account,
+        subject: economy.bankOf(account),
         currency: 'GOLD',
         amount: -250n,
         reasonCode: 'SPEND',
@@ -56,7 +56,9 @@ describe('economy invariants', () => {
       }),
     );
 
-    const state = await withTransaction(prisma, (tx) => economy.reconcile(tx, account, 'GOLD'));
+    const state = await withTransaction(prisma, (tx) =>
+      economy.reconcile(tx, economy.bankOf(account), 'GOLD'),
+    );
     expect(state).toEqual({ projected: 750n, ledgerSum: 750n, reconciles: true });
   });
 
@@ -64,7 +66,7 @@ describe('economy invariants', () => {
     const account = toAccountId(await seedAccount(prisma));
     await withTransaction(prisma, (tx) =>
       economy.post(tx, {
-        accountId: account,
+        subject: economy.bankOf(account),
         currency: 'GOLD',
         amount: 100n,
         reasonCode: 'SEED',
@@ -79,7 +81,7 @@ describe('economy invariants', () => {
     const attempts = Array.from({ length: 10 }, (_, index) =>
       withTransaction(prisma, (tx) =>
         economy.post(tx, {
-          accountId: account,
+          subject: economy.bankOf(account),
           currency: 'GOLD',
           amount: -30n,
           reasonCode: 'CONCURRENT_SPEND',
@@ -95,7 +97,9 @@ describe('economy invariants', () => {
 
     expect(outcomes.filter((o) => o === 'ok')).toHaveLength(3);
 
-    const state = await withTransaction(prisma, (tx) => economy.reconcile(tx, account, 'GOLD'));
+    const state = await withTransaction(prisma, (tx) =>
+      economy.reconcile(tx, economy.bankOf(account), 'GOLD'),
+    );
     expect(state.projected).toBe(10n);
     expect(state.reconciles).toBe(true);
     // And it never went negative on the way.
@@ -110,7 +114,7 @@ describe('economy invariants', () => {
       withTransaction(prisma, async (tx) => {
         if (!(await claimSettlement(tx, operationId, 'hunt-settlement', T0))) return 'replayed';
         await economy.post(tx, {
-          accountId: account,
+          subject: economy.bankOf(account),
           currency: 'GOLD',
           amount: 500n,
           reasonCode: 'SETTLEMENT',
@@ -124,7 +128,9 @@ describe('economy invariants', () => {
     expect(await award()).toBe('replayed');
     expect(await award()).toBe('replayed');
 
-    const state = await withTransaction(prisma, (tx) => economy.reconcile(tx, account, 'GOLD'));
+    const state = await withTransaction(prisma, (tx) =>
+      economy.reconcile(tx, economy.bankOf(account), 'GOLD'),
+    );
     expect(state.projected).toBe(500n);
     expect(await prisma.ledgerEntry.count()).toBe(1);
   });
@@ -133,7 +139,7 @@ describe('economy invariants', () => {
     const account = toAccountId(await seedAccount(prisma));
     await withTransaction(prisma, (tx) =>
       economy.post(tx, {
-        accountId: account,
+        subject: economy.bankOf(account),
         currency: 'GOLD',
         amount: 400n,
         reasonCode: 'SEED',
@@ -146,11 +152,15 @@ describe('economy invariants', () => {
     // or a manual edit could do, since the projection is only ever written
     // beside its entry.
     await prisma.currencyBalance.update({
-      where: { accountId_currency: { accountId: account, currency: 'GOLD' } },
+      where: {
+        subjectId_custody_currency: { subjectId: account, custody: 'BANK', currency: 'GOLD' },
+      },
       data: { amount: 999_999n },
     });
 
-    const drifted = await withTransaction(prisma, (tx) => economy.reconcile(tx, account, 'GOLD'));
+    const drifted = await withTransaction(prisma, (tx) =>
+      economy.reconcile(tx, economy.bankOf(account), 'GOLD'),
+    );
     expect(drifted.reconciles).toBe(false);
     expect(drifted.projected).toBe(999_999n);
     expect(drifted.ledgerSum).toBe(400n);
@@ -160,7 +170,7 @@ describe('economy invariants', () => {
     const account = toAccountId(await seedAccount(prisma));
     await withTransaction(prisma, (tx) =>
       economy.post(tx, {
-        accountId: account,
+        subject: economy.bankOf(account),
         currency: 'PREMIUM',
         amount: 10n,
         reasonCode: 'SEED',
@@ -172,7 +182,7 @@ describe('economy invariants', () => {
     // A correction is a COMPENSATING ENTRY, never an edit (ADR-003).
     await withTransaction(prisma, (tx) =>
       economy.post(tx, {
-        accountId: account,
+        subject: economy.bankOf(account),
         currency: 'PREMIUM',
         amount: -10n,
         reasonCode: 'CORRECTION',
@@ -183,7 +193,9 @@ describe('economy invariants', () => {
 
     const entries = await prisma.ledgerEntry.findMany({ orderBy: { createdAt: 'asc' } });
     expect(entries).toHaveLength(2);
-    const state = await withTransaction(prisma, (tx) => economy.reconcile(tx, account, 'PREMIUM'));
+    const state = await withTransaction(prisma, (tx) =>
+      economy.reconcile(tx, economy.bankOf(account), 'PREMIUM'),
+    );
     expect(state).toEqual({ projected: 0n, ledgerSum: 0n, reconciles: true });
   });
 
@@ -194,7 +206,7 @@ describe('economy invariants', () => {
     await expect(
       withTransaction(prisma, (tx) =>
         economy.post(tx, {
-          accountId: account,
+          subject: economy.bankOf(account),
           currency: 'GOLD',
           amount: -1n,
           reasonCode: 'OVERDRAW',
@@ -205,7 +217,9 @@ describe('economy invariants', () => {
     ).rejects.toThrow(/InsufficientFunds|balance would go negative/i);
 
     expect(await prisma.ledgerEntry.count()).toBe(before);
-    const state = await withTransaction(prisma, (tx) => economy.reconcile(tx, account, 'GOLD'));
+    const state = await withTransaction(prisma, (tx) =>
+      economy.reconcile(tx, economy.bankOf(account), 'GOLD'),
+    );
     expect(state.reconciles).toBe(true);
   });
 });

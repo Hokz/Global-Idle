@@ -178,6 +178,10 @@ describe('§14.2 database', () => {
       data: {
         id: entryId,
         accountId: account,
+        // ADR-019 — every entry names the scope it moved. A BANK entry's
+        // subject IS its account, which the database CHECKs.
+        subjectId: account,
+        custody: 'BANK',
         currency: 'GOLD',
         amount: 100n,
         reasonCode: 'TEST_CREDIT',
@@ -195,6 +199,8 @@ describe('§14.2 database', () => {
           data: {
             id: newId<'LedgerEntryId'>(new Date(T0.getTime() + 1)),
             accountId: account,
+            subjectId: account,
+            custody: 'BANK',
             currency: 'GOLD',
             amount: -50n,
             reasonCode: 'TEST_DEBIT',

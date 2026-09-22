@@ -143,7 +143,7 @@ describe('§14.7 redis', () => {
     // forgivable (ADR-003).
     await withTransaction(prisma, (tx) =>
       economy.post(tx, {
-        accountId: toAccountId(accountId),
+        subject: economy.bankOf(toAccountId(accountId)),
         currency: 'GOLD',
         amount: 500n,
         reasonCode: 'TEST_CREDIT',

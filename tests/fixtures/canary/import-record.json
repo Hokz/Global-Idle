@@ -530,6 +530,239 @@
         "captured": "blockCount"
       },
       "reason": "At 2000 ms between swings, 2 blocks regenerate per interval against a cap of 2, so a block is always available and the counter can never bind. A faster attacker would need it modelled; this phase has none."
+    },
+    {
+      "id": "death.blessingRange",
+      "file": "src/creatures/players/player.cpp",
+      "symbol": "Player::getLostPercent, the blessing loop",
+      "observed": "Death-loss reduction counts blessings 2 through 8 — SEVEN regular blessings. Twist of Fate (1) is not one of them; it is the PvP skull protection.",
+      "decision": "Keep",
+      "fixture": "packages/domain/src/contexts/hunt/death.ts → FULL_BLESS_COUNT",
+      "value": 7,
+      "probe": {
+        "pattern": "for \\(int i = (2); i <= maxBlessing; i\\+\\+\\) \\{",
+        "captured": "2"
+      }
+    },
+    {
+      "id": "death.blessingFactor",
+      "file": "src/creatures/players/player.cpp",
+      "symbol": "Player::getLostPercent → factor",
+      "observed": "Each regular blessing is worth 8 percentage points of reduction on a non-retro server.",
+      "decision": "Keep",
+      "fixture": "packages/domain/src/contexts/hunt/death.ts → BLESSING_FACTOR",
+      "value": 8,
+      "probe": {
+        "pattern": "const auto factor = \\(isRetro \\? 6\\.31 : (8)\\);",
+        "captured": "8"
+      }
+    },
+    {
+      "id": "death.lowLevelLoss",
+      "file": "src/creatures/players/player.cpp",
+      "symbol": "Player::getLostPercent, the level < 24 branch",
+      "observed": "Below level 24 the base loss is a flat 10 percent of total experience, not the level formula.",
+      "decision": "Keep",
+      "fixture": "packages/domain/src/contexts/hunt/death.ts → LOW_LEVEL_LOSS_PERCENT",
+      "value": 10,
+      "probe": {
+        "pattern": "percentReduction = \\(percentReduction >= 0\\.40 \\? 0\\.50 : percentReduction\\);\\s*\\n\\s*lossPercent = (10);",
+        "captured": "10"
+      }
+    },
+    {
+      "id": "death.lowLevelBlessingBranch",
+      "file": "src/creatures/players/player.cpp",
+      "symbol": "Player::getLostPercent, the level < 24 branch",
+      "observed": "Below level 24, a blessing reduction of 40 percent or more is REPLACED by a flat 50 percent — before Promotion is added. Five, six and seven blessings therefore all reduce by the same 50 percent at low level.",
+      "decision": "Keep",
+      "fixture": "packages/domain/src/contexts/hunt/death.ts → lostPercent, and DL2/DL3",
+      "value": "percentReduction >= 0.40 -> 0.50",
+      "probe": {
+        "pattern": "(percentReduction = \\(percentReduction >= 0\\.40 \\? 0\\.50 : percentReduction\\);)",
+        "captured": "percentReduction = (percentReduction >= 0.40 ? 0.50 : percentReduction);"
+      }
+    },
+    {
+      "id": "death.highLevelLoss",
+      "file": "src/creatures/players/player.cpp",
+      "symbol": "Player::getLostPercent, the level >= 24 branch",
+      "observed": "From level 24 the base loss is a function of the fractional level and the total experience, which makes the ABSOLUTE experience lost depend on level alone.",
+      "decision": "Keep",
+      "fixture": "packages/domain/src/contexts/hunt/death.ts → lostPercent",
+      "value": "((tmpLevel + 50) * 50 * ((tmpLevel * tmpLevel) - (5 * tmpLevel) + 8)) / experience",
+      "probe": {
+        "pattern": "(lossPercent = \\(\\(tmpLevel \\+ 50\\) \\* 50 \\* \\(\\(tmpLevel \\* tmpLevel\\) - \\(5 \\* tmpLevel\\) \\+ 8\\)\\) / experience;)",
+        "captured": "lossPercent = ((tmpLevel + 50) * 50 * ((tmpLevel * tmpLevel) - (5 * tmpLevel) + 8)) / experience;"
+      }
+    },
+    {
+      "id": "death.promotion",
+      "file": "src/creatures/players/player.cpp",
+      "symbol": "Player::getLostPercent → isPromoted",
+      "observed": "Promotion adds 30 percentage points of reduction, AFTER the blessing handling and after the low-level replacement.",
+      "decision": "Keep",
+      "fixture": "packages/domain/src/contexts/hunt/death.ts → PROMOTION_REDUCTION",
+      "value": 30,
+      "probe": {
+        "pattern": "percentReduction \\+= (30) / 100\\.;",
+        "captured": "30"
+      }
+    },
+    {
+      "id": "death.result",
+      "file": "src/creatures/players/player.cpp",
+      "symbol": "Player::getLostPercent, the return",
+      "observed": "The result is a FRACTION of total experience: the base loss percent scaled by what the reductions left, divided by 100.",
+      "decision": "Keep",
+      "fixture": "packages/domain/src/contexts/hunt/death.ts → lostPercent",
+      "value": "(lossPercent * (1 - percentReduction)) / 100",
+      "probe": {
+        "pattern": "(return \\(lossPercent \\* \\(1 - percentReduction\\)\\) / 100\\.;)",
+        "captured": "return (lossPercent * (1 - percentReduction)) / 100.;"
+      }
+    },
+    {
+      "id": "death.expLossRounding",
+      "file": "src/creatures/players/player.cpp",
+      "symbol": "Player::death → expLoss",
+      "observed": "Experience lost is rounded UP. A death that would cost a fraction of a point costs a whole one.",
+      "decision": "Keep",
+      "fixture": "packages/domain/src/contexts/hunt/death.ts → experienceLost, and DL7",
+      "value": "ceil(experience * deathLossPercent)",
+      "probe": {
+        "pattern": "(auto expLoss = static_cast<uint64_t>\\(std::ceil\\(experience \\* deathLossPercent\\)\\);)",
+        "captured": "auto expLoss = static_cast<uint64_t>(std::ceil(experience * deathLossPercent));"
+      }
+    },
+    {
+      "id": "death.expLossGate",
+      "file": "src/creatures/players/player.cpp",
+      "symbol": "Player::death, the subtraction guard",
+      "observed": "Experience is only subtracted when the Character has NO vocation, or is above level 7. A vocationed Character at level 7 or below loses nothing.",
+      "decision": "Keep",
+      "fixture": "packages/domain/src/contexts/hunt/death.ts → losesExperience, and DL8",
+      "value": "vocation == NONE || level > 7",
+      "probe": {
+        "pattern": "(if \\(vocation->getId\\(\\) == VOCATION_NONE \\|\\| level > 7\\) \\{)",
+        "captured": "if (vocation->getId() == VOCATION_NONE || level > 7) {"
+      },
+      "reason": "Global Idle's Origin Character is vocation-less until the Level-8 Oracle, so it is on the FIRST side of this guard: it loses experience at every level. Recorded because reading only the 'level > 7' half would make the Origin Character immune to its own death penalty."
+    },
+    {
+      "id": "death.levelDown",
+      "file": "src/creatures/players/player.cpp",
+      "symbol": "Player::death, the level-down loop",
+      "observed": "After the loss, the level is walked down while the remaining experience is below the level's requirement. Level 1 is the floor.",
+      "decision": "Keep",
+      "fixture": "packages/domain/src/contexts/hunt/progression.ts → levelForXp, and DL9",
+      "value": "while (level > 1 && experience < getExpForLevel(level)) --level",
+      "probe": {
+        "pattern": "(while \\(level > 1 && experience < Player::getExpForLevel\\(level\\)\\) \\{)",
+        "captured": "while (level > 1 && experience < Player::getExpForLevel(level)) {"
+      }
+    },
+    {
+      "id": "death.unfairFight",
+      "file": "src/creatures/players/player.cpp",
+      "symbol": "Player::death → unfairFightReduction",
+      "observed": "The unfair-fight reduction is 100 (a multiplier of 1.0) for every death that is not PvP against higher levels.",
+      "decision": "Simplify",
+      "fixture": "packages/domain/src/contexts/hunt/death.ts",
+      "value": 100,
+      "probe": {
+        "pattern": "uint8_t unfairFightReduction = (100);",
+        "captured": "100"
+      },
+      "reason": "Phase 2 has no PvP, so the multiplier is always 1.0 and is not modelled as an input. The seam is the death policy's own parameters; PvP attaches there when it exists."
+    },
+    {
+      "id": "death.configOverride",
+      "file": "config.lua.dist",
+      "symbol": "deathLosePercent",
+      "observed": "The configuration override is disabled by default, so the formula branch above is the live one.",
+      "decision": "Keep",
+      "fixture": "docs/specs/phase-2/PHASE_2_CANARY_SOURCE_MAP.md §8",
+      "value": -1,
+      "probe": {
+        "pattern": "deathLosePercent = (-1)",
+        "captured": "-1"
+      }
+    },
+    {
+      "id": "death.isPromoted",
+      "file": "src/creatures/players/player.cpp",
+      "symbol": "Player::isPromoted",
+      "observed": "A Character is promoted when its vocation has no further promotion AND is not itself the unpromoted entry — which is FALSE for a vocation-less Character.",
+      "decision": "Keep",
+      "fixture": "packages/domain/src/contexts/hunt/death.ts, and DL10",
+      "value": "promotedVocation == VOCATION_NONE && vocation->getId() != promotedVocation",
+      "probe": {
+        "pattern": "(return promotedVocation == VOCATION_NONE && vocation->getId\\(\\) != promotedVocation;)",
+        "captured": "return promotedVocation == VOCATION_NONE && vocation->getId() != promotedVocation;"
+      }
+    },
+    {
+      "id": "death.promotedVocationLookup",
+      "file": "src/creatures/players/vocations/vocation.cpp",
+      "symbol": "Vocations::getPromotedVocation",
+      "observed": "The promoted vocation of a vocation id is the one whose fromVocation names it. Nothing names vocation 0, so vocation 0 has no promotion and is therefore not promoted.",
+      "decision": "Keep",
+      "fixture": "DL10 — a pre-vocation Character receives no Promotion reduction",
+      "value": "VOCATION_NONE for vocation 0",
+      "probe": {
+        "pattern": "(if \\(vocationPtr->fromVocation == vocationId && currentVocationId != vocationId\\) \\{)",
+        "captured": "if (vocationPtr->fromVocation == vocationId && currentVocationId != vocationId) {"
+      }
+    },
+    {
+      "id": "death.levelPercent",
+      "file": "src/creatures/players/player.cpp",
+      "symbol": "Player::getPercentLevel",
+      "observed": "Progress into the current level, as a percentage with two decimals; it feeds the fractional level the >= 24 formula uses.",
+      "decision": "Keep",
+      "fixture": "packages/domain/src/contexts/hunt/death.ts → levelPercent",
+      "value": "round(((count * 100) / nextLevelCount) * 100) / 100",
+      "probe": {
+        "pattern": "(const double_t result = round\\(\\(\\(count \\* 100\\.\\) / nextLevelCount\\) \\* 100\\.\\) / 100\\.;)",
+        "captured": "const double_t result = round(((count * 100.) / nextLevelCount) * 100.) / 100.;"
+      }
+    },
+    {
+      "id": "death.skillLossRounding",
+      "file": "src/creatures/players/player.cpp",
+      "symbol": "Player::death, the skill loop",
+      "observed": "Skill tries lost are TRUNCATED, not rounded up — the opposite of the experience loss in the same function.",
+      "decision": "Simplify",
+      "fixture": "recorded only; Phase 4 owns durable Skills",
+      "value": "static_cast<uint32_t>(sumSkillTries * deathLossPercent)",
+      "probe": {
+        "pattern": "(auto lostSkillTries = static_cast<uint32_t>\\(sumSkillTries \\* deathLossPercent\\);)",
+        "captured": "auto lostSkillTries = static_cast<uint32_t>(sumSkillTries * deathLossPercent);"
+      },
+      "reason": "Phase 2 has no durable Skill representation, and inventing one to delete it would be a shadow system. The rounding is recorded now so the phase that owns Skills does not re-derive it — and so the difference from the experience path is not mistaken for a transcription error later."
+    },
+    {
+      "id": "blessings.enum",
+      "file": "src/enums/player_blessings.hpp",
+      "symbol": "enum class Blessings",
+      "observed": "Eight blessings. Twist of Fate is 1; the seven that reduce death loss are 2 through 8.",
+      "decision": "Keep",
+      "fixture": "packages/domain/src/contexts/hunt/death.ts → BLESSING_NAMES",
+      "value": [
+        "TwistOfFate",
+        "TheWisdomOfSolitude",
+        "TheSparkOfThePhoenix",
+        "TheFireOfTheSuns",
+        "TheSpiritualShielding",
+        "TheEmbraceOfTibia",
+        "HearthOfTheMountain",
+        "BloodOfTheMountain"
+      ],
+      "probe": {
+        "pattern": "TwistOfFate = 1,\\s*\\n\\s*TheWisdomOfSolitude = (2),",
+        "captured": "2"
+      }
     }
   ]
 }

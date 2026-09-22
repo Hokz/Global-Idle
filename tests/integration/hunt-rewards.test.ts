@@ -159,7 +159,7 @@ describe('§12 RW — rewards', () => {
 
     // ...and the projected balance is the same sum again.
     const balance = await withTransaction(prisma, (tx) =>
-      economy.readBalance(tx, hunt.accountId as never, 'GOLD'),
+      economy.readBalance(tx, economy.pouchOf(hunt.accountId as never, hunt.characterId), 'GOLD'),
     );
     expect(balance).toBe(summed);
 
@@ -192,9 +192,7 @@ describe('§12 RW — rewards', () => {
     // never be asked to write.
     expect(await readLedger(prisma, hunt.accountId)).toEqual([]);
     expect(
-      await prisma.currencyBalance.findUnique({
-        where: { accountId_currency: { accountId: hunt.accountId, currency: 'GOLD' } },
-      }),
+      await prisma.currencyBalance.findFirst({ where: { accountId: hunt.accountId } }),
     ).toBeNull();
   });
 

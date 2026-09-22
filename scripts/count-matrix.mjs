@@ -2,7 +2,7 @@
 /**
  * Count the implemented matrix cases and compare them with what the approved
  * specifications fix: Phase 0B §14 at **92**, Phase 1 §16 at **87**, Phase 2
- * §12 at **74**.
+ * §12 at **97**.
  *
  * The convention this relies on: every matrix case is exactly ONE test whose
  * title begins with its id and a colon — `it('W1: ...')` for a Vitest case,
@@ -74,6 +74,12 @@ const MATRICES = {
       PS: [1, 5],
       GW: [1, 8],
       SRC: [1, 4],
+      // The correction pass. Death settlement and currency custody changed
+      // what Phase 2 MEANS, so they are Phase 2's cases rather than a fourth
+      // matrix: the phase is not done without them.
+      DL: [1, 11],
+      GP: [1, 9],
+      BL: [1, 3],
     },
   },
 };
@@ -87,7 +93,10 @@ const PREFIXES = [
   'E2E',
   'SIM',
   'SRC',
+  'BL',
   'CH',
+  'DL',
+  'GP',
   'AC',
   'AT',
   'AU',
