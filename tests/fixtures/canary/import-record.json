@@ -1108,6 +1108,32 @@
       }
     },
     {
+      "id": "npc.alDee.backpack.buy",
+      "file": "data-otservbr-global/npc/al_dee.lua",
+      "symbol": "npcConfig.shop → backpack",
+      "observed": "Al Dee's general shop sells a backpack (clientId 2854) for 10 gold. Dixi's own line — \"Ask {Al Dee} or {Lee'Delle} for it!\" — is the source naming these two as the backpack vendors.",
+      "decision": "Keep",
+      "fixture": "service.rookgaard.buy.backpack",
+      "value": 10,
+      "probe": {
+        "pattern": "\\{ itemName = \"backpack\", clientId = 2854, buy = (\\d+) \\}",
+        "captured": "10"
+      }
+    },
+    {
+      "id": "npc.leeDelle.backpack.buy",
+      "file": "data-otservbr-global/npc/lee_delle.lua",
+      "symbol": "npcConfig.shop → backpack",
+      "observed": "Lee'Delle sells the same backpack for 9 gold. Recorded so the choice of 10 is visible as a choice: the dearer of the two source prices is the conservative Gold sink.",
+      "decision": "Simplify",
+      "fixture": "service.rookgaard.buy.backpack",
+      "value": 9,
+      "probe": {
+        "pattern": "\\{ itemName = \"backpack\", clientId = 2854, buy = (\\d+) \\}",
+        "captured": "9"
+      }
+    },
+    {
       "id": "npc.willie.cheese.sell",
       "file": "data-otservbr-global/npc/willie.lua",
       "symbol": "npcConfig.shop → cheese",

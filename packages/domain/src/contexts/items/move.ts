@@ -14,19 +14,24 @@
 import type { ResolvedBundle } from '@global-idle/game-data';
 import type { Instant } from '@global-idle/shared';
 import { recordDomainEvent } from '../../platform/observability/index.js';
-import { illegalItemMove, noRoomForItem } from '../../platform/errors/index.js';
+import { illegalItemMove, itemNotFound, noRoomForItem } from '../../platform/errors/index.js';
 import type { UnitOfWork } from '../../platform/transaction/index.js';
+import { assertSafeContext } from './access.js';
 import { itemDefinition } from './catalogue.js';
 import {
+  addToStack,
   assertCapacity,
   carried,
   containerOf,
   createItem,
   freeSpacesIn,
   fungibleWith,
+  lockDestination,
   lockItems,
+  lockSlot,
   planPlacement,
   readItem,
+  usedSpaces,
   weightOf,
   type Affix,
   type ItemDestination,
@@ -72,29 +77,86 @@ async function occupants(
   return [];
 }
 
+/** Install a container into one of the five slots — a move, like any other. */
+export async function installContainer(
+  tx: UnitOfWork,
+  input: Omit<MoveItem, 'to' | 'quantity'> & { readonly slotIndex: number },
+): Promise<void> {
+  await moveItem(tx, {
+    ...input,
+    to: { kind: 'HUNT_CONTAINER', slotIndex: input.slotIndex },
+  });
+}
+
 /**
  * Move a quantity of one instance to one destination.
  *
- * Refuses, in this order: a quantity that is not positive or exceeds the
- * stack; a destination the definition cannot occupy; a container that is not
- * installed in an unlocked slot; a container inside a container; an equipment
- * slot the definition does not fit; no free space; and finally the Capacity
- * the arrival would exceed. Every one of them leaves the source untouched.
+ * Refuses, in this order: a Depot touch from inside a Hunt; a quantity that is
+ * not positive or exceeds the stack; a destination the definition cannot
+ * occupy; a container that is not an ACTIVE container of THIS Character; a
+ * container inside a container; an equipment slot the definition does not fit;
+ * a loaded container being taken out of its slot; no free space; and finally
+ * the Capacity the arrival would exceed. Every one of them leaves the source
+ * untouched.
+ *
+ * INSTALLING and UNINSTALLING a top-level Hunt container are moves like any
+ * other — `to.kind === 'HUNT_CONTAINER'` — which is why the slot row can never
+ * drift from the instance: the same function writes both, in the same
+ * transaction, and the composite foreign key refuses the orderings that would
+ * leave one without the other.
  */
 export async function moveItem(tx: UnitOfWork, input: MoveItem): Promise<void> {
-  const source = await readItem(tx, input.accountId, input.instanceId);
-  await lockItems(tx, [source.id, input.to.kind === 'CONTAINER' ? input.to.containerId : '']);
+  const peek = await readItem(tx, input.accountId, input.instanceId);
+
+  // ── access, in the DOMAIN ───────────────────────────────────────────────
+  //
+  // Not in the controller. A rule that lives at one call site is a rule the
+  // next call site has to remember, and a job or a future service is exactly
+  // the caller that will not.
+  if (input.to.kind === 'DEPOT' || peek.location === 'DEPOT') {
+    await assertSafeContext(tx, input.characterId, 'depot');
+  }
+
+  // ── locks, in §8.5 order: Account, Character, slot, then instances ──────
+  if (input.to.kind === 'DEPOT')
+    await lockDestination(tx, input.accountId, input.characterId, input.to);
+  const slotsToLock = new Set<number>();
+  if (input.to.kind === 'HUNT_CONTAINER') slotsToLock.add(input.to.slotIndex);
+  if (peek.location === 'HUNT_CONTAINER' && peek.slotIndex !== null) {
+    slotsToLock.add(peek.slotIndex);
+  }
+  for (const index of [...slotsToLock].sort((a, b) => a - b)) {
+    await lockSlot(tx, input.characterId, index);
+  }
+  await lockItems(tx, [peek.id, input.to.kind === 'CONTAINER' ? input.to.containerId : '']);
 
   const fresh = await readItem(tx, input.accountId, input.instanceId);
+
+  // Another CHARACTER on the same account is still another Character. Its
+  // backpack, its potions and its worn armour are not a shared shelf, and the
+  // answer is NOT FOUND rather than FORBIDDEN because whose it is, is not
+  // information the asker is entitled to. Account storage is the exception
+  // that proves it: a Depot row belongs to nobody in particular.
+  if (fresh.characterId !== null && fresh.characterId !== input.characterId) {
+    throw itemNotFound({ instanceId: fresh.id });
+  }
+
   const quantity = input.quantity ?? fresh.quantity;
   if (quantity <= 0 || quantity > fresh.quantity) {
     throw illegalItemMove({ instanceId: fresh.id, quantity, available: fresh.quantity });
   }
 
   const definition = itemDefinition(input.bundle, fresh.definitionKey);
+  const isContainer = definition.category === 'CONTAINER';
 
   // ── destination legality ────────────────────────────────────────────────
   if (input.to.kind === 'EQUIPPED') {
+    if (isContainer) {
+      throw illegalItemMove({
+        instanceId: fresh.id,
+        reason: 'a container is installed in a Hunt slot, not worn',
+      });
+    }
     if (!definition.slot || definition.slot !== input.to.slot) {
       throw illegalItemMove({
         instanceId: fresh.id,
@@ -107,8 +169,16 @@ export async function moveItem(tx: UnitOfWork, input: MoveItem): Promise<void> {
       throw illegalItemMove({ instanceId: fresh.id, reason: 'equipment is worn whole' });
     }
   }
+  if (input.to.kind === 'HUNT_CONTAINER') {
+    if (!isContainer || !definition.containerSpaces) {
+      throw illegalItemMove({ instanceId: fresh.id, reason: 'only a container can be installed' });
+    }
+    if (quantity !== fresh.quantity || quantity !== 1) {
+      throw illegalItemMove({ instanceId: fresh.id, reason: 'a container is installed whole' });
+    }
+  }
   if (input.to.kind === 'CONTAINER') {
-    if (definition.category === 'CONTAINER') {
+    if (isContainer) {
       // The nesting exploit, refused where it is understood rather than where
       // it happens to be noticed. Containers live in top-level slots.
       throw illegalItemMove({
@@ -116,15 +186,34 @@ export async function moveItem(tx: UnitOfWork, input: MoveItem): Promise<void> {
         reason: 'a container cannot go in a container',
       });
     }
-    await containerOf(tx, input.bundle, input.accountId, input.to.containerId);
+    await containerOf(tx, input.bundle, input.accountId, input.characterId, input.to.containerId);
+  }
+
+  // ── taking a container OUT of its slot ──────────────────────────────────
+  //
+  // THE RULE, chosen and written down rather than left to whichever branch
+  // ran first: a container must be EMPTY to leave its slot. Moving it loaded
+  // would have to answer "where did its contents go", and every answer is
+  // worse than asking the player to empty it — carrying them into the Depot
+  // changes their custody silently, and leaving them behind orphans rows
+  // whose parent is no longer anywhere. Re-slotting an installed container
+  // from slot 1 to slot 3 is NOT leaving, so it keeps its contents.
+  const leavingSlot = fresh.location === 'HUNT_CONTAINER' && input.to.kind !== 'HUNT_CONTAINER';
+  if (leavingSlot && (await usedSpaces(tx, fresh.id)) > 0) {
+    throw illegalItemMove({
+      instanceId: fresh.id,
+      reason: 'empty the container before taking it out of its slot',
+    });
   }
 
   // ── space ───────────────────────────────────────────────────────────────
-  const free = await freeSpacesIn(tx, input.bundle, input.accountId, input.to);
+  const free = await freeSpacesIn(tx, input.bundle, input.accountId, input.characterId, input.to);
   const existing = await occupants(tx, input.accountId, input.characterId, input.to);
   const placement =
-    input.to.kind === 'EQUIPPED'
-      ? { merges: [], newStacks: [quantity] }
+    input.to.kind === 'EQUIPPED' || input.to.kind === 'HUNT_CONTAINER'
+      ? free >= 1
+        ? { merges: [], newStacks: [quantity] }
+        : null
       : planPlacement(
           {
             bundle: input.bundle,
@@ -156,11 +245,22 @@ export async function moveItem(tx: UnitOfWork, input: MoveItem): Promise<void> {
   }
 
   // ── apply ───────────────────────────────────────────────────────────────
-  for (const merge of placement.merges) {
-    await tx.itemInstance.update({
-      where: { id: merge.id },
-      data: { quantity: { increment: merge.add } },
+  //
+  // The slot is released BEFORE the instance changes shape and claimed AFTER,
+  // because the composite foreign key is checked per statement: a slot may
+  // never, even for one statement, name a row that does not agree with it.
+  if (fresh.location === 'HUNT_CONTAINER' && fresh.slotIndex !== null) {
+    await tx.characterContainerSlot.update({
+      where: {
+        characterId_slotIndex: { characterId: input.characterId, slotIndex: fresh.slotIndex },
+      },
+      data: { containerInstanceId: null },
     });
+  }
+
+  for (const merge of placement.merges) {
+    const row = existing.find((item) => item.id === merge.id)!;
+    await addToStack(tx, input.bundle, row, merge.add);
   }
 
   const custody = {
@@ -168,11 +268,14 @@ export async function moveItem(tx: UnitOfWork, input: MoveItem): Promise<void> {
     location:
       input.to.kind === 'EQUIPPED'
         ? ('EQUIPPED' as const)
-        : input.to.kind === 'CONTAINER'
-          ? ('CHARACTER_CONTAINER' as const)
-          : ('DEPOT' as const),
+        : input.to.kind === 'HUNT_CONTAINER'
+          ? ('HUNT_CONTAINER' as const)
+          : input.to.kind === 'CONTAINER'
+            ? ('CHARACTER_CONTAINER' as const)
+            : ('DEPOT' as const),
     slot: input.to.kind === 'EQUIPPED' ? input.to.slot : null,
     containerId: input.to.kind === 'CONTAINER' ? input.to.containerId : null,
+    slotIndex: input.to.kind === 'HUNT_CONTAINER' ? input.to.slotIndex : null,
   };
 
   // MOVING THE WHOLE STACK MOVES THE ROW, it does not replace it.
@@ -191,6 +294,7 @@ export async function moveItem(tx: UnitOfWork, input: MoveItem): Promise<void> {
   } else {
     for (const size of placement.newStacks) {
       await createItem(tx, {
+        bundle: input.bundle,
         accountId: input.accountId,
         ...custody,
         definitionKey: fresh.definitionKey,
@@ -208,6 +312,18 @@ export async function moveItem(tx: UnitOfWork, input: MoveItem): Promise<void> {
         data: { quantity: { decrement: quantity } },
       });
     }
+  }
+
+  if (input.to.kind === 'HUNT_CONTAINER') {
+    await tx.characterContainerSlot.update({
+      where: {
+        characterId_slotIndex: {
+          characterId: input.characterId,
+          slotIndex: input.to.slotIndex,
+        },
+      },
+      data: { containerInstanceId: fresh.id },
+    });
   }
 
   recordDomainEvent({
@@ -257,7 +373,13 @@ export async function placeInPouch(
 ): Promise<{ readonly collected: number; readonly reason: 'ok' | 'no-space' | 'over-capacity' }> {
   const rarity = input.rarity ?? 'COMMON';
   const affixes = input.affixes ?? [];
-  const free = await freeSpacesIn(tx, input.bundle, input.accountId, {
+  // The Loot Pouch is the Character's, so the Character is what serializes two
+  // drops racing for its last space.
+  await lockDestination(tx, input.accountId, input.characterId, {
+    kind: 'LOOT_POUCH',
+    characterId: input.characterId,
+  });
+  const free = await freeSpacesIn(tx, input.bundle, input.accountId, input.characterId, {
     kind: 'LOOT_POUCH',
     characterId: input.characterId,
   });
@@ -286,13 +408,12 @@ export async function placeInPouch(
   }
 
   for (const merge of placement.merges) {
-    await tx.itemInstance.update({
-      where: { id: merge.id },
-      data: { quantity: { increment: merge.add } },
-    });
+    const row = inPouch.find((item) => item.id === merge.id)!;
+    await addToStack(tx, input.bundle, row, merge.add);
   }
   for (const size of placement.newStacks) {
     await createItem(tx, {
+      bundle: input.bundle,
       accountId: input.accountId,
       characterId: input.characterId,
       definitionKey: input.definitionKey,

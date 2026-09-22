@@ -78,6 +78,7 @@ export const carriedWeight = (
 export async function give(
   prisma: PrismaClient,
   input: {
+    bundle: ResolvedBundle;
     accountId: string;
     characterId: string;
     containerId: string;
@@ -88,6 +89,7 @@ export async function give(
 ): Promise<string> {
   return withTransaction(prisma, async (tx) => {
     const created = await items.createItem(tx, {
+      bundle: input.bundle,
       accountId: input.accountId,
       characterId: input.characterId,
       definitionKey: input.definitionKey,

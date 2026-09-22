@@ -15,7 +15,7 @@ import type { UnitOfWork } from '../../platform/transaction/index.js';
 import { itemDefinition, startingGrant } from './catalogue.js';
 import { createItem } from './custody.js';
 import type { EquipmentSlot } from './custody.js';
-import { createSlots, installContainer } from './slots.js';
+import { createSlots } from './slots.js';
 
 export async function applyStartingGrant(
   tx: UnitOfWork,
@@ -31,6 +31,7 @@ export async function applyStartingGrant(
 
   for (const entry of grant.equipped) {
     await createItem(tx, {
+      bundle: input.bundle,
       accountId: input.accountId,
       characterId: input.characterId,
       definitionKey: entry.itemKey,
@@ -41,24 +42,23 @@ export async function applyStartingGrant(
     });
   }
 
+  // An installed container is its OWN custody. It is not worn: a Character
+  // wears one backpack and installs up to five containers, so EQUIPPED could
+  // never have held slots 2 to 5. The instance carries its slot index and the
+  // slot row's composite key checks that both agree.
   const container = await createItem(tx, {
+    bundle: input.bundle,
     accountId: input.accountId,
     characterId: input.characterId,
     definitionKey: grant.container,
     quantity: 1,
-    // A container in a top-level slot is not INSIDE anything, which is what
-    // `installed` means and why it is EQUIPPED in the BACKPACK slot rather
-    // than CHARACTER_CONTAINER: the latter would need a parent it does not
-    // have, and the CHECK would refuse it — correctly.
-    location: 'EQUIPPED',
-    slot: 'BACKPACK',
+    location: 'HUNT_CONTAINER',
+    slotIndex: 1,
     at: input.at,
   });
-  await installContainer(tx, {
-    bundle: input.bundle,
-    characterId: input.characterId,
-    slotIndex: 1,
-    instanceId: container.id,
+  await tx.characterContainerSlot.update({
+    where: { characterId_slotIndex: { characterId: input.characterId, slotIndex: 1 } },
+    data: { containerInstanceId: container.id },
   });
 
   for (const entry of grant.contents) {
@@ -69,6 +69,7 @@ export async function applyStartingGrant(
       const size = Math.min(maxStack, remaining);
       remaining -= size;
       await createItem(tx, {
+        bundle: input.bundle,
         accountId: input.accountId,
         characterId: input.characterId,
         definitionKey: entry.itemKey,

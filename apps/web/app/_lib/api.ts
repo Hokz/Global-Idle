@@ -227,6 +227,7 @@ export interface InventoryView {
   depot: { total: number; offset: number; limit: number; items: ItemView[] };
   stash: { definitionKey: string; label: string; quantity: string }[];
   lootPolicy: { mode: string; rules: { itemKey?: string; accept: boolean }[] };
+  routingCategories: string[];
   service: {
     key: string;
     sells: { itemKey: string; price: number }[];

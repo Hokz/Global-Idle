@@ -20,6 +20,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, type Page } from '@playwright/test';
 import { PrismaPg } from '@prisma/adapter-pg';
+import { economy, withTransaction } from '@global-idle/domain';
+import { accountId as toAccountId, operationId as toOperationId } from '@global-idle/shared';
 import { PrismaClient } from '../../packages/domain/src/generated/prisma/client.js';
 
 const ROOT = join(import.meta.dirname, '..', '..');
@@ -79,4 +81,33 @@ export async function enterHunt(page: Page): Promise<void> {
 export async function runOf(prisma: PrismaClient, characterId: string) {
   const claim = await prisma.occupancyClaim.findUniqueOrThrow({ where: { characterId } });
   return prisma.huntRun.findUniqueOrThrow({ where: { activityId: claim.activityId } });
+}
+
+/**
+ * Put Gold in the Bank, durably, the way a player would have earned it.
+ *
+ * The prices Phase 3 locked are Gold SINKS on purpose — 10,000 for slot 2 —
+ * and a browser case cannot farm that many Rats inside a test timeout. So the
+ * durable position is ARRANGED through the same ledger the game uses, and the
+ * case then does every visible step for real.
+ */
+export async function fundBank(
+  prisma: PrismaClient,
+  characterId: string,
+  amount: bigint,
+): Promise<void> {
+  const character = await prisma.character.findUniqueOrThrow({
+    where: { id: characterId },
+    select: { accountId: true },
+  });
+  await withTransaction(prisma as never, (tx) =>
+    economy.post(tx, {
+      subject: economy.bankOf(toAccountId(character.accountId)),
+      currency: 'GOLD',
+      amount,
+      reasonCode: 'e2e.seed',
+      operationId: toOperationId(`e2e:${characterId}:${amount}:${Date.now()}`),
+      at: new Date(),
+    }),
+  );
 }

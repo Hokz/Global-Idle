@@ -22,15 +22,21 @@ import {
 import type { ResolvedBundle } from '@global-idle/game-data';
 import type { Instant } from '@global-idle/shared';
 import {
+  containerSlotLocked,
   illegalItemMove,
   itemNotFound,
   noRoomForItem,
   overCapacity,
 } from '../../platform/errors/index.js';
-import type { UnitOfWork } from '../../platform/transaction/index.js';
+import {
+  lockAccount,
+  lockCharactersInOrder,
+  type UnitOfWork,
+} from '../../platform/transaction/index.js';
 import { itemDefinition } from './catalogue.js';
 
-export type ItemLocation = 'EQUIPPED' | 'CHARACTER_CONTAINER' | 'LOOT_POUCH' | 'DEPOT';
+export type ItemLocation =
+  'EQUIPPED' | 'HUNT_CONTAINER' | 'CHARACTER_CONTAINER' | 'LOOT_POUCH' | 'DEPOT';
 
 export type EquipmentSlot =
   'HEAD' | 'NECKLACE' | 'BACKPACK' | 'ARMOR' | 'RIGHT' | 'LEFT' | 'LEGS' | 'FEET' | 'RING' | 'AMMO';
@@ -51,6 +57,8 @@ export interface StoredItem {
   readonly location: ItemLocation;
   readonly slot: EquipmentSlot | null;
   readonly containerId: string | null;
+  /** HUNT_CONTAINER only: which of the five slots this container occupies. */
+  readonly slotIndex: number | null;
   readonly rarity: ItemRarity;
   readonly affixes: readonly Affix[];
 }
@@ -65,6 +73,7 @@ export interface StoredItem {
  */
 export type ItemDestination =
   | { readonly kind: 'EQUIPPED'; readonly slot: EquipmentSlot }
+  | { readonly kind: 'HUNT_CONTAINER'; readonly slotIndex: number }
   | { readonly kind: 'CONTAINER'; readonly containerId: string }
   | { readonly kind: 'DEPOT' };
 
@@ -84,6 +93,7 @@ const toStored = (row: {
   location: string;
   slot: string | null;
   containerId: string | null;
+  slotIndex: number | null;
   rarity: string;
   affixes: unknown;
 }): StoredItem => ({
@@ -95,6 +105,7 @@ const toStored = (row: {
   location: row.location as ItemLocation,
   slot: row.slot as EquipmentSlot | null,
   containerId: row.containerId,
+  slotIndex: row.slotIndex,
   rarity: row.rarity as ItemRarity,
   affixes: affixesOf(row.affixes),
 });
@@ -137,7 +148,7 @@ export async function carried(tx: UnitOfWork, characterId: string): Promise<read
   const rows = await tx.itemInstance.findMany({
     where: {
       characterId,
-      location: { in: ['EQUIPPED', 'CHARACTER_CONTAINER', 'LOOT_POUCH'] },
+      location: { in: ['EQUIPPED', 'HUNT_CONTAINER', 'CHARACTER_CONTAINER', 'LOOT_POUCH'] },
     },
     orderBy: { id: 'asc' },
   });
@@ -174,6 +185,8 @@ export async function depotSpaces(tx: UnitOfWork, accountId: string): Promise<nu
 }
 
 export interface CreateItem {
+  /** Required, because the definition is what says how big a stack may be. */
+  readonly bundle: ResolvedBundle;
   readonly accountId: string;
   readonly characterId: string | null;
   readonly definitionKey: string;
@@ -181,12 +194,37 @@ export interface CreateItem {
   readonly location: ItemLocation;
   readonly slot?: EquipmentSlot | null;
   readonly containerId?: string | null;
+  readonly slotIndex?: number | null;
   readonly rarity?: ItemRarity;
   readonly affixes?: readonly Affix[];
   readonly at: Instant;
 }
 
+/**
+ * The stack limit, where it can actually be evaluated.
+ *
+ * The database holds `1 <= quantity <= 255`, which is the PHYSICAL ceiling the
+ * source's own parser enforces — and it is all a CHECK can hold, because
+ * `maxStack` lives in the content bundle and no constraint can read a JSON
+ * artifact on disk. The item-specific limit is therefore the domain's, and it
+ * is asserted HERE, in the one function that brings rows into existence, so
+ * "Dagger quantity 2" is refused on every path rather than on the paths
+ * somebody remembered.
+ */
+export function assertStackLimit(
+  bundle: ResolvedBundle,
+  definitionKey: string,
+  quantity: number,
+): void {
+  const definition = itemDefinition(bundle, definitionKey);
+  const maxStack = definition.stackable ? definition.maxStack : 1;
+  if (!Number.isInteger(quantity) || quantity < 1 || quantity > maxStack) {
+    throw illegalItemMove({ definitionKey, quantity, maxStack, reason: 'quantity out of range' });
+  }
+}
+
 export async function createItem(tx: UnitOfWork, input: CreateItem): Promise<StoredItem> {
+  assertStackLimit(input.bundle, input.definitionKey, input.quantity);
   const row = await tx.itemInstance.create({
     data: {
       id: newId<'ItemInstanceId'>(input.at),
@@ -197,12 +235,30 @@ export async function createItem(tx: UnitOfWork, input: CreateItem): Promise<Sto
       location: input.location,
       slot: input.slot ?? null,
       containerId: input.containerId ?? null,
+      slotIndex: input.slotIndex ?? null,
       rarity: input.rarity ?? 'COMMON',
       affixes: (input.affixes ?? []) as never,
       createdAt: input.at,
     },
   });
   return toStored(row);
+}
+
+/**
+ * Add to an existing stack, never past the definition's `maxStack`.
+ *
+ * Merges already come from {@link planPlacement}, which respects the limit —
+ * this is the second lock on the same door, so a future caller that computes
+ * its own increment cannot quietly exceed it.
+ */
+export async function addToStack(
+  tx: UnitOfWork,
+  bundle: ResolvedBundle,
+  row: { readonly id: string; readonly definitionKey: string; readonly quantity: number },
+  add: number,
+): Promise<void> {
+  assertStackLimit(bundle, row.definitionKey, row.quantity + add);
+  await tx.itemInstance.update({ where: { id: row.id }, data: { quantity: { increment: add } } });
 }
 
 /**
@@ -292,12 +348,21 @@ export async function assertCapacity(
 export const POUCH_SPACES = LOOT_POUCH_SPACES;
 export const DEPOT_LIMIT = DEPOT_SPACES;
 
-/** A container instance, verified to be one — and to be installed in an
- *  unlocked slot of the Character that is asking. */
+/**
+ * A container instance, verified to be an ACTIVE one belonging to the asking
+ * Character.
+ *
+ * "Active" is now a property of the row rather than of a pointer: the instance
+ * itself says `HUNT_CONTAINER` and which slot it is in, and the slot's
+ * composite foreign key says the database agrees. A Depot container, another
+ * Character's container and a container whose slot was cleared all fail the
+ * same first test.
+ */
 export async function containerOf(
   tx: UnitOfWork,
   bundle: ResolvedBundle,
   accountId: string,
+  characterId: string,
   containerId: string,
 ): Promise<{ readonly item: StoredItem; readonly spaces: number }> {
   const item = await readItem(tx, accountId, containerId);
@@ -305,8 +370,16 @@ export async function containerOf(
   if (definition.category !== 'CONTAINER' || !definition.containerSpaces) {
     throw illegalItemMove({ containerId, reason: 'not a container' });
   }
+  if (item.location !== 'HUNT_CONTAINER') {
+    throw illegalItemMove({ containerId, reason: 'the container is not installed' });
+  }
+  if (item.characterId !== characterId) {
+    // Another Character on the SAME account is still another Character. Its
+    // backpack is not a shared shelf.
+    throw itemNotFound({ instanceId: containerId });
+  }
   const slot = await tx.characterContainerSlot.findFirst({
-    where: { containerInstanceId: containerId },
+    where: { characterId, containerInstanceId: containerId },
   });
   if (!slot || slot.unlockedAt === null) {
     throw illegalItemMove({
@@ -317,22 +390,89 @@ export async function containerOf(
   return { item, spaces: definition.containerSpaces };
 }
 
-/** Free spaces in a container, the Loot Pouch or the Depot. */
+/** A slot, read for writing: locked so two installs cannot both find it free. */
+export async function lockSlot(
+  tx: UnitOfWork,
+  characterId: string,
+  slotIndex: number,
+): Promise<{ readonly unlocked: boolean; readonly containerInstanceId: string | null }> {
+  const rows = await tx.$queryRawUnsafe<
+    { unlockedAt: Date | null; containerInstanceId: string | null }[]
+  >(
+    `SELECT "unlockedAt", "containerInstanceId" FROM "CharacterContainerSlot"
+      WHERE "characterId" = $1 AND "slotIndex" = $2 FOR UPDATE`,
+    characterId,
+    slotIndex,
+  );
+  const row = rows[0];
+  if (!row) throw containerSlotLocked({ slotIndex, reason: 'no such slot' });
+  return { unlocked: row.unlockedAt !== null, containerInstanceId: row.containerInstanceId };
+}
+
+/**
+ * Serialize on the DESTINATION before counting its free space.
+ *
+ * Counting spaces and then inserting is a read-then-write, and two arrivals
+ * that both read "one space left" both write. The lock is taken on the thing
+ * that owns the space — the container's own row, the Character for its Loot
+ * Pouch, the Account for its Depot — so the second caller waits, re-counts,
+ * and finds it full. Taken in §8.5 order: Account, then Character, then
+ * ItemInstance.
+ */
+export async function lockDestination(
+  tx: UnitOfWork,
+  accountId: string,
+  characterId: string,
+  destination: ItemDestination | { readonly kind: 'LOOT_POUCH'; readonly characterId: string },
+): Promise<void> {
+  switch (destination.kind) {
+    case 'DEPOT':
+      await lockAccount(tx, accountId);
+      return;
+    case 'LOOT_POUCH':
+      await lockCharactersInOrder(tx, [destination.characterId]);
+      return;
+    case 'HUNT_CONTAINER':
+      await lockSlot(tx, characterId, destination.slotIndex);
+      return;
+    case 'CONTAINER':
+      await lockItems(tx, [destination.containerId]);
+      return;
+    case 'EQUIPPED':
+      return;
+    default:
+      return;
+  }
+}
+
+/** Free spaces in a container, the Loot Pouch, the Depot or a Hunt slot. */
 export async function freeSpacesIn(
   tx: UnitOfWork,
   bundle: ResolvedBundle,
   accountId: string,
+  characterId: string,
   destination: ItemDestination | { readonly kind: 'LOOT_POUCH'; readonly characterId: string },
 ): Promise<number> {
   switch (destination.kind) {
     case 'CONTAINER': {
-      const { spaces } = await containerOf(tx, bundle, accountId, destination.containerId);
+      const { spaces } = await containerOf(
+        tx,
+        bundle,
+        accountId,
+        characterId,
+        destination.containerId,
+      );
       return spaces - (await usedSpaces(tx, destination.containerId));
     }
     case 'LOOT_POUCH':
       return POUCH_SPACES - (await pouchSpaces(tx, destination.characterId));
     case 'DEPOT':
       return DEPOT_LIMIT - (await depotSpaces(tx, accountId));
+    case 'HUNT_CONTAINER': {
+      const slot = await lockSlot(tx, characterId, destination.slotIndex);
+      if (!slot.unlocked) throw containerSlotLocked({ slotIndex: destination.slotIndex });
+      return slot.containerInstanceId === null ? 1 : 0;
+    }
     case 'EQUIPPED':
       return 1;
     default:

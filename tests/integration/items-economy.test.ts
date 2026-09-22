@@ -161,6 +161,7 @@ describe('§20 DTH — what a death costs now', () => {
     });
     await withTransaction(prisma, (tx) =>
       items.createItem(tx, {
+        bundle,
         accountId: hunt.accountId,
         characterId: null,
         definitionKey: DAGGER,
@@ -360,6 +361,7 @@ describe('§20 BNK — the Bank, and the Gold that is not carried', () => {
     const hero = await idle();
     const container = await firstContainer(prisma, hero.characterId);
     const stack = await give(prisma, {
+      bundle,
       accountId: hero.accountId,
       characterId: hero.characterId,
       containerId: container,
@@ -517,6 +519,7 @@ describe('§20 NPC — the Rookgaard counter', () => {
     const container = await firstContainer(prisma, hero.characterId);
     for (let index = (await contentsOf(prisma, container)).length; index < 20; index += 1) {
       await give(prisma, {
+        bundle,
         accountId: hero.accountId,
         characterId: hero.characterId,
         containerId: container,
@@ -806,6 +809,7 @@ describe('§20 MIG — migrations and invariants', () => {
     const hero = await idle();
     const row = await withTransaction(prisma, (tx) =>
       items.createItem(tx, {
+        bundle,
         accountId: hero.accountId,
         characterId: null,
         definitionKey: BACKPACK,

@@ -14,7 +14,14 @@ import type { Instant } from '@global-idle/shared';
 import { noRoomForItem } from '../../platform/errors/index.js';
 import type { UnitOfWork } from '../../platform/transaction/index.js';
 import { itemDefinition } from './catalogue.js';
-import { assertCapacity, createItem, freeSpacesIn, planPlacement } from './custody.js';
+import {
+  addToStack,
+  assertCapacity,
+  createItem,
+  freeSpacesIn,
+  lockDestination,
+  planPlacement,
+} from './custody.js';
 import { readSlots } from './slots.js';
 
 export interface RouteResult {
@@ -43,6 +50,62 @@ export async function route(
 ): Promise<RouteResult> {
   const definition = itemDefinition(input.bundle, input.definitionKey);
   const slots = await readSlots(tx, input.characterId);
+
+  // ── a CONTAINER is delivered by being INSTALLED ─────────────────────────
+  //
+  // It cannot route into a container, because containers do not nest. So the
+  // destination for one is a free Hunt Container Slot, which is also what
+  // makes slots 2 to 5 worth buying: unlock one, buy a backpack, and the
+  // backpack is in it. With every unlocked slot full the purchase fails
+  // atomically and nothing is charged, exactly as a full backpack does.
+  if (definition.category === 'CONTAINER') {
+    const free = slots.filter((slot) => slot.unlocked && !slot.containerInstanceId);
+    if (free.length < input.quantity) {
+      throw noRoomForItem({
+        definitionKey: input.definitionKey,
+        quantity: input.quantity,
+        freeSlots: free.length,
+        reason: 'no free Hunt container slot',
+      });
+    }
+    await assertCapacity(
+      tx,
+      input.bundle,
+      input.characterId,
+      input.baseLevel,
+      definition.weight * input.quantity,
+    );
+    let last = '';
+    for (let n = 0; n < input.quantity; n += 1) {
+      const slot = free[n]!;
+      await lockDestination(tx, input.accountId, input.characterId, {
+        kind: 'HUNT_CONTAINER',
+        slotIndex: slot.slotIndex,
+      });
+      const created = await createItem(tx, {
+        bundle: input.bundle,
+        accountId: input.accountId,
+        characterId: input.characterId,
+        definitionKey: input.definitionKey,
+        quantity: 1,
+        location: 'HUNT_CONTAINER',
+        slotIndex: slot.slotIndex,
+        at: input.at,
+      });
+      await tx.characterContainerSlot.update({
+        where: {
+          characterId_slotIndex: {
+            characterId: input.characterId,
+            slotIndex: slot.slotIndex,
+          },
+        },
+        data: { containerInstanceId: created.id },
+      });
+      last = created.id;
+    }
+    return { containerId: last, stacks: input.quantity };
+  }
+
   const installed = slots.filter((slot) => slot.unlocked && slot.containerInstanceId);
 
   const preferred = installed.filter(
@@ -60,7 +123,13 @@ export async function route(
 
   for (const slot of order) {
     const containerId = slot.containerInstanceId!;
-    const free = await freeSpacesIn(tx, input.bundle, input.accountId, {
+    // Serialize on the destination BEFORE counting its free space: two
+    // arrivals that both read "one space left" would otherwise both write.
+    await lockDestination(tx, input.accountId, input.characterId, {
+      kind: 'CONTAINER',
+      containerId,
+    });
+    const free = await freeSpacesIn(tx, input.bundle, input.accountId, input.characterId, {
       kind: 'CONTAINER',
       containerId,
     });
@@ -85,6 +154,7 @@ export async function route(
         location: row.location as never,
         slot: row.slot as never,
         containerId: row.containerId,
+        slotIndex: row.slotIndex,
         rarity: row.rarity as never,
         affixes: Array.isArray(row.affixes) ? (row.affixes as never) : [],
       })),
@@ -93,13 +163,12 @@ export async function route(
     if (!placement) continue;
 
     for (const merge of placement.merges) {
-      await tx.itemInstance.update({
-        where: { id: merge.id },
-        data: { quantity: { increment: merge.add } },
-      });
+      const row = rows.find((item) => item.id === merge.id)!;
+      await addToStack(tx, input.bundle, row, merge.add);
     }
     for (const size of placement.newStacks) {
       await createItem(tx, {
+        bundle: input.bundle,
         accountId: input.accountId,
         characterId: input.characterId,
         definitionKey: input.definitionKey,

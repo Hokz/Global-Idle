@@ -565,6 +565,10 @@ enum CurrencyCustody {
 enum ItemLocation {
   /// Worn. Drives combat. Safe from the Global Idle death rule.
   EQUIPPED
+  /// INSTALLED in one of the five top-level Hunt Container Slots. Not worn
+  /// gear: a Character wears one backpack and installs up to five containers,
+  /// so EQUIPPED could never have represented all five.
+  HUNT_CONTAINER
   /// Inside one of the five top-level Hunt containers.
   CHARACTER_CONTAINER
   /// Collected by a Hunt. AT RISK on death without Full Bless.
@@ -626,6 +630,10 @@ model ItemInstance {
   slot          EquipmentSlot?
   /// CHARACTER_CONTAINER only — the container instance this sits inside.
   containerId   String?
+  /// HUNT_CONTAINER only — WHICH of the five slots this container occupies.
+  /// It lives on the instance so the slot's foreign key can name it, which is
+  /// what makes "installed" a database fact instead of a service's opinion.
+  slotIndex     Int?
   rarity        ItemRarity     @default(COMMON)
   affixes       Json           @default("[]")
   /// Reserved for Phase 7's Forge. Nothing in Phase 3 reads it; it exists so
@@ -638,12 +646,23 @@ model ItemInstance {
   /// Character that does not exist, or one belonging to another Account.
   character Character? @relation(fields: [characterId, accountId], references: [id, accountId], onDelete: Restrict, onUpdate: Restrict)
 
-  container ItemInstance?           @relation("ContainerContents", fields: [containerId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  /// Contents name their parent AND their owner. The pair is what refuses a
+  /// Character-B potion inside a Character-A backpack, and what refuses moving
+  /// a still-loaded container out of its slot: the parent's characterId would
+  /// have to become null while its contents still point at it.
+  container ItemInstance?           @relation("ContainerContents", fields: [containerId, characterId], references: [id, characterId], onDelete: Restrict, onUpdate: Restrict)
   contents  ItemInstance[]          @relation("ContainerContents")
   installed CharacterContainerSlot? @relation("InstalledContainer")
 
   /// One item per equipment slot per Character.
   @@unique([characterId, slot], where: { location: "EQUIPPED" }, name: "equippedSlot")
+  /// One active container per Hunt Container Slot per Character.
+  @@unique([characterId, slotIndex], where: { location: "HUNT_CONTAINER" }, name: "huntContainerSlot")
+  /// Targets for the two composite foreign keys above and on the slot. They
+  /// are unique for free — `id` is the primary key — and exist only so the
+  /// PAIR and the TRIPLE can be pointed at.
+  @@unique([id, characterId], name: "instanceOwner")
+  @@unique([id, characterId, slotIndex], name: "instanceInstalled")
   @@index([accountId, location])
   @@index([characterId, location])
   @@index([containerId])
@@ -667,9 +686,18 @@ model CharacterContainerSlot {
   routingCategory     String?
 
   character Character     @relation(fields: [characterId], references: [id])
-  container ItemInstance? @relation("InstalledContainer", fields: [containerInstanceId], references: [id])
+  /// The installed container must be THIS Character's, and its own row must
+  /// agree that it sits in THIS slot. Three columns, one foreign key: a Depot
+  /// container (characterId null) cannot be installed, another Character's
+  /// container cannot be installed, and a container that was moved away
+  /// cannot be left behind as a dangling active slot.
+  container ItemInstance? @relation("InstalledContainer", fields: [containerInstanceId, characterId, slotIndex], references: [id, characterId, slotIndex])
 
   @@id([characterId, slotIndex])
+  /// The defining side of the one-to-one: one slot row per installed
+  /// container. `containerInstanceId` is already unique on its own; this is
+  /// the triple the foreign key is declared over.
+  @@unique([containerInstanceId, characterId, slotIndex], name: "installedContainer")
   @@map("CharacterContainerSlot")
 }
 

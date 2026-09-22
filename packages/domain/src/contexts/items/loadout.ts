@@ -20,6 +20,7 @@ const toStored = (row: {
   location: string;
   slot: string | null;
   containerId: string | null;
+  slotIndex: number | null;
   rarity: string;
   affixes: unknown;
 }): StoredItem => ({
@@ -31,6 +32,7 @@ const toStored = (row: {
   location: row.location as StoredItem['location'],
   slot: row.slot as StoredItem['slot'],
   containerId: row.containerId,
+  slotIndex: row.slotIndex,
   rarity: row.rarity as StoredItem['rarity'],
   affixes: Array.isArray(row.affixes) ? (row.affixes as StoredItem['affixes']) : [],
 });

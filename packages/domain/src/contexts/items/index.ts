@@ -16,6 +16,7 @@ export {
 } from './catalogue.js';
 
 export {
+  assertStackLimit,
   capacityFor,
   carried,
   carriedWeight,
@@ -38,7 +39,7 @@ export type {
   StoredItem,
 } from './custody.js';
 
-export { emptyPouch, moveItem, placeInPouch, unequip } from './move.js';
+export { emptyPouch, installContainer, moveItem, placeInPouch, unequip } from './move.js';
 export type { MoveItem } from './move.js';
 
 export { broughtSupplies, consumeSupplies, equippedItems } from './loadout.js';
@@ -50,7 +51,7 @@ export type { LootPolicy, LootPolicyMode, LootRule } from './policy.js';
 export { COMMON, rollIdentity } from './rarity.js';
 export type { RolledItem } from './rarity.js';
 
-export { createSlots, installContainer, readSlots, setRouting, unlockSlot } from './slots.js';
+export { createSlots, readSlots, setRouting, unlockSlot } from './slots.js';
 export type { ContainerSlot } from './slots.js';
 
 export { applyStartingGrant } from './grant.js';

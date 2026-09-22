@@ -126,12 +126,13 @@ fifth location; physically it is the one place quantity is a number rather than 
 
 `ItemLocation` values and what each requires:
 
-| location | characterId | containerId | slot | meaning |
-|---|---|---|---|---|
-| `EQUIPPED` | required | null | **required** | worn; drives combat |
-| `CHARACTER_CONTAINER` | required | **required** | null | inside an active container |
-| `LOOT_POUCH` | required | null | null | collected by a Hunt, at risk on death |
-| `DEPOT` | **null** | null | null | account storage, safe |
+| location | characterId | containerId | slot | slotIndex | meaning |
+|---|---|---|---|---|---|
+| `EQUIPPED` | required | null | **required** | null | worn; drives combat |
+| `HUNT_CONTAINER` | required | null | null | **required 1..5** | an ACTIVE top-level container |
+| `CHARACTER_CONTAINER` | required | **required** | null | null | inside an active container |
+| `LOOT_POUCH` | required | null | null | null | collected by a Hunt, at risk on death |
+| `DEPOT` | **null** | null | null | null | account storage, safe |
 
 A `CHECK` enforces that table exactly, so "an instance in two locations" and "an equipped instance
 also sitting in a backpack" are **unrepresentable**, not merely rejected. Ownership reuses the
@@ -139,9 +140,34 @@ ADR-019 pattern that Phase 2's integrity correction established: a composite for
 `(characterId, accountId) -> Character(id, accountId)`, so an instance cannot name a Character that
 does not exist or one belonging to another Account.
 
-A container instance is an ordinary `ItemInstance` of a `CONTAINER` definition. Children point at it
-with `containerId`. A self-referencing foreign key keeps that honest, and a CHECK forbids
-`containerId = id`.
+**An active container is its own custody, not worn gear.** A Character wears one backpack and
+installs up to five containers, so `EQUIPPED/BACKPACK` could never have represented slots 2 to 5.
+`HUNT_CONTAINER` carries the `slotIndex` on the instance itself, and the slot row points back with
+a **three-column foreign key**:
+
+```text
+CharacterContainerSlot(containerInstanceId, characterId, slotIndex)
+  -> ItemInstance(id, characterId, slotIndex)
+```
+
+That one key is what makes four separate things true at once, in the database rather than in a
+service:
+
+| Guarantee | How |
+|---|---|
+| the container belongs to the Character whose slot it is | the pair `(id, characterId)` must match |
+| a **Depot** container cannot be installed | a Depot row's `characterId` is null and the slot's is not |
+| another **Account's** container cannot be installed | the instance's own `(characterId, accountId)` key already fixes the account |
+| an installed container cannot move away leaving a dangling slot | its `slotIndex` would stop matching, so the move is refused unless the slot is cleared in the SAME transaction |
+
+A container instance holds children that point at it with `containerId` — and with
+`(containerId, characterId) -> ItemInstance(id, characterId)`, so **contents belong to the same
+Character as their parent**. A CHECK forbids `containerId = id`.
+
+**Uninstalling requires an EMPTY container.** Chosen and written down rather than left to whichever
+branch ran first: moving a loaded container would have to answer "where did its contents go", and
+every answer is worse than asking the player to empty it. Re-slotting an installed container from
+slot 1 to slot 3 is not leaving, so it keeps its contents.
 
 ### 3.1 The five top-level Hunt Container Slots
 
@@ -192,9 +218,13 @@ Operations, all server-authoritative and all atomic:
   to `maxStack`; the remainder stays in the source row, and a row that reaches 0 is deleted;
 - **split** — a row splits into two, both `>= 1`;
 - **partial move** — moving `n` of a stack is a split followed by a move of the new row;
-- **max validation** — no row may exceed `maxStack`, enforced by a CHECK against the definition's
-  value resolved at write time;
-- **no zero or negative quantity**, by CHECK;
+- **max validation** — two limits, and they are not the same promise. The **database** holds
+  `1 <= quantity <= 255`: a CHECK cannot read `maxStack`, because `maxStack` lives in a content
+  bundle on disk and no constraint can open a file. 255 is the PHYSICAL ceiling, and it is the
+  source's own parser ceiling. The **item-specific** `maxStack` is the domain's, asserted in the
+  one function that brings rows into existence and in the one that adds to them, so a Dagger with
+  a quantity of 2 is refused on every path rather than on the paths somebody remembered (**ITM11**);
+- **no zero or negative quantity**, by the same CHECK;
 - **conservation** — every operation preserves total quantity per definition per account, and the
   concurrency cases prove it under retry and under two writers.
 
@@ -432,8 +462,6 @@ Phase 6 still owns the Bank product. Phase 3 implements:
 
 - **display** the Bank balance and the Gold Pouch, separately;
 - **deposit** Gold Pouch → Bank, as ADR-019 double entry;
-- **withdraw** Bank → Gold Pouch, because the purchase flow's fallback needs the money to be
-  spendable in one place;
 - **container slot unlock** debits the **Bank**;
 - **sale proceeds credit the Bank**.
 
@@ -442,6 +470,12 @@ with a reason code and an operation id.
 
 **Purchase spending priority is locked: Gold Pouch first, Bank second.** A purchase that needs both
 is one transaction with two debits under one operation id.
+
+**There is deliberately NO Bank withdrawal.** An earlier draft of this section claimed one, and the
+API never had it. Nothing in the Phase 3 loop needs it: a purchase already debits the Bank directly
+when the Pouch is short, the slot unlock debits the Bank, and a sale credits it. The only thing a
+withdrawal would add is a way to move safe Gold somewhere a death can take it — a feature, when
+Phase 6 wants one, not an omission. The claim is removed rather than the route invented.
 
 ---
 
@@ -585,23 +619,29 @@ which is cheaper and stronger than a log nobody replays.
 All server-authoritative, all under the existing session and character authorization.
 
 ```text
-GET    /api/characters/:id/inventory        equipment, slots, containers, loot pouch, capacity, gold
-POST   /api/characters/:id/items/move       { instanceId, quantity?, to: {...} }
-POST   /api/characters/:id/items/equip      { instanceId, slot }
-POST   /api/characters/:id/items/unequip    { slot, to: {...} }
-POST   /api/characters/:id/slots/:n/unlock  idempotent, Bank-debited
-POST   /api/characters/:id/slots/:n/routing { category | null }
-GET    /api/characters/:id/loot-policy
-PUT    /api/characters/:id/loot-policy      { mode, rules }
-GET    /api/accounts/depot                  paginated
-GET    /api/accounts/stash
-POST   /api/service/buy                     { definitionKey, quantity }
-POST   /api/service/sell                    { instanceId | definitionKey, quantity }
-POST   /api/gold/deposit                    pouch -> bank
-POST   /api/gold/withdraw                   bank -> pouch
+GET    /api/characters/:id/inventory          equipment, slots, containers, loot pouch, capacity, gold, stash
+GET    /api/characters/:id/depot              ?offset&limit — a window, with the total beside it
+POST   /api/characters/:id/items/move         { instanceId, quantity?, to: {...} }
+POST   /api/characters/:id/slots/:n/unlock    Bank-debited
+PUT    /api/characters/:id/slots/:n/routing   { category | null }
+PUT    /api/characters/:id/loot-policy        { mode, rules }
+POST   /api/characters/:id/service/buy        { definitionKey, quantity }
+POST   /api/characters/:id/service/sell       { instanceId, quantity? }
+POST   /api/characters/:id/stash/deposit      { instanceId, quantity? }
+POST   /api/characters/:id/stash/withdraw     { definitionKey, quantity, containerId }
+POST   /api/characters/:id/gold/deposit       pouch -> bank
 ```
 
-Every mutating call carries a client-supplied idempotency key, exactly as Phase 1 and Phase 2 do.
+There is no separate equip/unequip route and no `items/install`: **equipping and installing are
+destinations of the one move**, `to.kind` of `EQUIPPED` or `HUNT_CONTAINER`. One primitive, one
+place where every legality rule lives. And there is no `gold/withdraw`, for the reason §11 gives.
+
+**Every mutating call REQUIRES an `Idempotency-Key` header**, exactly as Phase 1's Hunt entry does,
+and refuses with `IDEMPOTENCY_KEY_REQUIRED` (422) without one. The fingerprint is the CLIENT's
+command and nothing else — no timestamp, no server-resolved content version — so a retry after a
+lost response replays instead of buying a second backpack, and the same key with a different
+command is an explicit `IDEMPOTENCY_CONFLICT` (409). The operation id every ledger post uses is
+derived from the same key, so the settlement guard and the command guard agree.
 Every one validates ownership, source custody, destination acceptance, access context, stack limits,
 space, Capacity, slot legality, `stashEligible`, the Loot Pouch inbound prohibition and
 `quantity > 0` — **on the server**, regardless of what the UI sent.
@@ -629,12 +669,16 @@ drop was skipped — policy, no space, or over Capacity.
 
 ## 19. Persistence and migrations
 
-One migration, hand-written in the established style, adding: `ItemInstance`, `CharacterContainerSlot`,
-`StashEntry`, `CharacterLootPolicy`, the enums, and every CHECK and index §3 and §16 name. It must
+Three migrations, hand-written in the established style. The first adds `ItemInstance`,
+`CharacterContainerSlot`, `StashEntry`, `CharacterLootPolicy`, the enums, and every CHECK and index
+§3 and §16 name. The second adds the `HUNT_CONTAINER` enum value alone — PostgreSQL will not let a
+transaction use a value it added itself. The third adds `ItemInstance.slotIndex`, moves every
+already-installed container into its real custody, and replaces the two single-column foreign keys
+with the composite ones §3 describes. It must
 apply cleanly from an empty database and from the previous migration state, and leave no drift.
 
 The Origin Character's grant (source map §11) is applied at character creation: four armour pieces
-equipped, a backpack in Slot 1, and small health potions inside it.
+equipped, a backpack **installed** in Slot 1, and small health potions inside it.
 
 ---
 
@@ -647,26 +691,32 @@ exactly — no id is renumbered and no case is deleted.**
 | Group | Cases | What it fixes |
 |---|---|---|
 | **ISR** — item source and data | ISR1–ISR8 | the Canary item and loot fixtures, the Rat's physical loot, weights, stackability, container capacity, and invalid content rejected |
-| **ITM** — item model | ITM1–ITM10 | ItemDefinition vs ItemInstance, unique identity, stack and non-stack, maxStack, one rarity enum, deterministic rarity and affixes |
+| **ITM** — item model | ITM1–ITM11 | ItemDefinition vs ItemInstance, unique identity, stack and non-stack, maxStack (**ITM11**: the DOMAIN refuses a quantity above the definition's), one rarity enum, deterministic rarity and affixes |
 | **EQP** — equipment | EQP1–EQP8 | the real tutorial equipment, combat derived from it, equip and unequip, invalid slot, persistence, survives death, unarmed still works |
-| **CSL** — container slots | CSL1–CSL8 | exactly five, slot 1 free, slots 2–5 per-Character Gold unlock, Bank debit, no duplicate, no slot 6, another Character unaffected |
+| **ACT** — active Hunt containers | ACT1–ACT7 | installed is a fact both rows carry; another Character's and another Account's container refused; a Depot container is not active; an installed one cannot slip away behind its slot; contents cannot change owner; five slots, no sixth |
+| **CSL** — container slots | CSL1–CSL11 | exactly five, slot 1 free, slots 2–5 per-Character Gold unlock, Bank debit, no duplicate, no slot 6, another Character unaffected, **and the whole acquire → install → route → remove flow** |
 | **STK** — stack and space | STK1–STK7 | 255, 600 → 255/255/90, split, merge, a full container, no nesting exploit |
 | **CAP** — capacity | CAP1–CAP5 | physical weights count, Gold does not, overweight collection and moves refused, nothing destroyed |
 | **LPH** — loot pouch | LPH1–LPH9 | Rat loot enters, Gold does not, manual inbound refused, outbound valid, finite, full stops collection and not combat |
 | **POL** — loot policy | POL1–POL6 | both modes, and the item → category → rarity → default precedence |
 | **DTH** — death extension | DTH1–DTH6 | no Full Bless loses pouch and gold once, Full Bless keeps both, equipment/containers/Depot/Stash safe, concurrent and retry safe |
 | **DPT** — depot | DPT1–DPT4 | account ownership, deposit, withdraw, inaccessible during a Hunt |
-| **STH** — stash | STH1–STH6 | stashEligible only, quantity, withdrawal materializes stacks, unique equipment refused, inaccessible during a Hunt |
-| **MOV** — movement | MOV1–MOV8 | split, merge, cross-storage, illegal destination, ownership violation, move/move race, move/sell race, conservation |
-| **RTE** — routing | RTE1–RTE5 | purchase to preferred, fallback, full preferred, no destination → no charge |
+| **STH** — stash | STH1–STH8 | stashEligible only, quantity, withdrawal materializes stacks, unique equipment refused, inaccessible during a Hunt, **and reachable through the API in both directions** |
+| **MOV** — movement | MOV1–MOV10 | split, merge, cross-storage, illegal destination, ownership violation, move/move race, move/sell race, conservation, **the access rule proved at the DOMAIN**, and a loaded container that cannot leave its slot |
+| **RTE** — routing | RTE1–RTE6 | purchase to preferred, fallback, full preferred, no destination → no charge, **and a category set through the API** |
 | **BNK** — bank and gold | BNK1–BNK6 | balanced deposit, Pouch-first/Bank-fallback, slot unlock debit, sale to Bank, zero reconciliation mismatches |
 | **NPC** — service | NPC1–NPC5 | buy, refill, sell, and no remote service during a Hunt |
 | **HNT** — hunt integration | HNT1–HNT6 | deterministic loot, zero Stamina, retry without duplicate, reload and restart, Room 10 continues |
-| **SYS** — System UI and E2E | SYS1–SYS12 | the System UI, equipment, five slots, desktop drag, touch move, the Loot Pouch, a filter change affecting future loot, Depot/Stash context, purchase and refill, Hunt physical loot, death loot loss, reload |
+| **IDM** — idempotency | IDM1–IDM7 | a key is required; duplicate buy, deposit and partial sell each apply once; the same key with a different command conflicts; a retry returns the durable result; every mutating route swept, not sampled |
+| **LCK** — the last free space | LCK1–LCK4 | two concurrent arrivals, the loser not charged, concurrent Stash withdrawals, concurrent drops into the last Pouch space |
+| **SYS** — System UI and E2E | SYS1–SYS16 | the System UI, equipment, five slots, desktop drag, touch move, the Loot Pouch, a filter change affecting future loot, Depot/Stash context, purchase and refill, Hunt physical loot, death loot loss, reload, **unlock-and-install, taking a container back out, a touch Stash round trip, and a routing preference that survives a reload** |
 | **MIG** — migration and invariants | MIG1–MIG6 | empty database, previous state, no drift, the custody constraints, no duplication |
 
-**Totals: 18 groups, 125 cases** — ISR 8, ITM 10, EQP 8, CSL 8, STK 7, CAP 5, LPH 9, POL 6,
-DTH 6, DPT 4, STH 6, MOV 8, RTE 5, BNK 6, NPC 5, HNT 6, SYS 12, MIG 6.
+**Totals: 21 groups, 156 cases** — ISR 8, ITM 11, EQP 8, ACT 7, CSL 11, STK 7, CAP 5, LPH 9,
+POL 6, DTH 6, DPT 4, STH 8, MOV 10, RTE 6, BNK 6, NPC 5, HNT 6, IDM 7, LCK 4, SYS 16, MIG 6.
+
+The correction pass added 31 cases and **renumbered none**: every id from the reviewed 125 means
+what it meant, and the new ones continue their groups or open new ones.
 
 Every prefix is three letters and none of them collides with an existing group: the counter routes
 an id by its longest matching prefix, and `STK`/`STH` win over Phase 2's `ST`, `SYS` over Phase 1's

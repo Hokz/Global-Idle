@@ -2,7 +2,7 @@
 /**
  * Count the implemented matrix cases and compare them with what the approved
  * specifications fix: Phase 0B §14 at **92**, Phase 1 §16 at **87**, Phase 2
- * §12 at **106**, Phase 3 §20 at **125**.
+ * §12 at **106**, Phase 3 §20 at **156**.
  *
  * The convention this relies on: every matrix case is exactly ONE test whose
  * title begins with its id and a colon — `it('W1: ...')` for a Vitest case,
@@ -91,22 +91,28 @@ const MATRICES = {
     // Phase 0B's `C`. Two-letter codes would have needed a translation table.
     groups: {
       ISR: [1, 8],
-      ITM: [1, 10],
+      ITM: [1, 11],
       EQP: [1, 8],
-      CSL: [1, 8],
+      // The integrity correction's own groups. An ACTIVE container, every
+      // mutation run once, and the last free space contested — three things
+      // the reviewed 125 stated and did not hold.
+      ACT: [1, 7],
+      CSL: [1, 11],
       STK: [1, 7],
       CAP: [1, 5],
       LPH: [1, 9],
       POL: [1, 6],
       DTH: [1, 6],
       DPT: [1, 4],
-      STH: [1, 6],
-      MOV: [1, 8],
-      RTE: [1, 5],
+      STH: [1, 8],
+      MOV: [1, 10],
+      RTE: [1, 6],
       BNK: [1, 6],
       NPC: [1, 5],
       HNT: [1, 6],
-      SYS: [1, 12],
+      IDM: [1, 7],
+      LCK: [1, 4],
+      SYS: [1, 16],
       MIG: [1, 6],
     },
   },
@@ -118,6 +124,9 @@ const PREFIXES = [
   'ISR',
   'ITM',
   'EQP',
+  'ACT',
+  'IDM',
+  'LCK',
   'CSL',
   'STK',
   'CAP',

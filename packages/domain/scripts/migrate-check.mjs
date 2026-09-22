@@ -84,6 +84,25 @@ const REQUIRED_SQL = [
     pattern:
       /CHECK \(\s*\("custody" = 'BANK'\s+AND "characterId" IS NULL\s+AND "subjectId" = "accountId"\) OR\s*\("custody" = 'POUCH' AND "characterId" IS NOT NULL AND "subjectId" = "characterId"\)/,
   },
+  {
+    invariant: 'Phase 3 §3 — an installed container, its OWNER and its SLOT are one foreign key',
+    pattern:
+      /ALTER TABLE "CharacterContainerSlot"\s+ADD CONSTRAINT "CharacterContainerSlot_containerInstanceId_characterId_slo_fkey"\s+FOREIGN KEY \("containerInstanceId", "characterId", "slotIndex"\)\s+REFERENCES "ItemInstance"\("id", "characterId", "slotIndex"\)/,
+  },
+  {
+    invariant: 'Phase 3 §3 — contents belong to the same Character as their parent container',
+    pattern:
+      /ALTER TABLE "ItemInstance"\s+ADD CONSTRAINT "ItemInstance_containerId_characterId_fkey"\s+FOREIGN KEY \("containerId", "characterId"\) REFERENCES "ItemInstance"\("id", "characterId"\)/,
+  },
+  {
+    invariant: 'Phase 3 §3 — HUNT_CONTAINER is its own shape, and carries a slot index',
+    pattern:
+      /\("location" = 'HUNT_CONTAINER'\s+AND "characterId" IS NOT NULL AND "containerId" IS NULL\s+AND "slot" IS NULL\s+AND "slotIndex" IS NOT NULL\)/,
+  },
+  {
+    invariant: 'Phase 3 §3.1 — there is no slot 6 on the INSTANCE side either',
+    pattern: /CHECK \("slotIndex" IS NULL OR "slotIndex" BETWEEN 1 AND 5\)/,
+  },
 ];
 
 function migrationDirs() {

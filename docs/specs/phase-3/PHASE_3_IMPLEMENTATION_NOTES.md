@@ -32,6 +32,122 @@ be written.
 
 ---
 
+## 0. The integrity / usability correction
+
+Independent review accepted the large majority of Phase 3 and raised **seven**
+structural findings. Every one was the same shape as the two it raised against
+Phase 2: **a guarantee that was stated rather than held.** What follows is what
+each turned out to be.
+
+### 0.1 An active Hunt container was a pointer, not a custody
+
+The starting backpack sat at `EQUIPPED/BACKPACK` and a `CharacterContainerSlot`
+row named it by id. `installContainer` checked two things — the slot is
+unlocked, the definition is a `CONTAINER` — and four things that had to be true
+were nobody's to enforce:
+
+| Was not proved | Now held by |
+|---|---|
+| the container belongs to the Character whose slot it is | `CharacterContainerSlot(containerInstanceId, characterId, slotIndex) -> ItemInstance(id, characterId, slotIndex)` |
+| a **Depot** container is not installed | the same key — a Depot row's `characterId` is null and the slot's is not |
+| another **Account's** container is not installed | the same key, plus the instance's own `(characterId, accountId)` |
+| moving an installed container clears its slot atomically | the same key — the instance's `slotIndex` stops matching, so the move is refused unless the slot is cleared first |
+| contents belong to the same Character as their parent | `ItemInstance(containerId, characterId) -> ItemInstance(id, characterId)` |
+
+And a fifth thing was not merely unproved but **unrepresentable in the old
+shape**: one Character wears ONE backpack, so `EQUIPPED/BACKPACK` could never
+have held slots 2 to 5 at all. `HUNT_CONTAINER` is a location of its own, and
+the instance carries the `slotIndex` so the slot's foreign key can name it.
+
+**Measured, not argued.** ACT1 to ACT7 go around every service and drive the
+tables directly: setting an installed container's `slotIndex` to 2 by hand, or
+pointing slot 2 at another Character's backpack, or flipping an installed
+container to `DEPOT`, each come back as a foreign-key violation rather than as
+a row.
+
+**The uninstall rule is chosen and written down:** a container must be EMPTY to
+leave its slot. Moving it loaded would have to answer "where did its contents
+go", and every answer is worse than asking the player to empty it. Re-slotting
+from slot 1 to slot 3 is not leaving, so it keeps its contents.
+
+### 0.2 Slots 2 to 5 were unlockable and unusable
+
+There was no way to obtain a second container, and no destination for one if
+you had it — a container cannot route into a container. Slot 2 was a Gold sink
+with nothing behind it.
+
+The counter now sells a **real, source-backed** container: `al_dee.lua`,
+`{ itemName = "backpack", clientId = 2854, buy = 10 }`. Lee'Delle sells the
+same backpack for 9, and that row is in the import record too, so the choice of
+the dearer price is visible rather than silent. Nothing was invented.
+
+A purchased CONTAINER is delivered by being **installed** in the first free
+unlocked slot, which is what makes unlocking one worth the Gold. With every
+unlocked slot full the purchase fails atomically and nothing is charged.
+
+### 0.3 The API claimed idempotency and did not implement it
+
+§17 said *"Every mutating call carries a client-supplied idempotency key"*. The
+controller generated operation ids from `Date.now()`, so a double-submitted
+purchase bought twice and a retried deposit transferred twice.
+
+Every mutating Phase 3 route now **requires** an `Idempotency-Key`, through the
+Phase 0B port Phase 1's Hunt entry already uses. The fingerprint is the
+CLIENT's command and nothing else, and the operation id each ledger post uses
+is derived from the same key so the settlement guard and the command guard
+agree. IDM7 sweeps every route rather than sampling one.
+
+One implementation detail worth recording: the record stores `null` rather than
+the domain result. Not laziness — the domain returns BigInt Gold, which has no
+JSON form, and a record that could not be written would turn a command that had
+already happened into a 500.
+
+### 0.4 The Stash and routing were built and unreachable
+
+Both were fully implemented in the domain, tested against the domain, and
+exposed through no route. Four routes were added — stash deposit, stash
+withdraw, routing category, and container install/uninstall as destinations of
+the one move — and the System UI grew the controls for each, tap-reachable.
+
+**Bank withdrawal was the opposite case: a claim with nothing behind it.** §11
+promised it; no route existed. Nothing in the Phase 3 loop needs one — a
+purchase debits the Bank directly when the Pouch is short — so the CLAIM was
+removed rather than the route invented. Moving safe Gold somewhere a death can
+take it is a feature for the phase that wants it.
+
+### 0.5 The access rule lived in the controller
+
+`moveItem` did not know that the Depot is unreachable from a Hunt; the HTTP
+layer checked it before calling. That makes the invariant a property of every
+future caller's memory. It now lives inside the movement primitive, and MOV9
+proves it by calling the DOMAIN with no controller present.
+
+### 0.6 The `maxStack` CHECK could not read `maxStack`
+
+§4 said the database enforced `1..maxStack` "against the definition resolved at
+write time". A CHECK cannot open a content bundle. What the database actually
+held — and still holds — is `1 <= quantity <= 255`, the physical ceiling the
+source's own parser enforces.
+
+The item-specific limit is now asserted in `createItem` and in the one function
+that adds to a stack, so a Dagger with a quantity of 2 is refused on **every**
+path (ITM11). The documentation says which limit is whose.
+
+### 0.7 Free space was counted without holding the destination
+
+`moveItem` locked its rows, but `route`, the Stash withdrawal and the Loot
+Pouch counted free spaces and then inserted. Two arrivals that both read "one
+left" both wrote.
+
+Every destination is now locked before it is counted, in §8.5 order: the
+Account for the Depot, the Character for its Loot Pouch, the slot row for an
+install, the container's own instance row for everything else. LCK1 to LCK4 use
+a BARRIER rather than two promises and hope — the first transaction is held
+open after taking the lock and the second is asserted **blocked** before
+anything else is asserted.
+
+---
+
 ## 2. What the implementation found
 
 ### 2.1 A whole-stack move was destroying the item's identity
@@ -192,6 +308,8 @@ config so tuning is a publish rather than a deploy:
 | Container slot prices | 0 / 10k / 100k / 1kk / 100kk | the brief's discussed curve, marked INITIAL/TUNABLE |
 | Rarity weights | 1000 / 100 / 10 / 1 / 0.1 / 0.01 | conservative and exponential; the SHAPE is the decision, the numbers are not |
 | Affix set | `ARMOR_PLUS`, `ATTACK_PLUS` | the minimum that proves generation, persistence, a combat effect and non-merging |
+| Depot page size | **50**, max 200 | the response window, not the store bound; a product decision once a client pages for real |
+| Container price at the counter | **10 gold** | Al Dee's price. Lee'Delle sells the same backpack for 9, and both are recorded — which of the two source prices a shop charges is tuning, the fact that it is a SOURCE price is not |
 
 ---
 
@@ -200,15 +318,20 @@ config so tuning is a publish rather than a deploy:
 ```sh
 pnpm install
 pnpm build
-node scripts/count-matrix.mjs          # 92/92, 87/87, 106/106, 125/125
+node scripts/count-matrix.mjs          # 92/92, 87/87, 106/106, 156/156
 pnpm test:unit && pnpm test:fixtures   # includes ISR and ITM
-pnpm test:integration                  # includes EQP, CSL, STK, CAP, LPH, POL,
-                                       # DTH, DPT, STH, MOV, RTE, BNK, NPC, HNT, MIG
+pnpm test:integration                  # includes EQP, ACT, CSL, STK, CAP, LPH,
+                                       # POL, DTH, DPT, STH, MOV, RTE, BNK, NPC,
+                                       # HNT, IDM, LCK, MIG
 pnpm test:invariants
 # The integration and invariant suites TRUNCATE every table between cases,
-# including ContentBundle, so re-seed before the browser suite.
+# including ContentBundle, so re-seed before the browser suite — and REBUILD
+# the bundle first, or the seed republishes a stale artifact and the browser
+# sees content that no longer matches the repository. Cost one full browser run
+# to rediscover; CI does not hit it because its browser job builds content as
+# its own step.
 pnpm --filter @global-idle/game-data run build:bundle && pnpm seed
-pnpm test:e2e                          # includes SYS1-SYS12, desktop and touch
+pnpm test:e2e                          # includes SYS1-SYS16, desktop and touch
 
 # Re-verify the Canary import record against a real checkout — including the
 # six BINARY appearance probes, which decode data/items/appearances.dat:

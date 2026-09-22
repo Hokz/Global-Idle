@@ -304,7 +304,18 @@ path that runs, with the source's `attackValue = 7` and its roll from zero.
 | Service | Source | Value |
 |---|---|---|
 | Buy small health potion `7876` | `data-otservbr-global/npc/lily.lua` | **20 gold** — `{ itemName = "small health potion", clientId = 7876, buy = 20 }` |
+| Buy backpack `2854` | `data-otservbr-global/npc/al_dee.lua` | **10 gold** — `{ itemName = "backpack", clientId = 2854, buy = 10 }` |
 | Sell cheese `3607` | `data-otservbr-global/npc/willie.lua` | **2 gold** — `{ itemName = "cheese", clientId = 3607, sell = 2, count = 1 }` |
+
+**The backpack, and why Al Dee.** A Character with an unlocked slot 2 and no way
+to obtain a second container has bought nothing, so the counter has to sell one
+— and the container it sells is a real source item at a real source price
+rather than a prop. Two Rookgaard merchants sell it: Al Dee at **10** and
+Lee'Delle at **9**. Both rows are in the import record, so the choice of the
+dearer price is visible as a choice. The source names them itself, in Dixi's
+own line: *"You should never embark on an adventure without it. Ask {Al Dee} or
+{Lee'Delle} for it!"* — which is stronger evidence of who sells backpacks in
+Rookgaard than a coordinate would be.
 
 The direction is the source's, not a guess: `src/creatures/npcs/npc.cpp` reads `itemBuyPrice` on
 the purchase path (`totalCost = buyPrice * amount`, charged to the player) and `sellPrice` on the

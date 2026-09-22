@@ -11,15 +11,11 @@
  */
 import { HUNT_CONTAINER_SLOTS, type Instant, type OperationId } from '@global-idle/shared';
 import type { ResolvedBundle } from '@global-idle/game-data';
-import {
-  containerSlotLocked,
-  illegalItemMove,
-  insufficientFunds,
-} from '../../platform/errors/index.js';
+import { containerSlotLocked, insufficientFunds } from '../../platform/errors/index.js';
 import { recordDomainEvent } from '../../platform/observability/index.js';
 import type { UnitOfWork } from '../../platform/transaction/index.js';
 import { bankOf, post, readBalance } from '../economy/index.js';
-import { containerSlotPrices, itemDefinition } from './catalogue.js';
+import { containerSlotPrices } from './catalogue.js';
 
 export interface ContainerSlot {
   readonly slotIndex: number;
@@ -126,39 +122,11 @@ export async function unlockSlot(
   return { charged: gold, alreadyUnlocked: false };
 }
 
-/** Put a container into an unlocked slot. One slot holds one container. */
-export async function installContainer(
-  tx: UnitOfWork,
-  input: {
-    readonly bundle: ResolvedBundle;
-    readonly characterId: string;
-    readonly slotIndex: number;
-    readonly instanceId: string;
-  },
-): Promise<void> {
-  const slot = await tx.characterContainerSlot.findUnique({
-    where: {
-      characterId_slotIndex: { characterId: input.characterId, slotIndex: input.slotIndex },
-    },
-  });
-  if (!slot || slot.unlockedAt === null) {
-    throw containerSlotLocked({ slotIndex: input.slotIndex });
-  }
-  if (slot.containerInstanceId) {
-    throw illegalItemMove({ slotIndex: input.slotIndex, reason: 'the slot already holds one' });
-  }
-  const instance = await tx.itemInstance.findUniqueOrThrow({ where: { id: input.instanceId } });
-  const definition = itemDefinition(input.bundle, instance.definitionKey);
-  if (definition.category !== 'CONTAINER') {
-    throw illegalItemMove({ instanceId: input.instanceId, reason: 'not a container' });
-  }
-  await tx.characterContainerSlot.update({
-    where: {
-      characterId_slotIndex: { characterId: input.characterId, slotIndex: input.slotIndex },
-    },
-    data: { containerInstanceId: input.instanceId },
-  });
-}
+/**
+ * Installing is a MOVE now, not a pointer update — see `move.ts`. This file
+ * owns the slots themselves: how many there are, what they cost, and where a
+ * purchase prefers to land.
+ */
 
 export async function setRouting(
   tx: UnitOfWork,

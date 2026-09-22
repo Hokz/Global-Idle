@@ -17,6 +17,16 @@ import { ApiError, api, type InventoryView, type ItemView } from '../_lib/api';
 
 const oz = (hundredths: number): string => (hundredths / 100).toFixed(2);
 
+/**
+ * One key per user action.
+ *
+ * A click is one command; a retry of that click is the SAME command and must
+ * not buy a second backpack. The key travels with the request and the server
+ * decides — the browser is not trusted to know whether it already sent this.
+ */
+const commandKey = (): string =>
+  globalThis.crypto?.randomUUID?.() ?? `k-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
 function Item({
   item,
   selected,
@@ -68,12 +78,13 @@ export function SystemWindow({ characterId }: { characterId: string }) {
   /** Every action is the same shape: ask, take the whole world back, or show
    *  exactly why the server said no. */
   const act = useCallback(
-    async (path: string, body?: unknown) => {
+    async (path: string, body?: unknown, method: 'POST' | 'PUT' = 'POST') => {
       setBusy(true);
       setMessage(null);
       try {
         const next = await api<InventoryView>(`/api/characters/${characterId}${path}`, {
-          method: 'POST',
+          method,
+          headers: { 'Idempotency-Key': commandKey() },
           ...(body === undefined ? {} : { body: JSON.stringify(body) }),
         });
         setView(next);
@@ -90,7 +101,10 @@ export function SystemWindow({ characterId }: { characterId: string }) {
   );
 
   const moveTo = useCallback(
-    (to: { kind: string; slot?: string; containerId?: string }, id?: string) => {
+    (
+      to: { kind: string; slot?: string; containerId?: string; slotIndex?: number },
+      id?: string,
+    ) => {
       const instanceId = id ?? selected?.id;
       if (!instanceId) return;
       return act('/items/move', {
@@ -111,6 +125,8 @@ export function SystemWindow({ characterId }: { characterId: string }) {
   }
 
   const full = view.capacity.carried >= view.capacity.limit;
+  /** The first installed container, which is where a withdrawal lands. */
+  const firstContainer = view.slots.find((slot) => slot.containerInstanceId)?.containerInstanceId;
 
   return (
     <main data-testid="system-window" className="system">
@@ -170,6 +186,10 @@ export function SystemWindow({ characterId }: { characterId: string }) {
               const id = event.dataTransfer.getData('text/plain');
               if (slot.containerInstanceId) {
                 void moveTo({ kind: 'CONTAINER', containerId: slot.containerInstanceId }, id);
+              } else if (slot.unlocked) {
+                // An empty unlocked slot takes a CONTAINER, which is a move
+                // like any other — the server refuses anything else.
+                void moveTo({ kind: 'HUNT_CONTAINER', slotIndex: slot.slotIndex }, id);
               }
             }}
           >
@@ -179,9 +199,54 @@ export function SystemWindow({ characterId }: { characterId: string }) {
             </h3>
             {slot.unlocked ? (
               <>
-                <p data-testid="slot-spaces">
-                  {slot.contents.length} / {slot.spaces}
+                <p data-testid="slot-spaces" data-installed={slot.containerInstanceId ?? ''}>
+                  {slot.containerInstanceId ? `${slot.contents.length} / ${slot.spaces}` : 'empty'}
                 </p>
+                <label>
+                  Prefers
+                  <select
+                    data-testid="slot-routing"
+                    value={slot.routingCategory ?? ''}
+                    disabled={busy || !slot.containerInstanceId}
+                    onChange={(event) =>
+                      void act(
+                        `/slots/${slot.slotIndex}/routing`,
+                        { category: event.target.value || null },
+                        'PUT',
+                      )
+                    }
+                  >
+                    <option value="">Anything</option>
+                    {view.routingCategories.map((category) => (
+                      <option key={category} value={category}>
+                        {category}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {slot.containerInstanceId ? (
+                  <button
+                    type="button"
+                    data-testid="uninstall-container"
+                    disabled={busy || view.inHunt || slot.contents.length > 0}
+                    onClick={() =>
+                      void moveTo({ kind: 'DEPOT' }, slot.containerInstanceId ?? undefined)
+                    }
+                  >
+                    Take container out
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    data-testid="install-container"
+                    disabled={busy || selected?.category !== 'CONTAINER'}
+                    onClick={() =>
+                      void moveTo({ kind: 'HUNT_CONTAINER', slotIndex: slot.slotIndex })
+                    }
+                  >
+                    Install selected container
+                  </button>
+                )}
                 <ul>
                   {slot.contents.map((item) => (
                     <li key={item.id}>
@@ -230,25 +295,17 @@ export function SystemWindow({ characterId }: { characterId: string }) {
           data-testid="toggle-policy"
           disabled={busy}
           onClick={() =>
-            void (async () => {
-              setBusy(true);
-              try {
-                setView(
-                  await api<InventoryView>(`/api/characters/${characterId}/loot-policy`, {
-                    method: 'PUT',
-                    body: JSON.stringify({
-                      mode:
-                        view.lootPolicy.mode === 'ACCEPTED_ONLY'
-                          ? 'COLLECT_ALL_EXCEPT_SKIPPED'
-                          : 'ACCEPTED_ONLY',
-                      rules: [],
-                    }),
-                  }),
-                );
-              } finally {
-                setBusy(false);
-              }
-            })()
+            void act(
+              '/loot-policy',
+              {
+                mode:
+                  view.lootPolicy.mode === 'ACCEPTED_ONLY'
+                    ? 'COLLECT_ALL_EXCEPT_SKIPPED'
+                    : 'ACCEPTED_ONLY',
+                rules: [],
+              },
+              'PUT',
+            )
           }
         >
           {view.lootPolicy.mode === 'ACCEPTED_ONLY' ? 'Collect everything' : 'Collect nothing'}
@@ -282,13 +339,43 @@ export function SystemWindow({ characterId }: { characterId: string }) {
         {view.inHunt ? (
           <p data-testid="stash-unavailable">Not reachable from a Hunt.</p>
         ) : (
-          <ul>
-            {view.stash.map((entry) => (
-              <li key={entry.definitionKey} data-testid="stash-entry">
-                {entry.label} ×{entry.quantity}
-              </li>
-            ))}
-          </ul>
+          <>
+            <button
+              type="button"
+              data-testid="stash-deposit"
+              disabled={busy || !selected?.stashEligible}
+              onClick={() =>
+                void act('/stash/deposit', {
+                  instanceId: selected?.id,
+                  ...(amount > 0 && amount < (selected?.quantity ?? 1) ? { quantity: amount } : {}),
+                })
+              }
+            >
+              Stash selected
+            </button>
+            <ul>
+              {view.stash.map((entry) => (
+                <li key={entry.definitionKey} data-testid="stash-entry">
+                  {entry.label} ×{entry.quantity}
+                  <button
+                    type="button"
+                    data-testid="stash-withdraw"
+                    data-definition={entry.definitionKey}
+                    disabled={busy || !firstContainer}
+                    onClick={() =>
+                      void act('/stash/withdraw', {
+                        definitionKey: entry.definitionKey,
+                        quantity: amount,
+                        containerId: firstContainer,
+                      })
+                    }
+                  >
+                    Withdraw {amount}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </>
         )}
       </section>
 
@@ -341,13 +428,8 @@ export function SystemWindow({ characterId }: { characterId: string }) {
         <button
           type="button"
           data-testid="move-to-container"
-          disabled={busy || !selected || !view.slots[0]?.containerInstanceId}
-          onClick={() =>
-            void moveTo({
-              kind: 'CONTAINER',
-              containerId: view.slots[0]!.containerInstanceId!,
-            })
-          }
+          disabled={busy || !selected || !firstContainer}
+          onClick={() => void moveTo({ kind: 'CONTAINER', containerId: firstContainer! })}
         >
           Move to container
         </button>

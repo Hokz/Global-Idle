@@ -173,11 +173,20 @@ describe('§20 ISR — the item data is the source’s', () => {
         itemKey: 'item.small-health-potion',
         price: recordedValue('npc.lily.smallHealthPotion.buy'),
       },
+      // The backpack the counter sells is Al Dee's, at Al Dee's price. It is
+      // what makes an unlocked slot 2 worth buying — and it is a real source
+      // item at a real source price, not a tutorial prop invented to fill a
+      // hole in the loop.
+      { itemKey: 'item.backpack', price: recordedValue('npc.alDee.backpack.buy') },
     ]);
     expect(buys).toEqual([
       { itemKey: 'item.cheese', price: recordedValue('npc.willie.cheese.sell') },
     ]);
     expect(sells[0]!.price).toBe(20);
+    expect(sells[1]!.price).toBe(10);
+    // Lee'Delle sells the same backpack for 9. Recorded, and deliberately not
+    // used: the choice of the dearer price is visible rather than silent.
+    expect(recordedValue('npc.leeDelle.backpack.buy')).toBe(9);
     expect(buys[0]!.price).toBe(2);
     reverify('npc.');
   });

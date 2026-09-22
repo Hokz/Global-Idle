@@ -65,17 +65,30 @@ describe('§20 EQP — equipment', () => {
     const hero = await character();
     const worn = await equippedOf(prisma, hero.characterId);
 
-    // Four armour pieces, a weapon and the backpack — six real rows, each an
-    // ItemInstance of a real source item.
+    // Four armour pieces and a weapon are WORN. The backpack is not: a
+    // container is INSTALLED, in its own custody, because a Character wears
+    // one backpack and installs up to five containers.
     expect(worn.map((row) => `${row.slot}:${row.definitionKey}`).sort()).toEqual([
       'ARMOR:item.coat',
-      'BACKPACK:item.backpack',
       'FEET:item.leather-boots',
       'HEAD:item.leather-helmet',
       'LEFT:item.dagger',
       'LEGS:item.leather-legs',
     ]);
     for (const row of worn) expect(row.quantity).toBe(1);
+
+    // And the container is where the slot says it is — both rows agree,
+    // because a composite foreign key makes disagreeing impossible.
+    const installed = await prisma.itemInstance.findFirstOrThrow({
+      where: { characterId: hero.characterId, location: 'HUNT_CONTAINER' },
+    });
+    expect(installed.definitionKey).toBe(BACKPACK);
+    expect(installed.slotIndex).toBe(1);
+    expect(installed.slot).toBeNull();
+    const slot1 = await prisma.characterContainerSlot.findUniqueOrThrow({
+      where: { characterId_slotIndex: { characterId: hero.characterId, slotIndex: 1 } },
+    });
+    expect(slot1.containerInstanceId).toBe(installed.id);
   });
 
   it('EQP2: combat comes from the ITEMS, and lands on Phase 2’s numbers', async () => {
@@ -407,12 +420,12 @@ describe('§20 CSL — the five Hunt Container Slots', () => {
     const hero = await character();
     const spare = await withTransaction(prisma, (tx) =>
       items.createItem(tx, {
+        bundle,
         accountId: hero.accountId,
-        characterId: hero.characterId,
+        characterId: null,
         definitionKey: BACKPACK,
         quantity: 1,
-        location: 'EQUIPPED',
-        slot: 'NECKLACE',
+        location: 'DEPOT',
         at: T0,
       }),
     );
@@ -420,9 +433,12 @@ describe('§20 CSL — the five Hunt Container Slots', () => {
       withTransaction(prisma, (tx) =>
         items.installContainer(tx, {
           bundle,
+          accountId: hero.accountId,
           characterId: hero.characterId,
+          baseLevel: 1,
           slotIndex: 3,
           instanceId: spare.id,
+          at: T0,
         }),
       ),
     ).rejects.toThrow(/not unlocked/i);
@@ -513,6 +529,7 @@ describe('§20 STK — stacking and space', () => {
     const hero = await character();
     const container = await firstContainer(prisma, hero.characterId);
     const source = await give(prisma, {
+      bundle,
       accountId: hero.accountId,
       characterId: hero.characterId,
       containerId: container,
@@ -544,6 +561,7 @@ describe('§20 STK — stacking and space', () => {
     const hero = await character();
     const container = await firstContainer(prisma, hero.characterId);
     await give(prisma, {
+      bundle,
       accountId: hero.accountId,
       characterId: hero.characterId,
       containerId: container,
@@ -552,6 +570,7 @@ describe('§20 STK — stacking and space', () => {
       at: T0,
     });
     const second = await give(prisma, {
+      bundle,
       accountId: hero.accountId,
       characterId: hero.characterId,
       containerId: container,
@@ -586,6 +605,7 @@ describe('§20 STK — stacking and space', () => {
     const used = (await contentsOf(prisma, container)).length;
     for (let index = used; index < spaces; index += 1) {
       await give(prisma, {
+        bundle,
         accountId: hero.accountId,
         characterId: hero.characterId,
         containerId: container,
@@ -598,6 +618,7 @@ describe('§20 STK — stacking and space', () => {
 
     const orphan = await withTransaction(prisma, (tx) =>
       items.createItem(tx, {
+        bundle,
         accountId: hero.accountId,
         characterId: null,
         definitionKey: DAGGER,
@@ -630,6 +651,7 @@ describe('§20 STK — stacking and space', () => {
     const container = await firstContainer(prisma, hero.characterId);
     const spare = await withTransaction(prisma, (tx) =>
       items.createItem(tx, {
+        bundle,
         accountId: hero.accountId,
         characterId: null,
         definitionKey: BACKPACK,
@@ -697,6 +719,7 @@ describe('§20 CAP — Capacity', () => {
       items.carriedWeight(tx, bundle, hero.characterId),
     );
     await give(prisma, {
+      bundle,
       accountId: hero.accountId,
       characterId: hero.characterId,
       containerId: container,
@@ -743,6 +766,7 @@ describe('§20 CAP — Capacity', () => {
     const room = items.capacityFor(1) - carried;
     const fits = Math.floor(room / 400);
     await give(prisma, {
+      bundle,
       accountId: hero.accountId,
       characterId: hero.characterId,
       containerId: container,
@@ -753,6 +777,7 @@ describe('§20 CAP — Capacity', () => {
 
     const spare = await withTransaction(prisma, (tx) =>
       items.createItem(tx, {
+        bundle,
         accountId: hero.accountId,
         characterId: null,
         definitionKey: CHEESE,

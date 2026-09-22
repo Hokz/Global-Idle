@@ -1,5 +1,5 @@
 /**
- * Phase 3 §20 — SYS1 to SYS12. The System UI, in a real browser.
+ * Phase 3 §20 — SYS1 to SYS16. The System UI, in a real browser.
  *
  * Every case runs twice: once on the desktop viewport and once on the touch
  * one, because "desktop and touch" is what §18 asks for and a management
@@ -12,7 +12,7 @@
  * drive the domain directly; those are not re-litigated through a browser.
  */
 import { expect, test, type Page } from '@playwright/test';
-import { connect, enterHunt, play, runOf } from './support';
+import { connect, enterHunt, fundBank, play, runOf } from './support';
 
 async function system(page: Page, characterId: string): Promise<void> {
   await page.goto(`/system/${characterId}`);
@@ -37,12 +37,22 @@ test.describe('§20 SYS — the System UI', () => {
     await system(page, characterId);
 
     const slots = page.getByTestId('equipment-slot');
-    await expect(slots).toHaveCount(6);
-    for (const slot of ['HEAD', 'ARMOR', 'LEGS', 'FEET', 'LEFT', 'BACKPACK']) {
+    // FIVE worn pieces. The backpack is not one of them: a container is
+    // INSTALLED in a Hunt slot, which is its own custody — a Character wears
+    // one backpack and installs up to five containers.
+    await expect(slots).toHaveCount(5);
+    for (const slot of ['HEAD', 'ARMOR', 'LEGS', 'FEET', 'LEFT']) {
       await expect(page.locator(`[data-testid="equipment-slot"][data-slot="${slot}"]`)).toHaveCount(
         1,
       );
     }
+    await expect(page.locator('[data-testid="equipment-slot"][data-slot="BACKPACK"]')).toHaveCount(
+      0,
+    );
+    // And it IS somewhere: slot 1 holds it, with the potions inside.
+    await expect(
+      page.getByTestId('container-slot').nth(0).getByTestId('slot-spaces'),
+    ).not.toHaveText('empty');
   });
 
   test('SYS3: exactly five Hunt container slots, one free and four priced', async ({ page }) => {
@@ -214,5 +224,91 @@ test.describe('§20 SYS — the System UI', () => {
     } finally {
       await prisma.$disconnect();
     }
+  });
+
+  test('SYS13: unlock Slot 2, buy a container, and it is INSTALLED there', async ({ page }) => {
+    const characterId = await play(page);
+    const prisma = connect();
+    try {
+      await fundBank(prisma, characterId, 20_000n);
+    } finally {
+      await prisma.$disconnect();
+    }
+    await system(page, characterId);
+
+    const slotTwo = page.getByTestId('container-slot').nth(1);
+    await expect(slotTwo).toHaveAttribute('data-unlocked', 'false');
+    await slotTwo.getByTestId('unlock-slot').click();
+    await expect(slotTwo).toHaveAttribute('data-unlocked', 'true');
+    await expect(slotTwo.getByTestId('slot-spaces')).toHaveText('empty');
+
+    // The counter sells a real, source-backed backpack, and a purchased
+    // container is DELIVERED by being installed — it cannot go in a container.
+    await page.locator('[data-testid="buy"][data-definition="item.backpack"]').click();
+    await expect(slotTwo.getByTestId('slot-spaces')).toHaveText('0 / 20');
+    await expect(page.getByTestId('gold-bank')).toContainText('9990');
+  });
+
+  test('SYS14: an EMPTY container comes back out, and the slot is empty again', async ({
+    page,
+  }) => {
+    const characterId = await play(page);
+    const prisma = connect();
+    try {
+      await fundBank(prisma, characterId, 20_000n);
+    } finally {
+      await prisma.$disconnect();
+    }
+    await system(page, characterId);
+
+    const slotTwo = page.getByTestId('container-slot').nth(1);
+    await slotTwo.getByTestId('unlock-slot').click();
+    await page.locator('[data-testid="buy"][data-definition="item.backpack"]').click();
+    await expect(slotTwo.getByTestId('slot-spaces')).toHaveText('0 / 20');
+
+    await slotTwo.getByTestId('uninstall-container').click();
+    await expect(slotTwo.getByTestId('slot-spaces')).toHaveText('empty');
+
+    // Slot 1 is LOADED, so its container cannot leave — the button is not
+    // even offered, and the server would refuse it anyway.
+    await expect(
+      page.getByTestId('container-slot').nth(0).getByTestId('uninstall-container'),
+    ).toBeDisabled();
+  });
+
+  test('SYS15: TOUCH — stash something, and take it back, with no drag', async ({ page }) => {
+    const characterId = await play(page);
+    await system(page, characterId);
+
+    // A potion out of the tutorial backpack, selected by TAP.
+    const potion = page
+      .locator('[data-testid="item"][data-definition="item.small-health-potion"]')
+      .first();
+    await potion.click();
+    await page.getByTestId('amount').fill('2');
+    await page.getByTestId('stash-deposit').click();
+
+    const entry = page.getByTestId('stash-entry');
+    await expect(entry).toContainText('2');
+
+    await page.getByTestId('amount').fill('1');
+    await page
+      .locator('[data-testid="stash-withdraw"][data-definition="item.small-health-potion"]')
+      .click();
+    await expect(page.getByTestId('stash-entry')).toContainText('1');
+  });
+
+  test('SYS16: a routing preference is chosen, and survives a reload', async ({ page }) => {
+    const characterId = await play(page);
+    await system(page, characterId);
+
+    const routing = page.getByTestId('slot-routing').first();
+    await routing.selectOption('POTION');
+    await expect(routing).toHaveValue('POTION');
+
+    // The server owns it, so it is still there on a cold read.
+    await page.reload();
+    await expect(page.getByTestId('system-window')).toBeVisible();
+    await expect(page.getByTestId('slot-routing').first()).toHaveValue('POTION');
   });
 });

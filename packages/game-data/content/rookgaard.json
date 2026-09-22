@@ -487,13 +487,22 @@
     {
       "key": "service.rookgaard.counter",
       "kind": "service",
-      "references": ["region.rookgaard", "item.small-health-potion", "item.cheese"],
+      "references": [
+        "region.rookgaard",
+        "item.small-health-potion",
+        "item.cheese",
+        "item.backpack"
+      ],
       "label": "Rookgaard trading post",
       "region": "region.rookgaard",
       "sells": [
         {
           "itemKey": "item.small-health-potion",
           "price": 20
+        },
+        {
+          "itemKey": "item.backpack",
+          "price": 10
         }
       ],
       "buys": [
@@ -502,7 +511,7 @@
           "price": 2
         }
       ],
-      "sourceRef": "Hokz/canary@f6b81a8 data-otservbr-global/npc/lily.lua (small health potion buy = 20); data-otservbr-global/npc/willie.lua (cheese sell = 2). One counter rather than two NPCs with chat trees: Phase 3 builds the trade, not the town."
+      "sourceRef": "Hokz/canary@f6b81a8 data-otservbr-global/npc/lily.lua (small health potion buy = 20); data-otservbr-global/npc/willie.lua (cheese sell = 2); data-otservbr-global/npc/al_dee.lua (backpack clientId 2854 buy = 10). One counter rather than three NPCs with chat trees: Phase 3 builds the trade, not the town. Al Dee rather than Lee'Delle, who sells the same backpack for 9 — Dixi's own line points the player at both, and the dearer of the two is the conservative sink."
     },
     {
       "key": "starting-grant.origin.rookgaard",

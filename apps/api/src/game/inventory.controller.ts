@@ -23,10 +23,13 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import {
+  createIdempotencyPort,
   economy,
+  fingerprintOf,
   items as itemsContext,
   withTransaction,
   type PrismaClient,
+  type UnitOfWork,
 } from '@global-idle/domain';
 import {
   accountId as toAccountId,
@@ -109,6 +112,9 @@ export interface InventoryView {
     readonly quantity: string;
   }[];
   readonly lootPolicy: { readonly mode: string; readonly rules: readonly unknown[] };
+  /** Every category a slot may be set to prefer. The server's list, so the UI
+   *  offers exactly what routing can actually match. */
+  readonly routingCategories: readonly string[];
   readonly service: {
     readonly key: string;
     readonly sells: readonly { readonly itemKey: string; readonly price: number }[];
@@ -180,7 +186,12 @@ function pageOf(offset?: string, limit?: string): { offset: number; limit: numbe
 interface MoveBody {
   readonly instanceId?: string;
   readonly quantity?: number;
-  readonly to?: { readonly kind?: string; readonly slot?: string; readonly containerId?: string };
+  readonly to?: {
+    readonly kind?: string;
+    readonly slot?: string;
+    readonly containerId?: string;
+    readonly slotIndex?: number;
+  };
 }
 
 @Controller('api')
@@ -292,6 +303,9 @@ export class InventoryController {
         quantity: entry.quantity.toString(),
       })),
       lootPolicy: policy,
+      routingCategories: [
+        ...new Set(itemsContext.allItems(bundle).map((definition) => definition.category)),
+      ].sort(),
       service: {
         key: SERVICE_KEY,
         sells: itemsContext.serviceDefinition(bundle, SERVICE_KEY).sells,
@@ -336,6 +350,71 @@ export class InventoryController {
     };
   }
 
+  // ── every mutation below is a CLIENT COMMAND, and carries a key ─────────
+
+  /**
+   * Run a mutating command exactly once, however many times it is sent.
+   *
+   * The fingerprint is the CLIENT's command and nothing else — no timestamp,
+   * no resolved content version, nothing the server chose. A retry after a
+   * lost response therefore replays the original result instead of buying a
+   * second backpack; the same key with a different command is an explicit
+   * conflict rather than a silent overwrite (ADR-017, spec §17).
+   *
+   * The operation id every ledger post uses is DERIVED from the same key, so
+   * the settlement-level guard agrees with the command-level one rather than
+   * inventing a second opinion.
+   */
+  private async idempotent(
+    request: RequestWithSession,
+    namespace: string,
+    command: Record<string, unknown>,
+    body: (tx: UnitOfWork, operationId: ReturnType<typeof toOperationId>) => Promise<unknown>,
+  ): Promise<void> {
+    const session = this.session(request);
+    const raw = request.headers['idempotency-key'];
+    const clientKey = (Array.isArray(raw) ? raw[0] : raw)?.trim() ?? '';
+    if (!clientKey) {
+      throw fail(
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        'IDEMPOTENCY_KEY_REQUIRED',
+        'This request must carry an Idempotency-Key header.',
+      );
+    }
+    const operationId = toOperationId(`${namespace}:${session.accountId}:${clientKey}`);
+    const port = createIdempotencyPort((run) => withTransaction(this.prisma, run));
+    let outcome;
+    try {
+      outcome = await port.execute(
+        {
+          principalId: toAccountId(session.accountId),
+          commandNamespace: namespace,
+          clientKey,
+        },
+        fingerprintOf(command),
+        new Date(),
+        // The RESULT of every one of these routes is the inventory read that
+        // follows, so nothing domain-shaped is stored in the record. That is
+        // not laziness: the domain returns BigInt Gold, which has no JSON
+        // form, and a record that cannot be written would turn a successful
+        // command into a 500 after it had already happened.
+        async (tx) => {
+          await body(tx, operationId);
+          return null;
+        },
+      );
+    } catch (error) {
+      throw asHttp(error);
+    }
+    if (outcome.outcome === 'conflict') {
+      throw fail(
+        HttpStatus.CONFLICT,
+        'IDEMPOTENCY_CONFLICT',
+        'That Idempotency-Key was used for a different command.',
+      );
+    }
+  }
+
   @Post('characters/:characterId/items/move')
   async move(
     @Req() request: RequestWithSession,
@@ -348,11 +427,13 @@ export class InventoryController {
     const destination =
       to.kind === 'EQUIPPED'
         ? { kind: 'EQUIPPED' as const, slot: to.slot as never }
-        : to.kind === 'CONTAINER'
-          ? { kind: 'CONTAINER' as const, containerId: String(to.containerId) }
-          : to.kind === 'DEPOT'
-            ? { kind: 'DEPOT' as const }
-            : null;
+        : to.kind === 'HUNT_CONTAINER'
+          ? { kind: 'HUNT_CONTAINER' as const, slotIndex: Number(to.slotIndex) }
+          : to.kind === 'CONTAINER'
+            ? { kind: 'CONTAINER' as const, containerId: String(to.containerId) }
+            : to.kind === 'DEPOT'
+              ? { kind: 'DEPOT' as const }
+              : null;
     if (!destination || !body.instanceId) {
       throw fail(
         HttpStatus.UNPROCESSABLE_ENTITY,
@@ -360,16 +441,14 @@ export class InventoryController {
         'Name an item and a destination.',
       );
     }
-    if (destination.kind === 'DEPOT') {
-      await withTransaction(this.prisma, (tx) =>
-        itemsContext.assertSafeContext(tx, characterId, 'depot'),
-      ).catch((error) => {
-        throw asHttp(error);
-      });
-    }
 
-    try {
-      await withTransaction(this.prisma, (tx) =>
+    // The Hunt access rule is NOT checked here. It lives inside `moveItem`,
+    // where a job or a future caller cannot forget it.
+    await this.idempotent(
+      request,
+      'items.move',
+      { characterId, instanceId: body.instanceId, quantity: body.quantity ?? null, to },
+      (tx) =>
         itemsContext.moveItem(tx, {
           bundle,
           accountId: character.accountId,
@@ -380,10 +459,7 @@ export class InventoryController {
           to: destination,
           at: new Date(),
         }),
-      );
-    } catch (error) {
-      throw asHttp(error);
-    }
+    );
     return this.inventory(request, characterId);
   }
 
@@ -395,20 +471,39 @@ export class InventoryController {
   ): Promise<InventoryView> {
     const character = await this.owned(request, characterId);
     const bundle = await this.current();
-    try {
-      await withTransaction(this.prisma, (tx) =>
+    await this.idempotent(
+      request,
+      'slots.unlock',
+      { characterId, slotIndex: Number(slotIndex) },
+      (tx, operationId) =>
         itemsContext.unlockSlot(tx, {
           bundle,
           accountId: character.accountId,
           characterId,
           slotIndex: Number(slotIndex),
-          operationId: toOperationId(`slot:${characterId}:${slotIndex}`),
+          operationId,
           at: new Date(),
         }),
-      );
-    } catch (error) {
-      throw asHttp(error);
-    }
+    );
+    return this.inventory(request, characterId);
+  }
+
+  /** Where purchases, refills and withdrawals prefer to land. */
+  @Put('characters/:characterId/slots/:slotIndex/routing')
+  async routing(
+    @Req() request: RequestWithSession,
+    @Param('characterId') characterId: string,
+    @Param('slotIndex') slotIndex: string,
+    @Body() body: { category?: string | null },
+  ): Promise<InventoryView> {
+    await this.owned(request, characterId);
+    const category = typeof body.category === 'string' && body.category ? body.category : null;
+    await this.idempotent(
+      request,
+      'slots.routing',
+      { characterId, slotIndex: Number(slotIndex), category },
+      (tx) => itemsContext.setRouting(tx, { characterId, slotIndex: Number(slotIndex), category }),
+    );
     return this.inventory(request, characterId);
   }
 
@@ -420,13 +515,9 @@ export class InventoryController {
   ): Promise<InventoryView> {
     await this.owned(request, characterId);
     const mode = body.mode === 'ACCEPTED_ONLY' ? 'ACCEPTED_ONLY' : 'COLLECT_ALL_EXCEPT_SKIPPED';
-    await withTransaction(this.prisma, (tx) =>
-      itemsContext.writePolicy(
-        tx,
-        characterId,
-        { mode, rules: (body.rules ?? []) as never },
-        new Date(),
-      ),
+    const rules = (body.rules ?? []) as never;
+    await this.idempotent(request, 'loot-policy.write', { characterId, mode, rules }, (tx) =>
+      itemsContext.writePolicy(tx, characterId, { mode, rules }, new Date()),
     );
     return this.inventory(request, characterId);
   }
@@ -439,23 +530,25 @@ export class InventoryController {
   ): Promise<InventoryView> {
     const character = await this.owned(request, characterId);
     const bundle = await this.current();
-    try {
-      await withTransaction(this.prisma, (tx) =>
+    const definitionKey = String(body.definitionKey);
+    const quantity = Number(body.quantity ?? 1);
+    await this.idempotent(
+      request,
+      'service.buy',
+      { characterId, definitionKey, quantity },
+      (tx, operationId) =>
         itemsContext.buy(tx, {
           bundle,
           serviceKey: SERVICE_KEY,
           accountId: character.accountId,
           characterId,
           baseLevel: character.baseLevel,
-          definitionKey: String(body.definitionKey),
-          quantity: Number(body.quantity ?? 1),
-          operationId: toOperationId(`buy:${characterId}:${Date.now()}`),
+          definitionKey,
+          quantity,
+          operationId,
           at: new Date(),
         }),
-      );
-    } catch (error) {
-      throw asHttp(error);
-    }
+    );
     return this.inventory(request, characterId);
   }
 
@@ -467,22 +560,79 @@ export class InventoryController {
   ): Promise<InventoryView> {
     const character = await this.owned(request, characterId);
     const bundle = await this.current();
-    try {
-      await withTransaction(this.prisma, (tx) =>
+    const instanceId = String(body.instanceId);
+    await this.idempotent(
+      request,
+      'service.sell',
+      { characterId, instanceId, quantity: body.quantity ?? null },
+      (tx, operationId) =>
         itemsContext.sell(tx, {
           bundle,
           serviceKey: SERVICE_KEY,
           accountId: character.accountId,
           characterId,
-          instanceId: String(body.instanceId),
+          instanceId,
           ...(body.quantity === undefined ? {} : { quantity: body.quantity }),
-          operationId: toOperationId(`sell:${characterId}:${Date.now()}`),
+          operationId,
           at: new Date(),
         }),
-      );
-    } catch (error) {
-      throw asHttp(error);
-    }
+    );
+    return this.inventory(request, characterId);
+  }
+
+  @Post('characters/:characterId/stash/deposit')
+  async stashDeposit(
+    @Req() request: RequestWithSession,
+    @Param('characterId') characterId: string,
+    @Body() body: { instanceId?: string; quantity?: number },
+  ): Promise<InventoryView> {
+    const character = await this.owned(request, characterId);
+    const bundle = await this.current();
+    const instanceId = String(body.instanceId);
+    await this.idempotent(
+      request,
+      'stash.deposit',
+      { characterId, instanceId, quantity: body.quantity ?? null },
+      (tx) =>
+        itemsContext.stow(tx, {
+          bundle,
+          accountId: character.accountId,
+          characterId,
+          instanceId,
+          ...(body.quantity === undefined ? {} : { quantity: body.quantity }),
+          at: new Date(),
+        }),
+    );
+    return this.inventory(request, characterId);
+  }
+
+  @Post('characters/:characterId/stash/withdraw')
+  async stashWithdraw(
+    @Req() request: RequestWithSession,
+    @Param('characterId') characterId: string,
+    @Body() body: { definitionKey?: string; quantity?: number; containerId?: string },
+  ): Promise<InventoryView> {
+    const character = await this.owned(request, characterId);
+    const bundle = await this.current();
+    const definitionKey = String(body.definitionKey);
+    const quantity = Number(body.quantity ?? 0);
+    const containerId = String(body.containerId);
+    await this.idempotent(
+      request,
+      'stash.withdraw',
+      { characterId, definitionKey, quantity, containerId },
+      (tx) =>
+        itemsContext.withdraw(tx, {
+          bundle,
+          accountId: character.accountId,
+          characterId,
+          baseLevel: character.baseLevel,
+          definitionKey,
+          quantity,
+          containerId,
+          at: new Date(),
+        }),
+    );
     return this.inventory(request, characterId);
   }
 
@@ -496,8 +646,11 @@ export class InventoryController {
     const amount = BigInt(body.amount ?? 0);
     if (amount <= 0n)
       throw fail(HttpStatus.UNPROCESSABLE_ENTITY, 'INVALID_REQUEST', 'Deposit a positive amount.');
-    try {
-      await withTransaction(this.prisma, async (tx) => {
+    await this.idempotent(
+      request,
+      'gold.deposit',
+      { characterId, amount: amount.toString() },
+      async (tx, operationId) => {
         await itemsContext.assertSafeContext(tx, characterId, 'bank');
         await economy.transfer(tx, {
           from: economy.pouchOf(toAccountId(character.accountId), characterId),
@@ -505,13 +658,11 @@ export class InventoryController {
           currency: 'GOLD',
           amount,
           reasonCode: 'gold.deposit',
-          operationId: toOperationId(`deposit:${characterId}:${Date.now()}`),
+          operationId,
           at: new Date(),
         });
-      });
-    } catch (error) {
-      throw asHttp(error);
-    }
+      },
+    );
     return this.inventory(request, characterId);
   }
 }

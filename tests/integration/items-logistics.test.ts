@@ -107,6 +107,7 @@ describe('§20 LPH — the Loot Pouch', () => {
     const hero = await idle();
     const container = await firstContainer(prisma, hero.characterId);
     const stack = await give(prisma, {
+      bundle,
       accountId: hero.accountId,
       characterId: hero.characterId,
       containerId: container,
@@ -399,6 +400,7 @@ describe('§20 DPT — the Depot', () => {
     const hero = await idle();
     const container = await firstContainer(prisma, hero.characterId);
     const stack = await give(prisma, {
+      bundle,
       accountId: hero.accountId,
       characterId: hero.characterId,
       containerId: container,
@@ -428,6 +430,7 @@ describe('§20 DPT — the Depot', () => {
     const hero = await idle();
     const container = await firstContainer(prisma, hero.characterId);
     const stack = await give(prisma, {
+      bundle,
       accountId: hero.accountId,
       characterId: hero.characterId,
       containerId: container,
@@ -458,6 +461,7 @@ describe('§20 DPT — the Depot', () => {
     const hero = await idle();
     const stored = await withTransaction(prisma, (tx) =>
       items.createItem(tx, {
+        bundle,
         accountId: hero.accountId,
         characterId: null,
         definitionKey: CHEESE,
@@ -503,6 +507,7 @@ describe('§20 STH — the Stash', () => {
     const hero = await idle();
     const container = await firstContainer(prisma, hero.characterId);
     const dagger = await give(prisma, {
+      bundle,
       accountId: hero.accountId,
       characterId: hero.characterId,
       containerId: container,
@@ -532,6 +537,7 @@ describe('§20 STH — the Stash', () => {
     const container = await firstContainer(prisma, hero.characterId);
     for (let index = 0; index < 2; index += 1) {
       const stack = await give(prisma, {
+        bundle,
         accountId: hero.accountId,
         characterId: hero.characterId,
         containerId: container,
@@ -583,6 +589,7 @@ describe('§20 STH — the Stash', () => {
     const container = await firstContainer(prisma, hero.characterId);
     const affixed = await withTransaction(prisma, (tx) =>
       items.createItem(tx, {
+        bundle,
         accountId: hero.accountId,
         characterId: hero.characterId,
         definitionKey: CHEESE,
@@ -665,6 +672,7 @@ describe('§20 MOV — movement', () => {
     const hero = await idle();
     const container = await firstContainer(prisma, hero.characterId);
     const stack = await give(prisma, {
+      bundle,
       accountId: hero.accountId,
       characterId: hero.characterId,
       containerId: container,
@@ -698,6 +706,7 @@ describe('§20 MOV — movement', () => {
     const hero = await idle();
     const container = await firstContainer(prisma, hero.characterId);
     const stack = await give(prisma, {
+      bundle,
       accountId: hero.accountId,
       characterId: hero.characterId,
       containerId: container,
@@ -722,6 +731,7 @@ describe('§20 MOV — movement', () => {
     // A SPLIT is the one case that creates something, and it still leaves no
     // zero-quantity row behind.
     const bulk = await give(prisma, {
+      bundle,
       accountId: hero.accountId,
       characterId: hero.characterId,
       containerId: container,
@@ -749,6 +759,7 @@ describe('§20 MOV — movement', () => {
     const hero = await idle();
     const container = await firstContainer(prisma, hero.characterId);
     const stack = await give(prisma, {
+      bundle,
       accountId: hero.accountId,
       characterId: hero.characterId,
       containerId: container,
@@ -781,6 +792,7 @@ describe('§20 MOV — movement', () => {
     const theirs = await idle({ name: 'stranger' });
     const container = await firstContainer(prisma, theirs.characterId);
     const stack = await give(prisma, {
+      bundle,
       accountId: theirs.accountId,
       characterId: theirs.characterId,
       containerId: container,
@@ -811,6 +823,7 @@ describe('§20 MOV — movement', () => {
     const hero = await idle();
     const orphanContainer = await withTransaction(prisma, (tx) =>
       items.createItem(tx, {
+        bundle,
         accountId: hero.accountId,
         characterId: null,
         definitionKey: BACKPACK,
@@ -821,6 +834,7 @@ describe('§20 MOV — movement', () => {
     );
     const stack = await withTransaction(prisma, (tx) =>
       items.createItem(tx, {
+        bundle,
         accountId: hero.accountId,
         characterId: null,
         definitionKey: CHEESE,
@@ -851,6 +865,7 @@ describe('§20 MOV — movement', () => {
     const hero = await idle();
     const container = await firstContainer(prisma, hero.characterId);
     const stack = await give(prisma, {
+      bundle,
       accountId: hero.accountId,
       characterId: hero.characterId,
       containerId: container,
@@ -887,6 +902,7 @@ describe('§20 MOV — movement', () => {
     const hero = await idle();
     const container = await firstContainer(prisma, hero.characterId);
     const stack = await give(prisma, {
+      bundle,
       accountId: hero.accountId,
       characterId: hero.characterId,
       containerId: container,
@@ -936,6 +952,7 @@ describe('§20 MOV — movement', () => {
     const hero = await idle();
     const container = await firstContainer(prisma, hero.characterId);
     const stack = await give(prisma, {
+      bundle,
       accountId: hero.accountId,
       characterId: hero.characterId,
       containerId: container,
@@ -989,6 +1006,7 @@ describe('§20 RTE — Manage Containers routing', () => {
       );
       const container = await withTransaction(prisma, (tx) =>
         items.createItem(tx, {
+          bundle,
           accountId,
           characterId,
           definitionKey: BACKPACK,
@@ -1063,6 +1081,7 @@ describe('§20 RTE — Manage Containers routing', () => {
     const preferred = slots[1]!.containerInstanceId!;
     for (let index = 0; index < 20; index += 1) {
       await give(prisma, {
+        bundle,
         accountId: hero.accountId,
         characterId: hero.characterId,
         containerId: preferred,
@@ -1116,6 +1135,7 @@ describe('§20 RTE — Manage Containers routing', () => {
     const container = await firstContainer(prisma, hero.characterId);
     for (let index = (await contentsOf(prisma, container)).length; index < 20; index += 1) {
       await give(prisma, {
+        bundle,
         accountId: hero.accountId,
         characterId: hero.characterId,
         containerId: container,

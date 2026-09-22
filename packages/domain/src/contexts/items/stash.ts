@@ -11,7 +11,7 @@ import { illegalItemMove, noRoomForItem } from '../../platform/errors/index.js';
 import type { UnitOfWork } from '../../platform/transaction/index.js';
 import { assertSafeContext } from './access.js';
 import { itemDefinition } from './catalogue.js';
-import { assertCapacity, createItem, freeSpacesIn, readItem } from './custody.js';
+import { assertCapacity, createItem, freeSpacesIn, lockDestination, readItem } from './custody.js';
 
 export interface StashRow {
   readonly definitionKey: string;
@@ -140,7 +140,13 @@ export async function withdraw(
     remaining -= size;
   }
 
-  const free = await freeSpacesIn(tx, input.bundle, input.accountId, {
+  // Lock the destination container before counting, for the same reason a
+  // purchase does: the last free space must be won by exactly one caller.
+  await lockDestination(tx, input.accountId, input.characterId, {
+    kind: 'CONTAINER',
+    containerId: input.containerId,
+  });
+  const free = await freeSpacesIn(tx, input.bundle, input.accountId, input.characterId, {
     kind: 'CONTAINER',
     containerId: input.containerId,
   });
@@ -157,6 +163,7 @@ export async function withdraw(
 
   for (const size of stacks) {
     await createItem(tx, {
+      bundle: input.bundle,
       accountId: input.accountId,
       characterId: input.characterId,
       definitionKey: input.definitionKey,
