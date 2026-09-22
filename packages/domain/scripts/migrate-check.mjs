@@ -67,6 +67,23 @@ const REQUIRED_SQL = [
     invariant: 'I6 — the ledger is append-only for the application role',
     pattern: /REVOKE UPDATE, DELETE ON "LedgerEntry" FROM "globalidle_app"/,
   },
+  {
+    invariant:
+      'ADR-019 — a POUCH names a REAL Character owned by the row\u2019s Account (LedgerEntry)',
+    pattern:
+      /ALTER TABLE "LedgerEntry" ADD CONSTRAINT "LedgerEntry_characterId_accountId_fkey"[\s\S]*?FOREIGN KEY \("characterId", "accountId"\) REFERENCES "Character"\("id", "accountId"\)/,
+  },
+  {
+    invariant:
+      'ADR-019 — a POUCH names a REAL Character owned by the row\u2019s Account (CurrencyBalance)',
+    pattern:
+      /ALTER TABLE "CurrencyBalance" ADD CONSTRAINT "CurrencyBalance_characterId_accountId_fkey"[\s\S]*?FOREIGN KEY \("characterId", "accountId"\) REFERENCES "Character"\("id", "accountId"\)/,
+  },
+  {
+    invariant: 'ADR-019 — custody, carrier and subject key agree, or the row is refused',
+    pattern:
+      /CHECK \(\s*\("custody" = 'BANK'\s+AND "characterId" IS NULL\s+AND "subjectId" = "accountId"\) OR\s*\("custody" = 'POUCH' AND "characterId" IS NOT NULL AND "subjectId" = "characterId"\)/,
+  },
 ];
 
 function migrationDirs() {

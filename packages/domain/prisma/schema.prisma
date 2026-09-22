@@ -198,6 +198,8 @@ model Character {
   stamina      CharacterStamina?
   participants ActivityParticipant[]
   huntRuns     HuntRun[]
+  pouchEntries LedgerEntry[]
+  pouchBalance CurrencyBalance[]
 
   /// I1 — one PLAYABLE (non-retired) Character per vocation per account.
   /// Object form: the pinned Prisma accepts null equality here, so no raw()
@@ -208,6 +210,11 @@ model Character {
   /// (Phase 1 spec §13.2). I1 treats nulls as distinct, so without this a
   /// second Origin Character would be accepted.
   @@unique([accountId], where: { retiredAt: null, vocation: null }, name: "originCharacter")
+  /// ADR-019 — the target of the POUCH composite foreign key. `id` alone is
+  /// already unique, so this adds no constraint on Character; what it adds is
+  /// something a foreign key can POINT AT, which is how a ledger row proves
+  /// that the Character it names belongs to the Account it claims.
+  @@unique([id, accountId], name: "characterOfAccount")
   @@index([accountId])
   @@map("Character")
 }
@@ -480,6 +487,12 @@ model LedgerEntry {
   /// row so an account-wide audit never joins through Character.
   subjectId   String
   custody     CurrencyCustody
+  /// The CARRYING Character, and the reason POUCH ownership is a fact rather
+  /// than a convention: NULL for BANK, and for POUCH a composite foreign key
+  /// to `Character(id, accountId)`, so the database refuses a pouch for a
+  /// Character that does not exist OR that belongs to another Account. A
+  /// CHECK ties it to `custody` and to `subjectId` (see the migration).
+  characterId String?
   currency    CurrencyKind
   /// Signed. Credit is positive, debit is negative; the balance projection is
   /// their sum (ADR-003).
@@ -488,7 +501,8 @@ model LedgerEntry {
   operationId String
   createdAt   DateTime
 
-  account Account @relation(fields: [accountId], references: [id])
+  account   Account    @relation(fields: [accountId], references: [id])
+  character Character? @relation(fields: [characterId, accountId], references: [id, accountId], onDelete: Restrict, onUpdate: Restrict)
 
   @@index([accountId, currency, createdAt])
   @@index([subjectId, custody, currency, createdAt])
@@ -507,15 +521,20 @@ model LedgerEntry {
 /// ledger, and reconciliation recomputes each from its own entries.
 model CurrencyBalance {
   /// The Account for BANK, the Character for POUCH.
-  subjectId String
-  custody   CurrencyCustody
-  currency  CurrencyKind
+  subjectId   String
+  custody     CurrencyCustody
+  currency    CurrencyKind
   /// Always the owning Account, denormalised, for account-wide queries.
-  accountId String
-  amount    BigInt
-  updatedAt DateTime
+  accountId   String
+  /// The CARRYING Character — NULL for BANK, and for POUCH a composite foreign
+  /// key to `Character(id, accountId)`. Same guarantee as on LedgerEntry: the
+  /// projection cannot name a Character the entries could not.
+  characterId String?
+  amount      BigInt
+  updatedAt   DateTime
 
-  account Account @relation(fields: [accountId], references: [id])
+  account   Account    @relation(fields: [accountId], references: [id])
+  character Character? @relation(fields: [characterId, accountId], references: [id, accountId], onDelete: Restrict, onUpdate: Restrict)
 
   @@id([subjectId, custody, currency])
   @@index([accountId, currency])

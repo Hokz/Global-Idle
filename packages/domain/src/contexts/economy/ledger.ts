@@ -28,8 +28,13 @@ export type CurrencyCustody = 'BANK' | 'POUCH';
 /**
  * Who holds the value, and in which scope.
  *
- * `subjectId` is the Account for `BANK` and the Character for `POUCH`; the
- * database CHECKs that pairing rather than trusting every call site.
+ * `subjectId` is the Account for `BANK` and the Character for `POUCH`. That is
+ * not a naming convention the code is trusted to keep: every row also carries
+ * an explicit `characterId`, and the database holds a COMPOSITE foreign key
+ * `(characterId, accountId) -> Character(id, accountId)` plus a CHECK tying
+ * both to `custody`. A pouch therefore cannot name a Character that does not
+ * exist, or one that belongs to a different Account, even if this file is
+ * wrong.
  */
 export interface CustodySubject {
   readonly accountId: AccountId;
@@ -47,6 +52,16 @@ export const pouchOf = (accountId: AccountId, characterId: string): CustodySubje
   custody: 'POUCH',
   characterId,
 });
+
+/**
+ * The CARRYING Character, or `null` for an account-scoped BANK row.
+ *
+ * Written to its own column rather than inferred from `subjectId`, because a
+ * foreign key needs a column to point at. The two agree by CHECK.
+ */
+export function characterIdOf(subject: CustodySubject): string | null {
+  return subject.custody === 'POUCH' ? subjectIdOf(subject) : null;
+}
 
 /** The row key `subjectId` a scope projects onto. */
 export function subjectIdOf(subject: CustodySubject): string {
@@ -104,6 +119,7 @@ export async function post(tx: UnitOfWork, posting: LedgerPosting): Promise<bigi
       accountId,
       subjectId,
       custody,
+      characterId: characterIdOf(posting.subject),
       currency: posting.currency,
       amount: posting.amount,
       reasonCode: posting.reasonCode,
@@ -146,13 +162,14 @@ async function ensureBalanceRow(
 ): Promise<void> {
   await tx.$executeRawUnsafe(
     `INSERT INTO "CurrencyBalance"
-       ("subjectId", "custody", "currency", "accountId", "amount", "updatedAt")
-     VALUES ($1, $2::"CurrencyCustody", $3::"CurrencyKind", $4, 0, $5)
+       ("subjectId", "custody", "currency", "accountId", "characterId", "amount", "updatedAt")
+     VALUES ($1, $2::"CurrencyCustody", $3::"CurrencyKind", $4, $5, 0, $6)
      ON CONFLICT DO NOTHING`,
     subjectId,
     subject.custody,
     currency,
     subject.accountId,
+    characterIdOf(subject),
     at,
   );
 }

@@ -4,9 +4,10 @@
 // a dependency-cruiser violation, inside this package as much as across it
 // (§4.1, tests W8 and W11).
 //
-// Phase 0B builds the CURRENCY foundation only: append-only ledger, balance
-// projection, transactional debit and credit, and reconciliation. No
-// ItemInstance, no custody, no Market, no Forge (§19).
+// Phase 0B built the CURRENCY foundation: append-only ledger, balance
+// projection, transactional debit and credit, and reconciliation. Phase 2's
+// correction added CUSTODY SCOPES to that same ledger (ADR-019) — still no
+// ItemInstance, no Market and no Forge (§19).
 export const CONTEXT_NAME = 'economy' as const;
 
 export type {
@@ -18,6 +19,7 @@ export type {
 } from './ledger.js';
 export {
   bankOf,
+  characterIdOf,
   countReconciliationMismatches,
   post,
   pouchOf,
