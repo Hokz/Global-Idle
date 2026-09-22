@@ -133,6 +133,13 @@ Mandatory tests: cases 1–28 in
 
 ## Phase 3 — Loot + Itemization + Inventory/Logistics — current phase
 
+**Specification:**
+[`docs/specs/phase-3/PHASE_3_ITEMIZATION_INVENTORY_LOGISTICS_SPEC.md`](specs/phase-3/PHASE_3_ITEMIZATION_INVENTORY_LOGISTICS_SPEC.md)
+— `IMPLEMENTATION_SPEC_READY`. Implementation is on its own branch and pull
+request, stacked on Phase 2, with status
+`IMPLEMENTATION_COMPLETE — PENDING INDEPENDENT REVIEW`.
+
+
 - loot tables;
 - BaseItem;
 - ItemInstance;

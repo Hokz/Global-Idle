@@ -183,13 +183,14 @@ jobs:
         run: pnpm build
 
       # ─────────────────────────────────────────── the matrices are countable
-      - name: 'Test matrices — Phase 0B 92, Phase 1 87, Phase 2 106'
-        # Not a §13 check; it is how "all 92 pass", "all 87 pass" and "all 106
-        # pass" stay countable claims rather than assertions (Phase 0B §14,
-        # Phase 1 §16, Phase 2 §12). It fails on a missing id, a duplicate, and
-        # an id belonging to no matrix — which is what keeps three id spaces
-        # from colliding now that Phase 1 continues the D group at D19 and
-        # Phase 2 adds a second group starting with S.
+      - name: 'Test matrices — Phase 0B 92, Phase 1 87, Phase 2 106, Phase 3 125'
+        # Not a §13 check; it is how each phase's "all N pass" stays a
+        # countable claim rather than an assertion (Phase 0B §14, Phase 1 §16,
+        # Phase 2 §12, Phase 3 §20). It fails on a missing id, a duplicate, and
+        # an id belonging to no matrix — which is what keeps FOUR id spaces
+        # from colliding now that Phase 1 continues the D group at D19, Phase 2
+        # adds groups starting with S, and Phase 3 uses three-letter codes for
+        # exactly that reason.
         run: node scripts/count-matrix.mjs
 
   # ═══════════════════════════════════════════════════════════════════════════
