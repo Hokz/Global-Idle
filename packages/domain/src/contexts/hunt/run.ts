@@ -36,10 +36,11 @@ import { recordDomainEvent } from '../../platform/observability/index.js';
 import type { UnitOfWork } from '../../platform/transaction/index.js';
 import { endActivity, occupancyFor, pauseForGrace, resumeFromGrace } from '../activity/index.js';
 import { settleStamina } from '../character/index.js';
-import { post } from '../economy/index.js';
+import { pouchOf, post, readBalance } from '../economy/index.js';
 import { entitlementPort } from '../identity/index.js';
 import { createTimerPort } from '../../platform/timer/index.js';
 import { levelForXp, levelProgress } from './progression.js';
+import { settleDeath, type DeathProtection } from './death.js';
 import { buildHuntPlan } from './plan.js';
 import { settleRewards } from './rewards.js';
 
@@ -81,7 +82,13 @@ export interface HuntRunView {
   /** STRINGS on the wire. A bigint does not survive JSON, and a number would
    *  quietly lose precision on a total the curve takes past 2^53. */
   readonly sessionXp: string;
+  /** What THIS RUN earned, for display. The authoritative carried total is
+   *  `pouchGold`, which is the ledger's projection; this is a per-run counter
+   *  and is deliberately not the number anything settles against. */
   readonly sessionGold: string;
+  /** The Character's Gold Pouch — CARRIED, and lost on death without Full
+   *  Bless (ADR-019). Not the Bank. */
+  readonly pouchGold: string;
   /** The DURABLE progression, so the window does not have to ask twice. */
   readonly baseLevel: number;
   readonly baseXp: string;
@@ -92,6 +99,16 @@ export interface HuntRunView {
   readonly connection: 'ONLINE_ACTIVE' | 'RECONNECT_GRACE_PAUSED' | 'ACTIVITY_ENDED';
   readonly graceExpiresAt: string | null;
   readonly endedReason: HuntEndReason | null;
+  /** Present only on the settlement that KILLED the Character. What death
+   *  cost, so the window can say it rather than leaving the player to work it
+   *  out from two numbers that both went down. */
+  readonly penalty: {
+    readonly experienceLost: string;
+    readonly goldForfeited: string;
+    readonly levelBefore: number;
+    readonly levelAfter: number;
+    readonly fullBless: boolean;
+  } | null;
   readonly events: readonly HuntEvent[];
 }
 
@@ -244,6 +261,7 @@ export async function advance(
       creatures: readonly StoredCreature[];
       sessionXp: bigint;
       sessionGold: bigint;
+      pouchGold: bigint;
       endedReason: HuntEndReason | null;
       baseXp: bigint;
       staminaRemainingMs: number;
@@ -251,6 +269,7 @@ export async function advance(
     connection: HuntRunView['connection'],
     graceExpiresAt: Instant | null,
     events: readonly HuntEvent[],
+    penalty: DeathPenalty | null = null,
   ): HuntRunView => {
     const progress = levelProgress(state.baseXp);
     return {
@@ -269,6 +288,7 @@ export async function advance(
       })),
       sessionXp: state.sessionXp.toString(),
       sessionGold: state.sessionGold.toString(),
+      pouchGold: state.pouchGold.toString(),
       baseLevel: progress.level,
       baseXp: progress.totalXp.toString(),
       levelStartXp: progress.levelStartXp.toString(),
@@ -288,9 +308,27 @@ export async function advance(
       connection,
       graceExpiresAt: graceExpiresAt ? graceExpiresAt.toISOString() : null,
       endedReason: state.endedReason,
+      penalty: penalty
+        ? {
+            experienceLost: penalty.experienceLost.toString(),
+            goldForfeited: penalty.goldForfeited.toString(),
+            levelBefore: penalty.levelBefore,
+            levelAfter: penalty.levelAfter,
+            fullBless: penalty.fullBless,
+          }
+        : null,
       events,
     };
   };
+
+  // The CARRIED total, read from the ledger's projection rather than summed
+  // from the run: a Character may have carried Gold in from an earlier Hunt,
+  // and a run counter cannot know about it.
+  const pouchGold = await readBalance(
+    tx,
+    pouchOf(character.accountId as never, run.characterId),
+    'GOLD',
+  );
 
   const stored = {
     room: run.room,
@@ -301,6 +339,7 @@ export async function advance(
     creatures: run.creatures as unknown as StoredCreature[],
     sessionXp: run.sessionXp,
     sessionGold: run.sessionGold,
+    pouchGold,
     endedReason: run.endedReason as HuntEndReason | null,
     baseXp: character.baseXp,
     staminaRemainingMs: stamina.remaining,
@@ -445,8 +484,13 @@ export async function advance(
     await burnTimers(run.simulatedThrough, simulatedTo, operation);
 
     if (settled.gold > 0n) {
+      // THE POUCH, not the Bank (ADR-019). Gold a creature dropped is CARRIED:
+      // it is at risk until it is deposited, and death without Full Bless
+      // takes it. Crediting the account balance here — which is what this did
+      // before — made every coin safe the instant it dropped and quietly
+      // deleted the risk a Hunt is supposed to carry.
       await post(tx, {
-        accountId: character.accountId as never,
+        subject: pouchOf(character.accountId as never, run.characterId),
         currency: 'GOLD',
         amount: settled.gold,
         reasonCode: 'hunt.reward',
@@ -464,6 +508,7 @@ export async function advance(
       creatures: step.state.creatures as unknown as StoredCreature[],
       sessionXp: run.sessionXp + settled.experience,
       sessionGold: run.sessionGold + settled.gold,
+      pouchGold: pouchGold + settled.gold,
       endedReason: step.state.ended,
       baseXp: character.baseXp + settled.experience,
       staminaRemainingMs: settled.staminaRemaining,
@@ -489,8 +534,26 @@ export async function advance(
 
     if (step.state.ended === 'DIED') {
       await stopTimers(simulatedTo, operation);
-      await endRun(tx, input.activityId, 'DIED', input.now);
-      return view({ ...next, endedReason: 'DIED' }, 'ACTIVITY_ENDED', null, events);
+      const penalty = await endRun(tx, input.activityId, 'DIED', input.now);
+      // RE-READ, because `endRun` just took some of it away. Returning `next`
+      // here would show the player the experience and the Gold they had a
+      // moment before dying, which is the one moment they will look hardest.
+      const after = await tx.character.findUniqueOrThrow({
+        where: { id: run.characterId },
+        select: { baseXp: true },
+      });
+      const carried = await readBalance(
+        tx,
+        pouchOf(character.accountId as never, run.characterId),
+        'GOLD',
+      );
+      return view(
+        { ...next, endedReason: 'DIED', baseXp: after.baseXp, pouchGold: carried },
+        'ACTIVITY_ENDED',
+        null,
+        events,
+        penalty,
+      );
     }
   } else if (input.seen) {
     await tx.huntRun.update({
@@ -579,15 +642,27 @@ export async function endRunOrActivity(
   else await endActivity(tx, activityId, at);
 }
 
-/** End a run and the Activity with it, releasing the occupancy claim. */
+/**
+ * End a run and the Activity with it, releasing the occupancy claim.
+ *
+ * ONCE ONLY, and the run row is what makes it so: a run that already carries
+ * an `endedReason` returns immediately, so a death cannot be settled twice
+ * however many times this is reached.
+ */
 export async function endRun(
   tx: UnitOfWork,
   activityId: ActivityId,
   reason: HuntEndReason,
   at: Instant,
-): Promise<void> {
+): Promise<DeathPenalty | null> {
   const run = await tx.huntRun.findUnique({ where: { activityId } });
-  if (!run || run.endedReason !== null) return;
+  if (!run || run.endedReason !== null) return null;
+
+  // DEATH IS THE ONLY ENDING THAT COSTS ANYTHING. Leaving and losing a
+  // connection are not punished: §8 already ends the run, and inventing a
+  // penalty for them would make the reconnect grace a trap rather than a
+  // mercy.
+  const penalty = reason === 'DIED' ? await settleDeathPenalty(tx, run.characterId, at) : null;
 
   await tx.huntRun.update({
     where: { activityId },
@@ -601,7 +676,84 @@ export async function endRun(
     reason,
     room: run.room,
     cycle: run.cycle,
+    ...(penalty
+      ? {
+          experienceLost: penalty.experienceLost.toString(),
+          goldForfeited: penalty.goldForfeited.toString(),
+          levelAfter: penalty.levelAfter,
+        }
+      : {}),
   });
+  return penalty;
+}
+
+export interface DeathPenalty {
+  readonly experienceLost: bigint;
+  readonly levelBefore: number;
+  readonly levelAfter: number;
+  readonly goldForfeited: bigint;
+  readonly fullBless: boolean;
+}
+
+/**
+ * Apply what death costs: Base XP by Canary's formula, and the whole Gold
+ * Pouch unless the Character had Full Bless.
+ *
+ * The forfeiture is a real ledger entry, not a reset: value leaves the economy
+ * with a reason and an operation id, so "where did my gold go" survives the
+ * one movement a player is most likely to dispute (ADR-019).
+ */
+async function settleDeathPenalty(
+  tx: UnitOfWork,
+  characterId: string,
+  at: Instant,
+): Promise<DeathPenalty> {
+  const character = await tx.character.findUniqueOrThrow({
+    where: { id: characterId },
+    select: { accountId: true, baseXp: true, vocation: true, blessings: true, promoted: true },
+  });
+
+  const protection: DeathProtection = {
+    blessings: character.blessings,
+    promoted: character.promoted,
+  };
+  const settled = settleDeath({
+    experience: character.baseXp,
+    protection,
+    vocation: character.vocation,
+  });
+
+  if (settled.experienceLost > 0n) {
+    await tx.character.update({
+      where: { id: characterId },
+      data: { baseXp: settled.experienceAfter, baseLevel: settled.levelAfter },
+    });
+  }
+
+  let goldForfeited = 0n;
+  if (settled.forfeitsCarried) {
+    const pouch = pouchOf(character.accountId as never, characterId);
+    const carried = await readBalance(tx, pouch, 'GOLD');
+    if (carried > 0n) {
+      await post(tx, {
+        subject: pouch,
+        currency: 'GOLD',
+        amount: -carried,
+        reasonCode: 'hunt.death.forfeit',
+        operationId: toOperationId(`hunt.death:${characterId}:${at.toISOString()}`),
+        at,
+      });
+      goldForfeited = carried;
+    }
+  }
+
+  return {
+    experienceLost: settled.experienceLost,
+    levelBefore: settled.levelBefore,
+    levelAfter: settled.levelAfter,
+    goldForfeited,
+    fullBless: !settled.forfeitsCarried,
+  };
 }
 
 export const asActivityId = toActivityId;

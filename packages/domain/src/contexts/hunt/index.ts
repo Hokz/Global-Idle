@@ -15,7 +15,25 @@ export {
   endRunOrActivity,
   startRun,
 } from './run.js';
-export type { HuntEndReason, HuntRunView } from './run.js';
+export type { DeathPenalty, HuntEndReason, HuntRunView } from './run.js';
+
+export {
+  BLESSING_FACTOR,
+  FORMULA_LEVEL,
+  FULL_BLESS_COUNT,
+  LOW_LEVEL_BRANCH_REPLACEMENT,
+  LOW_LEVEL_BRANCH_THRESHOLD,
+  LOW_LEVEL_LOSS_PERCENT,
+  PROMOTION_REDUCTION,
+  UNPROTECTED,
+  VOCATION_EXEMPT_LEVEL,
+  isFullBless,
+  levelPercent,
+  losesExperience,
+  lostPercent,
+  settleDeath,
+} from './death.js';
+export type { DeathLossInput, DeathProtection, DeathSettlement } from './death.js';
 
 export { buildHuntPlan } from './plan.js';
 export type { HuntPlan } from './plan.js';

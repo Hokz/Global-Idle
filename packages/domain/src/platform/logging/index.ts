@@ -91,6 +91,10 @@ export type DomainLogEvent =
   | {
       readonly kind: 'economy.operation';
       readonly accountId: string;
+      /** ADR-019 — WHICH scope moved. A log line that only said "the account
+       *  gained 3 gold" cannot distinguish a Hunt reward from a deposit. */
+      readonly custody: string;
+      readonly subjectId: string;
       readonly currency: string;
       readonly amount: string;
       readonly reasonCode: string;
@@ -116,6 +120,10 @@ export type DomainLogEvent =
       readonly reason: string;
       readonly room: number;
       readonly cycle: number;
+      /** Present only on a DIED ending: what the death cost. */
+      readonly experienceLost?: string;
+      readonly goldForfeited?: string;
+      readonly levelAfter?: number;
     }
   | {
       readonly kind: 'activity.transition';
