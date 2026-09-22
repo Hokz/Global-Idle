@@ -10,8 +10,9 @@
  * about the balance of the content, not about what the Game Window does with
  * the state it is given. So the cases that are about RENDERING a far-away
  * state arrange that state in the durable row and let the server serve it.
- * The window still learns everything from `GET /api/characters/:id/hunt`; it
- * is the truth behind that route that is fast-forwarded, not the route.
+ * The window still learns everything through the real routes — `POST
+ * .../hunt/advance` to settle and `GET .../hunt` to read; it is the truth
+ * behind them that is fast-forwarded, not the routes.
  *
  * The cases that are about PROGRESS — combat happening, a run resuming — use
  * real server time and assert on real change.
