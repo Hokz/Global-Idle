@@ -30,7 +30,7 @@ import {
   simulateHunt,
   type HuntEvent,
   type HuntState,
-  type MovementLeg,
+  type Movement,
   type TilePosition,
 } from '@global-idle/game-engine';
 import type { ContentBundleResolver } from '@global-idle/game-data';
@@ -94,20 +94,35 @@ export interface HuntRunView {
      *  it identifies this actor for as long as it exists and is never a row. */
     id?: string;
     tile?: TilePosition;
-    leg?: MovementLeg | null;
+    movement?: Movement | null;
   }[];
   /**
    * Phase 3.5 — where the Character IS, and on which map.
    *
    * Null when the Hunt names no map, which is every Phase 2 fixture. The tile
-   * is authoritative; the leg is the step in flight, and exists so a browser
+   * is authoritative; the movement is the step in flight, and exists so a browser
    * can interpolate pixels between two server tiles without ever deciding
    * where anything is.
    */
   readonly space: {
+    /**
+     * WHICH BUNDLE the simulation is running against.
+     *
+     * The browser fetches its map by this version, not by "whatever is current"
+     * — a publish between entering a Hunt and drawing it would otherwise have
+     * the server colliding against one map while the player looks at another.
+     */
+    readonly contentVersion: string;
     readonly mapKey: string;
     readonly tile: TilePosition;
-    readonly leg: MovementLeg | null;
+    readonly movement: Movement | null;
+    /**
+     * The simulation instant this snapshot describes, in the same milliseconds
+     * a movement's `startsAtMs` and `arrivesAtMs` are in. The renderer needs
+     * exactly this to place an actor inside a step; without it the client would
+     * have to invent a duration, which is what it used to do.
+     */
+    readonly nowMs: number;
   } | null;
   /**
    * Phase 3.5 — the snapshot's monotonic revision.
@@ -167,7 +182,7 @@ interface StoredCreature {
    *  run has no space, and absent is not the same as zero. */
   readonly id?: string;
   readonly position?: TilePosition;
-  readonly leg?: MovementLeg;
+  readonly movement?: Movement;
 }
 
 /** Create the run beside the Activity, in the same transaction (spec §11). */
@@ -233,6 +248,7 @@ interface ProjectionContext {
   readonly creatureMaxHealth: (key: string) => number | null;
   readonly pouchUsed: number;
   readonly mapKey: string | null;
+  readonly contentVersion: string;
 }
 
 /** The durable run, at one instant, in the shape the projection reads. */
@@ -250,7 +266,7 @@ interface RunProjection {
   readonly baseXp: bigint;
   readonly staminaRemainingMs: number;
   readonly revision: number;
-  readonly position?: { readonly tile: TilePosition; readonly leg?: MovementLeg };
+  readonly position?: { readonly tile: TilePosition; readonly movement?: Movement };
 }
 
 /**
@@ -285,7 +301,7 @@ function project(
       maxHealth: context.creatureMaxHealth(creature.key) ?? creature.health,
       ...(creature.id === undefined ? {} : { id: creature.id }),
       ...(creature.position === undefined ? {} : { tile: creature.position }),
-      ...(creature.position === undefined ? {} : { leg: creature.leg ?? null }),
+      ...(creature.position === undefined ? {} : { movement: creature.movement ?? null }),
     })),
     sessionXp: state.sessionXp.toString(),
     sessionGold: state.sessionGold.toString(),
@@ -327,9 +343,11 @@ function project(
     space:
       context.mapKey !== null && state.position
         ? {
+            contentVersion: context.contentVersion,
             mapKey: context.mapKey,
             tile: state.position.tile,
-            leg: state.position.leg ?? null,
+            movement: state.position.movement ?? null,
+            nowMs: state.tick * TICK_MS,
           }
         : null,
     revision: state.revision,
@@ -469,6 +487,7 @@ export async function advance(
         creatureMaxHealth: (key) => plan.creatures[key]?.maxHealth ?? null,
         pouchUsed,
         mapKey: space?.map.key ?? null,
+        contentVersion: activity.contentVersion,
       },
       state,
       connection,
@@ -749,7 +768,7 @@ export async function advance(
         : {
             position: {
               tile: step.state.position,
-              ...(step.state.leg === undefined ? {} : { leg: step.state.leg }),
+              ...(step.state.movement === undefined ? {} : { movement: step.state.movement }),
             },
           }),
     };
@@ -770,7 +789,7 @@ export async function advance(
           : {
               position: {
                 tile: step.state.position,
-                ...(step.state.leg === undefined ? {} : { leg: step.state.leg }),
+                ...(step.state.movement === undefined ? {} : { movement: step.state.movement }),
               } as never,
             }),
         sessionXp: next.sessionXp,
@@ -918,6 +937,7 @@ export async function snapshot(
       creatureMaxHealth: (key) => plan.creatures[key]?.maxHealth ?? null,
       pouchUsed,
       mapKey: space?.map.key ?? null,
+      contentVersion: activity.contentVersion,
     },
     {
       room: run.room,

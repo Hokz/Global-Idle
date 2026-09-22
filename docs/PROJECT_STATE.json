@@ -4,15 +4,15 @@
     "id": "phase-3-5",
     "name": "Phase 3.5 — Tile / spatial Game Window",
     "status": "IMPLEMENTATION_COMPLETE — PENDING INDEPENDENT REVIEW",
-    "pr": null,
+    "pr": 9,
     "spec": "docs/specs/phase-3-5/PHASE_3_5_TILE_SPATIAL_GAME_WINDOW_SPEC.md"
   },
   "lastVerifiedPhase": {
-    "id": "phase-2",
-    "name": "Phase 2 — Hunt simulator and the first Game Window",
+    "id": "phase-3",
+    "name": "Phase 3 — Itemization, inventory and loot logistics",
     "verifiedAt": "2026-09-22",
-    "acceptedHead": "03058b5",
-    "pr": 7
+    "acceptedHead": "d46f78b",
+    "pr": 8
   },
   "phases": [
     {
@@ -41,14 +41,14 @@
     {
       "id": "phase-3",
       "name": "Itemization, inventory and loot logistics",
-      "status": "IMPLEMENTATION_COMPLETE — PENDING INDEPENDENT REVIEW",
+      "status": "VERIFIED",
       "matrix": 169
     },
     {
       "id": "phase-3-5",
       "name": "Tile / spatial Game Window",
       "status": "IMPLEMENTATION_COMPLETE — PENDING INDEPENDENT REVIEW",
-      "matrix": 39
+      "matrix": 70
     }
   ],
   "baseline": {
@@ -59,7 +59,8 @@
       5,
       6,
       7,
-      8
+      8,
+      9
     ]
   }
 }

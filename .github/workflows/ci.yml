@@ -189,7 +189,7 @@ jobs:
       - name: 'Canonical project state — AGENTS.md agrees with docs/PROJECT_STATE.json'
         run: node scripts/check-project-state.mjs
 
-      - name: 'Test matrices — Phase 0B 92, Phase 1 87, Phase 2 106, Phase 3 169, Phase 3.5 39'
+      - name: 'Test matrices — Phase 0B 92, Phase 1 87, Phase 2 106, Phase 3 169, Phase 3.5 70'
         # Not a §13 check; it is how each phase's "all N pass" stays a
         # countable claim rather than an assertion (Phase 0B §14, Phase 1 §16,
         # Phase 2 §12, Phase 3 §20, Phase 3.5 §20). It fails on a missing id, a

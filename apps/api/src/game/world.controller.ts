@@ -341,17 +341,27 @@ export class WorldController {
   }
 
   /**
-   * The static tile map a Hunt is played on (Phase 3.5 §5).
+   * The static tile map a Hunt is played on, AT A NAMED VERSION (§5).
    *
-   * CONTENT, not state: rows, a legend and regions, immutable for the life of
-   * a bundle version. It is fetched once and cached hard, which is the whole
-   * reason the map is not part of the run snapshot — sending 61 by 11 tiles
-   * with every poll would be the same bytes, every second, forever.
+   * The version is in the URL, and that is the whole point. An Activity pins
+   * the bundle it started under and keeps simulating against it after a
+   * publish; a map endpoint that answered with "whatever is current" would
+   * have the server colliding against one geometry while the browser drew
+   * another — a wall the Character walks through, on screen. The identity of
+   * the resource is `contentVersion + key`, so the answer is genuinely
+   * immutable and the cache header is genuinely true.
    */
-  @Get('maps/:key')
+  @Get('content/:contentVersion/maps/:key')
   @Header('Cache-Control', 'public, max-age=31536000, immutable')
-  async map(@Param('key') key: string) {
-    const bundle = await this.current();
+  async map(@Param('contentVersion') version: string, @Param('key') key: string) {
+    let bundle;
+    try {
+      bundle = await this.resolver.resolve(toContentVersion(version));
+    } catch {
+      // An unknown version is ABSENT, not a server fault: a client asking for
+      // a bundle this deployment never published is asking for nothing.
+      throw notFound();
+    }
     const definition = bundle.definitions.get(key);
     const parsed = definition ? mapSchema.safeParse(definition) : undefined;
     if (!parsed?.success) throw notFound();

@@ -2,14 +2,17 @@
  * Space, as the simulation understands it (Phase 3.5 spec §2–§5).
  *
  * PURE. No clock, no database, no randomness. A tile map is compiled once from
- * authored rows into flat typed arrays, and every question a tick asks —
- * "is this walkable", "who is standing there", "which way to the Rat" — is an
- * array index or a bounded search over one.
+ * authored rows into flat typed arrays, and every question a settlement asks —
+ * "may this be stood on", "may a path run through it", "which way to the Rat" —
+ * is an array index or a bounded search over one.
  *
  * The coordinate is SEMANTIC, not pixels. `z` exists from the first map even
  * though the Sewers use one floor, because retrofitting a third axis into
  * saved positions, path costs and region membership is a migration and adding
  * it now is a field.
+ *
+ * Every rule here that claims to come from the source engine is cited in
+ * `docs/specs/phase-3-5/PHASE_3_5_CANARY_SPATIAL_SOURCE_MAP.md`.
  */
 
 export interface TilePosition {
@@ -21,28 +24,48 @@ export interface TilePosition {
 export const samePosition = (a: TilePosition, b: TilePosition): boolean =>
   a.x === b.x && a.y === b.y && a.z === b.z;
 
-/** Orthogonal distance. Phase 3.5 has no diagonal movement — see `STEPS`. */
+/** Orthogonal distance. Kept for callers that want a cheap same-floor metric. */
 export const manhattan = (a: TilePosition, b: TilePosition): number =>
   Math.abs(a.x - b.x) + Math.abs(a.y - b.y) + Math.abs(a.z - b.z) * 64;
 
+/** `Position::getDistanceX/Y` compared with `<=` — the source's range metric. */
+export const chebyshev = (a: TilePosition, b: TilePosition): number =>
+  Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
+
 /**
- * FOUR directions, and that is a decision rather than an omission.
+ * EIGHT directions, as the source engine has them
+ * (`src/game/movement/position.hpp:12-22`, `src/utils/tools.cpp:581`).
  *
- * Allowing diagonals immediately raises corner-cutting: may an actor move
- * between two walls that touch at a corner? Every answer is defensible and
- * each one changes pathing, chokepoints and how a corridor fight reads. Phase
- * 3.5 needs none of them, so it takes the rule with no corner case at all —
- * and a later phase that wants diagonals has to answer the question on
- * purpose, which is the right time to answer it.
- *
- * The order is the deterministic tie-break: north, west, east, south.
+ * The order is one half of the deterministic tie-break: the four cardinals in
+ * north, west, east, south, then the four diagonals. The other half is the
+ * cost and the tile index, which is what actually decides — this order only
+ * settles a tie that survives both.
  */
 export const STEPS: readonly (readonly [number, number])[] = [
   [0, -1],
   [-1, 0],
   [1, 0],
   [0, 1],
+  [-1, -1],
+  [1, -1],
+  [-1, 1],
+  [1, 1],
 ];
+
+/**
+ * `MAP_NORMALWALKCOST` and the diagonal it implies
+ * (`src/map/utils/astarnodes.hpp:38-40`, `astarnodes.cpp:274-277`):
+ *
+ *     ((|dx| + |dy|) - 1) * 25 + 10
+ *
+ * so a cardinal step is 10 and a diagonal 35. Integers, so the comparison that
+ * breaks a tie is exact rather than a float that nearly is.
+ */
+export const NORMAL_WALK_COST = 10;
+export const DIAGONAL_WALK_COST = 35;
+
+export const stepCost = (dx: number, dy: number): number =>
+  Math.abs(dx) === 1 && Math.abs(dy) === 1 ? DIAGONAL_WALK_COST : NORMAL_WALK_COST;
 
 /** One authored map, as a human writes it into content. */
 export interface MapSource {
@@ -53,9 +76,33 @@ export interface MapSource {
   readonly legend: Readonly<Record<string, TileKindName>>;
   readonly entry: { readonly x: number; readonly y: number };
   readonly regions: readonly MapRegionSource[];
+  /**
+   * Floor links. Phase 3.5 ships none in the live map and builds no dungeon;
+   * this is the SEAM that proves the world model does not assume one `z`
+   * forever (spec §6).
+   */
+  readonly connectors?: readonly MapConnectorSource[];
 }
 
-export type TileKindName = 'floor' | 'wall' | 'water';
+/**
+ * The three things a tile can block, kept apart because the source keeps them
+ * apart: `blockSolid`, `blockPathFind` and `blockProjectile` are three
+ * independent item properties mapping to three independent tile states
+ * (`src/items/items.hpp:347-351`, `src/items/items_definitions.hpp:463-468`).
+ *
+ * Phase 3.5 fires no projectile. What it refuses to do is collapse the three
+ * into one `walkable` bit, because un-collapsing it later is a content schema
+ * migration and a Paladin is one phase away.
+ */
+export type TileKindName = 'floor' | 'wall' | 'water' | 'sludge';
+
+export interface MapConnectorSource {
+  readonly from: { readonly x: number; readonly y: number; readonly z: number };
+  readonly to: { readonly x: number; readonly y: number; readonly z: number };
+  readonly kind: ConnectorKind;
+}
+
+export type ConnectorKind = 'STAIRS_UP' | 'STAIRS_DOWN' | 'LADDER';
 
 export interface MapRegionSource {
   readonly id: string;
@@ -72,13 +119,23 @@ export interface TileMap {
   readonly key: string;
   readonly width: number;
   readonly height: number;
+  /** Every floor the map declares, lowest first. Usually one. */
+  readonly floors: readonly number[];
+  /** The floor the authored rows describe. */
   readonly z: number;
-  /** 1 where an actor may stand. */
-  readonly walkable: Uint8Array;
+  /** Per tile: the OR of `BLOCK_*`. Three questions, one byte. */
+  readonly flags: Uint8Array;
   /** The authored kind, for the renderer. */
   readonly kind: Uint8Array;
   readonly entry: TilePosition;
   readonly regions: readonly MapRegion[];
+  readonly connectors: readonly MapConnector[];
+}
+
+export interface MapConnector {
+  readonly from: TilePosition;
+  readonly to: TilePosition;
+  readonly kind: ConnectorKind;
 }
 
 export interface MapRegion {
@@ -91,15 +148,31 @@ export interface MapRegion {
   readonly spawns: readonly TilePosition[];
 }
 
+export const BLOCK_SOLID = 1;
+export const BLOCK_PATH = 2;
+export const BLOCK_PROJECTILE = 4;
+
 export const KIND_CODES: Readonly<Record<TileKindName, number>> = {
   floor: 0,
   wall: 1,
   water: 2,
+  sludge: 3,
 };
-const WALKABLE: Readonly<Record<TileKindName, boolean>> = {
-  floor: true,
-  wall: false,
-  water: false,
+
+/**
+ * What each authored kind blocks.
+ *
+ * `water` is the case that proves the three are not one: it cannot be stood on
+ * and a path will not run through it, but an arrow crosses it — so a Phase 4
+ * Paladin shooting over the sewer channel needs no schema change. `sludge` is
+ * the mirror image, after the source's magic fields: stand on it if you must,
+ * but the pathfinder routes around it.
+ */
+const BLOCKS: Readonly<Record<TileKindName, number>> = {
+  floor: 0,
+  wall: BLOCK_SOLID | BLOCK_PATH | BLOCK_PROJECTILE,
+  water: BLOCK_SOLID | BLOCK_PATH,
+  sludge: BLOCK_PATH,
 };
 
 export class MapError extends Error {
@@ -119,7 +192,7 @@ export function compileMap(source: MapSource): TileMap {
   const width = source.rows[0]!.length;
   if (width === 0) throw new MapError(`${source.key}: a map needs at least one column.`);
 
-  const walkable = new Uint8Array(width * height);
+  const flags = new Uint8Array(width * height);
   const kind = new Uint8Array(width * height);
   for (let y = 0; y < height; y += 1) {
     const row = source.rows[y]!;
@@ -135,14 +208,15 @@ export function compileMap(source: MapSource): TileMap {
         );
       const index = y * width + x;
       kind[index] = KIND_CODES[name];
-      walkable[index] = WALKABLE[name] ? 1 : 0;
+      flags[index] = BLOCKS[name];
     }
   }
 
   const inside = (x: number, y: number) => x >= 0 && y >= 0 && x < width && y < height;
-  const walk = (x: number, y: number) => inside(x, y) && walkable[y * width + x] === 1;
+  const stand = (x: number, y: number) =>
+    inside(x, y) && (flags[y * width + x]! & BLOCK_SOLID) === 0;
 
-  if (!walk(source.entry.x, source.entry.y)) {
+  if (!stand(source.entry.x, source.entry.y)) {
     throw new MapError(`${source.key}: the entry tile is not walkable.`);
   }
 
@@ -158,7 +232,7 @@ export function compileMap(source: MapSource): TileMap {
       throw new MapError(`${source.key}: region ${region.id} has no spawn tiles.`);
     }
     for (const spawn of region.spawns) {
-      if (!walk(spawn.x, spawn.y)) {
+      if (!stand(spawn.x, spawn.y)) {
         throw new MapError(
           `${source.key}: region ${region.id} spawns on (${spawn.x}, ${spawn.y}), which is not walkable.`,
         );
@@ -180,29 +254,87 @@ export function compileMap(source: MapSource): TileMap {
 
   if (regions.length === 0) throw new MapError(`${source.key}: a map needs at least one region.`);
 
-  return {
+  const connectors = (source.connectors ?? []).map((connector) => {
+    if (connector.from.z === connector.to.z) {
+      throw new MapError(
+        `${source.key}: connector at (${connector.from.x}, ${connector.from.y}) does not change floor.`,
+      );
+    }
+    if (connector.from.z === source.z && !stand(connector.from.x, connector.from.y)) {
+      throw new MapError(
+        `${source.key}: connector at (${connector.from.x}, ${connector.from.y}) is not on a walkable tile.`,
+      );
+    }
+    return {
+      from: { ...connector.from },
+      to: { ...connector.to },
+      kind: connector.kind,
+    };
+  });
+
+  const floors = [...new Set([source.z, ...connectors.map((connector) => connector.to.z)])].sort(
+    (a, b) => a - b,
+  );
+
+  const map: TileMap = {
     key: source.key,
     width,
     height,
+    floors,
     z: source.z,
-    walkable,
+    flags,
     kind,
     entry: { x: source.entry.x, y: source.entry.y, z: source.z },
     regions,
+    connectors,
   };
+
+  assertProgressionReachable(map);
+  return map;
 }
 
 export const tileIndex = (map: TileMap, x: number, y: number): number => y * map.width + x;
 
 export const isInside = (map: TileMap, position: TilePosition): boolean =>
-  position.z === map.z &&
+  map.floors.includes(position.z) &&
   position.x >= 0 &&
   position.y >= 0 &&
   position.x < map.width &&
   position.y < map.height;
 
-export const isWalkable = (map: TileMap, position: TilePosition): boolean =>
-  isInside(map, position) && map.walkable[tileIndex(map, position.x, position.y)] === 1;
+/** May an actor STAND here? `blockSolid`. */
+export const canOccupy = (map: TileMap, position: TilePosition): boolean =>
+  isInside(map, position) &&
+  (map.flags[tileIndex(map, position.x, position.y)]! & BLOCK_SOLID) === 0;
+
+/** May a PATH run through here? `blockPathFind`. */
+export const canPathThrough = (map: TileMap, position: TilePosition): boolean =>
+  isInside(map, position) &&
+  (map.flags[tileIndex(map, position.x, position.y)]! & BLOCK_PATH) === 0;
+
+/** Does this tile stop a PROJECTILE? `blockProjectile`. Nothing shoots yet. */
+export const blocksProjectile = (map: TileMap, position: TilePosition): boolean =>
+  !isInside(map, position) ||
+  (map.flags[tileIndex(map, position.x, position.y)]! & BLOCK_PROJECTILE) !== 0;
+
+/** The old name, kept meaning exactly "may be stood on". */
+export const isWalkable = canOccupy;
+
+/** The floor link leaving this tile, if there is one. */
+export const connectorAt = (map: TileMap, position: TilePosition): MapConnector | null =>
+  map.connectors.find((connector) => samePosition(connector.from, position)) ?? null;
+
+/**
+ * MELEE RANGE, defined independently of how anything moves.
+ *
+ * `Position::areInRange<1, 1>` (`src/game/movement/position.hpp:33-36`, used by
+ * `Weapon::useFist` at `src/items/weapons/weapons.cpp:225`) is Chebyshev
+ * distance one — all eight neighbours. It agrees with 8-direction movement
+ * here, and it is a separate function because the day they disagree, one of
+ * them has to be able to change.
+ */
+export const isAdjacent = (a: TilePosition, b: TilePosition): boolean =>
+  a.z === b.z && chebyshev(a, b) === 1;
 
 /** The tiles an actor could stand on to attack something on `target`. */
 export function meleeGoals(
@@ -213,7 +345,7 @@ export function meleeGoals(
   const goals: TilePosition[] = [];
   for (const [dx, dy] of STEPS) {
     const candidate = { x: target.x + dx, y: target.y + dy, z: target.z };
-    if (isWalkable(map, candidate) && !blocked(candidate)) goals.push(candidate);
+    if (canOccupy(map, candidate) && !blocked(candidate)) goals.push(candidate);
   }
   return goals;
 }
@@ -226,8 +358,15 @@ export function meleeGoals(
  * approach now and a "get within range with line of sight" policy later
  * without the caller changing.
  *
- * Deterministic A*: lowest `f`, ties to lowest `g`, then to the lowest tile
- * index. No randomness anywhere, so a reload recomputes the same path.
+ * Deterministic A* over integer costs: lowest `f`, ties to lowest `g`, then to
+ * the lowest tile index. No randomness anywhere, so a reload recomputes the
+ * same path.
+ *
+ * DIAGONALS CUT CORNERS, and that is the source's rule rather than a
+ * convenience: `Game::internalMoveCreature` validates the destination tile and
+ * nothing else, and the source's own A* evaluates a diagonal neighbour by that
+ * neighbour alone (`src/map/map.cpp:1107-1145`). A step is legal when its
+ * destination is.
  */
 export function stepToward(
   map: TileMap,
@@ -237,12 +376,29 @@ export function stepToward(
   limit = 4096,
 ): TilePosition | null {
   if (goals.length === 0) return null;
-  const goalIds = new Set(goals.map((goal) => tileIndex(map, goal.x, goal.y)));
+  // One floor. Changing floor is a property of a tile you step onto, not a
+  // path the search plans through — the source's A* holds `z` constant too.
+  const here = goals.filter((goal) => goal.z === from.z);
+  if (here.length === 0) return null;
+
+  const goalIds = new Set(here.map((goal) => tileIndex(map, goal.x, goal.y)));
   const start = tileIndex(map, from.x, from.y);
   if (goalIds.has(start)) return null;
 
-  const heuristic = (x: number, y: number) =>
-    Math.min(...goals.map((goal) => Math.abs(goal.x - x) + Math.abs(goal.y - y)));
+  // Admissible and consistent for costs of 10 and 35: walk the diagonal part
+  // first, then the straight remainder.
+  const heuristic = (x: number, y: number) => {
+    let best = Infinity;
+    for (const goal of here) {
+      const dx = Math.abs(goal.x - x);
+      const dy = Math.abs(goal.y - y);
+      const diagonal = Math.min(dx, dy);
+      const straight = Math.max(dx, dy) - diagonal;
+      const estimate = diagonal * DIAGONAL_WALK_COST + straight * NORMAL_WALK_COST;
+      if (estimate < best) best = estimate;
+    }
+    return best;
+  };
 
   const cameFrom = new Map<number, number>();
   const g = new Map<number, number>([[start, 0]]);
@@ -275,7 +431,7 @@ export function stepToward(
         if (previous === undefined) return null;
         node = previous;
       }
-      return { x: node % map.width, y: Math.floor(node / map.width), z: map.z };
+      return { x: node % map.width, y: Math.floor(node / map.width), z: from.z };
     }
 
     const bx = best % map.width;
@@ -283,13 +439,15 @@ export function stepToward(
     for (const [dx, dy] of STEPS) {
       const nx = bx + dx;
       const ny = by + dy;
-      const candidate = { x: nx, y: ny, z: map.z };
-      if (!isWalkable(map, candidate)) continue;
+      const candidate = { x: nx, y: ny, z: from.z };
+      // A goal tile must be STANDABLE; every tile routed THROUGH must also be
+      // path-open, which is where `blockPathFind` earns its separate bit.
       const id = tileIndex(map, nx, ny);
-      // A goal tile is enterable even if something stands next to it; any
-      // OTHER blocked tile is not a place to route through.
-      if (!goalIds.has(id) && blocked(candidate)) continue;
-      const tentative = bestG + 1;
+      const goal = goalIds.has(id);
+      if (!canOccupy(map, candidate)) continue;
+      if (!goal && !canPathThrough(map, candidate)) continue;
+      if (!goal && blocked(candidate)) continue;
+      const tentative = bestG + stepCost(dx, dy);
       if (tentative < (g.get(id) ?? Infinity)) {
         g.set(id, tentative);
         cameFrom.set(id, best);
@@ -300,6 +458,46 @@ export function stepToward(
   return null;
 }
 
-/** Is `a` orthogonally adjacent to `b`? The melee precondition, once. */
-export const isAdjacent = (a: TilePosition, b: TilePosition): boolean =>
-  a.z === b.z && Math.abs(a.x - b.x) + Math.abs(a.y - b.y) === 1;
+/**
+ * Can the Hunt still be PLAYED on this map?
+ *
+ * Structural validity is not enough once a map is a gameplay asset: a content
+ * edit that walls off room 7 publishes a Hunt that softlocks halfway through.
+ * So the compiler proves the progression graph, ignoring dynamic actors —
+ * entry reaches room 1, room *n* reaches room *n+1*, and every spawn tile is
+ * reachable inside its own region.
+ */
+function assertProgressionReachable(map: TileMap): void {
+  const reachable = (from: TilePosition): Set<number> => {
+    const seen = new Set<number>();
+    if (!canOccupy(map, from)) return seen;
+    const queue: TilePosition[] = [from];
+    seen.add(tileIndex(map, from.x, from.y));
+    while (queue.length > 0) {
+      const at = queue.shift()!;
+      for (const [dx, dy] of STEPS) {
+        const next = { x: at.x + dx, y: at.y + dy, z: at.z };
+        if (!canOccupy(map, next) || !canPathThrough(map, next)) continue;
+        const id = tileIndex(map, next.x, next.y);
+        if (seen.has(id)) continue;
+        seen.add(id);
+        queue.push(next);
+      }
+    }
+    return seen;
+  };
+
+  const ordered = [...map.regions].sort((a, b) => a.room - b.room);
+  let from = map.entry;
+  for (const region of ordered) {
+    const reach = reachable(from);
+    for (const spawn of region.spawns) {
+      if (!reach.has(tileIndex(map, spawn.x, spawn.y))) {
+        throw new MapError(
+          `${map.key}: region ${region.id} spawn (${spawn.x}, ${spawn.y}) cannot be reached from (${from.x}, ${from.y}) — the progression is broken.`,
+        );
+      }
+    }
+    from = region.spawns[0]!;
+  }
+}

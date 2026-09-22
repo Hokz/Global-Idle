@@ -238,22 +238,30 @@ input {
 }
 
 /* ── the tile scene (Phase 3.5) ───────────────────────────────────────── */
+/* The LOGICAL game window is 480 x 352 and never changes. This box only says
+   how much room the page gives it; the canvas scales itself to fit and keeps
+   the same fifteen by eleven tiles visible at any size. */
 .tile-scene {
   position: relative;
-  width: 100%;
-  height: 420px;
+  /* The box has the SHAPE of the logical surface and is capped at a size that
+     keeps the scene a window rather than a wall. 573 = 420 * 480 / 352, so a
+     wide panel letterboxes nothing. */
+  width: min(100%, 573px);
+  aspect-ratio: 480 / 352;
+  margin-inline: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 8px;
   overflow: hidden;
   border: 1px solid #23262d;
-  background: #0a0c10;
-  /* The scene is the one part of this page with no text to reflow, so it is
-     also the one part that may be sized in pixels. */
+  background: #05070a;
   box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.75);
 }
 .tile-scene canvas {
   display: block;
-  width: 100%;
-  height: 100%;
+  /* Width and height are set by the renderer, in whole logical multiples. */
+  image-rendering: pixelated;
   /* Nothing here is interactive: the Character controls itself. */
   pointer-events: none;
 }
@@ -296,7 +304,8 @@ input {
 
 @media (max-width: 560px) {
   .tile-scene {
-    height: 260px;
+    /* Smaller on screen, and exactly as much world in it. */
+    width: 100%;
   }
 }
 

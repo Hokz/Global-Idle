@@ -41,20 +41,34 @@ export type {
 // a tile is.
 export { CHARACTER_ACTOR } from './hunt.js';
 export {
+  BLOCK_PATH,
+  BLOCK_PROJECTILE,
+  BLOCK_SOLID,
+  DIAGONAL_WALK_COST,
   KIND_CODES,
   MapError,
+  NORMAL_WALK_COST,
   STEPS,
+  blocksProjectile,
+  canOccupy,
+  canPathThrough,
+  chebyshev,
   compileMap,
+  connectorAt,
   isAdjacent,
   isInside,
   isWalkable,
   manhattan,
   meleeGoals,
   samePosition,
+  stepCost,
   stepToward,
   tileIndex,
 } from './space.js';
 export type {
+  ConnectorKind,
+  MapConnector,
+  MapConnectorSource,
   MapRegion,
   MapRegionSource,
   MapSource,
@@ -62,4 +76,11 @@ export type {
   TileMap,
   TilePosition,
 } from './space.js';
-export type { MovementLeg, SpatialPlan } from './hunt.js';
+export {
+  BEAT_MS,
+  DEFAULT_STEP_SPEED,
+  DIAGONAL_STEP_FACTOR,
+  GROUND_SPEED,
+  stepDurationMs,
+} from './hunt.js';
+export type { Movement, SpatialPlan } from './hunt.js';

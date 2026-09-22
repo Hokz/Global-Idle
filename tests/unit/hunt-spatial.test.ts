@@ -8,10 +8,14 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  BEAT_MS,
   CHARACTER_ACTOR,
+  DIAGONAL_STEP_FACTOR,
+  TICK_MS,
   compileMap,
   createSeededRandom,
   simulateHunt,
+  stepDurationMs,
   type CombatProfile,
   type CreatureStats,
   type HuntState,
@@ -73,6 +77,8 @@ const RAT: CreatureStats = {
   armor: 1,
   mitigation: 7,
   gold: { chance: 1, min: 1, max: 4 },
+  // `monster.speed` for a Rat (`data-otservbr-global/monster/mammals/rat.lua`).
+  stepSpeed: 67,
 };
 
 const PROFILE: CombatProfile = {
@@ -86,6 +92,9 @@ const PROFILE: CombatProfile = {
   defense: 4,
   armor: 4,
   supply: { healMin: 60, healMax: 90, useBelowPercent: 40 },
+  // `vocation basespeed + (level - 1)` — 110 at level 1, so 550 ms a step
+  // against the Rat's 900. The Character is faster than what chases it.
+  stepSpeed: 111,
 };
 
 const PLAN: RoomPlan = {
@@ -97,6 +106,10 @@ const PLAN: RoomPlan = {
 };
 
 const at = (x: number, y: number): TilePosition => ({ x, y, z: 7 });
+
+/** Chebyshev one, stated here so a timing case does not import a rule. */
+const isAdjacentTiles = (a: TilePosition, b: TilePosition): boolean =>
+  a.z === b.z && Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y)) === 1;
 
 function spatial(source: MapSource = DOORWAY): SpatialPlan {
   const map = compileMap(source);
@@ -236,8 +249,12 @@ describe('§20 SPC — the fight, with a map under it', () => {
       position: at(1, 2),
       creatures: [rat('a', at(5, 1)), rat('b', at(5, 3))],
     });
-    const first = simulateHunt(before, PROFILE, PLAN, 6, seeded(), undefined, spatial());
-    expect(first.state.leg).toBeDefined();
+    // One tick in, the Character is mid-step: it left at 50 ms, arrived at
+    // 600, and left again — so the boundary falls inside a leg, which is the
+    // case a settlement has to survive.
+    const first = simulateHunt(before, PROFILE, PLAN, 1, seeded(), undefined, spatial());
+    expect(first.state.movement).toBeDefined();
+    expect(first.state.movement!.arrivesAtMs).toBeGreaterThan(first.state.tick * TICK_MS);
 
     const reloaded = JSON.parse(JSON.stringify(first.state)) as HuntState;
     expect(reloaded).toEqual(first.state); // nothing unserializable leaked into it
@@ -361,5 +378,194 @@ describe('§20 RND — space spends no randomness', () => {
     );
     expect(withMap.drawsConsumed).toBe(without.drawsConsumed);
     expect(withMap.state.creatures[0]!.health).toBe(without.state.creatures[0]!.health);
+  });
+});
+
+describe('§20 STP — one authoritative movement timeline', () => {
+  /** An open room, so geometry never gets a vote in a timing case. */
+  const OPEN_ROOM: MapSource = {
+    key: 'map.room',
+    z: 7,
+    rows: ['#######', '#.....#', '#.....#', '#.....#', '#######'],
+    legend: LEGEND,
+    entry: { x: 1, y: 2 },
+    regions: [
+      { id: 'west', rect: [1, 1, 2, 3], room: 1, spawns: [{ x: 1, y: 1 }] },
+      { id: 'east', rect: [4, 1, 2, 3], room: 2, spawns: [{ x: 5, y: 1 }] },
+    ],
+  };
+
+  it('STP1: a step lasts what the source says it lasts', () => {
+    // `floor(1000 * groundSpeed / calculated)` rounded up to SERVER_BEAT, with
+    // the log curve in between — creature.cpp:1690-1709.
+    expect(stepDurationMs(110)).toBe(550);
+    expect(stepDurationMs(67)).toBe(900);
+    // Faster is shorter, monotonically, and never below one beat.
+    expect(stepDurationMs(300)).toBeLessThan(stepDurationMs(110));
+    expect(stepDurationMs(0)).toBeGreaterThanOrEqual(BEAT_MS);
+    // Every duration lands on the 50 ms beat.
+    for (const speed of [1, 40, 67, 110, 220, 1000]) {
+      expect(stepDurationMs(speed) % BEAT_MS).toBe(0);
+    }
+  });
+
+  it('STP2: an actor cannot swing from a tile it has not reached yet', () => {
+    // A deliberately slow Character: it leaves at 50 ms and arrives at 1600,
+    // so at the tick-1 boundary its DESTINATION is adjacent to the Rat while
+    // it is not. A model that moved first and asked later would hit here.
+    const slow = { ...PROFILE, stepSpeed: 40 };
+    const step = simulateHunt(
+      state({ position: at(1, 2), creatures: [rat('a', at(3, 2))] }),
+      slow,
+      PLAN,
+      1,
+      seeded(),
+      undefined,
+      spatial(OPEN_ROOM),
+    );
+    const flight = step.state.movement;
+    expect(flight).toBeDefined();
+    expect(flight!.arrivesAtMs).toBeGreaterThan(step.state.tick * TICK_MS);
+    // The destination IS in reach of the Rat. The actor is not.
+    expect(isAdjacentTiles(flight!.to, at(3, 2))).toBe(true);
+    expect(step.state.position).toEqual(at(1, 2));
+    expect(step.events.some((event) => event.kind === 'hit')).toBe(false);
+  });
+
+  it('STP3: a destination is RESERVED — no two actors ever claim one tile', () => {
+    let current = state({
+      position: at(1, 2),
+      creatures: [rat('a', at(5, 1)), rat('b', at(5, 3)), rat('c', at(5, 2))],
+    });
+    for (let span = 0; span < 200 && current.ended === null; span += 1) {
+      const step = simulateHunt(
+        current,
+        PROFILE,
+        PLAN,
+        1,
+        createSeededRandom(`stp3:${span}`),
+        undefined,
+        spatial(OPEN_ROOM),
+      );
+      current = step.state;
+      const living = current.creatures.filter((creature) => creature.health > 0);
+      const tiles = [current.position!, ...living.map((creature) => creature.position!)];
+      const claims = [
+        ...(current.movement ? [current.movement.to] : []),
+        ...living.flatMap((creature) => (creature.movement ? [creature.movement.to] : [])),
+      ];
+      const all = [...tiles, ...claims].map((tile) => `${tile.x},${tile.y},${tile.z}`);
+      expect(new Set(all).size).toBe(all.length);
+    }
+  });
+
+  it('STP4: a leg in flight describes itself completely and coherently', () => {
+    const step = simulateHunt(
+      state({ position: at(1, 2), creatures: [rat('a', at(5, 2))] }),
+      { ...PROFILE, stepSpeed: 40 },
+      PLAN,
+      1,
+      seeded(),
+      undefined,
+      spatial(OPEN_ROOM),
+    );
+    const flight = step.state.movement!;
+    expect(flight.from).toEqual(step.state.position);
+    expect(isAdjacentTiles(flight.from, flight.to)).toBe(true);
+    expect(flight.startsAtMs).toBeLessThan(flight.arrivesAtMs);
+    expect(flight.arrivesAtMs - flight.startsAtMs).toBe(stepDurationMs(40));
+    // And the event that announced it says the same thing.
+    const announced = step.events.find((event) => event.kind === 'move');
+    expect(announced).toMatchObject({
+      actor: CHARACTER_ACTOR,
+      from: flight.from,
+      to: flight.to,
+      startsAtMs: flight.startsAtMs,
+      arrivesAtMs: flight.arrivesAtMs,
+    });
+  });
+
+  it('STP5: a settlement boundary inside a leg is not a seam', () => {
+    const before = state({ position: at(1, 2), creatures: [rat('a', at(5, 2))] });
+    const first = simulateHunt(
+      before,
+      { ...PROFILE, stepSpeed: 40 },
+      PLAN,
+      1,
+      seeded(),
+      undefined,
+      spatial(OPEN_ROOM),
+    );
+    expect(first.state.movement).toBeDefined();
+
+    const reloaded = JSON.parse(JSON.stringify(first.state)) as HuntState;
+    expect(reloaded).toEqual(first.state);
+    const resumed = simulateHunt(
+      reloaded,
+      { ...PROFILE, stepSpeed: 40 },
+      PLAN,
+      10,
+      seeded(),
+      undefined,
+      spatial(OPEN_ROOM),
+    );
+    const continued = simulateHunt(
+      first.state,
+      { ...PROFILE, stepSpeed: 40 },
+      PLAN,
+      10,
+      seeded(),
+      undefined,
+      spatial(OPEN_ROOM),
+    );
+    expect(JSON.stringify(resumed.state)).toBe(JSON.stringify(continued.state));
+    expect(JSON.stringify(resumed.events)).toBe(JSON.stringify(continued.events));
+  });
+
+  it('STP6: movement is finer than the combat tick', () => {
+    const step = simulateHunt(
+      state({ position: at(1, 2), creatures: [rat('a', at(5, 2))] }),
+      PROFILE,
+      PLAN,
+      2,
+      seeded(),
+      undefined,
+      spatial(OPEN_ROOM),
+    );
+    const moves = step.events.filter((event) => event.kind === 'move');
+    expect(moves.length).toBeGreaterThan(1);
+    // At least one step both began and ended between two combat ticks — which
+    // is the whole point of resolving movement on the 50 ms beat.
+    expect(moves.some((move) => 'startsAtMs' in move && move.startsAtMs % TICK_MS !== 0)).toBe(
+      true,
+    );
+  });
+
+  it('STP7: a diagonal step costs three cardinal ones, in time as in the source', () => {
+    // The corner map from PTH9: the only legal move out of (1,1) is diagonal.
+    const corner: MapSource = {
+      key: 'map.corner',
+      z: 7,
+      rows: ['#####', '#.#.#', '##..#', '#####'],
+      legend: LEGEND,
+      entry: { x: 1, y: 1 },
+      regions: [{ id: 'only', rect: [1, 1, 3, 2], room: 1, spawns: [{ x: 3, y: 1 }] }],
+    };
+    const step = simulateHunt(
+      state({ position: at(1, 1), creatures: [rat('a', at(3, 1))] }),
+      PROFILE,
+      PLAN,
+      1,
+      seeded(),
+      undefined,
+      spatial(corner),
+    );
+    const move = step.events.find((event) => event.kind === 'move');
+    expect(move).toBeDefined();
+    const flight = move as Extract<typeof move, { kind: 'move' }>;
+    expect(flight.to).toEqual(at(2, 2));
+    expect(flight.arrivesAtMs - flight.startsAtMs).toBe(
+      stepDurationMs(PROFILE.stepSpeed!) * DIAGONAL_STEP_FACTOR,
+    );
   });
 });

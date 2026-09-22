@@ -83,6 +83,8 @@ export interface HuntEvent {
   actor?: string;
   from?: Tile;
   to?: Tile;
+  startsAtMs?: number;
+  arrivesAtMs?: number;
 }
 
 /** A tile, exactly as the server states it. The browser never invents one. */
@@ -93,18 +95,18 @@ export interface Tile {
 }
 
 /**
- * A step in flight: which tile it left, which it is entering, and the two
- * ticks that bound it.
+ * A step in flight, on the SERVER'S millisecond timeline.
  *
- * The client interpolates PIXELS along this leg for the sake of the eye. It
- * never derives a position from it — the authoritative answer is always
- * `tile`, and a leg that disagrees with the next snapshot loses.
+ * The client interpolates pixels along it for the sake of the eye, using these
+ * two instants and the snapshot's own `nowMs` — never a duration of its own.
+ * The authoritative answer is always `tile`; a step that disagrees with the
+ * next snapshot loses.
  */
-export interface MovementLeg {
+export interface Movement {
   from: Tile;
   to: Tile;
-  startedTick: number;
-  completesTick: number;
+  startsAtMs: number;
+  arrivesAtMs: number;
 }
 export interface RunCreature {
   key: string;
@@ -113,7 +115,7 @@ export interface RunCreature {
   /** Phase 3.5 — present only when the Hunt has a map. */
   id?: string;
   tile?: Tile;
-  leg?: MovementLeg | null;
+  movement?: Movement | null;
 }
 export interface RunView {
   activityId: string;
@@ -149,11 +151,14 @@ export interface RunView {
     fullBless: boolean;
   } | null;
   events: HuntEvent[];
-  /** Phase 3.5 — where the Character is, and on which map. Null without one. */
+  /** Phase 3.5 — where the Character is, on which map, of which BUNDLE, and
+   *  at what simulation instant. Null when the Hunt has no map. */
   space: {
+    contentVersion: string;
     mapKey: string;
     tile: Tile;
-    leg: MovementLeg | null;
+    movement: Movement | null;
+    nowMs: number;
   } | null;
   /** Phase 3.5 — monotonic. A snapshot older than the one on screen is
    *  DISCARDED: two polls can arrive out of order, and applying the older one
@@ -205,7 +210,7 @@ export interface TileMapView {
   key: string;
   z: number;
   rows: string[];
-  legend: Record<string, 'wall' | 'floor' | 'water'>;
+  legend: Record<string, 'wall' | 'floor' | 'water' | 'sludge'>;
   entry: { x: number; y: number };
   regions: MapRegion[];
 }

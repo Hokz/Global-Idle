@@ -1,38 +1,32 @@
 'use client';
 
 /**
- * The tile scene (Phase 3.5 §7).
+ * The tile scene (Phase 3.5 spec §7).
  *
  * A CAMERA, not a simulator. Every position it draws came from the server:
- * the map is content, the tiles actors stand on are authoritative, and the
- * only thing this file decides is how many pixels lie between two of them
- * while the eye catches up. There is no input, no prediction and no local
- * clock that anything durable depends on — pause the tab and the drawing
- * stops; the hunt does not.
+ * the map is content pinned to the Activity's bundle, the tiles actors stand
+ * on are authoritative, and the timing of a step in flight is the server's
+ * too. There is no input, no prediction and no clock of its own that anything
+ * durable depends on — pause the tab and the drawing stops; the hunt does not.
  *
- * What it MAY do is ease. A server tick is a second long and a step is one
- * tile, so a renderer that snapped would look like a spreadsheet. It eases
- * over a fraction of a second between two tiles the server stated, and any
- * snapshot that disagrees wins immediately.
+ * THE LOGICAL WORLD IS FIXED. Fifteen tiles across and eleven down, 32 logical
+ * pixels each, on a 480 × 352 logical surface — on a desktop monitor, on a
+ * phone, at any device pixel ratio. A bigger screen shows the same corridor
+ * bigger; it does not show more of it. How much of the world a player can see
+ * is gameplay, and gameplay does not depend on the hardware.
  */
 import { useEffect, useRef } from 'react';
-import type { RunView, Tile, TileMapView } from '../_lib/api';
+import type { Movement, RunView, Tile, TileMapView } from '../_lib/api';
 
-/** How long the eye takes to cross one tile. Presentation, nothing else. */
-const EASE_MS = 260;
-
-/**
- * How much of the world is in frame.
- *
- * A chamber is nine tiles deep, so the tile size is taken from the SHORTER
- * constraint: a viewport that only fits six rows would cut the room in half
- * and hide half the fight.
- */
-const VIEW_WIDE = 17;
-const VIEW_NARROW = 9;
-const VIEW_DEEP = 9;
-const VIEW_SHALLOW = 7;
-const NARROW_PX = 560;
+/** The LOCKED Game Window. Logical pixels, not CSS pixels, not device pixels. */
+export const TILE_PX = 32;
+export const VIEW_TILES_X = 15;
+export const VIEW_TILES_Y = 11;
+export const LOGICAL_WIDTH = TILE_PX * VIEW_TILES_X; // 480
+export const LOGICAL_HEIGHT = TILE_PX * VIEW_TILES_Y; // 352
+/** Zero-based centre tile: the Character stands here whenever bounds allow. */
+export const CENTRE_X = (VIEW_TILES_X - 1) / 2; // 7
+export const CENTRE_Y = (VIEW_TILES_Y - 1) / 2; // 5
 
 export interface TileSceneProps {
   readonly map: TileMapView;
@@ -45,23 +39,12 @@ interface Drawn {
   readonly id: string;
   readonly kind: 'character' | 'creature';
   readonly tile: Tile;
+  readonly movement: Movement | null;
   readonly health: number;
   readonly maxHealth: number;
-  readonly label: string;
-}
-
-/** Where an actor is being drawn, between two tiles the server stated. */
-interface Eased {
-  from: Tile;
-  to: Tile;
-  startedAt: number;
-  facing: 1 | -1;
 }
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-
-/** Ease-out cubic: fast off the tile, settling onto the next one. */
-const ease = (t: number) => 1 - Math.pow(1 - t, 3);
 
 /**
  * A stable pseudo-random number for a tile, so the same stone is mottled the
@@ -73,19 +56,50 @@ function hash(x: number, y: number): number {
   return n - Math.floor(n);
 }
 
+/**
+ * Where an actor is, in tiles, at a simulation instant.
+ *
+ * This is the whole interpolation contract: the fraction comes from the
+ * server's own `startsAtMs`/`arrivesAtMs` and the simulation time being drawn,
+ * and it is clamped, so a late snapshot draws an arrival rather than a slide
+ * past it. Nothing here invents a duration.
+ */
+export function placeActor(
+  tile: Tile,
+  movement: Movement | null,
+  atMs: number,
+): {
+  x: number;
+  y: number;
+} {
+  if (!movement) return { x: tile.x, y: tile.y };
+  const span = movement.arrivesAtMs - movement.startsAtMs;
+  if (span <= 0) return { x: movement.to.x, y: movement.to.y };
+  const progress = Math.min(1, Math.max(0, (atMs - movement.startsAtMs) / span));
+  return {
+    x: lerp(movement.from.x, movement.to.x, progress),
+    y: lerp(movement.from.y, movement.to.y, progress),
+  };
+}
+
 export function TileScene({ map, run, debug = false }: TileSceneProps) {
   const holder = useRef<HTMLDivElement | null>(null);
   const canvas = useRef<HTMLCanvasElement | null>(null);
   /** The latest snapshot, read by the animation loop without restarting it. */
   const latest = useRef<{ map: TileMapView; run: RunView; debug: boolean }>({ map, run, debug });
-  const eased = useRef(new Map<string, Eased>());
+  /**
+   * Wall clock at the moment the current snapshot's simulation time was true.
+   *
+   * The simulation runs at one second per second, so after a snapshot arrives
+   * the client advances its notion of simulation time with the wall clock and
+   * nothing else. That is the only arithmetic the renderer does about time.
+   */
+  const anchor = useRef<{ nowMs: number; at: number } | null>(null);
   const camera = useRef<{ x: number; y: number } | null>(null);
 
-  // AFTER render, not during it: the loop reads this ref on its own schedule,
-  // and mutating a ref in the render body is a side effect React is entitled
-  // to run twice.
   useEffect(() => {
     latest.current = { map, run, debug };
+    if (run.space) anchor.current = { nowMs: run.space.nowMs, at: performance.now() };
   }, [map, run, debug]);
 
   useEffect(() => {
@@ -99,30 +113,40 @@ export function TileScene({ map, run, debug = false }: TileSceneProps) {
     let frame = 0;
     let stop = false;
 
+    /**
+     * The backing buffer is a whole multiple of the LOGICAL surface, and the
+     * CSS box is whatever the layout gives it. Everything drawn below is in
+     * logical pixels, so no viewport and no device pixel ratio can change what
+     * is visible — only how large it looks.
+     */
     const resize = () => {
-      const ratio = Math.min(window.devicePixelRatio || 1, 2);
-      const width = Math.max(1, Math.round(box.clientWidth));
-      const height = Math.max(1, Math.round(box.clientHeight));
-      if (element.width !== width * ratio || element.height !== height * ratio) {
-        element.width = Math.round(width * ratio);
-        element.height = Math.round(height * ratio);
-      }
-      return { width, height, ratio };
+      const cssWidth = Math.max(1, box.clientWidth);
+      const cssHeight = Math.max(1, box.clientHeight);
+      const fit = Math.min(cssWidth / LOGICAL_WIDTH, cssHeight / LOGICAL_HEIGHT);
+      const ratio = Math.min(window.devicePixelRatio || 1, 3);
+      const scale = Math.max(1, Math.round(fit * ratio));
+      if (element.width !== LOGICAL_WIDTH * scale) element.width = LOGICAL_WIDTH * scale;
+      if (element.height !== LOGICAL_HEIGHT * scale) element.height = LOGICAL_HEIGHT * scale;
+      element.style.width = `${Math.floor(LOGICAL_WIDTH * fit)}px`;
+      element.style.height = `${Math.floor(LOGICAL_HEIGHT * fit)}px`;
+      context.setTransform(scale, 0, 0, scale, 0, 0);
+      context.imageSmoothingEnabled = false;
     };
 
-    const draw = (at: number) => {
+    const draw = () => {
       if (stop) return;
       const { map: current, run: view, debug: overlay } = latest.current;
-      const { width, height, ratio } = resize();
-      context.setTransform(ratio, 0, 0, ratio, 0, 0);
-
-      const narrow = width < NARROW_PX;
-      const across = narrow ? VIEW_NARROW : VIEW_WIDE;
-      const down = narrow ? VIEW_SHALLOW : VIEW_DEEP;
-      const size = Math.max(14, Math.floor(Math.min(width / across, height / down)));
+      resize();
+      const width = LOGICAL_WIDTH;
+      const height = LOGICAL_HEIGHT;
+      const size = TILE_PX;
       const rows = current.rows;
       const mapWidth = (rows[0]?.length ?? 0) * size;
       const mapHeight = rows.length * size;
+
+      // ── the simulation instant being drawn ───────────────────────────
+      const held = anchor.current;
+      const simNow = held ? held.nowMs + (performance.now() - held.at) : 0;
 
       // ── who is on the board ──────────────────────────────────────────
       const actors: Drawn[] = [];
@@ -131,9 +155,9 @@ export function TileScene({ map, run, debug = false }: TileSceneProps) {
           id: 'character',
           kind: 'character',
           tile: view.space.tile,
+          movement: view.space.movement,
           health: view.health,
           maxHealth: view.maxHealth,
-          label: 'You',
         });
       }
       for (const creature of view.creatures) {
@@ -142,64 +166,35 @@ export function TileScene({ map, run, debug = false }: TileSceneProps) {
           id: creature.id,
           kind: 'creature',
           tile: creature.tile,
+          movement: creature.movement ?? null,
           health: creature.health,
           maxHealth: creature.maxHealth,
-          label: creature.key.replace(/^creature\./, ''),
         });
       }
 
-      // ── ease each actor toward the tile the server put it on ─────────
-      const live = new Set(actors.map((actor) => actor.id));
-      for (const id of [...eased.current.keys()]) {
-        if (!live.has(id)) eased.current.delete(id);
-      }
       const placed = new Map<string, { x: number; y: number; facing: number }>();
       for (const actor of actors) {
-        const previous = eased.current.get(actor.id);
-        if (!previous) {
-          eased.current.set(actor.id, {
-            from: actor.tile,
-            to: actor.tile,
-            startedAt: at,
-            facing: 1,
-          });
-        } else if (previous.to.x !== actor.tile.x || previous.to.y !== actor.tile.y) {
-          const progress = Math.min(1, (at - previous.startedAt) / EASE_MS);
-          const t = ease(progress);
-          const fromX = lerp(previous.from.x, previous.to.x, t);
-          const fromY = lerp(previous.from.y, previous.to.y, t);
-          eased.current.set(actor.id, {
-            from: { x: fromX, y: fromY, z: actor.tile.z },
-            to: actor.tile,
-            startedAt: at,
-            facing: actor.tile.x < fromX ? -1 : 1,
-          });
-        }
-        const step = eased.current.get(actor.id)!;
-        const progress = Math.min(1, (at - step.startedAt) / EASE_MS);
-        const t = ease(progress);
-        placed.set(actor.id, {
-          x: lerp(step.from.x, step.to.x, t),
-          y: lerp(step.from.y, step.to.y, t),
-          facing: step.facing,
-        });
+        const at = placeActor(actor.tile, actor.movement, simNow);
+        const facing = actor.movement && actor.movement.to.x < actor.movement.from.x ? -1 : 1;
+        placed.set(actor.id, { ...at, facing });
       }
 
-      // ── camera ───────────────────────────────────────────────────────
+      // ── camera: the Character on the centre tile, clamped at the edges ─
       const hero = placed.get('character') ?? { x: 0, y: 0, facing: 1 };
-      const wantX = hero.x * size + size / 2 - width / 2;
-      const wantY = hero.y * size + size / 2 - height / 2;
+      const wantX = (hero.x - CENTRE_X) * size;
+      const wantY = (hero.y - CENTRE_Y) * size;
       const clampX =
         mapWidth <= width ? (mapWidth - width) / 2 : Math.min(Math.max(wantX, 0), mapWidth - width);
       const clampY =
         mapHeight <= height
           ? (mapHeight - height) / 2
           : Math.min(Math.max(wantY, 0), mapHeight - height);
-      // The camera itself eases, so a two-tile settlement does not snap the
-      // whole world sideways.
+      // The camera eases so a settlement does not snap the world sideways; it
+      // is presentation, and it never changes WHICH tiles are in frame by more
+      // than the clamp above allows.
       const previousCamera = camera.current;
       const cam = previousCamera
-        ? { x: lerp(previousCamera.x, clampX, 0.18), y: lerp(previousCamera.y, clampY, 0.18) }
+        ? { x: lerp(previousCamera.x, clampX, 0.25), y: lerp(previousCamera.y, clampY, 0.25) }
         : { x: clampX, y: clampY };
       camera.current = cam;
 
@@ -221,18 +216,14 @@ export function TileScene({ map, run, debug = false }: TileSceneProps) {
         const row = rows[y] ?? '';
         for (let x = firstColumn; x <= lastColumn; x += 1) {
           const symbol = row[x] ?? '#';
-          // An unknown symbol cannot reach here — `compileMap` refuses the
-          // bundle — so the fallback is a belt, not a policy.
+          // An unknown symbol cannot reach here — the content build refuses
+          // the bundle — so the fallback is a belt, not a policy.
           const kind = current.legend[symbol] ?? 'wall';
           const px = Math.round(x * size - cam.x);
           const py = Math.round(y * size - cam.y);
           const noise = hash(x, y);
 
           if (kind === 'wall') {
-            // MASONRY: lighter than the floor, lit from above, with a shadow
-            // under the lip. A wall drawn darker than the ground reads as a
-            // hole, and then the player cannot tell why the Character walked
-            // round it.
             const lip = Math.max(3, size * 0.2);
             context.fillStyle = `hsl(206 8% ${33 + noise * 7}%)`;
             context.fillRect(px, py, size, size);
@@ -240,7 +231,6 @@ export function TileScene({ map, run, debug = false }: TileSceneProps) {
             context.fillRect(px, py, size, lip * 0.5);
             context.fillStyle = 'rgba(0,0,0,0.42)';
             context.fillRect(px, py + size - lip * 0.6, size, lip * 0.6);
-            // Courses, so a long wall is not one flat slab.
             context.fillStyle = 'rgba(0,0,0,0.22)';
             context.fillRect(px, py + size * 0.52, size, 1);
             context.fillRect(px + (y % 2 === 0 ? size * 0.5 : size * 0.25), py, 1, size * 0.52);
@@ -257,10 +247,11 @@ export function TileScene({ map, run, debug = false }: TileSceneProps) {
             context.lineTo(px + size * 0.85, py + size * (0.5 + noise * 0.2));
             context.stroke();
           } else {
-            context.fillStyle = `hsl(30 10% ${18 + noise * 5}%)`;
+            context.fillStyle =
+              kind === 'sludge'
+                ? `hsl(90 18% ${18 + noise * 4}%)`
+                : `hsl(30 10% ${18 + noise * 5}%)`;
             context.fillRect(px, py, size, size);
-            // Grout, and a few flagstone chips, so the floor has a texture at
-            // a glance without costing a texture atlas.
             context.strokeStyle = 'rgba(0,0,0,0.42)';
             context.lineWidth = 1;
             context.strokeRect(px + 0.5, py + 0.5, size - 1, size - 1);
@@ -284,15 +275,15 @@ export function TileScene({ map, run, debug = false }: TileSceneProps) {
         const lx = hero.x * size + size / 2 - cam.x;
         const ly = hero.y * size + size / 2 - cam.y;
         const lantern = context.createRadialGradient(lx, ly, size * 0.4, lx, ly, size * 5);
-        lantern.addColorStop(0, 'rgba(255, 198, 130, 0.13)');
+        lantern.addColorStop(0, 'rgba(255, 198, 130, 0.14)');
         lantern.addColorStop(0.6, 'rgba(255, 180, 110, 0.04)');
         lantern.addColorStop(1, 'rgba(0, 0, 0, 0)');
         context.fillStyle = lantern;
         context.fillRect(0, 0, width, height);
 
-        // Enough fall-off to give the frame a centre. Not enough to hide the
+        // Enough fall-off to give the frame a centre. NOT enough to hide the
         // map: a player who cannot see the far wall cannot read the room.
-        const dusk = context.createRadialGradient(lx, ly, size * 7, lx, ly, size * 18);
+        const dusk = context.createRadialGradient(lx, ly, size * 6, lx, ly, size * 14);
         dusk.addColorStop(0, 'rgba(0, 0, 0, 0)');
         dusk.addColorStop(1, 'rgba(0, 0, 0, 0.3)');
         context.fillStyle = dusk;
@@ -300,11 +291,7 @@ export function TileScene({ map, run, debug = false }: TileSceneProps) {
       }
 
       // ── actors ───────────────────────────────────────────────────────
-      const order = [...actors].sort((a, b) => {
-        const pa = placed.get(a.id)!;
-        const pb = placed.get(b.id)!;
-        return pa.y - pb.y;
-      });
+      const order = [...actors].sort((a, b) => placed.get(a.id)!.y - placed.get(b.id)!.y);
 
       for (const actor of order) {
         const spot = placed.get(actor.id)!;
@@ -374,7 +361,7 @@ export function TileScene({ map, run, debug = false }: TileSceneProps) {
             Math.PI * 2,
           );
           context.fill();
-          context.strokeStyle = '#6b5a4a';
+          context.strokeStyle = '#8a7361';
           context.lineWidth = Math.max(1, size * 0.05);
           context.beginPath();
           context.moveTo(cx - spot.facing * body, py + size * 0.64);
@@ -384,9 +371,9 @@ export function TileScene({ map, run, debug = false }: TileSceneProps) {
 
         if (!dead && actor.health < actor.maxHealth) {
           const barWidth = size * 0.66;
-          const barHeight = Math.max(3, size * 0.08);
+          const barHeight = Math.max(3, size * 0.09);
           const left = cx - barWidth / 2;
-          const top = py + size * 0.1;
+          const top = py + size * 0.08;
           context.fillStyle = 'rgba(0,0,0,0.6)';
           context.fillRect(left, top, barWidth, barHeight);
           const share = Math.max(0, Math.min(1, actor.health / Math.max(1, actor.maxHealth)));
@@ -398,20 +385,23 @@ export function TileScene({ map, run, debug = false }: TileSceneProps) {
       // ── contact ──────────────────────────────────────────────────────
       //
       // Adjacency is IN THE DATA — it is the precondition the server itself
-      // checks before an attack — so drawing a clash between two actors that
-      // are next to each other states something true rather than guessing at
-      // a fight the client cannot see.
+      // checks before an attack, Chebyshev one — so drawing a clash between
+      // two actors that are next to each other states something true rather
+      // than guessing at a fight the client cannot see.
       const heroTile = view.space?.tile;
       if (heroTile) {
         for (const creature of view.creatures) {
           if (!creature.tile || creature.health <= 0) continue;
           const touching =
             creature.tile.z === heroTile.z &&
-            Math.abs(creature.tile.x - heroTile.x) + Math.abs(creature.tile.y - heroTile.y) === 1;
+            Math.max(
+              Math.abs(creature.tile.x - heroTile.x),
+              Math.abs(creature.tile.y - heroTile.y),
+            ) === 1;
           if (!touching) continue;
           const mx = ((creature.tile.x + heroTile.x) / 2 + 0.5) * size - cam.x;
           const my = ((creature.tile.y + heroTile.y) / 2 + 0.5) * size - cam.y;
-          const pulse = 0.5 + 0.5 * Math.sin(at / 90);
+          const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 90);
           context.strokeStyle = `rgba(255, 216, 140, ${0.25 + pulse * 0.45})`;
           context.lineWidth = Math.max(1.5, size * 0.06);
           for (const angle of [Math.PI / 4, -Math.PI / 4]) {
@@ -425,7 +415,7 @@ export function TileScene({ map, run, debug = false }: TileSceneProps) {
 
       // ── the developer overlay ────────────────────────────────────────
       if (overlay) {
-        context.strokeStyle = 'rgba(120, 200, 255, 0.22)';
+        context.strokeStyle = 'rgba(120, 200, 255, 0.28)';
         context.lineWidth = 1;
         for (let x = firstColumn; x <= lastColumn + 1; x += 1) {
           const px = Math.round(x * size - cam.x) + 0.5;
@@ -441,18 +431,18 @@ export function TileScene({ map, run, debug = false }: TileSceneProps) {
           context.lineTo(width, py);
           context.stroke();
         }
-        context.fillStyle = 'rgba(120, 200, 255, 0.75)';
-        context.font = `${Math.max(8, Math.round(size * 0.24))}px ui-monospace, monospace`;
+        context.fillStyle = 'rgba(120, 200, 255, 0.8)';
+        context.font = '8px ui-monospace, monospace';
         for (let y = firstRow; y <= lastRow; y += 5) {
           for (let x = firstColumn; x <= lastColumn; x += 5) {
-            context.fillText(`${x},${y}`, x * size - cam.x + 2, y * size - cam.y + size * 0.3);
+            context.fillText(`${x},${y}`, x * size - cam.x + 2, y * size - cam.y + 9);
           }
         }
         for (const actor of actors) {
           const spot = placed.get(actor.id)!;
           context.fillStyle = 'rgba(255, 255, 255, 0.85)';
           context.fillText(
-            actor.id === 'character' ? 'character' : actor.id.split(':').slice(-1)[0]!,
+            actor.id === 'character' ? 'character' : (actor.id.split(':').slice(-1)[0] ?? ''),
             spot.x * size - cam.x,
             spot.y * size - cam.y - 2,
           );

@@ -570,6 +570,7 @@
       "attackIntervalMs": 2000,
       "unarmedAttackValue": 7,
       "supplyUseBelowPercent": 40,
+      "baseSpeed": 110,
       "sourceRef": "Hokz/canary@f6b81a8 schema.sql players.healthmax 150 and skill_* 10; data/XML/vocations.xml vocation id=0 None attackspeed 2000 and meleeDamage 1.0; src/items/weapons/weapons.cpp Weapon::useFist attackValue 7. ARMOUR, ATTACK VALUE, DEFENCE and SUPPLY CHARGES are deliberately absent: every one of them now comes from an item the Character is wearing or carrying."
     },
     {

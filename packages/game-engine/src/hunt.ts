@@ -15,8 +15,9 @@
 import { normalRandom, uniformRandom } from './distributions.js';
 import type { SeededRandom } from './random.js';
 import {
+  canOccupy,
+  connectorAt,
   isAdjacent,
-  isWalkable,
   meleeGoals,
   samePosition,
   stepToward,
@@ -25,7 +26,57 @@ import {
   type TilePosition,
 } from './space.js';
 
+/** The COMBAT tick, unchanged since Phase 2 and pinned by its golden file. */
 export const TICK_MS = 1000;
+
+/**
+ * `SERVER_BEAT` (`src/game/game.hpp:64`) — 50 ms, and the resolution movement
+ * is decided at.
+ *
+ * A combat tick is a second; a step is not. Iterating the settlement in beats
+ * and resolving combat only on the tick boundaries gives movement real timing
+ * WITHOUT a second clock and without moving a single Phase 2 draw: a Hunt with
+ * no map iterates whole ticks exactly as it always did.
+ */
+export const BEAT_MS = 50;
+
+/** Default ground speed (`src/creatures/creature.cpp:1817`). */
+export const GROUND_SPEED = 150;
+
+/** `WALK_DIAGONAL_EXTRA_COST` (`src/creatures/creature.hpp:45`). */
+export const DIAGONAL_STEP_FACTOR = 3;
+
+/**
+ * The vocation base speed every Character starts from
+ * (`data/XML/vocations.xml`, `basespeed="110"`), used when a profile or a
+ * creature does not state one. It is a real number from the source rather than
+ * a placeholder, so a missing speed produces a slow actor and never a stalled
+ * one.
+ */
+export const DEFAULT_STEP_SPEED = 110;
+
+const SPEED_A = 857.36;
+const SPEED_B = 261.29;
+const SPEED_C = -4795.01;
+
+/**
+ * How long ONE cardinal step takes, from the source's own arithmetic
+ * (`Creature::getStepDuration`, `src/creatures/creature.cpp:1690-1709`):
+ *
+ *     calculated = floor(857.36 * ln(speed + 261.29) - 4795.01 + 0.5)
+ *     duration   = floor(1000 * groundSpeed / calculated)
+ *                  rounded UP to a multiple of SERVER_BEAT
+ *
+ * A level-1 Character (speed 110, the vocation base in `data/XML/vocations.xml`)
+ * gets 550 ms; a Rat (speed 67) gets 900 ms. The Character is faster than what
+ * is chasing it, which is why an approach is a chase rather than a queue.
+ */
+export function stepDurationMs(stepSpeed: number, groundSpeed: number = GROUND_SPEED): number {
+  const speed = Math.max(1, Math.floor(stepSpeed));
+  const calculated = Math.max(1, Math.floor(SPEED_A * Math.log(speed + SPEED_B) + SPEED_C + 0.5));
+  const raw = Math.floor((1000 * groundSpeed) / calculated);
+  return Math.max(BEAT_MS, Math.ceil(raw / BEAT_MS) * BEAT_MS);
+}
 
 export interface CreatureStats {
   readonly key: string;
@@ -38,6 +89,9 @@ export interface CreatureStats {
   /** Percent, as Canary stores it: `damage -= damage * mitigation / 100`. */
   readonly mitigation: number;
   readonly gold: { readonly chance: number; readonly min: number; readonly max: number };
+  /** Phase 3.5 — the source's `monster.speed`. Absent means this creature is
+   *  never simulated on a map, which is every Phase 2 fixture. */
+  readonly stepSpeed?: number;
   /** PHYSICAL loot — Phase 3. Separate from `gold`, which is a currency scope
    *  and never an item. A Rat's whole table is one entry. */
   readonly loot?: readonly {
@@ -75,6 +129,10 @@ export interface CombatProfile {
   readonly defense: number;
   readonly armor: number;
   readonly supply: SupplyProfile;
+  /** Phase 3.5 — `vocation base speed + (level - 1)`, the source's own
+   *  `Player::updateBaseSpeed`. Optional for the same reason as the creature's:
+   *  a Hunt with no map never asks. */
+  readonly stepSpeed?: number;
 }
 
 export interface RoomDefinition {
@@ -101,23 +159,31 @@ export interface HuntCreatureState {
    * VERIFIED combat kernel stays verified.
    */
   readonly id?: string;
+  /** The tile it IS on. Never a fraction, never the destination of a step in
+   *  flight. */
   readonly position?: TilePosition;
-  readonly leg?: MovementLeg;
+  readonly movement?: Movement;
 }
 
 /**
- * One tile step, as the CLIENT needs it.
+ * A step IN FLIGHT, on the simulation's own millisecond timeline.
  *
- * The server's truth is `position` — always a real tile, never a fraction.
- * A leg says which step just started and when it completes, so the browser can
- * interpolate pixels between two authoritative tiles without ever deciding
- * where an actor is.
+ * This is one authoritative state, not a server hint plus a client guess. An
+ * actor with an `activeMovement` is STILL STANDING on `from` — it cannot
+ * attack from `to`, cannot be attacked at `to`, and does not occupy `to` — but
+ * `to` is RESERVED, so nothing else may claim it. On `arrivesAtMs` the actor
+ * commits to `to` and the reservation ends.
+ *
+ * The browser interpolates between `from` and `to` using these two instants
+ * and the simulation time the snapshot was taken at. It invents no duration of
+ * its own, which is what makes the picture a view of the server's state rather
+ * than a second opinion about it.
  */
-export interface MovementLeg {
+export interface Movement {
   readonly from: TilePosition;
   readonly to: TilePosition;
-  readonly startedTick: number;
-  readonly completesTick: number;
+  readonly startsAtMs: number;
+  readonly arrivesAtMs: number;
 }
 
 /** The map and the room→region mapping a spatial Hunt simulates over. */
@@ -141,7 +207,7 @@ export interface HuntState {
   readonly ended: HuntEndReason | null;
   /** Phase 3.5 — present only when the Hunt has a map. */
   readonly position?: TilePosition;
-  readonly leg?: MovementLeg;
+  readonly movement?: Movement;
 }
 
 export interface HuntReward {
@@ -204,12 +270,18 @@ export type HuntEvent =
     }
   | { readonly tick: number; readonly kind: 'died' }
   | {
-      /** Phase 3.5 — an actor stepped from one authoritative tile to another. */
+      /**
+       * Phase 3.5 — an actor STARTED a step, with the timing the server will
+       * hold it to. Not "has moved": the actor is still on `from` until
+       * `arrivesAtMs`.
+       */
       readonly tick: number;
       readonly kind: 'move';
       readonly actor: string;
       readonly from: TilePosition;
       readonly to: TilePosition;
+      readonly startsAtMs: number;
+      readonly arrivesAtMs: number;
     };
 
 export interface HuntStep {
@@ -358,45 +430,156 @@ export function simulateHunt(
   const supplyThreshold = (profile.maxHealth * profile.supply.useBelowPercent) / 100;
 
   // ── space ────────────────────────────────────────────────────────────────
+  //
+  // One authoritative movement state. An actor is on `position`; if it has an
+  // `activeMovement` it is still on `position` and will be on `movement.to`
+  // at `arrivesAtMs`, and nothing else may take that tile in the meantime.
   let position = state.position ?? space?.map.entry;
-  let leg: MovementLeg | undefined;
+  let movement: Movement | undefined = state.movement;
 
-  /** Every tile a LIVING actor is standing on. Recomputed per query, because
-   *  actors move within a tick and a stale set is an overlap. */
+  /** Absolute simulation time. Ticks are the combat grid laid over it. */
+  let nowMs = tick * TICK_MS;
+
+  /** Tiles no one else may enter: every living actor's tile, plus every tile a
+   *  living actor has already committed to stepping onto. */
   const occupied = (exclude?: string): ((at: TilePosition) => boolean) => {
     const taken: TilePosition[] = [];
-    if (position && exclude !== CHARACTER) taken.push(position);
+    if (exclude !== CHARACTER) {
+      if (position) taken.push(position);
+      if (movement) taken.push(movement.to);
+    }
     for (const creature of creatures) {
-      if (creature.health <= 0 || !creature.position) continue;
+      if (creature.health <= 0) continue;
       if (creature.id !== undefined && creature.id === exclude) continue;
-      taken.push(creature.position);
+      if (creature.position) taken.push(creature.position);
+      if (creature.movement) taken.push(creature.movement.to);
     }
     return (at: TilePosition) => taken.some((tile) => samePosition(tile, at));
   };
 
-  /** One authoritative step, or nothing. The position IS the tile; the leg is
-   *  only what the browser interpolates between two of them. */
-  const stepActor = (
+  /** What one step costs this actor, in milliseconds. Diagonals cost three
+   *  times a cardinal, which is the source's `WALK_DIAGONAL_EXTRA_COST`. */
+  const durationFor = (speed: number, from: TilePosition, to: TilePosition): number => {
+    const base = stepDurationMs(speed);
+    const diagonal = from.x !== to.x && from.y !== to.y;
+    return diagonal ? base * DIAGONAL_STEP_FACTOR : base;
+  };
+
+  /**
+   * Begin a step toward `target`, or nothing.
+   *
+   * Nothing moves here. What is decided is which tile the actor has committed
+   * to and when it will arrive; the arrival is applied by `arrive`.
+   */
+  const departFor = (
     actor: string,
+    speed: number,
     from: TilePosition,
     target: TilePosition,
-  ): { readonly to: TilePosition; readonly leg: MovementLeg } | null => {
+  ): Movement | null => {
     if (!space) return null;
     const blocked = occupied(actor);
     const goals = meleeGoals(space.map, target, blocked);
     const next = stepToward(space.map, from, goals, blocked);
-    if (!next || !isWalkable(space.map, next)) return null;
-    const stepLeg: MovementLeg = {
+    if (!next || !canOccupy(space.map, next)) return null;
+    const started: Movement = {
       from,
       to: next,
-      startedTick: tick,
-      completesTick: tick + 1,
+      startsAtMs: nowMs,
+      arrivesAtMs: nowMs + durationFor(speed, from, next),
     };
-    events.push({ tick, kind: 'move', actor, from, to: next });
-    return { to: next, leg: stepLeg };
+    events.push({
+      tick: Math.floor(nowMs / TICK_MS),
+      kind: 'move',
+      actor,
+      from,
+      to: next,
+      startsAtMs: started.startsAtMs,
+      arrivesAtMs: started.arrivesAtMs,
+    });
+    return started;
   };
 
-  for (let step = 0; step < ticks && ended === null; step += 1) {
+  /** A step that has run its time COMMITS, and a connector under the arrival
+   *  tile takes the actor to the floor it leads to (spec §6). */
+  const arrive = (at: Movement): TilePosition => {
+    if (!space) return at.to;
+    const link = connectorAt(space.map, at.to);
+    return link ? { ...link.to } : at.to;
+  };
+
+  /**
+   * One beat of movement, for every actor, in a fixed order.
+   *
+   * ARRIVALS first and then DEPARTURES, both in the same order: the Character,
+   * then creatures by index. That order is the arbitration — the second actor
+   * to decide sees the first one's reservation already standing — and it is
+   * inside one deterministic function, which is why it is an array index and
+   * not a database lock.
+   */
+  const moveBeat = (): void => {
+    if (!space) return;
+
+    if (movement && nowMs >= movement.arrivesAtMs) {
+      position = arrive(movement);
+      movement = undefined;
+    }
+    for (let index = 0; index < creatures.length; index += 1) {
+      const creature = creatures[index]!;
+      if (!creature.movement || nowMs < creature.movement.arrivesAtMs) continue;
+      const { movement: _done, ...rest } = creature;
+      creatures[index] = { ...rest, position: arrive(creature.movement) };
+    }
+
+    if (position && !movement) {
+      // The Character fights what is IN REACH and walks toward the first
+      // creature it can take a step toward. Reach chooses the candidates;
+      // index order still chooses between them (P2-D6, narrowed).
+      const engaged = creatures.some(
+        (creature) =>
+          creature.health > 0 && creature.position && isAdjacent(position!, creature.position),
+      );
+      if (!engaged) {
+        for (const enemy of creatures) {
+          if (enemy.health <= 0 || !enemy.position) continue;
+          const started = departFor(
+            CHARACTER,
+            profile.stepSpeed ?? DEFAULT_STEP_SPEED,
+            position,
+            enemy.position,
+          );
+          if (!started) continue;
+          movement = started;
+          break;
+        }
+      }
+    }
+
+    if (!position) return;
+    for (let index = 0; index < creatures.length; index += 1) {
+      const creature = creatures[index]!;
+      if (creature.health <= 0 || !creature.position || !creature.id || creature.movement) continue;
+      if (isAdjacent(creature.position, position)) continue;
+      const stats = plan.creatures[creature.key];
+      const started = departFor(
+        creature.id,
+        stats?.stepSpeed ?? DEFAULT_STEP_SPEED,
+        creature.position,
+        position,
+      );
+      if (started) creatures[index] = { ...creature, movement: started };
+    }
+  };
+
+  // A Hunt with no map beats once per tick, which is the loop Phase 2 has
+  // always run: same iterations, same order, same draws, same golden file.
+  const beat = space ? BEAT_MS : TICK_MS;
+  const endMs = nowMs + ticks * TICK_MS;
+
+  while (nowMs < endMs && ended === null) {
+    nowMs += beat;
+    moveBeat();
+    if (nowMs % TICK_MS !== 0) continue;
     tick += 1;
 
     // 1. Spawn the encounter if the room is empty.
@@ -431,40 +614,15 @@ export function simulateHunt(
 
     // 2. The Character acts. Target: the lowest-index living creature (P2-D6).
     //
-    // With a map it must first BE somewhere it can reach from. Walking is what
-    // it does with a tick it cannot attack in, so approach and attack are the
-    // same decision rather than two systems taking turns.
-    //
     // WHAT SPACE CHANGES is the candidate set, never the arbitration. Index
     // order still decides which of several creatures is hit; it no longer
     // decides which one is *considered*. A Character fixated on the lowest
     // index regardless of reach stands still forever the moment that creature
     // is unreachable — one rat in a one-tile doorway is enough — while the two
     // biting it go unanswered. Reach first, then index.
-    if (space && position) {
-      const engagedNow = creatures.some(
-        (creature) =>
-          creature.health > 0 && creature.position && isAdjacent(position!, creature.position),
-      );
-      if (!engagedNow) {
-        // Approach the first creature a step exists toward. An unreachable one
-        // is SKIPPED rather than waited on: it is walking toward the Character
-        // anyway, and standing still is not a decision a fight should make.
-        for (let index = 0; index < creatures.length; index += 1) {
-          const enemy = creatures[index]!;
-          if (enemy.health <= 0 || !enemy.position) continue;
-          const stepped = stepActor(CHARACTER, position, enemy.position);
-          if (!stepped) continue;
-          position = stepped.to;
-          leg = stepped.leg;
-          break;
-        }
-      }
-    }
-
-    // Recomputed AFTER the step, so a step that lands in melee range attacks in
-    // the same tick — walking and swinging are separate cooldowns in the source
-    // engine, not alternating turns.
+    //
+    // Reach is measured from the tile the actor IS on. An actor with a step in
+    // flight has not arrived, so it cannot swing from where it is going.
     const engaged = space
       ? creatures.findIndex(
           (creature) =>
@@ -521,26 +679,8 @@ export function simulateHunt(
       }
     }
 
-    // 3. Living creatures act, in index order.
-    //
-    // Index order is the deterministic arbitration when two want one tile: the
-    // earlier actor moves first and the later one sees it standing there.
-    if (space && position) {
-      // The array being stepped through IS the one `occupied` reads, so the
-      // second creature to move sees the first one already standing on its new
-      // tile. Mapping into a fresh array would have every creature decide
-      // against the same stale snapshot and two of them walk onto one tile.
-      const moving = creatures.slice();
-      creatures = moving;
-      for (let index = 0; index < moving.length; index += 1) {
-        const creature = moving[index]!;
-        if (creature.health <= 0 || !creature.position || !creature.id) continue;
-        if (isAdjacent(creature.position, position)) continue;
-        const stepped = stepActor(creature.id, creature.position, position);
-        if (stepped) moving[index] = { ...creature, position: stepped.to, leg: stepped.leg };
-      }
-    }
-
+    // 3. Living creatures act, in index order. Their MOVEMENT was decided on
+    //    the beat; what is left here is whether they can reach and swing.
     for (const creature of creatures) {
       if (creature.health <= 0 || tick < creature.nextAttackTick) continue;
       if (space && (!creature.position || !position || !isAdjacent(creature.position, position))) {
@@ -598,7 +738,7 @@ export function simulateHunt(
       characterNextAttackTick,
       ended,
       ...(position === undefined ? {} : { position }),
-      ...(leg === undefined ? {} : { leg }),
+      ...(movement === undefined ? {} : { movement }),
     },
     rewards,
     events,

@@ -267,6 +267,10 @@ export const characterBaselineSchema = definitionSchema.extend({
   /** Below this fraction of health, a carried supply is drunk. Behaviour, not
    *  an item stat: the item says how much it heals. */
   supplyUseBelowPercent: z.number().min(0).max(100),
+  /** `vocation basespeed` (`data/XML/vocations.xml`). A Character's step speed
+   *  is this plus `level - 1`, exactly as `Player::updateBaseSpeed` computes
+   *  it, and the step duration follows from the source's log curve. */
+  baseSpeed: z.number().int().positive(),
   sourceRef,
 });
 
@@ -327,14 +331,33 @@ export const mapRegionSchema = z
   })
   .strict();
 
+const tileRef = z
+  .object({ x: z.number().int().min(0), y: z.number().int().min(0), z: z.number().int() })
+  .strict();
+
+export const mapConnectorSchema = z
+  .object({
+    from: tileRef,
+    to: tileRef,
+    kind: z.enum(['STAIRS_UP', 'STAIRS_DOWN', 'LADDER']),
+  })
+  .strict();
+
 export const mapSchema = definitionSchema.extend({
   kind: z.literal('map'),
   label: z.string().min(1),
   z: z.number().int(),
   rows: z.array(z.string().min(1)).min(1),
-  legend: z.record(z.string().length(1), z.enum(['floor', 'wall', 'water'])),
+  legend: z.record(z.string().length(1), z.enum(['floor', 'wall', 'water', 'sludge'])),
   entry: z.object({ x: z.number().int().min(0), y: z.number().int().min(0) }),
   regions: z.array(mapRegionSchema).min(1),
+  /**
+   * Floor links — the SEAM, not a dungeon (Phase 3.5 §6).
+   *
+   * Declaring the shape now is what lets a later phase add a second floor
+   * without migrating every published map. The live Sewers declare none.
+   */
+  connectors: z.array(mapConnectorSchema).optional(),
 });
 
 export const huntSchema = definitionSchema.extend({

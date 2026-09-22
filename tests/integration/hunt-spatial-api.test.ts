@@ -36,7 +36,13 @@ interface Snapshot {
   revision: number;
   room: number;
   creatures: { key: string; health: number; id?: string; tile?: Tile }[];
-  space: { mapKey: string; tile: Tile; leg: unknown } | null;
+  space: {
+    contentVersion: string;
+    mapKey: string;
+    tile: Tile;
+    movement: { from: Tile; to: Tile; startsAtMs: number; arrivesAtMs: number } | null;
+    nowMs: number;
+  } | null;
 }
 
 let directory: string;
@@ -131,6 +137,12 @@ describe('§20 SNP — the snapshot contract', () => {
 
     expect(snapshot.body.space).not.toBeNull();
     expect(snapshot.body.space?.mapKey).toBe('map.rookgaard.sewers');
+    // The bundle the SIMULATION is running against — what the browser must
+    // fetch its map by.
+    expect(snapshot.body.space?.contentVersion).toMatch(/^v[0-9a-f]+$/);
+    // The simulation instant this snapshot describes, in the same
+    // milliseconds a step's start and arrival are in.
+    expect(snapshot.body.space?.nowMs).toBe(snapshot.body.tick * 1000);
     const tile = snapshot.body.space!.tile;
     expect(Number.isInteger(tile.x)).toBe(true);
     expect(Number.isInteger(tile.y)).toBe(true);
@@ -169,24 +181,32 @@ describe('§20 SNP — the snapshot contract', () => {
     expect(seen[seen.length - 1]).toBeGreaterThan(seen[0]!);
   });
 
-  it('SNP6: the map is CONTENT — fetched by key, cacheable, and 404 when it is not one', async () => {
+  it('SNP6: the map is CONTENT — fetched by VERSION and key, cacheable, 404 otherwise', async () => {
+    const id = await hunting();
+    const snapshot = await call<Snapshot>(base, `/api/characters/${id}/hunt`, { cookie });
+    const version = snapshot.body.space!.contentVersion;
+
     const found = await call<{ contentVersion: string; map: { key: string; rows: string[] } }>(
       base,
-      '/api/maps/map.rookgaard.sewers',
+      `/api/content/${version}/maps/map.rookgaard.sewers`,
       { cookie },
     );
     expect(found.status).toBe(200);
+    expect(found.body.contentVersion).toBe(version);
     expect(found.body.map.key).toBe('map.rookgaard.sewers');
     expect(found.body.map.rows.length).toBeGreaterThan(0);
-    // Immutable for the life of a bundle version, which is why it is not part
-    // of the snapshot the client polls every two seconds.
+    // The URL names the version, so the resource genuinely cannot change and
+    // the cache header is genuinely true.
     expect(found.headers.get('cache-control')).toContain('immutable');
 
-    const missing = await call(base, '/api/maps/map.nowhere', { cookie });
+    const missing = await call(base, `/api/content/${version}/maps/map.nowhere`, { cookie });
     expect(missing.status).toBe(404);
     // A key that IS in the bundle but is not a map is equally absent.
-    const wrongKind = await call(base, `/api/maps/${HUNT_KEY}`, { cookie });
+    const wrongKind = await call(base, `/api/content/${version}/maps/${HUNT_KEY}`, { cookie });
     expect(wrongKind.status).toBe(404);
+    // And a bundle this deployment never published is absent, not a fault.
+    const noVersion = await call(base, '/api/content/v0/maps/map.rookgaard.sewers', { cookie });
+    expect(noVersion.status).toBe(404);
   });
 
   it('SNP7: no Activity is null, and someone else’s Character is absent', async () => {

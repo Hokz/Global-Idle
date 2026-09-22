@@ -200,19 +200,27 @@ export function GameWindow({ characterId, label, summary, onEnded }: GameWindowP
   }, [poll]);
 
   /**
-   * The tile map, fetched ONCE.
+   * The tile map, fetched ONCE, AT THE VERSION THE SIMULATION IS USING.
    *
-   * It is content, immutable for the life of a bundle version, and it is two
-   * orders of magnitude larger than a snapshot. Sending it with every poll
-   * would be the same 671 tiles every second for the whole hunt.
+   * The cache key is `contentVersion:mapKey`, not `mapKey`. An Activity pins
+   * its bundle and keeps simulating against it after a publish; asking for
+   * "the current map" would draw the new geometry over the old collision, and
+   * the player would watch the Character walk through a wall that is only on
+   * their screen.
+   *
+   * It is content, immutable for the life of that version, and two orders of
+   * magnitude larger than a snapshot — so it is fetched once and never polled.
    */
   const mapKey = run?.space?.mapKey ?? null;
+  const mapVersion = run?.space?.contentVersion ?? null;
   useEffect(() => {
-    if (!mapKey) return;
+    if (!mapKey || !mapVersion) return;
     let cancelled = false;
     void (async () => {
       try {
-        const loaded = await api<MapResponse>(`/api/maps/${encodeURIComponent(mapKey)}`);
+        const loaded = await api<MapResponse>(
+          `/api/content/${encodeURIComponent(mapVersion)}/maps/${encodeURIComponent(mapKey)}`,
+        );
         if (!cancelled) setMap(loaded.map);
       } catch {
         // A map that will not load costs the scene, not the hunt: the readouts
@@ -223,7 +231,7 @@ export function GameWindow({ characterId, label, summary, onEnded }: GameWindowP
     return () => {
       cancelled = true;
     };
-  }, [mapKey]);
+  }, [mapKey, mapVersion]);
 
   // The grace countdown is the only clock this component runs, and it only
   // DISPLAYS: the deadline itself is the server's, and it is the server that

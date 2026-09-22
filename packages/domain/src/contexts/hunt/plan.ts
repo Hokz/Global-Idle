@@ -77,6 +77,7 @@ export function mapFor(bundle: ResolvedBundle, mapKey: string): TileMap {
       room: region.room,
       spawns: region.spawns,
     })),
+    ...(parsed.data.connectors ? { connectors: parsed.data.connectors } : {}),
   });
   compiled.set(id, map);
   return map;
@@ -192,6 +193,9 @@ export function buildHuntPlan(input: BuildHuntPlan): HuntPlan {
         mitigation: creature.data.mitigation,
         gold: creature.data.gold,
         loot: creature.data.loot,
+        // Phase 3.5 — `monster.speed`, straight from content. The engine turns
+        // it into a step duration with the source's own curve.
+        stepSpeed: creature.data.speed,
       };
     }
   }
@@ -238,6 +242,9 @@ export function buildHuntPlan(input: BuildHuntPlan): HuntPlan {
         healMax: input.supplyHeal?.max ?? 0,
         useBelowPercent: baseline.data.supplyUseBelowPercent,
       },
+      // `Player::updateBaseSpeed`: the vocation's base plus one per level past
+      // the first. A level-1 Character steps in 550 ms; a Rat takes 900.
+      stepSpeed: baseline.data.baseSpeed + Math.max(0, level - 1),
     },
     supplyCharges: input.supplyCharges,
     // Space, when the Hunt names a map. A Hunt without one simulates exactly
