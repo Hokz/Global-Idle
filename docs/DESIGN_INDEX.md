@@ -31,6 +31,34 @@ documents exist, what each one covers and how far each one has been approved.
   - status: `DESIGN BASELINE / PARTIALLY OPEN`
   - scope: unique-vocation roster, Gold unlocks, 1–4 Active Party formation, Frontline, Shared XP eligibility, reconnect behavior.
 
+### Economy / Custody
+
+- **Economy custody and reward destinations**
+  - path: `docs/design/ECONOMY_CUSTODY_AND_REWARD_DESTINATIONS.md`
+  - status: `BASELINE` — Gold parts implemented in Phase 2, the rest recorded
+  - scope: Gold Pouch vs Bank, the three reward destinations, what death takes, sinks and sources, the Bank's direction.
+
+### Inventory / Logistics
+
+- **Inventory and logistics foundation**
+  - path: `docs/design/INVENTORY_AND_LOGISTICS_FOUNDATION.md`
+  - status: `BASELINE` — nothing implemented; Phase 3 owns it
+  - scope: five Hunt container slots and their Gold unlocks, stacking/space/capacity as three separate limits, Loot Pouch, Loot Policy, Auto-Sell, Depot, Stash, item movement, Manage Containers routing.
+
+### Multiplayer
+
+- **Multiplayer activities foundation**
+  - path: `docs/design/MULTIPLAYER_ACTIVITIES_FOUNDATION.md`
+  - status: `BASELINE` — nothing implemented; Phases 4 and 5B own it
+  - scope: Active Party vs Expedition Group, Warzones, PvP Arena, and the one architectural guardrail (do not make Team A vs Team B impossible).
+
+### Future directions
+
+- **Future directions**
+  - path: `docs/design/FUTURE_DIRECTIONS.md`
+  - status: `FUTURE / NOT IMPLEMENTED`
+  - scope: world and regional progression, requirement/cost/reward shapes, Bestiary and Charms, Imbuements, outfits and achievements.
+
 ---
 
 ## Documentation lifecycle
@@ -104,4 +132,7 @@ everything under `docs/design/`:
 | `docs/ARCHITECTURE.md` | Phase 0 product-level sketch, superseded in detail by the package above |
 | `docs/MVP_SCOPE.md` | First playable vertical slice |
 | `docs/ECONOMY.md` | Economy principles, sinks and transaction rules |
-| `docs/REFERENCES.md` | Research source hierarchy |
+| `docs/REFERENCES.md` | Research source hierarchy — and the **1x Tibia/Canary baseline lock**: the source's numbers are the numbers unless a divergence is recorded with its reason and its fixture |
+| `docs/architecture/decisions/ADR-019-currency-custody-scopes.md` | **Currency custody** — value lives in scopes (`BANK`, `POUCH`) and the one append-only ledger says which; extends ADR-003 and contradicts none of it |
+| `docs/specs/phase-2/PHASE_2_HUNT_SIMULATOR_SPEC.md` | **Phase 2 implementation specification** — the Hunt simulator, rooms, Stamina, XP, Gold custody, supplies, death and the first Game Window |
+| `docs/specs/phase-2/PHASE_2_CANARY_SOURCE_MAP.md` | **Phase 2 evidence** — every formula and datum imported or adapted from `Hokz/canary`, with the machine-checked import record beside it |

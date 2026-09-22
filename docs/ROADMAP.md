@@ -86,9 +86,11 @@ No full gameplay yet.
 - room-10 infinite loop;
 - monster encounters;
 - supplies;
-- death;
+- death — and what it COSTS: Base XP by Canary's own formula, and the whole Gold Pouch without
+  Full Bless;
 - XP;
-- gold;
+- gold, into a **Gold Pouch** that is carried and at risk — the Bank is a different, safe number
+  ([ADR-019](architecture/decisions/ADR-019-currency-custody-scopes.md));
 - server-side activity state, persisted across reloads and the grace period;
 - connection/session lifecycle;
 - background/minimized online continuity;
@@ -115,7 +117,7 @@ At least one timer path should exercise the reusable `ActiveUseTimer` foundation
 Mandatory tests: cases 1–28 in
 [`docs/architecture/ACTIVITY_OCCUPANCY_AND_TIMERS.md`](architecture/ACTIVITY_OCCUPANCY_AND_TIMERS.md) §7.
 
-## Phase 3 — Loot + Itemization
+## Phase 3 — Loot + Itemization + Inventory/Logistics
 
 - loot tables;
 - BaseItem;
@@ -124,9 +126,27 @@ Mandatory tests: cases 1–28 in
 - affix generation;
 - inventory;
 - equipment;
-- sell loop.
+- weight, stacking and `maxStack`;
+- the five Character Hunt container slots, and their Gold unlocks;
+- container space;
+- Loot Pouch, and the physical Loot-Pouch death loss;
+- Loot Filter;
+- Depot;
+- Stash;
+- item movement, desktop and touch;
+- Manage Containers routing;
+- sell loop;
+- basic NPC purchase and refill.
+
+Recorded in full: [`design/INVENTORY_AND_LOGISTICS_FOUNDATION.md`](design/INVENTORY_AND_LOGISTICS_FOUNDATION.md).
 
 ## Phase 4 — Skills + Party + Vocations
+
+- real Skills representation, and **durable Skill death loss** (deferred from Phase 2 on purpose:
+  inventing a Skill so that death could delete it would have been a shadow system);
+- vocation Capacity from the baseline;
+- aggregated Party logistics;
+- Promotion acquisition, if this is the natural owning slice.
 
 - final skill progression model;
 - character roster with unique vocations;
@@ -147,6 +167,20 @@ Mandatory tests: cases 1–28 in
 
 ## Phase 5 — Quest/Dungeon/Boss Framework
 
+- the Requirement / Cost / Reward primitive, built when the first content slice actually needs it;
+- Reward Chest — persistent, and SAFE from Hunt death;
+- blessing acquisition and reacquisition, if this is the natural owning slice;
+- travel and access foundations.
+
+## Phase 5B — Multiplayer Activities
+
+- cross-account Expeditions and Warzones;
+- PvP Arena, matchmaking, rating and ranking.
+
+Recorded in full: [`design/MULTIPLAYER_ACTIVITIES_FOUNDATION.md`](design/MULTIPLAYER_ACTIVITIES_FOUNDATION.md).
+Nothing here is built early; the only architectural obligation is not to make Team A vs Team B
+impossible.
+
 - generic dungeon rooms;
 - basic puzzles;
 - unlock framework;
@@ -156,6 +190,12 @@ Mandatory tests: cases 1–28 in
 - boss rotation.
 
 ## Phase 6 — Economy
+
+- full Bank services and history;
+- player-to-player transfer;
+- Market, escrow, fees and price history.
+
+Recorded in full: [`design/ECONOMY_CUSTODY_AND_REWARD_DESTINATIONS.md`](design/ECONOMY_CUSTODY_AND_REWARD_DESTINATIONS.md).
 
 - gold sinks;
 - market;
@@ -181,6 +221,10 @@ Mandatory tests: cases 1–28 in
 - vocation Skill Tree.
 
 ## Phase 8 — Premium
+
+- Auto-Sell, with item / category / rarity / default rules and protected-state overrides;
+- advanced loot management;
+- approved remote services.
 
 - Premium purchase, renewal and expiry;
 - entitlement transitions, segmenting any unsettled interval at the transition;

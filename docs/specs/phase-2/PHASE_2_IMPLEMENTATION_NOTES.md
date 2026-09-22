@@ -3,10 +3,101 @@
 **Status:** `IMPLEMENTATION_COMPLETE — PENDING INDEPENDENT REVIEW`
 **Spec:** [`PHASE_2_HUNT_SIMULATOR_SPEC.md`](./PHASE_2_HUNT_SIMULATOR_SPEC.md) ·
 **Evidence:** [`PHASE_2_CANARY_SOURCE_MAP.md`](./PHASE_2_CANARY_SOURCE_MAP.md)
-**Matrix:** Phase 2 74/74, with Phase 0B 92/92 and Phase 1 87/87 still passing.
+**Matrix:** Phase 2 **97/97**, with Phase 0B 92/92 and Phase 1 87/87 still passing.
 
 This document records what the implementation DECIDED, what it FOUND, and what it COST — the
 things a specification cannot know in advance. It is not a summary of the spec.
+
+---
+
+## 0. The correction pass — Gold custody and death
+
+Two Product Owner decisions made after Phase 2 was specified superseded two of its behaviours.
+Neither is a failure against the original assignment; both change what Phase 2 MEANS, so they are
+Phase 2's to fix rather than a later phase's to inherit.
+
+### 0.1 Hunt Gold was safe the instant it dropped
+
+`hunt.reward` posted straight into the account's `CurrencyBalance`. That made every coin a Rat
+dropped **immediately equivalent to banked Gold**, and quietly deleted the risk a Hunt is supposed
+to carry: there was nothing a death could take.
+
+The locked rule is `creature Gold -> Gold Pouch`, and `Gold Pouch != Bank`.
+
+The obvious shortcut — a `goldPouch` integer on `Character` — is the exact shape ADR-003 forbids:
+a mutable balance no ledger explains, and the one number a player will argue about after a death.
+So custody became a **dimension of the ledger** instead
+([ADR-019](../../architecture/decisions/ADR-019-currency-custody-scopes.md)): every entry and every
+projection row carries `(subjectId, custody, currency)`, where the subject is the Account for
+`BANK` and the **Character** for `POUCH`. A database CHECK enforces the pairing.
+
+Everything ADR-003 decided still holds — append-only, projection written only beside its entry,
+one operation id per movement, reconciliation recomputed from the entries — now **per scope**,
+which is the same guarantee at the granularity the data has. Three consequences fall out for free:
+
+- a deposit is **double entry**, two rows under one operation id summing to zero, so it is already
+  expressible and already balanced before any Bank UI exists;
+- a death forfeiture is a single negative entry with a reason, so the movement most likely to be
+  disputed is the one the ledger explains best;
+- a future custody — Market escrow, a shared Party pool — is an enum value, not a new table.
+
+**Per Character, not per Account.** It costs one column now and a migration of live money later.
+
+### 0.2 Death ended the run and cost nothing
+
+The formula is Canary's, and the correction is mostly about refusing a summary.
+
+> "Seven blessings at 8% plus Promotion's 30% is 86% off."
+
+That is **true from level 24 and false below it**, and every Character Phase 2 can represent is
+below level 24. `Player::getLostPercent()` takes a different branch there: a blessing reduction of
+40% or more is **replaced by a flat 50%** before Promotion is added. So at low level the fifth
+blessing is worth 18 points, the sixth and seventh are worth nothing, and full blessings plus
+Promotion is **80% off, not 86%**.
+
+Three more things the source says that a summary would have lost, each of which changes behaviour:
+
+| | |
+|---|---|
+| `vocation == VOCATION_NONE \|\| level > 7` | The familiar "no XP loss below level 8" is only HALF the guard. Global Idle's Origin Character is vocation-less until the Oracle, so it is on the first side and **always** loses. Reading only the second half would have made the whole tutorial death-free |
+| `isPromoted()` for vocation 0 | **false**, from source: nothing promotes from vocation 0. The 30-point discount is not available to a Rookgaard Character, and a database CHECK now refuses `promoted` without a vocation rather than trusting a call site |
+| `ceil`, in binary64 | The source computes `(1 - 0.30)` in floating point and lands a hair high, so when the exact product is a whole number it charges one extra point. Phase 2 reproduces that. Being quietly more exact than the baseline is a divergence, and a silent one — DL7 pins the boundary at 4,300 experience, where the source takes 302 and exact arithmetic takes 301 |
+
+**What death now costs:** Base XP by that formula, the Base Level recomputed from what is left,
+and the **whole Gold Pouch** unless the Character has Full Bless. Leaving and losing a connection
+still cost nothing — punishing a lost connection would make the five-minute grace a trap.
+
+**Carried-reward protection is BINARY.** Partial blessings reduce the XP loss exactly as the
+baseline says and protect nothing carried. Six blessings forfeit the Pouch; seven keep it. Full
+Bless is still not a free death: the XP loss applies, the Hunt ends, and blessings are consumed.
+
+**Settled once**, and the run row is what makes it so: `endRun` returns immediately for a run that
+already carries an ending, so no retry, replay or restart can charge the penalty twice.
+
+### 0.3 The seam, and what is deliberately NOT built
+
+`Character.blessings` and `Character.promoted` are the whole of it. Nothing in Phase 2 raises
+either: there is no blessing shop, no NPC, no Oracle and no Promotion flow, and inventing any of
+them would be exactly the shadow system this phase refuses everywhere else. What they buy is that
+the policy **reads** protection from authoritative state instead of assuming "unblessed forever"
+inside Hunt code — so the acquisition flow attaches in one place when its phase arrives.
+
+**Skill loss is specified and deferred.** Canary loses Skill tries to death with the same
+percentage and a different rounding (truncation, not `ceil`). Phase 2 has no durable Skill
+representation, and creating one so that death could delete it would be a shadow system. The
+rounding is in the import record with Phase 4 named as its owner, and BL3 asserts both that the
+deferral is recorded and that no shadow Skill column or table has appeared in the meantime.
+
+### 0.4 What this cost elsewhere
+
+Widening the ledger's signature touched four call sites outside the Hunt — the economy invariant
+suite, the Phase 0B append-only permission case, the observability case and the Redis
+durable-state case. Each now names the scope it meant, which is the point: there is deliberately
+no default, because a reward that forgot to say would land in the Bank, and that is the defect
+this correction exists to remove.
+
+**No Phase 0B or Phase 1 case was weakened.** The four that changed were changed because the row
+shape changed, and each still asserts exactly what it asserted before.
 
 ---
 
@@ -15,9 +106,12 @@ things a specification cannot know in advance. It is not a summary of the spec.
 A Level-1 pre-vocation Character can enter the Rookgaard Sewers from the Atlas and be watched
 fighting. Rats spawn, the Character attacks on its own cadence, damage resolves through Canary's
 reduction chain, creatures die, rooms clear, room 10 repeats forever. Base XP and Gold are
-durable and ledger-backed. Stamina starts burning at the first qualifying XP and not before.
-Supplies are consumed and run out. The Character can die. Closing the lid keeps it running;
-losing the connection pauses it for exactly five minutes and then ends it.
+durable, and Gold is **carried in a Gold Pouch** that death can take. Stamina starts burning at
+the first qualifying XP and not before. Supplies are consumed and run out. The Character can die,
+and dying costs Base XP by Canary's own formula and the whole Pouch without Full Bless. A
+**backgrounded or minimised tab keeps the Hunt advancing for as long as its heartbeat still
+reaches the server**; a connection that actually goes away pauses the run for exactly five minutes
+and then ends it.
 
 | Layer | What Phase 2 added |
 |---|---|
@@ -26,7 +120,9 @@ losing the connection pauses it for exactly five minutes and then ends it.
 | `packages/domain` | the `hunt` context (`run`, `plan`, `rewards`, `progression`), durable Stamina settlement in the `character` context, `occupancyFor` in the `activity` context |
 | database | `HuntRun`, `HuntEndReason`, `Character.baseXp` |
 | `apps/api` | `GET /characters/:id/hunt`, `POST /characters/:id/hunt/heartbeat`, and sign-out now ends the Activity |
-| `apps/web` | the first **Game Window** |
+| `apps/web` | the first **Game Window**, showing the Pouch and what a death cost |
+| economy | a `custody` dimension on the ledger and its projection (ADR-019), `transfer` as double entry, per-scope reconciliation |
+| death | a pure transcription of `getLostPercent` and `Player::death`, and the protection seam on `Character` |
 
 ---
 
@@ -204,6 +300,14 @@ elements answering to one test id is a test that passes by accident.
 - **No Phase 3 itemization.** No `BaseItem`, no `ItemInstance`, no inventory, no equipment, no
   loot table, no rarity, no affixes — and no shadow version of any of them. The tutorial combat
   profile is an immutable content-authored set of combat INPUTS and is explicitly temporary.
+- **No coins.** The Gold Pouch is a currency CUSTODY SCOPE — a number in the ledger — not a stack
+  of gold, platinum and crystal coins with weight and slots. Modelling three denominations as item
+  stacks is Phase 3's, and doing it now would be the same shadow itemization. The name collision
+  with Tibia's store container is recorded in the source map so a later phase does not import that
+  item and find the name taken by a different idea.
+- **No blessing shop, no Oracle, no Promotion flow.** Only the two columns the death policy reads.
+- **No Bank UI, no deposit route, no NPC.** `transfer` exists and is balanced and tested, because
+  the custody model would be unverifiable without it; nothing player-facing calls it yet.
 - **No second vocation, spell, rune, condition or fight mode.** No creature but the Rat, no
   region but Rookgaard.
 - **No party, no Shared XP.** ST12 and ST13 therefore prove the property a mixed party will rest
@@ -219,14 +323,50 @@ elements answering to one test id is a test that passes by accident.
 
 ---
 
-## 7. How to check this
+## 7. Manual browser validation
+
+An instrumented walkthrough, run against the real stack — `pnpm build`, migrate, build the bundle,
+seed, the real API on 3001 and `next start` on 3000 — on **both** viewports. Instrumented rather
+than watched so the evidence is checkable: the console, page errors and every response status were
+recorded rather than glanced at.
+
+| Step | Desktop 1440×900 | Touch 390×844 |
+|---|---|---|
+| Sign in, create a Character | ok | ok |
+| Atlas renders, and no Game Window on it | ok | ok |
+| Marker → Enter → Game Window opens | ok | ok |
+| Combat runs with nothing pressed | 8 log lines, e.g. *"You block the attack"* | same |
+| Scene shows server state | Room 1, Rat 18/20, self 149/150 | same |
+| Readouts | xp 0, pouch 0, stamina 42:00 NEUTRAL | same |
+| Room and cycle come from the row | Room 10 · cycle 2 | same |
+| Reload returns from durable state | Room 10 | same |
+| Death is shown, with what it cost | *"Lost 101 experience \| Lost 1 gold from your pouch"* | same |
+| Death is durable | xp 1005 → 904, level 5, pouch 1 → 0 | same |
+| The Bank is untouched | **no row at all** | same |
+| Back to the Atlas, then Leave | ok | ok |
+
+```text
+desktop: console errors 0, page errors 0, HTTP>=400 0
+touch:   console errors 0, page errors 0, HTTP>=400 0
+```
+
+The death numbers are the formula, checkable by hand: an unblessed vocation-less Character at
+1,005 experience loses `ceil(1005 × 0.10) = 101`, and 904 is still level 5, so it is not demoted.
+The single gold coin is what one Rat happened to drop, and it is gone.
+
+**What this is not:** a person's eyes on the layout. It exercises the flow, the state and the
+error channels; it does not judge whether the scene looks good.
+
+---
+
+## 8. How to check this
 
 ```sh
 pnpm install
 pnpm build
-node scripts/count-matrix.mjs          # 92/92, 87/87, 74/74
-pnpm test:unit && pnpm test:fixtures   # includes SIM1-SIM10 and SRC1-SRC4
-pnpm test:integration                  # includes ST, AU, RW, SU, DE, CX, PS
+node scripts/count-matrix.mjs          # 92/92, 87/87, 97/97
+pnpm test:unit && pnpm test:fixtures   # includes SIM, SRC and the pure DL cases
+pnpm test:integration                  # includes ST, AU, RW, SU, DE, CX, PS, DL, GP, BL
 pnpm test:invariants
 # The integration and invariant suites TRUNCATE every table between cases,
 # including ContentBundle, so a local run leaves the database with no published

@@ -23,8 +23,15 @@ Enter the Rookgaard Sewers from the Atlas and **watch their Character fight**: r
 the Character attacks on its own cadence, damage lands, creatures die, the room clears, the next
 room opens. Ten rooms, then room 10 repeats forever. Base XP and Gold accrue and are durable.
 Stamina starts burning at the first qualifying XP and not before. Supplies are consumed and run
-out. The Character can die. Closing the laptop lid keeps it running; losing the connection pauses
-it for five minutes and then ends it.
+out. The Character can die. A **backgrounded or minimised tab keeps the Hunt advancing for as long as its heartbeat
+still reaches the server**; a connection that actually goes away pauses the run for exactly five
+minutes and then ends it.
+
+> **Say it precisely.** An earlier draft of this paragraph said "closing the laptop lid keeps it
+> running", which claims more than the system does. What is guaranteed is the HEARTBEAT, not the
+> lid: a hidden tab whose timers are throttled to about once a minute still proves liveness
+> (P2-D8), and a machine that suspends stops sending anything and takes the ordinary
+> liveness-plus-grace path like any other lost connection.
 
 ### 1.2 Non-goals
 
@@ -243,6 +250,7 @@ Nothing here is new design; it is the locked rules made executable.
 | Premium band | XP at a reward is multiplied by 1.5 while stamina is **above 39:00**, else 1.0 |
 | Segmentation | evaluated **per reward**, at the stamina the Character had on that reward's tick — exact, not pro-rata |
 | Zero stamina | the reward is dropped entirely: 0 XP, 0 Gold. Combat continues |
+| Where the Gold goes | the Character's **Gold Pouch**, never the Bank (§9.1, ADR-019) |
 | Recovery | Premium 1:1, Free 1:2, capped at 42:00, no waiting period, offline and idle eligible; **grace recovers nothing** |
 | Retry | every settlement carries `settlementOperationId(activityId, checkpoint)`; a replay is a no-op |
 
@@ -300,6 +308,53 @@ Plus, on existing tables: `Character.baseXp` (durable Base XP) and
 **Nothing presentational is persisted.** Positions, sprites and animation phases are derived by
 the client from authoritative state.
 
+### 9.1 Gold is CARRIED, not banked
+
+A creature's Gold credits the Character's **Gold Pouch** — a currency custody scope, weightless
+and slotless, that the Character is carrying and can lose. The **Bank** is a different number:
+account-scoped, safe, and never written by a Hunt.
+
+Both are projections of the one append-only ledger, discriminated by a `custody` dimension on
+every entry (ADR-019). Nothing about ADR-003 is weakened: the ledger is still the truth, the
+projection is still written only beside its entry, every movement still carries an operation id,
+and reconciliation still recomputes from the entries — now per scope.
+
+```text
+Hunt reward        +N  ->  (character, POUCH)         hunt.reward
+Deposit            -N  ->  (character, POUCH)  }      gold.deposit, one operation, double entry
+                   +N  ->  (account,   BANK)   }
+Death, unblessed   -N  ->  (character, POUCH)         hunt.death.forfeit
+```
+
+**Per Character, not per Account.** What is carried is carried BY someone: a Knight's death cannot
+cost a Druid its earnings, and an Active Party must be able to carry several pouches at once.
+
+**No auto-deposit.** The Pouch is not swept into the Bank when a Hunt ends. Depositing is a
+deliberate act, which is what makes carrying Gold a choice rather than a formality.
+
+### 9.2 What death costs
+
+Death is the only ending that costs anything. Leaving and losing a connection end the run and take
+nothing — punishing a lost connection would make the five-minute grace a trap rather than a mercy.
+
+| | |
+|---|---|
+| Base XP | Canary's `Player::getLostPercent()`, transcribed — including the sub-24 branch (source map §8) |
+| Base Level | recomputed from the remaining XP; 1 is the floor |
+| Gold Pouch | **forfeited in full** without Full Bless; **kept in full** with it |
+| Bank | untouched, always |
+| Supplies, the five Hunt containers, equipment, Depot, Stash, Reward Chest | untouched — Phase 3 onward |
+| Skills | deferred: Phase 2 has no durable Skill representation, and inventing one to delete it would be a shadow system |
+
+**Full Bless is a BINARY threshold for what is carried.** Partial blessings reduce the experience
+loss exactly as Canary says, and protect nothing in the Pouch. Seven protects it; six does not.
+
+**Full Bless is not a free death.** The experience loss still applies, the Hunt still ends, and
+Skill loss will apply when Skills exist.
+
+**Settled once.** The penalty rides the run's own ending: a run that already carries an
+`endedReason` is not ended again, so no retry, replay or restart can charge it twice.
+
 Every settlement is one transaction: simulate → write `HuntRun` → award XP → post the Gold ledger
 entry → settle Stamina → settle active-use timers, all under
 `settlementOperationId(activityId, checkpointSequence)`. A retry re-reads the sequence and does
@@ -349,8 +404,12 @@ the `HuntRun` alongside the Activity in the same transaction.
 | **PS** — persistence | PS1–PS5 | reload; process restart; identical deterministic state; no duplicate rewards; room advancement and rewards stay consistent |
 | **GW** — game window | GW1–GW8 | Atlas → Hunt → Game Window; visible combat progress; room changes; reload; grace is visible; resume; Leave; death — desktop and touch |
 | **SRC** — source fidelity | SRC1–SRC4 | the Rat fixture matches `rat.lua`; the damage formula matches its inputs/outputs; the XP curve matches `getExpForLevel`; the tutorial profile matches its cited sources |
+| **DL** — death loss | DL1–DL11 | the flat sub-24 base; blessings below the branch; the 40%→50% replacement; Promotion after it; the ≥24 formula; the vocation gate; the source's rounding including its floating point; the level walk-down; no negative XP; a pre-vocation Character cannot be promoted; the penalty settles once |
+| **GP** — gold pouch | GP1–GP9 | Gold lands in the Pouch and never the Bank; the Pouch is durable; zero Stamina credits nothing; a retry credits once; death without Full Bless forfeits it once; Full Bless keeps it; Leave and grace destroy nothing; the Bank is distinct and transfers are balanced; every scope reconciles |
+| **BL** — bless policy | BL1–BL3 | partial Bless reduces XP loss and protects nothing carried; Full Bless is the binary carried-reward threshold; Skill loss is deferred explicitly and no shadow Skill exists |
 
-**Totals: 10 groups, 74 cases** — SIM 10, ST 24, AU 4, RW 6, SU 3, DE 4, CX 6, PS 5, GW 8, SRC 4
+**Totals: 13 groups, 97 cases** — SIM 10, ST 24, AU 4, RW 6, SU 3, DE 4, CX 6, PS 5, GW 8, SRC 4,
+DL 11, GP 9, BL 3
 — counted by `scripts/count-matrix.mjs`, which already counts Phase 0B's 92 and Phase 1's 87.
 Those two remain in force and are not renumbered.
 
@@ -366,14 +425,16 @@ Those two remain in force and are not renumbered.
 ## 13. Definition of Done
 
 1. Phase 0B 92/92 and Phase 1 87/87 still pass, unmodified.
-2. Phase 2 74/74 pass.
+2. Phase 2 97/97 pass.
 3. A Level-1 pre-vocation Character can enter the Sewers and kill a Rat, with every number traced.
 4. The simulation is server-authoritative and deterministic from its seed.
 5. Rooms 1–10 advance; room 10 repeats and persists its cycle.
 6. Base XP is durable and advances Base Level on the Canary curve.
-7. Gold is ledger-backed and auditable.
+7. Gold is ledger-backed and auditable, and lands in the Character's **Gold Pouch** — carried and
+   at risk — rather than in the safe account Bank.
 8. Supplies are consumed, exhaust durably, and do not force an exit.
-9. Death ends the run, releases the claim and is durable.
+9. Death ends the run, releases the claim and is durable — and COSTS: Base XP by Canary's own
+   formula including its sub-24 branch, and the whole Gold Pouch without Full Bless.
 10. Stamina activates on the first qualifying XP, segments at 39:00, yields nothing at 0:00, and
     recovers at 1:1 / 1:2.
 11. Active-use cases 25–28 hold.

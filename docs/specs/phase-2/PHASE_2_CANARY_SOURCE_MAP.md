@@ -199,7 +199,123 @@ Health potion heals **60–90**. **Simplify** — Phase 2 models a supply as
 `{ key, charges, healMin, healMax, useBelowHealthPercent }` on the activity, with no item, no
 flask and no inventory. Phase 3 replaces it with real items.
 
-## 7. Deliberately NOT imported
+## 7. Gold custody — a Global Idle decision, and it says so
+
+Canary carries Gold as **item stacks**: gold, platinum and crystal coins in containers, with
+weight, with slots, and with a death that scatters them along with everything else a Character was
+carrying. Tibia's own "gold pouch" is a store container that auto-collects those coins.
+
+Global Idle's **Gold Pouch is not that.** It is a currency CUSTODY SCOPE (ADR-019): a number in the
+ledger, carried by a Character, weightless, slotless, and forfeited on death without Full Bless.
+
+| Question | Whose answer |
+|---|---|
+| How much Gold a Rat drops | **Canary** (`monster.loot`, §1) |
+| What death does to accumulated experience | **Canary** (§8) |
+| Whether carried Gold is at risk on death | **Canary in spirit** — it is, and it is |
+| Whether Gold occupies inventory weight and slots | **Global Idle** — it does not |
+| Where Gold lives between Hunts | **Global Idle** — a Pouch and a Bank, ADR-019 |
+
+**Adapt, recorded.** The reason is Phase 2's own scope rule: Phase 3 owns `BaseItem`,
+`ItemInstance`, weight and containers, and modelling three denominations of coin as item stacks
+now would be exactly the shadow itemization this phase refuses. What is kept is the CONSEQUENCE
+the baseline gives Gold — that carrying it is a risk — without the machinery Phase 2 has no
+business building. The name collision with Tibia's store container is noted here so a later phase
+does not import that item and find the name already taken by a different idea.
+
+---
+
+## 8. Death — the formula, not the slogan
+
+`src/creatures/players/player.cpp` → `Player::getLostPercent()` and `Player::death()`.
+
+The summary that circulates — *"seven blessings at 8% plus Promotion's 30% is 86% off"* — is
+**true from level 24 and false below it.** Canary takes a different branch, and Phase 2 is
+entirely inside the branch the summary hides.
+
+```cpp
+int32_t blessingCount = 0;                       // blessings 2..8 — SEVEN of them
+for (int i = 2; i <= 8; i++) if (hasBlessing(i)) blessingCount++;
+
+const auto factor = (isRetro ? 6.31 : 8);
+double percentReduction = (blessingCount * factor) / 100.;
+
+double lossPercent;
+if (level >= 24) {
+    const double tmpLevel = level + (levelPercent / 100.);
+    lossPercent = ((tmpLevel + 50) * 50 * ((tmpLevel * tmpLevel) - (5 * tmpLevel) + 8)) / experience;
+} else {
+    percentReduction = (percentReduction >= 0.40 ? 0.50 : percentReduction);   // <- the branch
+    lossPercent = 10;
+}
+
+if (isPromoted()) percentReduction += 30 / 100.;
+
+return (lossPercent * (1 - percentReduction)) / 100.;
+```
+
+| Fact | Where | Decision |
+|---|---|---|
+| Seven regular blessings (2–8); Twist of Fate (1) is the PvP skull protection and is not one | `Player::getLostPercent` | **Keep** |
+| Each is worth 8 percentage points on a non-retro server | same → `factor` | **Keep** |
+| Below level 24 the base loss is a flat **10%** of the total | same | **Keep** |
+| Below level 24, a reduction of **40% or more becomes a flat 50%** | same | **Keep** |
+| Promotion adds **30 points**, after that replacement | same | **Keep** |
+| From level 24 the loss follows the fractional level, so the ABSOLUTE cost depends on level, not on the total | same | **Keep** |
+| `deathLosePercent = -1` by default, so the formula branch is the live one | `config.lua.dist` | **Keep** |
+| `unfairFightReduction` is 100 outside PvP | `Player::death` | **Simplify** — Phase 2 has no PvP, so the multiplier is always 1.0 and is not an input |
+| Experience lost is `ceil(experience × deathLossPercent)` | same | **Keep**, including its floating point — see below |
+| The subtraction is guarded by `vocation == VOCATION_NONE \|\| level > 7` | same | **Keep** |
+| The level walks down while the remainder is below its requirement; 1 is the floor | same | **Keep** |
+| Skill tries lost are **truncated**, not rounded up | same | **Simplify** — recorded, deferred to the phase that owns Skills |
+
+### 8.1 What the branch does to the numbers
+
+At low level — which is every Phase 2 Character — the fifth blessing is worth 18 points and the
+sixth and seventh are worth **nothing**:
+
+| Blessings | Reduction below 24 | Loss of a 1,000-XP Character |
+|---|---|---|
+| 0 | 0% | 100 |
+| 4 | 32% | 68 |
+| 5 | **50%** (not 40%) | 50 |
+| 6 | **50%** | 50 |
+| 7 | **50%** (not 56%) | 50 |
+| 7 + Promotion | **80%** (not 86%) | 20 |
+
+From level 24 the same seven blessings and Promotion really are 86%. Both readings are tested:
+DL3 and DL4 pin the low branch, DL5 pins the high one.
+
+### 8.2 Promotion and the Origin Character
+
+`Player::isPromoted()` asks `Vocations::getPromotedVocation(vocation)`, which looks for a vocation
+whose `fromVocation` names this one. Nothing names vocation **0**, so a vocation-less Character has
+no promotion and `isPromoted()` is **false** for it.
+
+That is the SOURCE's answer to "does a Rookgaard Character get the 30-point discount", not a Global
+Idle rule, and Global Idle enforces it in the database rather than trusting a call site: a
+`CHECK` refuses `promoted = true` while `vocation IS NULL`.
+
+### 8.3 The guard that would have made the tutorial free
+
+`Player::death` subtracts experience only when `vocation == VOCATION_NONE || level > 7`. Reading
+only the second half — the familiar "no experience loss below level 8" — would make Global Idle's
+Origin Character, which is vocation-less until the Level-8 Oracle, **immune to its own death
+penalty for the entire tutorial**. It is on the FIRST side of the guard. DL6 pins both sides.
+
+### 8.4 The one place the transcription keeps a defect
+
+`getLostPercent` computes in `double`, and `(1 - 0.30)` in binary64 lands a hair above 0.7. When
+the exact product would be a whole number the source therefore charges one extra point — at 4,300
+experience, unblessed and promoted, it takes **302** where exact arithmetic takes 301.
+
+Phase 2 reproduces that, in the same order and the same binary64. Recomputing it exactly would
+"fix" about one case in five hundred and would be a **silent divergence from the baseline** in
+every one of them. DL7 pins the boundary, so the choice is visible rather than accidental.
+
+---
+
+## 9. Deliberately NOT imported
 
 The five vocation spell books · every other creature · the item database · the map · Forge ·
 Imbuements · Bestiary and Charms · the Wheel · the loot system · blessings and the full death

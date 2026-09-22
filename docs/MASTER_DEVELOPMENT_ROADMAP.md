@@ -64,14 +64,32 @@ A hunt can show:
 
 ## 4. Death
 
-Death must matter.
+Death must matter. As of the Phase 2 correction pass this is no longer a direction — the formula
+is the baseline's, transcribed, and it is implemented and tested.
 
-Direction:
+**Experience and skills** follow `Player::getLostPercent()`
+([source map §8](specs/phase-2/PHASE_2_CANARY_SOURCE_MAP.md)):
 
-- lose character progression;
-- lose some skill progression;
-- blessings/protection systems reduce punishment;
-- exact values require balancing/research.
+- seven regular blessings, 8 percentage points each;
+- Promotion adds 30 points;
+- **below level 24** the base loss is a flat 10% AND any blessing reduction of 40% or more is
+  replaced by a flat 50% — so full blessings plus Promotion is 80% off there, not 86%;
+- **from level 24** the loss follows the fractional level, and 86% is real;
+- the loss is rounded up, and the level walks down after it.
+
+**Carried rewards** follow Global Idle's own binary rule
+([custody baseline](design/ECONOMY_CUSTODY_AND_REWARD_DESTINATIONS.md)):
+
+- without Full Bless: the whole Gold Pouch, and later the whole ordinary Loot Pouch;
+- with Full Bless: both kept in full;
+- partial blessings reduce XP loss and protect nothing carried;
+- equipment, the five Hunt containers, supplies, Depot, Stash and the Reward Chest are never
+  touched by this rule.
+
+Full Bless is not a free death: the experience loss still applies, the Hunt still ends, and
+blessings must be reacquired — a recurring Gold sink by design.
+
+Skill loss is specified and **deferred** to Phase 4, where a real Skill representation exists.
 
 ## 5. Skill progression
 

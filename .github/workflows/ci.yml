@@ -161,8 +161,10 @@ jobs:
       # Docker daemon present and the variables unset, the Testcontainers path
       # is the only path (tests/support/global-setup.ts).
       - name: '10 · Integration tests'
-        # Includes Phase 2's ST, AU, RW, SU, DE, CX and PS groups, which drive
-        # the real domain against the real database. PS2, PS4 and PS5 spawn a
+        # Includes Phase 2's ST, AU, RW, SU, DE, CX, PS, DL, GP and BL groups,
+        # which drive the real domain against the real database — the custody
+        # cases in particular, because a ledger that drifts is only visible
+        # against a real one. PS2, PS4 and PS5 spawn a
         # SEPARATE NODE PROCESS against the same database, so restart safety is
         # proven by a restart rather than by a second connection.
         run: pnpm test:integration
@@ -170,7 +172,9 @@ jobs:
       - name: '11 · Economy invariant tests'
         # A category of its own, not ordinary unit tests: currency
         # double-spend under concurrency, non-idempotent replay, ledger
-        # mutation, reconciliation drift (§13).
+        # mutation, reconciliation drift (§13) — now PER CUSTODY SCOPE, so a
+        # Character's pouch cannot hide a disagreement inside its account's
+        # bank (ADR-019).
         run: pnpm test:invariants
 
       # ─────────────────────────────────────────── check 12 — the apps build
@@ -179,8 +183,8 @@ jobs:
         run: pnpm build
 
       # ─────────────────────────────────────────── the matrices are countable
-      - name: 'Test matrices — Phase 0B 92, Phase 1 87, Phase 2 74'
-        # Not a §13 check; it is how "all 92 pass", "all 87 pass" and "all 74
+      - name: 'Test matrices — Phase 0B 92, Phase 1 87, Phase 2 97'
+        # Not a §13 check; it is how "all 92 pass", "all 87 pass" and "all 97
         # pass" stay countable claims rather than assertions (Phase 0B §14,
         # Phase 1 §16, Phase 2 §12). It fails on a missing id, a duplicate, and
         # an id belonging to no matrix — which is what keeps three id spaces
