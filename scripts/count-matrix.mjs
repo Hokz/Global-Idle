@@ -2,7 +2,7 @@
 /**
  * Count the implemented matrix cases and compare them with what the approved
  * specifications fix: Phase 0B §14 at **92**, Phase 1 §16 at **87**, Phase 2
- * §12 at **97**.
+ * §12 at **106**, Phase 3 §20 at **125**.
  *
  * The convention this relies on: every matrix case is exactly ONE test whose
  * title begins with its id and a colon — `it('W1: ...')` for a Vitest case,
@@ -82,11 +82,57 @@ const MATRICES = {
       BL: [1, 3],
     },
   },
+  'phase-3': {
+    spec: 'docs/specs/phase-3/PHASE_3_ITEMIZATION_INVENTORY_LOGISTICS_SPEC.md §20',
+    // Every Phase 3 prefix is THREE letters, deliberately. The id spaces of the
+    // three earlier matrices already hold `S`, `ST`, `C`, `D`, `E` and more, and
+    // the counter routes by the longest matching prefix — so `STK` and `STH`
+    // win over Phase 2's `ST`, `SYS` over Phase 1's `S`, and `CAP`/`CSL` over
+    // Phase 0B's `C`. Two-letter codes would have needed a translation table.
+    groups: {
+      ISR: [1, 8],
+      ITM: [1, 10],
+      EQP: [1, 8],
+      CSL: [1, 8],
+      STK: [1, 7],
+      CAP: [1, 5],
+      LPH: [1, 9],
+      POL: [1, 6],
+      DTH: [1, 6],
+      DPT: [1, 4],
+      STH: [1, 6],
+      MOV: [1, 8],
+      RTE: [1, 5],
+      BNK: [1, 6],
+      NPC: [1, 5],
+      HNT: [1, 6],
+      SYS: [1, 12],
+      MIG: [1, 6],
+    },
+  },
 };
 
 // Longest-first so `AC13` is not read as `A` + `C13`, and `E2E1` is not `E` +
 // `2`. Regex alternation is ordered, and that order is the whole contract.
 const PREFIXES = [
+  'ISR',
+  'ITM',
+  'EQP',
+  'CSL',
+  'STK',
+  'CAP',
+  'LPH',
+  'POL',
+  'DTH',
+  'DPT',
+  'STH',
+  'MOV',
+  'RTE',
+  'BNK',
+  'NPC',
+  'HNT',
+  'SYS',
+  'MIG',
   'DEV',
   'REG',
   'API',

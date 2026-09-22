@@ -18,6 +18,25 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { REPO_ROOT } from './repo.js';
 
+/**
+ * How a row is re-read out of the source.
+ *
+ * Most rows are a REGEX over a text file. One family is not: stackability
+ * lives in `data/items/appearances.dat`, a client appearance protobuf, because
+ * `Items::loadFromProtobuf` sets `ItemType::stackable` from
+ * `object.flags().cumulative()` and nothing in `items.xml` carries it. Reading
+ * that flag by memory is exactly the habit this record exists to break, so it
+ * gets a probe of its own rather than a footnote.
+ */
+export type ImportProbe =
+  | { readonly kind?: 'pattern'; readonly pattern: string; readonly captured: string | string[] }
+  | {
+      readonly kind: 'appearance';
+      readonly appearanceId: number;
+      readonly flag: 'cumulative';
+      readonly captured: 'true' | 'false';
+    };
+
 export interface ImportRecord {
   readonly id: string;
   readonly file: string;
@@ -27,7 +46,7 @@ export interface ImportRecord {
   readonly fixture: string;
   readonly value: unknown;
   readonly reason?: string;
-  readonly probe: { readonly pattern: string; readonly captured: string | string[] };
+  readonly probe: ImportProbe;
 }
 
 export interface ImportRecordFile {
@@ -62,6 +81,83 @@ export function canarySource(): string | null {
   return null;
 }
 
+/**
+ * Just enough protobuf to read one boolean.
+ *
+ * `src/protobuf/appearances.proto` gives the three field numbers this needs:
+ * `Appearances.object` = 1, `Appearance.id` = 1, `Appearance.flags` = 3, and
+ * `AppearanceFlags.cumulative` = 6. Everything else in a 4.8 MB file is
+ * skipped by length, so no protobuf runtime is added to the repository for a
+ * decoder this small — and a wrong field number fails loudly rather than
+ * silently returning `false`.
+ */
+interface WireField {
+  readonly field: number;
+  readonly varint?: bigint;
+  readonly bytes?: Uint8Array;
+}
+
+function readVarint(buffer: Uint8Array, at: number): { value: bigint; next: number } {
+  let value = 0n;
+  let shift = 0n;
+  let index = at;
+  for (;;) {
+    const byte = buffer[index];
+    if (byte === undefined) throw new Error(`appearances.dat: varint runs off the end at ${at}`);
+    index += 1;
+    value |= BigInt(byte & 0x7f) << shift;
+    if ((byte & 0x80) === 0) return { value, next: index };
+    shift += 7n;
+  }
+}
+
+function* wireFields(buffer: Uint8Array, from: number, to: number): Generator<WireField> {
+  let index = from;
+  while (index < to) {
+    const key = readVarint(buffer, index);
+    index = key.next;
+    const field = Number(key.value >> 3n);
+    const wire = Number(key.value & 7n);
+    if (wire === 0) {
+      const value = readVarint(buffer, index);
+      index = value.next;
+      yield { field, varint: value.value };
+    } else if (wire === 2) {
+      const length = readVarint(buffer, index);
+      const start = length.next;
+      const end = start + Number(length.value);
+      index = end;
+      yield { field, bytes: buffer.subarray(start, end) };
+    } else if (wire === 5) {
+      index += 4;
+    } else if (wire === 1) {
+      index += 8;
+    } else {
+      throw new Error(`appearances.dat: unsupported wire type ${wire} at ${index}`);
+    }
+  }
+}
+
+/** The `cumulative` flag for one appearance id, or `null` if the id is absent. */
+export function appearanceCumulative(file: Uint8Array, appearanceId: number): boolean | null {
+  for (const object of wireFields(file, 0, file.length)) {
+    if (object.field !== 1 || !object.bytes) continue;
+    let id: number | null = null;
+    let flags: Uint8Array | null = null;
+    for (const inner of wireFields(object.bytes, 0, object.bytes.length)) {
+      if (inner.field === 1 && inner.varint !== undefined) id = Number(inner.varint);
+      else if (inner.field === 3 && inner.bytes) flags = inner.bytes;
+    }
+    if (id !== appearanceId) continue;
+    if (!flags) return false;
+    for (const flag of wireFields(flags, 0, flags.length)) {
+      if (flag.field === 6 && flag.varint !== undefined) return flag.varint !== 0n;
+    }
+    return false;
+  }
+  return null;
+}
+
 export interface ProbeResult {
   readonly id: string;
   readonly ok: boolean;
@@ -78,6 +174,25 @@ export function verifyAgainstSource(root: string): readonly ProbeResult[] {
   return importRecord.imports.map((entry) => {
     const path = join(root, entry.file);
     if (!existsSync(path)) return { id: entry.id, ok: false, detail: `missing ${entry.file}` };
+
+    if (entry.probe.kind === 'appearance') {
+      const decoded = appearanceCumulative(readFileSync(path), entry.probe.appearanceId);
+      if (decoded === null) {
+        return {
+          id: entry.id,
+          ok: false,
+          detail: `appearance ${entry.probe.appearanceId} is not in ${entry.file}`,
+        };
+      }
+      const read = decoded ? 'true' : 'false';
+      return {
+        id: entry.id,
+        ok: read === entry.probe.captured,
+        detail:
+          read === entry.probe.captured ? 'ok' : `read ${read}, recorded ${entry.probe.captured}`,
+      };
+    }
+
     const source = readFileSync(path, 'utf8');
     const match = new RegExp(entry.probe.pattern).exec(source);
     if (!match) return { id: entry.id, ok: false, detail: `no match in ${entry.file}` };
