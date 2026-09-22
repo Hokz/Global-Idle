@@ -12,7 +12,7 @@
  * drive the domain directly; those are not re-litigated through a browser.
  */
 import { expect, test, type Page } from '@playwright/test';
-import { enterHunt, play } from './support';
+import { connect, enterHunt, play, runOf } from './support';
 
 async function system(page: Page, characterId: string): Promise<void> {
   await page.goto(`/system/${characterId}`);
@@ -178,24 +178,41 @@ test.describe('§20 SYS — the System UI', () => {
     const characterId = await play(page);
     await enterHunt(page);
 
-    // The Game Window reports occupancy, and the combat log names what was
-    // picked up — "nothing is being collected" has to be VISIBLE to be fixable.
-    await expect(page.getByTestId('pouch-occupancy')).toBeVisible();
-    await expect
-      .poll(
-        async () => Number(await page.getByTestId('pouch-occupancy').getAttribute('data-used')),
-        {
-          timeout: 90_000,
-        },
-      )
-      .toBeGreaterThan(0);
-    await expect(page.getByTestId('events')).toContainText('You pick up');
+    // A Hunt advances one tick per real second and a Rat drops cheese on
+    // 39.41% of kills, so honestly waiting for a drop is a twenty-minute test.
+    // This is the idiom support.ts already describes: the case is about
+    // RENDERING, so the durable position is arranged and the SERVER simulates
+    // the span. Nothing about the drop is faked — the run's own engine rolls
+    // it, over a span this test moved the clock for.
+    const prisma = connect();
+    try {
+      const run = await runOf(prisma, characterId);
+      await prisma.huntRun.update({
+        where: { activityId: run.activityId },
+        data: { simulatedThrough: new Date(Date.now() - 20 * 60_000), lastSeenAt: new Date() },
+      });
 
-    // ...and the System UI shows the same thing it collected.
-    await system(page, characterId);
-    await expect(
-      page.getByTestId('loot-pouch').locator('[data-definition="item.cheese"]'),
-    ).toHaveCount(1);
-    await expect(page.getByTestId('pouch-occupancy')).toContainText('/ 20');
+      // The Game Window reports occupancy, and the combat log names what was
+      // picked up — "nothing is being collected" has to be VISIBLE before it
+      // can be fixed.
+      await expect(page.getByTestId('run-pouch-occupancy')).toBeVisible();
+      await expect
+        .poll(
+          async () =>
+            Number(await page.getByTestId('run-pouch-occupancy').getAttribute('data-used')),
+          { timeout: 60_000 },
+        )
+        .toBeGreaterThan(0);
+      await expect(page.getByTestId('events')).toContainText('You pick up');
+
+      // ...and the System UI shows the very thing it collected.
+      await system(page, characterId);
+      await expect(
+        page.getByTestId('loot-pouch').locator('[data-definition="item.cheese"]'),
+      ).toHaveCount(1);
+      await expect(page.getByTestId('pouch-occupancy')).toContainText('/ 20');
+    } finally {
+      await prisma.$disconnect();
+    }
   });
 });

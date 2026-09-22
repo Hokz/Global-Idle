@@ -310,7 +310,10 @@ export function GameWindow({ characterId, label, summary, onEnded }: GameWindowP
               picked up" is a state the player has to be able to SEE before
               they can fix it. */}
           <dt>Loot pouch</dt>
-          <dd data-testid="pouch-occupancy" data-used={run.lootPouch?.used ?? 0}>
+          {/* `run-pouch-occupancy`, not `pouch-occupancy`: the System UI owns
+              that id. Two elements answering to one test id is a test that
+              passes by accident. */}
+          <dd data-testid="run-pouch-occupancy" data-used={run.lootPouch?.used ?? 0}>
             {run.lootPouch ? `${run.lootPouch.used} / ${run.lootPouch.spaces}` : '—'}
           </dd>
         </div>
