@@ -66,12 +66,13 @@ function describe(event: HuntEvent): string {
 const ENDED: Record<string, { title: string; detail: string }> = {
   DIED: {
     title: 'You have died',
-    detail: 'The hunt is over. Your Base XP and Gold are already banked.',
+    detail: 'The hunt is over.',
   },
-  LEFT: { title: 'You left the hunt', detail: 'Everything you earned is banked.' },
+  LEFT: { title: 'You left the hunt', detail: 'You keep what you were carrying.' },
   GRACE_EXPIRED: {
     title: 'The connection did not come back',
-    detail: 'The hunt ended after five minutes of reconnect grace.',
+    detail:
+      'The hunt ended after five minutes of reconnect grace. You keep what you were carrying.',
   },
 };
 
@@ -279,8 +280,16 @@ export function GameWindow({ characterId, label, summary, onEnded }: GameWindowP
           <dd data-testid="session-xp">{run.sessionXp}</dd>
         </div>
         <div className="stat">
-          <dt>Session gold</dt>
-          <dd data-testid="session-gold">{run.sessionGold}</dd>
+          <dt>Gold pouch</dt>
+          {/* THE CARRIED TOTAL, and the number that is at risk. `sessionGold`
+              is what this run earned; the pouch is what the Character is
+              actually holding, and what a death without Full Bless takes. */}
+          <dd data-testid="pouch-gold">
+            {run.pouchGold}
+            <span className="muted small" data-testid="session-gold">
+              {run.sessionGold} this run
+            </span>
+          </dd>
         </div>
         <div className="stat">
           <dt>Stamina</dt>
@@ -327,6 +336,29 @@ export function GameWindow({ characterId, label, summary, onEnded }: GameWindowP
           <p className="muted small" style={{ margin: 0 }}>
             {ended.detail}
           </p>
+          {run.penalty ? (
+            // WHAT IT COST, said plainly. Two numbers going down without an
+            // explanation is how a player concludes the game ate their gold.
+            <ul
+              className="small stack"
+              data-testid="penalty"
+              style={{ margin: 0, paddingLeft: 18 }}
+            >
+              <li data-testid="penalty-xp">
+                Lost {run.penalty.experienceLost} experience
+                {run.penalty.levelAfter < run.penalty.levelBefore
+                  ? ` — down to level ${run.penalty.levelAfter}`
+                  : ''}
+              </li>
+              <li data-testid="penalty-gold">
+                {run.penalty.fullBless
+                  ? 'Your blessings protected your gold pouch'
+                  : run.penalty.goldForfeited === '0'
+                    ? 'Your gold pouch was empty'
+                    : `Lost ${run.penalty.goldForfeited} gold from your pouch`}
+              </li>
+            </ul>
+          ) : null}
           <div className="row">
             <button className="primary" data-testid="back-to-atlas" onClick={() => void onEnded()}>
               Back to the Atlas

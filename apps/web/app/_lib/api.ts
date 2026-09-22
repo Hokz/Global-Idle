@@ -82,7 +82,11 @@ export interface RunView {
   supplyCharges: number;
   creatures: RunCreature[];
   sessionXp: string;
+  /** What THIS RUN earned. The carried total is `pouchGold`. */
   sessionGold: string;
+  /** The Gold Pouch — CARRIED, and lost on death without Full Bless. Not the
+   *  Bank, which is safe and is a different number. */
+  pouchGold: string;
   baseLevel: number;
   baseXp: string;
   levelStartXp: string;
@@ -92,6 +96,14 @@ export interface RunView {
   connection: 'ONLINE_ACTIVE' | 'RECONNECT_GRACE_PAUSED' | 'ACTIVITY_ENDED';
   graceExpiresAt: string | null;
   endedReason: 'DIED' | 'LEFT' | 'GRACE_EXPIRED' | null;
+  /** Only on the settlement that killed the Character. */
+  penalty: {
+    experienceLost: string;
+    goldForfeited: string;
+    levelBefore: number;
+    levelAfter: number;
+    fullBless: boolean;
+  } | null;
   events: HuntEvent[];
 }
 
