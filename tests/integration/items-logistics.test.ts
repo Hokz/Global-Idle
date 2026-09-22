@@ -690,15 +690,19 @@ describe('§20 MOV — movement', () => {
     expect(await totalOf(prisma, hero.accountId, CHEESE)).toBe(before);
   });
 
-  it('MOV2: moving the whole stack removes the row rather than leaving a zero', async () => {
+  it('MOV2: moving a whole stack MOVES THE ROW — the identity survives the trip', async () => {
+    // Found by BNK5, which sold an item by the id it had before a move and got
+    // ItemNotFound. Deleting and recreating copies the VALUE and loses the
+    // THING, and an id is what a rarity, an affix and one day a Forge tier
+    // hang on — so a whole-stack move updates in place.
     const hero = await idle();
     const container = await firstContainer(prisma, hero.characterId);
     const stack = await give(prisma, {
       accountId: hero.accountId,
       characterId: hero.characterId,
       containerId: container,
-      definitionKey: CHEESE,
-      quantity: 3,
+      definitionKey: DAGGER,
+      quantity: 1,
       at: T0,
     });
     await withTransaction(prisma, (tx) =>
@@ -712,7 +716,33 @@ describe('§20 MOV — movement', () => {
         at: T0,
       }),
     );
-    expect(await prisma.itemInstance.findUnique({ where: { id: stack } })).toBeNull();
+    const moved = await prisma.itemInstance.findUniqueOrThrow({ where: { id: stack } });
+    expect(moved).toMatchObject({ location: 'DEPOT', characterId: null, containerId: null });
+
+    // A SPLIT is the one case that creates something, and it still leaves no
+    // zero-quantity row behind.
+    const bulk = await give(prisma, {
+      accountId: hero.accountId,
+      characterId: hero.characterId,
+      containerId: container,
+      definitionKey: CHEESE,
+      quantity: 3,
+      at: T0,
+    });
+    await withTransaction(prisma, (tx) =>
+      items.moveItem(tx, {
+        bundle,
+        accountId: hero.accountId,
+        characterId: hero.characterId,
+        baseLevel: 400,
+        instanceId: bulk,
+        quantity: 3,
+        to: { kind: 'DEPOT' },
+        at: T0,
+      }),
+    );
+    expect(await prisma.itemInstance.count({ where: { quantity: { lte: 0 } } })).toBe(0);
+    expect(await totalOf(prisma, hero.accountId, CHEESE)).toBe(3);
   });
 
   it('MOV3: a quantity of zero or more than the stack is refused', async () => {

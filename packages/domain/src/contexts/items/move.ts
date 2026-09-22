@@ -162,33 +162,52 @@ export async function moveItem(tx: UnitOfWork, input: MoveItem): Promise<void> {
       data: { quantity: { increment: merge.add } },
     });
   }
-  for (const size of placement.newStacks) {
-    await createItem(tx, {
-      accountId: input.accountId,
-      characterId: input.to.kind === 'DEPOT' ? null : input.characterId,
-      definitionKey: fresh.definitionKey,
-      quantity: size,
-      location:
-        input.to.kind === 'EQUIPPED'
-          ? 'EQUIPPED'
-          : input.to.kind === 'CONTAINER'
-            ? 'CHARACTER_CONTAINER'
-            : 'DEPOT',
-      slot: input.to.kind === 'EQUIPPED' ? input.to.slot : null,
-      containerId: input.to.kind === 'CONTAINER' ? input.to.containerId : null,
-      rarity: fresh.rarity,
-      affixes: fresh.affixes,
-      at: input.at,
-    });
-  }
 
-  if (quantity === fresh.quantity) {
-    await tx.itemInstance.delete({ where: { id: fresh.id } });
-  } else {
+  const custody = {
+    characterId: input.to.kind === 'DEPOT' ? null : input.characterId,
+    location:
+      input.to.kind === 'EQUIPPED'
+        ? ('EQUIPPED' as const)
+        : input.to.kind === 'CONTAINER'
+          ? ('CHARACTER_CONTAINER' as const)
+          : ('DEPOT' as const),
+    slot: input.to.kind === 'EQUIPPED' ? input.to.slot : null,
+    containerId: input.to.kind === 'CONTAINER' ? input.to.containerId : null,
+  };
+
+  // MOVING THE WHOLE STACK MOVES THE ROW, it does not replace it.
+  //
+  // An instance's id IS its identity — it is what a rarity, an affix and one
+  // day a Forge tier hang on. Deleting and recreating would copy the value and
+  // lose the thing, and the loss would only surface in a phase that keyed
+  // something on it. So the row is updated in place whenever nothing merged,
+  // and only a genuine SPLIT creates something new.
+  const movesWhole = quantity === fresh.quantity && placement.merges.length === 0;
+  if (movesWhole && placement.newStacks.length === 1) {
     await tx.itemInstance.update({
       where: { id: fresh.id },
-      data: { quantity: { decrement: quantity } },
+      data: { ...custody, quantity },
     });
+  } else {
+    for (const size of placement.newStacks) {
+      await createItem(tx, {
+        accountId: input.accountId,
+        ...custody,
+        definitionKey: fresh.definitionKey,
+        quantity: size,
+        rarity: fresh.rarity,
+        affixes: fresh.affixes,
+        at: input.at,
+      });
+    }
+    if (quantity === fresh.quantity) {
+      await tx.itemInstance.delete({ where: { id: fresh.id } });
+    } else {
+      await tx.itemInstance.update({
+        where: { id: fresh.id },
+        data: { quantity: { decrement: quantity } },
+      });
+    }
   }
 
   recordDomainEvent({
