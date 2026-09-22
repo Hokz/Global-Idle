@@ -14,6 +14,16 @@
  */
 import { normalRandom, uniformRandom } from './distributions.js';
 import type { SeededRandom } from './random.js';
+import {
+  isAdjacent,
+  isWalkable,
+  meleeGoals,
+  samePosition,
+  stepToward,
+  type MapRegion,
+  type TileMap,
+  type TilePosition,
+} from './space.js';
 
 export const TICK_MS = 1000;
 
@@ -82,6 +92,39 @@ export interface HuntCreatureState {
   readonly key: string;
   readonly health: number;
   readonly nextAttackTick: number;
+  /**
+   * Phase 3.5 — spatial fields, present only when the Hunt has a map.
+   *
+   * They are OPTIONAL because Phase 2's golden fixture pins this state's exact
+   * JSON, and `undefined` does not serialize. A Hunt with no map produces
+   * byte-for-byte what it produced before space existed, which is how the
+   * VERIFIED combat kernel stays verified.
+   */
+  readonly id?: string;
+  readonly position?: TilePosition;
+  readonly leg?: MovementLeg;
+}
+
+/**
+ * One tile step, as the CLIENT needs it.
+ *
+ * The server's truth is `position` — always a real tile, never a fraction.
+ * A leg says which step just started and when it completes, so the browser can
+ * interpolate pixels between two authoritative tiles without ever deciding
+ * where an actor is.
+ */
+export interface MovementLeg {
+  readonly from: TilePosition;
+  readonly to: TilePosition;
+  readonly startedTick: number;
+  readonly completesTick: number;
+}
+
+/** The map and the room→region mapping a spatial Hunt simulates over. */
+export interface SpatialPlan {
+  readonly map: TileMap;
+  /** Region for a room number, falling back to the endless room's region. */
+  readonly regionFor: (room: number) => MapRegion;
 }
 
 export type HuntEndReason = 'DIED';
@@ -96,6 +139,9 @@ export interface HuntState {
   readonly creatures: readonly HuntCreatureState[];
   readonly characterNextAttackTick: number;
   readonly ended: HuntEndReason | null;
+  /** Phase 3.5 — present only when the Hunt has a map. */
+  readonly position?: TilePosition;
+  readonly leg?: MovementLeg;
 }
 
 export interface HuntReward {
@@ -156,7 +202,15 @@ export type HuntEvent =
       readonly healed: number;
       readonly remaining: number;
     }
-  | { readonly tick: number; readonly kind: 'died' };
+  | { readonly tick: number; readonly kind: 'died' }
+  | {
+      /** Phase 3.5 — an actor stepped from one authoritative tile to another. */
+      readonly tick: number;
+      readonly kind: 'move';
+      readonly actor: string;
+      readonly from: TilePosition;
+      readonly to: TilePosition;
+    };
 
 export interface HuntStep {
   readonly state: HuntState;
@@ -168,6 +222,10 @@ export interface HuntStep {
 }
 
 const msToTicks = (ms: number): number => Math.max(1, Math.round(ms / TICK_MS));
+
+/** The actor id the Character moves under, in events and in occupancy. */
+export const CHARACTER_ACTOR = 'character';
+const CHARACTER = CHARACTER_ACTOR;
 
 /** The room a run is in, or the endless one once past the end of the plan. */
 function roomFor(plan: RoomPlan, room: number): RoomDefinition {
@@ -274,6 +332,16 @@ export function simulateHunt(
    * Omitted, nothing drops, which is what every Phase 2 case expects.
    */
   lootRng?: SeededRandom,
+  /**
+   * Phase 3.5 — SPACE.
+   *
+   * Omitted, this function is exactly what Phase 2 verified: the same branches,
+   * the same draws, the same golden file. Present, an attack additionally
+   * requires the attacker to be standing next to its target, and an actor that
+   * is not spends its tick walking. No new randomness: pathing is a
+   * deterministic rule, so a reload recomputes the same future.
+   */
+  space?: SpatialPlan,
 ): HuntStep {
   const before = rng.drawCount;
   const rewards: HuntReward[] = [];
@@ -289,22 +357,72 @@ export function simulateHunt(
   const minHit = minMeleeHit(profile);
   const supplyThreshold = (profile.maxHealth * profile.supply.useBelowPercent) / 100;
 
+  // ── space ────────────────────────────────────────────────────────────────
+  let position = state.position ?? space?.map.entry;
+  let leg: MovementLeg | undefined;
+
+  /** Every tile a LIVING actor is standing on. Recomputed per query, because
+   *  actors move within a tick and a stale set is an overlap. */
+  const occupied = (exclude?: string): ((at: TilePosition) => boolean) => {
+    const taken: TilePosition[] = [];
+    if (position && exclude !== CHARACTER) taken.push(position);
+    for (const creature of creatures) {
+      if (creature.health <= 0 || !creature.position) continue;
+      if (creature.id !== undefined && creature.id === exclude) continue;
+      taken.push(creature.position);
+    }
+    return (at: TilePosition) => taken.some((tile) => samePosition(tile, at));
+  };
+
+  /** One authoritative step, or nothing. The position IS the tile; the leg is
+   *  only what the browser interpolates between two of them. */
+  const stepActor = (
+    actor: string,
+    from: TilePosition,
+    target: TilePosition,
+  ): { readonly to: TilePosition; readonly leg: MovementLeg } | null => {
+    if (!space) return null;
+    const blocked = occupied(actor);
+    const goals = meleeGoals(space.map, target, blocked);
+    const next = stepToward(space.map, from, goals, blocked);
+    if (!next || !isWalkable(space.map, next)) return null;
+    const stepLeg: MovementLeg = {
+      from,
+      to: next,
+      startedTick: tick,
+      completesTick: tick + 1,
+    };
+    events.push({ tick, kind: 'move', actor, from, to: next });
+    return { to: next, leg: stepLeg };
+  };
+
   for (let step = 0; step < ticks && ended === null; step += 1) {
     tick += 1;
 
     // 1. Spawn the encounter if the room is empty.
     if (creatures.length === 0) {
       const definition = roomFor(plan, room);
-      const spawned: { key: string; health: number; nextAttackTick: number }[] = [];
+      const region = space?.regionFor(room);
+      const spawned: HuntCreatureState[] = [];
+      let slot = 0;
       for (const entry of definition.creatures) {
         const stats = plan.creatures[entry.key];
         if (!stats) throw new RangeError(`Room ${room} names ${entry.key}, which is not resolved.`);
         for (let index = 0; index < entry.count; index += 1) {
+          // A deterministic, run-local identity. It survives persistence and
+          // reload because it is derived from WHERE and WHICH, never from a
+          // counter that a restart would lose. Not a durable database row:
+          // this actor exists only inside this run.
+          const id = region ? `${entry.key}:${region.id}:c${cycle}:s${slot}` : undefined;
+          const position = region ? region.spawns[slot % region.spawns.length] : undefined;
           spawned.push({
             key: entry.key,
             health: stats.maxHealth,
             nextAttackTick: tick + msToTicks(stats.attackIntervalMs),
+            ...(id === undefined ? {} : { id }),
+            ...(position === undefined ? {} : { position }),
           });
+          slot += 1;
         }
       }
       creatures = spawned;
@@ -312,7 +430,30 @@ export function simulateHunt(
     }
 
     // 2. The Character acts. Target: the lowest-index living creature (P2-D6).
-    if (tick >= characterNextAttackTick) {
+    //
+    // With a map it must first BE somewhere it can reach from. Walking is what
+    // it does with a tick it cannot attack in, so approach and attack are the
+    // same decision rather than two systems taking turns.
+    const engaged = creatures.findIndex((creature) => creature.health > 0);
+    if (space && position && engaged >= 0) {
+      const enemy = creatures[engaged]!;
+      if (enemy.position && !isAdjacent(position, enemy.position)) {
+        const stepped = stepActor(CHARACTER, position, enemy.position);
+        if (stepped) {
+          position = stepped.to;
+          leg = stepped.leg;
+        }
+      }
+    }
+
+    const inRange =
+      !space ||
+      engaged < 0 ||
+      (!!position &&
+        !!creatures[engaged]?.position &&
+        isAdjacent(position, creatures[engaged]!.position!));
+
+    if (tick >= characterNextAttackTick && inRange) {
       const index = creatures.findIndex((creature) => creature.health > 0);
       if (index >= 0) {
         const target = creatures[index]!;
@@ -359,8 +500,23 @@ export function simulateHunt(
     }
 
     // 3. Living creatures act, in index order.
+    //
+    // Index order is the deterministic arbitration when two want one tile: the
+    // earlier actor moves first and the later one sees it standing there.
+    if (space && position) {
+      creatures = creatures.map((creature) => {
+        if (creature.health <= 0 || !creature.position || !creature.id) return creature;
+        if (isAdjacent(creature.position, position!)) return creature;
+        const stepped = stepActor(creature.id, creature.position, position!);
+        return stepped ? { ...creature, position: stepped.to, leg: stepped.leg } : creature;
+      });
+    }
+
     for (const creature of creatures) {
       if (creature.health <= 0 || tick < creature.nextAttackTick) continue;
+      if (space && (!creature.position || !position || !isAdjacent(creature.position, position))) {
+        continue;
+      }
       const stats = plan.creatures[creature.key]!;
       const damage = applyReduction(
         rng,
@@ -403,7 +559,18 @@ export function simulateHunt(
   }
 
   return {
-    state: { tick, room, cycle, health, supplyCharges, creatures, characterNextAttackTick, ended },
+    state: {
+      tick,
+      room,
+      cycle,
+      health,
+      supplyCharges,
+      creatures,
+      characterNextAttackTick,
+      ended,
+      ...(position === undefined ? {} : { position }),
+      ...(leg === undefined ? {} : { leg }),
+    },
     rewards,
     events,
     roomsCleared,

@@ -30,6 +30,7 @@ import {
   simulateHunt,
   type HuntEvent,
   type HuntState,
+  type TilePosition,
 } from '@global-idle/game-engine';
 import type { ContentBundleResolver } from '@global-idle/game-data';
 import { claimSettlement, settlementOperationId } from '../../platform/idempotency/index.js';
@@ -150,7 +151,7 @@ export async function startRun(
   // count, which is the whole difference Phase 3 makes.
   const equipped = await items.equippedItems(tx, input.characterId);
   const supplies = await items.broughtSupplies(tx, bundle, input.characterId);
-  const { plan, profile, supplyCharges } = buildHuntPlan({
+  const { plan, profile, supplyCharges, space } = buildHuntPlan({
     bundle,
     huntKey: input.contentKey,
     level: input.level,
@@ -172,6 +173,8 @@ export async function startRun(
       characterNextAttackTick: state.characterNextAttackTick,
       supplyCharges: state.supplyCharges,
       creatures: [],
+      // The Character starts ON the map, at its authored entry tile.
+      ...(space ? { position: { tile: space.map.entry } as never } : {}),
       lastSeenAt: input.at,
     },
   });
@@ -281,7 +284,7 @@ export async function advance(
   const bundle = await input.resolver.resolve(activity.contentVersion);
   const equipped = await items.equippedItems(tx, run.characterId);
   const supplies = await items.broughtSupplies(tx, bundle, run.characterId);
-  const { plan, profile } = buildHuntPlan({
+  const { plan, profile, space } = buildHuntPlan({
     bundle,
     huntKey: activity.contentKey,
     level: levelForXp(character.baseXp),
@@ -462,6 +465,11 @@ export async function advance(
       return view(stored, 'ONLINE_ACTIVE', null, []);
     }
 
+    // The persisted tile, or the map's entry the first time a spatial run
+    // advances. Never a pixel, never interpolated: the row holds a TILE.
+    const persistedPosition =
+      (run.position as { tile?: TilePosition } | null)?.tile ?? space?.map.entry ?? null;
+
     const state: HuntState = {
       tick: run.tick,
       room: run.room,
@@ -471,6 +479,7 @@ export async function advance(
       creatures: stored.creatures,
       characterNextAttackTick: run.characterNextAttackTick,
       ended: null,
+      ...(persistedPosition === null ? {} : { position: persistedPosition }),
     };
 
     // The seed includes the tick, so a settlement is a pure function of the
@@ -482,7 +491,7 @@ export async function advance(
     // the persisted position, so a replay reproduces the drops as well as the
     // hits.
     const lootRng = createSeededRandom(`${bound.rngSeed}:${state.tick}:loot`);
-    const step = simulateHunt(state, profile, plan, ticks, rng, lootRng);
+    const step = simulateHunt(state, profile, plan, ticks, rng, lootRng, space);
     events = step.events;
 
     const participant = await tx.activityParticipant.findUniqueOrThrow({
@@ -645,6 +654,14 @@ export async function advance(
         characterNextAttackTick: step.state.characterNextAttackTick,
         supplyCharges: next.supplyCharges,
         creatures: next.creatures as never,
+        ...(step.state.position === undefined
+          ? {}
+          : {
+              position: {
+                tile: step.state.position,
+                ...(step.state.leg === undefined ? {} : { leg: step.state.leg }),
+              } as never,
+            }),
         sessionXp: next.sessionXp,
         sessionGold: next.sessionGold,
         checkpointSequence: sequence,

@@ -309,6 +309,34 @@ export const huntRoomSchema = z.object({
   endless: z.boolean().default(false),
 });
 
+/**
+ * A tile map, as a human writes it (Phase 3.5 §7).
+ *
+ * Rows of characters, a legend, regions that name which Phase 2 room they ARE,
+ * and the tiles creatures stand on. Readable in a diff, validated at build
+ * time, and compiled once into flat arrays for the runtime — static map data
+ * never becomes mutable database state.
+ */
+export const mapRegionSchema = z
+  .object({
+    id: z.string().min(1),
+    /** `[x, y, width, height]`, inclusive of the origin. */
+    rect: z.tuple([z.number().int(), z.number().int(), z.number().int(), z.number().int()]),
+    room: z.number().int().min(1),
+    spawns: z.array(z.object({ x: z.number().int().min(0), y: z.number().int().min(0) })).min(1),
+  })
+  .strict();
+
+export const mapSchema = definitionSchema.extend({
+  kind: z.literal('map'),
+  label: z.string().min(1),
+  z: z.number().int(),
+  rows: z.array(z.string().min(1)).min(1),
+  legend: z.record(z.string().length(1), z.enum(['floor', 'wall', 'water'])),
+  entry: z.object({ x: z.number().int().min(0), y: z.number().int().min(0) }),
+  regions: z.array(mapRegionSchema).min(1),
+});
+
 export const huntSchema = definitionSchema.extend({
   kind: z.literal('hunt'),
   label: z.string().min(1),
@@ -329,11 +357,16 @@ export const huntSchema = definitionSchema.extend({
   /** The Character's own combat facts. Armour, attack and defence are NOT here
    *  — they come from what is equipped. */
   characterBaseline: key.optional(),
+  /** Phase 3.5 — the tile map this Hunt is fought ON. Absent means the Hunt is
+   *  still the abstract Phase 2 encounter counter, which is what every Phase 2
+   *  fixture expects and why this is optional rather than required. */
+  map: key.optional(),
 });
 
 export type Region = z.infer<typeof regionSchema>;
 export type AtlasMarker = z.infer<typeof atlasMarkerSchema>;
 export type Hunt = z.infer<typeof huntSchema>;
+export type MapDefinition = z.infer<typeof mapSchema>;
 export type HuntRoom = z.infer<typeof huntRoomSchema>;
 export type Creature = z.infer<typeof creatureSchema>;
 export type ItemDefinition = z.infer<typeof itemSchema>;

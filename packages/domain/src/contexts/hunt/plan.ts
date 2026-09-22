@@ -12,9 +12,21 @@
  * an empty hand falls to `Weapon::useFist`'s 7. The `combat-profile` content
  * kind is gone, and `ISR`/`EQP` cases assert that it is.
  */
-import { characterBaselineSchema, creatureSchema, huntSchema } from '@global-idle/game-data';
+import {
+  characterBaselineSchema,
+  creatureSchema,
+  huntSchema,
+  mapSchema,
+} from '@global-idle/game-data';
 import type { ResolvedBundle } from '@global-idle/game-data';
-import type { CombatProfile, CreatureStats, RoomPlan } from '@global-idle/game-engine';
+import { compileMap } from '@global-idle/game-engine';
+import type {
+  CombatProfile,
+  CreatureStats,
+  RoomPlan,
+  SpatialPlan,
+  TileMap,
+} from '@global-idle/game-engine';
 import { contentKindMismatch, huntNotFound } from '../../platform/errors/index.js';
 import { itemDefinition } from '../items/index.js';
 import type { Affix, StoredItem } from '../items/index.js';
@@ -27,6 +39,54 @@ export interface HuntPlan {
   readonly plan: RoomPlan;
   readonly profile: CombatProfile;
   readonly supplyCharges: number;
+  /** Phase 3.5 — present when the Hunt names a map. Absent means the Hunt is
+   *  still the abstract Phase 2 encounter, which is what every Phase 2 fixture
+   *  simulates. */
+  readonly space?: SpatialPlan;
+}
+
+/**
+ * Compiled maps, by CONTENT VERSION and key.
+ *
+ * A map is immutable once published — the version is a content hash — so a
+ * compiled one is safe to keep forever and cheap to reuse. This is why a
+ * settlement never parses rows: it looks up flat arrays that were built once.
+ */
+const compiled = new Map<string, TileMap>();
+
+export function mapFor(bundle: ResolvedBundle, mapKey: string): TileMap {
+  const id = `${bundle.version}:${mapKey}`;
+  const cached = compiled.get(id);
+  if (cached) return cached;
+
+  const definition = bundle.definitions.get(mapKey);
+  if (!definition) throw huntNotFound({ key: mapKey, version: bundle.version });
+  const parsed = mapSchema.safeParse(definition);
+  if (!parsed.success) {
+    throw contentKindMismatch({ key: mapKey, expected: 'map', actual: definition.kind });
+  }
+  const map = compileMap({
+    key: parsed.data.key,
+    z: parsed.data.z,
+    rows: parsed.data.rows,
+    legend: parsed.data.legend,
+    entry: parsed.data.entry,
+    regions: parsed.data.regions.map((region) => ({
+      id: region.id,
+      rect: region.rect as readonly [number, number, number, number],
+      room: region.room,
+      spawns: region.spawns,
+    })),
+  });
+  compiled.set(id, map);
+  return map;
+}
+
+/** Room number → the region it IS. Rooms past the plan reuse the endless one. */
+export function spatialPlanFor(map: TileMap): SpatialPlan {
+  const byRoom = new Map(map.regions.map((region) => [region.room, region]));
+  const last = map.regions[map.regions.length - 1]!;
+  return { map, regionFor: (room) => byRoom.get(room) ?? last };
 }
 
 const affixTotal = (affixes: readonly Affix[], kind: Affix['affix']): number =>
@@ -180,5 +240,10 @@ export function buildHuntPlan(input: BuildHuntPlan): HuntPlan {
       },
     },
     supplyCharges: input.supplyCharges,
+    // Space, when the Hunt names a map. A Hunt without one simulates exactly
+    // what Phase 2 verified.
+    ...(hunt.data.map === undefined
+      ? {}
+      : { space: spatialPlanFor(mapFor(bundle, hunt.data.map)) }),
   };
 }

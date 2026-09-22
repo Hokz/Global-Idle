@@ -27,6 +27,7 @@ import {
   characterBaselineSchema,
   creatureSchema,
   huntSchema,
+  mapSchema,
   regionSchema,
   type BundleSource,
 } from './schema.js';
@@ -91,6 +92,7 @@ export function validateBundleSource(input: unknown): ValidationResult {
     service: serviceSchema,
     'starting-grant': startingGrantSchema,
     'character-baseline': characterBaselineSchema,
+    map: mapSchema,
   } as const;
 
   for (const definition of source.definitions) {

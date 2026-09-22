@@ -36,3 +36,30 @@ export type {
   ResolvedContentSlice,
   SimulationResult,
 } from './simulate.js';
+
+// Phase 3.5 — space. Pure, deterministic, and the only place that knows what
+// a tile is.
+export { CHARACTER_ACTOR } from './hunt.js';
+export {
+  KIND_CODES,
+  MapError,
+  STEPS,
+  compileMap,
+  isAdjacent,
+  isInside,
+  isWalkable,
+  manhattan,
+  meleeGoals,
+  samePosition,
+  stepToward,
+  tileIndex,
+} from './space.js';
+export type {
+  MapRegion,
+  MapRegionSource,
+  MapSource,
+  TileKindName,
+  TileMap,
+  TilePosition,
+} from './space.js';
+export type { MovementLeg, SpatialPlan } from './hunt.js';

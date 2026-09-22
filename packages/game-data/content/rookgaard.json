@@ -125,7 +125,8 @@
         "character-baseline.origin",
         "creature.rat",
         "region.rookgaard",
-        "starting-grant.origin.rookgaard"
+        "starting-grant.origin.rookgaard",
+        "map.rookgaard.sewers"
       ],
       "label": "Rookgaard Sewers",
       "region": "region.rookgaard",
@@ -236,7 +237,8 @@
         }
       ],
       "startingGrant": "starting-grant.origin.rookgaard",
-      "characterBaseline": "character-baseline.origin"
+      "characterBaseline": "character-baseline.origin",
+      "map": "map.rookgaard.sewers"
     },
     {
       "key": "marker.rookgaard.sewers",
@@ -564,11 +566,313 @@
       "label": "Pre-vocation Character",
       "maxHealth": 150,
       "attackSkill": 10,
-      "attackFactor": 1.0,
+      "attackFactor": 1,
       "attackIntervalMs": 2000,
       "unarmedAttackValue": 7,
       "supplyUseBelowPercent": 40,
       "sourceRef": "Hokz/canary@f6b81a8 schema.sql players.healthmax 150 and skill_* 10; data/XML/vocations.xml vocation id=0 None attackspeed 2000 and meleeDamage 1.0; src/items/weapons/weapons.cpp Weapon::useFist attackValue 7. ARMOUR, ATTACK VALUE, DEFENCE and SUPPLY CHARGES are deliberately absent: every one of them now comes from an item the Character is wearing or carrying."
+    },
+    {
+      "key": "map.rookgaard.sewers",
+      "kind": "map",
+      "references": [],
+      "label": "Rookgaard Sewers",
+      "z": 7,
+      "legend": {
+        "#": "wall",
+        ".": "floor",
+        "~": "water"
+      },
+      "entry": {
+        "x": 1,
+        "y": 5
+      },
+      "rows": [
+        "#############################################################",
+        "#.....#.....#.....#.....#.....#.....#.....#.....#.....#.....#",
+        "#...........#.....#.....#.....#.....#.....#...........#.....#",
+        "#..#..#.....#.....#.....#.....#..#........#.....#.....#.....#",
+        "#..#..#..#..#.....#...........#.....#..#..#.....#.....#.....#",
+        "#.....#........#..#.....#.....#.....#..#..#..#..#...........#",
+        "#.....#.....#..#..#..#..#.....#.....#...........#..#..#.....#",
+        "#.....#.....#.....#.....#..#........#.....#.....#..#..#..#..#",
+        "#.....#.....#...........#..#..#.....#.....#.....#.....#.....#",
+        "#.....#.....#.....#.....#.....#.....#.....#.....#.....#.....#",
+        "#############################################################"
+      ],
+      "regions": [
+        {
+          "id": "sewers-1",
+          "rect": [1, 1, 5, 9],
+          "room": 1,
+          "spawns": [
+            {
+              "x": 5,
+              "y": 2
+            },
+            {
+              "x": 5,
+              "y": 8
+            },
+            {
+              "x": 2,
+              "y": 8
+            },
+            {
+              "x": 4,
+              "y": 2
+            },
+            {
+              "x": 2,
+              "y": 2
+            }
+          ]
+        },
+        {
+          "id": "sewers-2",
+          "rect": [7, 1, 5, 9],
+          "room": 2,
+          "spawns": [
+            {
+              "x": 11,
+              "y": 2
+            },
+            {
+              "x": 11,
+              "y": 8
+            },
+            {
+              "x": 8,
+              "y": 8
+            },
+            {
+              "x": 10,
+              "y": 2
+            },
+            {
+              "x": 8,
+              "y": 2
+            }
+          ]
+        },
+        {
+          "id": "sewers-3",
+          "rect": [13, 1, 5, 9],
+          "room": 3,
+          "spawns": [
+            {
+              "x": 17,
+              "y": 2
+            },
+            {
+              "x": 17,
+              "y": 8
+            },
+            {
+              "x": 14,
+              "y": 8
+            },
+            {
+              "x": 16,
+              "y": 2
+            },
+            {
+              "x": 14,
+              "y": 2
+            }
+          ]
+        },
+        {
+          "id": "sewers-4",
+          "rect": [19, 1, 5, 9],
+          "room": 4,
+          "spawns": [
+            {
+              "x": 23,
+              "y": 2
+            },
+            {
+              "x": 23,
+              "y": 8
+            },
+            {
+              "x": 20,
+              "y": 8
+            },
+            {
+              "x": 22,
+              "y": 2
+            },
+            {
+              "x": 20,
+              "y": 2
+            }
+          ]
+        },
+        {
+          "id": "sewers-5",
+          "rect": [25, 1, 5, 9],
+          "room": 5,
+          "spawns": [
+            {
+              "x": 29,
+              "y": 2
+            },
+            {
+              "x": 29,
+              "y": 8
+            },
+            {
+              "x": 26,
+              "y": 8
+            },
+            {
+              "x": 28,
+              "y": 2
+            },
+            {
+              "x": 26,
+              "y": 2
+            }
+          ]
+        },
+        {
+          "id": "sewers-6",
+          "rect": [31, 1, 5, 9],
+          "room": 6,
+          "spawns": [
+            {
+              "x": 35,
+              "y": 2
+            },
+            {
+              "x": 35,
+              "y": 8
+            },
+            {
+              "x": 32,
+              "y": 8
+            },
+            {
+              "x": 34,
+              "y": 2
+            },
+            {
+              "x": 32,
+              "y": 2
+            }
+          ]
+        },
+        {
+          "id": "sewers-7",
+          "rect": [37, 1, 5, 9],
+          "room": 7,
+          "spawns": [
+            {
+              "x": 41,
+              "y": 2
+            },
+            {
+              "x": 41,
+              "y": 8
+            },
+            {
+              "x": 38,
+              "y": 8
+            },
+            {
+              "x": 40,
+              "y": 2
+            },
+            {
+              "x": 38,
+              "y": 2
+            }
+          ]
+        },
+        {
+          "id": "sewers-8",
+          "rect": [43, 1, 5, 9],
+          "room": 8,
+          "spawns": [
+            {
+              "x": 47,
+              "y": 2
+            },
+            {
+              "x": 47,
+              "y": 8
+            },
+            {
+              "x": 44,
+              "y": 8
+            },
+            {
+              "x": 46,
+              "y": 2
+            },
+            {
+              "x": 44,
+              "y": 2
+            }
+          ]
+        },
+        {
+          "id": "sewers-9",
+          "rect": [49, 1, 5, 9],
+          "room": 9,
+          "spawns": [
+            {
+              "x": 53,
+              "y": 2
+            },
+            {
+              "x": 53,
+              "y": 8
+            },
+            {
+              "x": 50,
+              "y": 8
+            },
+            {
+              "x": 52,
+              "y": 2
+            },
+            {
+              "x": 50,
+              "y": 2
+            }
+          ]
+        },
+        {
+          "id": "sewers-10",
+          "rect": [55, 1, 5, 9],
+          "room": 10,
+          "spawns": [
+            {
+              "x": 59,
+              "y": 2
+            },
+            {
+              "x": 59,
+              "y": 8
+            },
+            {
+              "x": 56,
+              "y": 8
+            },
+            {
+              "x": 58,
+              "y": 2
+            },
+            {
+              "x": 56,
+              "y": 2
+            }
+          ]
+        }
+      ],
+      "sourceRef": "Authored for Global Idle. Ten chambers joined by doorways, each with a pillar the pathfinder has to go around, so Phase 2 rooms 1-10 become PLACES rather than counters. Not imported from Canary: Tibia’s Rookgaard sewer geometry is proprietary map data, and Phase 3.5 needs a real map, not that map."
     }
   ],
   "unlockSets": []
