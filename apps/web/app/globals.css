@@ -236,6 +236,79 @@ input {
   flex-wrap: wrap;
   flex: 1;
 }
+
+/* ── the tile scene (Phase 3.5) ───────────────────────────────────────── */
+/* The LOGICAL game window is 480 x 352 and never changes. This box only says
+   how much room the page gives it; the canvas scales itself to fit and keeps
+   the same fifteen by eleven tiles visible at any size. */
+.tile-scene {
+  position: relative;
+  /* The box has the SHAPE of the logical surface and is capped at a size that
+     keeps the scene a window rather than a wall. 573 = 420 * 480 / 352, so a
+     wide panel letterboxes nothing. */
+  width: min(100%, 573px);
+  aspect-ratio: 480 / 352;
+  margin-inline: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #23262d;
+  background: #05070a;
+  box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.75);
+}
+.tile-scene canvas {
+  display: block;
+  /* Width and height are set by the renderer, in whole logical multiples. */
+  image-rendering: pixelated;
+  /* Nothing here is interactive: the Character controls itself. */
+  pointer-events: none;
+}
+.tile-debug {
+  position: absolute;
+  left: 8px;
+  bottom: 6px;
+  margin: 0;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  color: #8fd0ff;
+  background: rgba(6, 10, 16, 0.78);
+}
+
+/* With a map above it, the actor strip is a READOUT, not the scene: smaller
+   sprites, in a row, saying who is engaged and how hurt they are. */
+.scene-floor.with-map {
+  gap: 12px;
+  align-items: center;
+}
+.scene-floor.with-map .sprite {
+  width: 24px;
+  height: 24px;
+}
+.scene-floor.with-map .actor {
+  min-width: 56px;
+  flex-direction: row;
+  gap: 8px;
+  align-items: center;
+}
+.scene-floor.with-map .actor figcaption {
+  flex-direction: row;
+  gap: 8px;
+  align-items: center;
+}
+.scene-floor.with-map .actors {
+  gap: 10px;
+}
+
+@media (max-width: 560px) {
+  .tile-scene {
+    /* Smaller on screen, and exactly as much world in it. */
+    width: 100%;
+  }
+}
+
 .actors {
   list-style: none;
   margin: 0;

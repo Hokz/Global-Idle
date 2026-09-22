@@ -8,8 +8,13 @@
 // across a process restart.
 export const GAME_ENGINE_PACKAGE = '@global-idle/game-engine' as const;
 
-export { createSeededRandom } from './random.js';
-export type { SeededRandom } from './random.js';
+export {
+  SEEDED_RANDOM_ALGORITHM,
+  createSeededRandom,
+  isSeededRandomState,
+  restoreSeededRandom,
+} from './random.js';
+export type { SeededRandom, SeededRandomState } from './random.js';
 
 export { normalRandom, uniformRandom } from './distributions.js';
 
@@ -36,3 +41,51 @@ export type {
   ResolvedContentSlice,
   SimulationResult,
 } from './simulate.js';
+
+// Phase 3.5 — space. Pure, deterministic, and the only place that knows what
+// a tile is.
+export { CHARACTER_ACTOR } from './hunt.js';
+export {
+  BLOCK_PATH,
+  BLOCK_PROJECTILE,
+  BLOCK_SOLID,
+  DIAGONAL_WALK_COST,
+  KIND_CODES,
+  MapError,
+  NORMAL_WALK_COST,
+  STEPS,
+  blocksProjectile,
+  canOccupy,
+  canPathThrough,
+  chebyshev,
+  compileMap,
+  connectorAt,
+  isAdjacent,
+  isInside,
+  isWalkable,
+  manhattan,
+  meleeGoals,
+  samePosition,
+  stepCost,
+  stepToward,
+  tileIndex,
+} from './space.js';
+export type {
+  ConnectorKind,
+  MapConnector,
+  MapConnectorSource,
+  MapRegion,
+  MapRegionSource,
+  MapSource,
+  TileKindName,
+  TileMap,
+  TilePosition,
+} from './space.js';
+export {
+  BEAT_MS,
+  DEFAULT_STEP_SPEED,
+  DIAGONAL_STEP_FACTOR,
+  GROUND_SPEED,
+  stepDurationMs,
+} from './hunt.js';
+export type { Movement, SpatialPlan } from './hunt.js';

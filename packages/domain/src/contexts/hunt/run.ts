@@ -27,9 +27,15 @@ import {
   TICK_MS,
   createSeededRandom,
   initialState,
+  isSeededRandomState,
+  restoreSeededRandom,
   simulateHunt,
   type HuntEvent,
   type HuntState,
+  type Movement,
+  type SeededRandom,
+  type SeededRandomState,
+  type TilePosition,
 } from '@global-idle/game-engine';
 import type { ContentBundleResolver } from '@global-idle/game-data';
 import { claimSettlement, settlementOperationId } from '../../platform/idempotency/index.js';
@@ -84,7 +90,53 @@ export interface HuntRunView {
   readonly health: number;
   readonly maxHealth: number;
   readonly supplyCharges: number;
-  readonly creatures: readonly { key: string; health: number; maxHealth: number }[];
+  readonly creatures: readonly {
+    key: string;
+    health: number;
+    maxHealth: number;
+    /** Phase 3.5 — present only when the Hunt has a map. The id is RUN-LOCAL:
+     *  it identifies this actor for as long as it exists and is never a row. */
+    id?: string;
+    tile?: TilePosition;
+    movement?: Movement | null;
+  }[];
+  /**
+   * Phase 3.5 — where the Character IS, and on which map.
+   *
+   * Null when the Hunt names no map, which is every Phase 2 fixture. The tile
+   * is authoritative; the movement is the step in flight, and exists so a browser
+   * can interpolate pixels between two server tiles without ever deciding
+   * where anything is.
+   */
+  readonly space: {
+    /**
+     * WHICH BUNDLE the simulation is running against.
+     *
+     * The browser fetches its map by this version, not by "whatever is current"
+     * — a publish between entering a Hunt and drawing it would otherwise have
+     * the server colliding against one map while the player looks at another.
+     */
+    readonly contentVersion: string;
+    readonly mapKey: string;
+    readonly tile: TilePosition;
+    readonly movement: Movement | null;
+    /**
+     * The simulation instant this snapshot describes, in the same milliseconds
+     * a movement's `startsAtMs` and `arrivesAtMs` are in. The renderer needs
+     * exactly this to place an actor inside a step; without it the client would
+     * have to invent a duration, which is what it used to do.
+     */
+    readonly nowMs: number;
+  } | null;
+  /**
+   * Phase 3.5 — the snapshot's monotonic revision.
+   *
+   * `checkpointSequence`: it advances once per applied settlement and never
+   * goes backwards. A client that holds a higher revision must DISCARD this
+   * response — two polls in flight can arrive out of order, and rendering the
+   * older one rewinds the world on screen.
+   */
+  readonly revision: number;
   /** STRINGS on the wire. A bigint does not survive JSON, and a number would
    *  quietly lose precision on a total the curve takes past 2^53. */
   readonly sessionXp: string;
@@ -129,6 +181,12 @@ interface StoredCreature {
   readonly key: string;
   readonly health: number;
   readonly nextAttackTick: number;
+  /** Phase 3.5 — written by the engine when the Hunt has a map. Optional in
+   *  the column for the same reason it is optional in the engine: a Phase 2
+   *  run has no space, and absent is not the same as zero. */
+  readonly id?: string;
+  readonly position?: TilePosition;
+  readonly movement?: Movement;
 }
 
 /** Create the run beside the Activity, in the same transaction (spec §11). */
@@ -150,7 +208,7 @@ export async function startRun(
   // count, which is the whole difference Phase 3 makes.
   const equipped = await items.equippedItems(tx, input.characterId);
   const supplies = await items.broughtSupplies(tx, bundle, input.characterId);
-  const { plan, profile, supplyCharges } = buildHuntPlan({
+  const { plan, profile, supplyCharges, space } = buildHuntPlan({
     bundle,
     huntKey: input.contentKey,
     level: input.level,
@@ -172,9 +230,232 @@ export async function startRun(
       characterNextAttackTick: state.characterNextAttackTick,
       supplyCharges: state.supplyCharges,
       creatures: [],
+      // The Character starts ON the map, at its authored entry tile.
+      ...(space ? { position: { tile: space.map.entry } as never } : {}),
       lastSeenAt: input.at,
     },
   });
+}
+
+/**
+ * The Character's durable spatial state, read in ONE place.
+ *
+ * `HuntRun.position` holds `{ tile, movement? }`. An earlier version pulled
+ * `.tile` out here and `.movement` out there, and the reconstruction path
+ * quietly took only the tile — so a step in flight at a settlement boundary
+ * was persisted correctly and then thrown away on the next read. The actor
+ * went back to being free, its destination stopped being reserved, and the
+ * "identical future after a restart" guarantee held only for runs that
+ * happened to end a settlement standing still.
+ *
+ * One parser, one shape, both callers.
+ */
+interface StoredSpatialState {
+  readonly tile: TilePosition;
+  readonly movement?: Movement;
+}
+
+function readStoredSpatialState(
+  stored: unknown,
+  entry: TilePosition | undefined,
+): StoredSpatialState | null {
+  const value = stored as { tile?: TilePosition; movement?: Movement } | null;
+  const tile = value?.tile ?? entry;
+  if (!tile) return null;
+  return { tile, ...(value?.movement ? { movement: value.movement } : {}) };
+}
+
+/**
+ * The run's place in its own random streams, read and written in ONE place.
+ *
+ * WHY THIS EXISTS. Settlement used to build its generators from
+ * `${activity.rngSeed}:${run.tick}`. That made each settlement a pure function
+ * of the persisted state — good — but it also made the SETTLEMENT BOUNDARIES
+ * an input. Sixty one-second advances restarted the stream sixty times; one
+ * sixty-second advance ran it once; the same durable state and the same
+ * elapsed time produced different hits, different Gold and different loot. The
+ * client decides when to POST `/hunt/advance`, so the client was deciding the
+ * luck. Persisting where each stream stopped makes the boundary invisible:
+ * one long settlement and many short ones consume the same draws in the same
+ * order.
+ *
+ * THREE STREAMS, still separate (P3-D4). Combat is what Phase 2 is verified
+ * against; physical loot is its own so a new drop table cannot shift a hit;
+ * the item identity roll is its own so rarity and affixes cannot either. This
+ * correction is about each stream's CONTINUITY, never about merging them.
+ */
+const RNG_STATE_VERSION = 1;
+
+interface StoredRngState {
+  readonly version: typeof RNG_STATE_VERSION;
+  readonly combat: SeededRandomState;
+  readonly loot: SeededRandomState;
+  readonly identity: SeededRandomState;
+}
+
+interface RngStreams {
+  readonly combat: SeededRandom;
+  readonly loot: SeededRandom;
+  readonly identity: SeededRandom;
+}
+
+/**
+ * Continue this run's streams, or open them.
+ *
+ * `stored` is null exactly twice: on a row written before the streams were
+ * durable, and on the first settlement of a new run. Both take the same path
+ * and it is the OLD rule — `${seed}:${tick}` — which is why a brand new run
+ * (tick 0) begins on precisely the stream the previous implementation used,
+ * and why Phase 2's golden draw sequence is untouched. From then on the row
+ * carries the position.
+ *
+ * Anything else present but unreadable THROWS. A row that holds a state this
+ * engine cannot continue is a row whose future is unknown; reseeding it
+ * quietly would invent a different one and call it the same run.
+ */
+function restoreRngStreams(stored: unknown, seed: string, tick: number): RngStreams {
+  const open = (suffix: string): SeededRandom => createSeededRandom(`${seed}:${tick}${suffix}`);
+  if (stored === null || stored === undefined) {
+    return { combat: open(''), loot: open(':loot'), identity: open(':identity') };
+  }
+  const value = stored as Partial<StoredRngState>;
+  if (typeof value !== 'object' || value.version !== RNG_STATE_VERSION) {
+    throw new RangeError(
+      `HuntRun.rngState is version ${String(value.version)}; this build writes ${RNG_STATE_VERSION}.`,
+    );
+  }
+  const resume = (name: 'combat' | 'loot' | 'identity'): SeededRandom => {
+    const state = value[name];
+    if (!isSeededRandomState(state)) {
+      throw new RangeError(`HuntRun.rngState.${name} is not a stream this engine can continue.`);
+    }
+    return restoreSeededRandom(state);
+  };
+  return { combat: resume('combat'), loot: resume('loot'), identity: resume('identity') };
+}
+
+/** Where the streams stand now, for the row. */
+function snapshotRngStreams(streams: RngStreams): StoredRngState {
+  return {
+    version: RNG_STATE_VERSION,
+    combat: streams.combat.snapshot(),
+    loot: streams.loot.snapshot(),
+    identity: streams.identity.snapshot(),
+  };
+}
+
+/** Everything the view needs that does not change between two settlements. */
+interface ProjectionContext {
+  readonly activityId: string;
+  readonly characterId: string;
+  readonly maxHealth: number;
+  readonly creatureMaxHealth: (key: string) => number | null;
+  readonly pouchUsed: number;
+  readonly mapKey: string | null;
+  readonly contentVersion: string;
+}
+
+/** The durable run, at one instant, in the shape the projection reads. */
+interface RunProjection {
+  readonly room: number;
+  readonly cycle: number;
+  readonly tick: number;
+  readonly characterHealth: number;
+  readonly supplyCharges: number;
+  readonly creatures: readonly StoredCreature[];
+  readonly sessionXp: bigint;
+  readonly sessionGold: bigint;
+  readonly pouchGold: bigint;
+  readonly endedReason: HuntEndReason | null;
+  readonly baseXp: bigint;
+  readonly staminaRemainingMs: number;
+  readonly revision: number;
+  readonly position?: { readonly tile: TilePosition; readonly movement?: Movement };
+}
+
+/**
+ * Durable state → the view, in ONE place.
+ *
+ * `advance` and `snapshot` must answer with the same shape from the same
+ * numbers; the only difference between them is whether the state they hand in
+ * was simulated first. Two projections would drift, and the first symptom
+ * would be a field the pure read forgets to fill.
+ */
+function project(
+  context: ProjectionContext,
+  state: RunProjection,
+  connection: HuntRunView['connection'],
+  graceExpiresAt: Instant | null,
+  events: readonly HuntEvent[],
+  penalty: DeathPenalty | null = null,
+): HuntRunView {
+  const progress = levelProgress(state.baseXp);
+  return {
+    activityId: context.activityId,
+    characterId: context.characterId,
+    room: state.room,
+    cycle: state.cycle,
+    tick: state.tick,
+    health: state.characterHealth,
+    maxHealth: context.maxHealth,
+    supplyCharges: state.supplyCharges,
+    creatures: state.creatures.map((creature) => ({
+      key: creature.key,
+      health: creature.health,
+      maxHealth: context.creatureMaxHealth(creature.key) ?? creature.health,
+      ...(creature.id === undefined ? {} : { id: creature.id }),
+      ...(creature.position === undefined ? {} : { tile: creature.position }),
+      ...(creature.position === undefined ? {} : { movement: creature.movement ?? null }),
+    })),
+    sessionXp: state.sessionXp.toString(),
+    sessionGold: state.sessionGold.toString(),
+    pouchGold: state.pouchGold.toString(),
+    baseLevel: progress.level,
+    baseXp: progress.totalXp.toString(),
+    levelStartXp: progress.levelStartXp.toString(),
+    nextLevelXp: progress.nextLevelXp.toString(),
+    staminaRemainingMs: state.staminaRemainingMs,
+    // The mode is DERIVED from the same authoritative state the Character
+    // context derives it from: ended is recovering, paused is neutral, and a
+    // run that has not yet earned its first XP is neutral too (§3.3).
+    staminaMode:
+      connection === 'ACTIVITY_ENDED'
+        ? 'RECOVERING'
+        : connection === 'RECONNECT_GRACE_PAUSED'
+          ? 'NEUTRAL'
+          : state.tick > 0 && state.sessionXp > 0n
+            ? 'CONSUMING'
+            : 'NEUTRAL',
+    connection,
+    graceExpiresAt: graceExpiresAt ? graceExpiresAt.toISOString() : null,
+    endedReason: state.endedReason,
+    // Phase 3 — how full the Loot Pouch is. "Nothing is being picked up" is
+    // a state the player has to be able to SEE before they can fix it.
+    lootPouch: { used: context.pouchUsed, spaces: LOOT_POUCH_SPACES },
+    penalty: penalty
+      ? {
+          experienceLost: penalty.experienceLost.toString(),
+          goldForfeited: penalty.goldForfeited.toString(),
+          levelBefore: penalty.levelBefore,
+          levelAfter: penalty.levelAfter,
+          fullBless: penalty.fullBless,
+          lootForfeited: penalty.lootForfeited,
+        }
+      : null,
+    events,
+    // Phase 3.5 — space, and the revision that orders two snapshots.
+    space:
+      context.mapKey !== null && state.position
+        ? {
+            contentVersion: context.contentVersion,
+            mapKey: context.mapKey,
+            tile: state.position.tile,
+            movement: state.position.movement ?? null,
+            nowMs: state.tick * TICK_MS,
+          }
+        : null,
+    revision: state.revision,
+  };
 }
 
 /**
@@ -281,7 +562,7 @@ export async function advance(
   const bundle = await input.resolver.resolve(activity.contentVersion);
   const equipped = await items.equippedItems(tx, run.characterId);
   const supplies = await items.broughtSupplies(tx, bundle, run.characterId);
-  const { plan, profile } = buildHuntPlan({
+  const { plan, profile, space } = buildHuntPlan({
     bundle,
     huntKey: activity.contentKey,
     level: levelForXp(character.baseXp),
@@ -303,78 +584,28 @@ export async function advance(
   });
 
   const view = (
-    state: {
-      room: number;
-      cycle: number;
-      tick: number;
-      characterHealth: number;
-      supplyCharges: number;
-      creatures: readonly StoredCreature[];
-      sessionXp: bigint;
-      sessionGold: bigint;
-      pouchGold: bigint;
-      endedReason: HuntEndReason | null;
-      baseXp: bigint;
-      staminaRemainingMs: number;
-    },
+    state: RunProjection,
     connection: HuntRunView['connection'],
     graceExpiresAt: Instant | null,
     events: readonly HuntEvent[],
     penalty: DeathPenalty | null = null,
-  ): HuntRunView => {
-    const progress = levelProgress(state.baseXp);
-    return {
-      activityId: String(input.activityId),
-      characterId: run.characterId,
-      room: state.room,
-      cycle: state.cycle,
-      tick: state.tick,
-      health: state.characterHealth,
-      maxHealth: profile.maxHealth,
-      supplyCharges: state.supplyCharges,
-      creatures: state.creatures.map((creature) => ({
-        key: creature.key,
-        health: creature.health,
-        maxHealth: plan.creatures[creature.key]?.maxHealth ?? creature.health,
-      })),
-      sessionXp: state.sessionXp.toString(),
-      sessionGold: state.sessionGold.toString(),
-      pouchGold: state.pouchGold.toString(),
-      baseLevel: progress.level,
-      baseXp: progress.totalXp.toString(),
-      levelStartXp: progress.levelStartXp.toString(),
-      nextLevelXp: progress.nextLevelXp.toString(),
-      staminaRemainingMs: state.staminaRemainingMs,
-      // The mode is DERIVED from the same authoritative state the Character
-      // context derives it from: ended is recovering, paused is neutral, and a
-      // run that has not yet earned its first XP is neutral too (§3.3).
-      staminaMode:
-        connection === 'ACTIVITY_ENDED'
-          ? 'RECOVERING'
-          : connection === 'RECONNECT_GRACE_PAUSED'
-            ? 'NEUTRAL'
-            : state.tick > 0 && state.sessionXp > 0n
-              ? 'CONSUMING'
-              : 'NEUTRAL',
+  ): HuntRunView =>
+    project(
+      {
+        activityId: String(input.activityId),
+        characterId: run.characterId,
+        maxHealth: profile.maxHealth,
+        creatureMaxHealth: (key) => plan.creatures[key]?.maxHealth ?? null,
+        pouchUsed,
+        mapKey: space?.map.key ?? null,
+        contentVersion: activity.contentVersion,
+      },
+      state,
       connection,
-      graceExpiresAt: graceExpiresAt ? graceExpiresAt.toISOString() : null,
-      endedReason: state.endedReason,
-      // Phase 3 — how full the Loot Pouch is. "Nothing is being picked up" is
-      // a state the player has to be able to SEE before they can fix it.
-      lootPouch: { used: pouchUsed, spaces: LOOT_POUCH_SPACES },
-      penalty: penalty
-        ? {
-            experienceLost: penalty.experienceLost.toString(),
-            goldForfeited: penalty.goldForfeited.toString(),
-            levelBefore: penalty.levelBefore,
-            levelAfter: penalty.levelAfter,
-            fullBless: penalty.fullBless,
-            lootForfeited: penalty.lootForfeited,
-          }
-        : null,
+      graceExpiresAt,
       events,
-    };
-  };
+      penalty,
+    );
 
   // The CARRIED total, read from the ledger's projection rather than summed
   // from the run: a Character may have carried Gold in from an earlier Hunt,
@@ -386,7 +617,8 @@ export async function advance(
   );
   const pouchUsed = await items.pouchSpaces(tx, run.characterId);
 
-  const stored = {
+  const storedSpatial = readStoredSpatialState(run.position, space?.map.entry);
+  const stored: RunProjection = {
     room: run.room,
     cycle: run.cycle,
     tick: run.tick,
@@ -399,6 +631,15 @@ export async function advance(
     endedReason: run.endedReason as HuntEndReason | null,
     baseXp: character.baseXp,
     staminaRemainingMs: stamina.remaining,
+    revision: run.checkpointSequence,
+    ...(storedSpatial
+      ? {
+          position: {
+            tile: storedSpatial.tile,
+            ...(storedSpatial.movement ? { movement: storedSpatial.movement } : {}),
+          },
+        }
+      : {}),
   };
 
   // ── ended ────────────────────────────────────────────────────────────────
@@ -440,7 +681,7 @@ export async function advance(
   /** The instant the simulation actually reached. Everything settles here. */
   const simulatedTo = new Date(run.simulatedThrough.getTime() + ticks * TICK_MS);
 
-  let next = stored;
+  let next: RunProjection = stored;
   let events: readonly HuntEvent[] = [];
 
   if (ticks > 0) {
@@ -462,6 +703,9 @@ export async function advance(
       return view(stored, 'ONLINE_ACTIVE', null, []);
     }
 
+    // The persisted tile AND the step in flight, or the map's entry the first
+    // time a spatial run advances. Never a pixel, never interpolated: the row
+    // holds a TILE, and the movement that tile is part way out of.
     const state: HuntState = {
       tick: run.tick,
       room: run.room,
@@ -471,18 +715,17 @@ export async function advance(
       creatures: stored.creatures,
       characterNextAttackTick: run.characterNextAttackTick,
       ended: null,
+      ...(storedSpatial === null ? {} : { position: storedSpatial.tile }),
+      ...(storedSpatial?.movement === undefined ? {} : { movement: storedSpatial.movement }),
     };
 
-    // The seed includes the tick, so a settlement is a pure function of the
-    // persisted position: a rolled-back attempt replays identically, and a
-    // restart resumes the same future.
-    const rng = createSeededRandom(`${bound.rngSeed}:${state.tick}`);
-    // A SECOND stream for physical loot, so the fight's draw sequence is
-    // exactly what Phase 2 was verified against. Both are pure functions of
-    // the persisted position, so a replay reproduces the drops as well as the
-    // hits.
-    const lootRng = createSeededRandom(`${bound.rngSeed}:${state.tick}:loot`);
-    const step = simulateHunt(state, profile, plan, ticks, rng, lootRng);
+    // The streams RESUME from the row rather than being reseeded per
+    // settlement, so how the elapsed time was cut into checkpoints cannot
+    // change what the dice say. They are snapshotted back into the same
+    // `huntRun.update` below, inside this transaction: a rollback un-consumes
+    // them exactly as it un-consumes the XP.
+    const streams = restoreRngStreams(run.rngState, bound.rngSeed, state.tick);
+    const step = simulateHunt(state, profile, plan, ticks, streams.combat, streams.loot, space);
     events = step.events;
 
     const participant = await tx.activityParticipant.findUniqueOrThrow({
@@ -568,7 +811,7 @@ export async function advance(
     const collected: { definitionKey: string; quantity: number }[] = [];
     if (step.rewards.length > 0) {
       const policy = await items.readPolicy(tx, run.characterId);
-      const identityRng = createSeededRandom(`${bound.rngSeed}:${state.tick}:identity`);
+      const identityRng = streams.identity;
       const rewarded = new Set(settled.rewardedTicks);
       for (const reward of step.rewards) {
         // Zero Stamina drops the WHOLE reward, loot included (§2.3, §14).
@@ -632,6 +875,16 @@ export async function advance(
       endedReason: step.state.ended,
       baseXp: character.baseXp + settled.experience,
       staminaRemainingMs: settled.staminaRemaining,
+      // The revision the client will hold after this settlement commits.
+      revision: sequence,
+      ...(step.state.position === undefined
+        ? {}
+        : {
+            position: {
+              tile: step.state.position,
+              ...(step.state.movement === undefined ? {} : { movement: step.state.movement }),
+            },
+          }),
     };
 
     await tx.huntRun.update({
@@ -645,9 +898,21 @@ export async function advance(
         characterNextAttackTick: step.state.characterNextAttackTick,
         supplyCharges: next.supplyCharges,
         creatures: next.creatures as never,
+        ...(step.state.position === undefined
+          ? {}
+          : {
+              position: {
+                tile: step.state.position,
+                ...(step.state.movement === undefined ? {} : { movement: step.state.movement }),
+              } as never,
+            }),
         sessionXp: next.sessionXp,
         sessionGold: next.sessionGold,
         checkpointSequence: sequence,
+        // Where the streams stopped. Same row, same statement, same
+        // transaction as the XP, the Gold, the supplies and the tick — there
+        // is no second write and no write-ahead record to reconcile.
+        rngState: snapshotRngStreams(streams) as never,
         ...(input.seen ? { lastSeenAt: input.now } : {}),
       },
     });
@@ -713,6 +978,112 @@ export async function advance(
   }
 
   return view(next, 'ONLINE_ACTIVE', null, events);
+}
+
+/**
+ * The run as it stands DURABLY, without advancing it (Phase 3.5 §6).
+ *
+ * The mutating read is deliberately gone from GET. Advance-on-read is still
+ * the model — it is just that "read" now means a POST the client sends on its
+ * own clock, because a GET is the one verb the whole stack is allowed to
+ * repeat: a retry, a prefetch, a double-render in React strict mode or a
+ * proxy's revalidation all re-issue it, and every one of those was a
+ * settlement the player never asked for.
+ *
+ * This writes NOTHING. What it reports is the state as of the last applied
+ * settlement, which is what "pure" means here rather than an approximation of
+ * it: Stamina is the durable figure, not one settled to now, and no event is
+ * replayed because events belong to the settlement that produced them.
+ */
+export async function snapshot(
+  tx: UnitOfWork,
+  input: {
+    readonly activityId: ActivityId;
+    readonly resolver: ContentBundleResolver;
+  },
+): Promise<HuntRunView | null> {
+  const run = await tx.huntRun.findUnique({ where: { activityId: input.activityId } });
+  if (!run) return null;
+
+  const activity = await tx.activity.findUniqueOrThrow({
+    where: { id: input.activityId },
+    select: { contentVersion: true, contentKey: true, sessionBound: true },
+  });
+  const character = await tx.character.findUniqueOrThrow({
+    where: { id: run.characterId },
+    select: { id: true, accountId: true, baseXp: true },
+  });
+
+  const bundle = await input.resolver.resolve(activity.contentVersion);
+  const equipped = await items.equippedItems(tx, run.characterId);
+  const supplies = await items.broughtSupplies(tx, bundle, run.characterId);
+  const { plan, profile, space } = buildHuntPlan({
+    bundle,
+    huntKey: activity.contentKey,
+    level: levelForXp(character.baseXp),
+    equipped,
+    supplyCharges: supplies.charges,
+    supplyHeal: supplies.heal,
+  });
+
+  const stamina = await tx.characterStamina.findUniqueOrThrow({
+    where: { characterId: run.characterId },
+    select: { remainingMs: true },
+  });
+  const pouchGold = await readBalance(
+    tx,
+    pouchOf(character.accountId as never, run.characterId),
+    'GOLD',
+  );
+  const pouchUsed = await items.pouchSpaces(tx, run.characterId);
+
+  const bound = activity.sessionBound;
+  const ended = run.endedReason !== null || bound === null || bound.state === 'ACTIVITY_ENDED';
+  const paused = !ended && bound?.state === 'RECONNECT_GRACE_PAUSED';
+  const connection: HuntRunView['connection'] = ended
+    ? 'ACTIVITY_ENDED'
+    : paused
+      ? 'RECONNECT_GRACE_PAUSED'
+      : 'ONLINE_ACTIVE';
+
+  const storedSpatial = readStoredSpatialState(run.position, space?.map.entry);
+  return project(
+    {
+      activityId: String(input.activityId),
+      characterId: run.characterId,
+      maxHealth: profile.maxHealth,
+      creatureMaxHealth: (key) => plan.creatures[key]?.maxHealth ?? null,
+      pouchUsed,
+      mapKey: space?.map.key ?? null,
+      contentVersion: activity.contentVersion,
+    },
+    {
+      room: run.room,
+      cycle: run.cycle,
+      tick: run.tick,
+      characterHealth: run.characterHealth,
+      supplyCharges: run.supplyCharges,
+      creatures: run.creatures as unknown as StoredCreature[],
+      sessionXp: run.sessionXp,
+      sessionGold: run.sessionGold,
+      pouchGold,
+      endedReason: run.endedReason as HuntEndReason | null,
+      baseXp: character.baseXp,
+      staminaRemainingMs: stamina.remainingMs,
+      revision: run.checkpointSequence,
+      ...(storedSpatial
+        ? {
+            position: {
+              tile: storedSpatial.tile,
+              ...(storedSpatial.movement ? { movement: storedSpatial.movement } : {}),
+            },
+          }
+        : {}),
+    },
+    connection,
+    paused ? (bound?.graceExpiresAt ?? null) : null,
+    [],
+  );
 }
 
 /**

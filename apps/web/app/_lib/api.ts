@@ -66,7 +66,9 @@ export interface HuntEvent {
     | 'died'
     // Phase 3 — physical loot, collected or explained.
     | 'loot'
-    | 'loot-skipped';
+    | 'loot-skipped'
+    // Phase 3.5 — an actor stepped from one authoritative tile to another.
+    | 'move';
   room?: number;
   cycle?: number;
   count?: number;
@@ -78,11 +80,42 @@ export interface HuntEvent {
   item?: string;
   quantity?: number;
   reason?: 'policy' | 'no-space' | 'over-capacity';
+  actor?: string;
+  from?: Tile;
+  to?: Tile;
+  startsAtMs?: number;
+  arrivesAtMs?: number;
+}
+
+/** A tile, exactly as the server states it. The browser never invents one. */
+export interface Tile {
+  x: number;
+  y: number;
+  z: number;
+}
+
+/**
+ * A step in flight, on the SERVER'S millisecond timeline.
+ *
+ * The client interpolates pixels along it for the sake of the eye, using these
+ * two instants and the snapshot's own `nowMs` — never a duration of its own.
+ * The authoritative answer is always `tile`; a step that disagrees with the
+ * next snapshot loses.
+ */
+export interface Movement {
+  from: Tile;
+  to: Tile;
+  startsAtMs: number;
+  arrivesAtMs: number;
 }
 export interface RunCreature {
   key: string;
   health: number;
   maxHealth: number;
+  /** Phase 3.5 — present only when the Hunt has a map. */
+  id?: string;
+  tile?: Tile;
+  movement?: Movement | null;
 }
 export interface RunView {
   activityId: string;
@@ -118,6 +151,19 @@ export interface RunView {
     fullBless: boolean;
   } | null;
   events: HuntEvent[];
+  /** Phase 3.5 — where the Character is, on which map, of which BUNDLE, and
+   *  at what simulation instant. Null when the Hunt has no map. */
+  space: {
+    contentVersion: string;
+    mapKey: string;
+    tile: Tile;
+    movement: Movement | null;
+    nowMs: number;
+  } | null;
+  /** Phase 3.5 — monotonic. A snapshot older than the one on screen is
+   *  DISCARDED: two polls can arrive out of order, and applying the older one
+   *  rewinds the world in front of the player. */
+  revision: number;
   /** Phase 3 — how full the Loot Pouch is right now. */
   lootPouch?: { used: number; spaces: number };
 }
@@ -145,6 +191,32 @@ export interface Atlas {
   contentVersion: string;
   regions: Region[];
   markers: Marker[];
+}
+
+/**
+ * The static tile map, as `GET /api/maps/:key` returns it (Phase 3.5).
+ *
+ * Immutable for the life of a bundle version, so the browser fetches it once
+ * and keeps it. The rows are the authored source, not a second model: the
+ * server compiles the same characters into the same collision it simulates on.
+ */
+export interface MapRegion {
+  id: string;
+  room: number;
+  rect: [number, number, number, number];
+  spawns: { x: number; y: number }[];
+}
+export interface TileMapView {
+  key: string;
+  z: number;
+  rows: string[];
+  legend: Record<string, 'wall' | 'floor' | 'water' | 'sludge'>;
+  entry: { x: number; y: number };
+  regions: MapRegion[];
+}
+export interface MapResponse {
+  contentVersion: string;
+  map: TileMapView;
 }
 
 export class ApiError extends Error {

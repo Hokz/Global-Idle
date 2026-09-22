@@ -251,9 +251,10 @@ Generation, for a `rarityEligible` definition only:
 definition selected  ->  rarity roll  ->  affix roll(s)  ->  ItemInstance
 ```
 
-- **Deterministic**, from the same seeded stream as the rest of the settlement
-  (`createSeededRandom(\`${rngSeed}:${tick}\`)`), so a replay produces the same instance and a
-  retry does not reroll.
+- **Deterministic**, from the run's own identity stream — kept separate from combat and from
+  physical loot so a rarity change cannot move a hit, and **continued across settlements** rather
+  than reseeded at each one (Phase 3.5 §10, superseding the `createSeededRandom(\`${rngSeed}:${tick}\`)`
+  rule this line used to state). A replay produces the same instance and a retry does not reroll.
 - **Exponentially rarer** as rarity climbs. The initial distribution is **INITIAL/TUNABLE**, content
   driven, and deliberately conservative:
 

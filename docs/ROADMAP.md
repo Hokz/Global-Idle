@@ -163,6 +163,31 @@ request, stacked on Phase 2, with status
 
 Recorded in full: [`design/INVENTORY_AND_LOGISTICS_FOUNDATION.md`](design/INVENTORY_AND_LOGISTICS_FOUNDATION.md).
 
+## Phase 3.5 — Tile / spatial Game Window
+
+> Status lives in [`PROJECT_STATE.json`](./PROJECT_STATE.json), not here.
+
+**Specification:**
+[`docs/specs/phase-3-5/PHASE_3_5_TILE_SPATIAL_GAME_WINDOW_SPEC.md`](specs/phase-3-5/PHASE_3_5_TILE_SPATIAL_GAME_WINDOW_SPEC.md).
+Implementation is on its own branch, stacked on Phase 3.
+
+The Hunt stops being an abstraction and becomes a PLACE. The minimum
+authoritative spatial engine the next playable slice needs, and no more:
+
+- maps as validated, compiled CONTENT — never rows in PostgreSQL;
+- tiles, walls and collision, with two actors never on one square;
+- deterministic four-direction A* to a goal set, with no randomness at all;
+- combat gated on adjacency, and a target rule that fights what it can reach;
+- rooms 1–10 as ten physical chambers joined by one-tile doorways;
+- a Canvas game window that is a CAMERA — it draws the server's answer and
+  decides nothing;
+- `POST` advances the run, `GET` reads it, and a monotonic revision means a
+  late snapshot can never rewind the world on screen;
+- a developer-only debug overlay, off unless a build asks for it.
+
+Not in this phase: player-driven movement, diagonals, line of sight, ranged
+attacks, multi-floor play, a map editor.
+
 ## Phase 4 — Skills + Party + Vocations
 
 - real Skills representation, and **durable Skill death loss** (deferred from Phase 2 on purpose:

@@ -328,10 +328,22 @@ model HuntRun {
   characterHealth         Int
   characterNextAttackTick Int      @default(0)
   supplyCharges           Int
-  /// The living encounter: `[{ key, health, nextAttackTick }]`. Json because
-  /// it is an opaque, versioned snapshot of engine state, never queried by
-  /// field and never joined to.
+  /// The living encounter: `[{ key, health, nextAttackTick, id?, position? }]`.
+  /// Json because it is an opaque, versioned snapshot of engine state, never
+  /// queried by field and never joined to.
   creatures               Json
+  /// Phase 3.5 — the Character's authoritative TILE, and the step it is
+  /// currently walking. Null for a Hunt with no map. Never pixels, never a
+  /// camera, never an interpolated position: those are the renderer's and are
+  /// recomputed from this every frame.
+  position                Json?
+  /// Where this run stands in each of its random streams — combat, physical
+  /// loot, and the item identity roll. Persisted so a settlement RESUMES a
+  /// stream instead of reseeding it, which is what makes one 60-second advance
+  /// and sixty 1-second advances produce the same future. Null on a row
+  /// written before the streams were durable; seeded once from the old rule at
+  /// that row's tick and continued from then on.
+  rngState                Json?
 
   /// This run's earnings, for display. The DURABLE totals are Character.baseXp
   /// and the currency ledger; these are a session view, not a second truth.

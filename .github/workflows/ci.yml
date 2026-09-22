@@ -189,14 +189,14 @@ jobs:
       - name: 'Canonical project state — AGENTS.md agrees with docs/PROJECT_STATE.json'
         run: node scripts/check-project-state.mjs
 
-      - name: 'Test matrices — Phase 0B 92, Phase 1 87, Phase 2 106, Phase 3 169'
+      - name: 'Test matrices — Phase 0B 92, Phase 1 87, Phase 2 106, Phase 3 169, Phase 3.5 95'
         # Not a §13 check; it is how each phase's "all N pass" stays a
         # countable claim rather than an assertion (Phase 0B §14, Phase 1 §16,
-        # Phase 2 §12, Phase 3 §20). It fails on a missing id, a duplicate, and
-        # an id belonging to no matrix — which is what keeps FOUR id spaces
-        # from colliding now that Phase 1 continues the D group at D19, Phase 2
-        # adds groups starting with S, and Phase 3 uses three-letter codes for
-        # exactly that reason.
+        # Phase 2 §12, Phase 3 §20, Phase 3.5 §20). It fails on a missing id, a
+        # duplicate, and an id belonging to no matrix — which is what keeps
+        # FIVE id spaces from colliding now that Phase 1 continues the D group
+        # at D19, Phase 2 adds groups starting with S, and Phases 3 and 3.5 use
+        # three-letter codes for exactly that reason.
         run: node scripts/count-matrix.mjs
 
   # ═══════════════════════════════════════════════════════════════════════════
@@ -290,7 +290,7 @@ jobs:
           pnpm --filter @global-idle/game-data run build:bundle
           pnpm seed
 
-      - name: 'Browser acceptance — E2E1-E2E10, UI1-UI8, GW1-GW8, desktop and touch'
+      - name: 'Browser acceptance — E2E1-E2E10, UI1-UI8, GW1-GW8, VIS1-VIS12, desktop and touch'
         # Playwright starts and stops the API and the web server itself; see
         # playwright.config.ts for why it owns them rather than trusting a
         # background process to still be alive.

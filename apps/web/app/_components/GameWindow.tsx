@@ -21,11 +21,28 @@
  * positions and inventing persisted ones would be a second source of truth.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ApiError, api, type HuntEvent, type RunView } from '../_lib/api';
+import {
+  ApiError,
+  api,
+  type HuntEvent,
+  type MapResponse,
+  type RunView,
+  type TileMapView,
+} from '../_lib/api';
+import { TileScene } from './TileScene';
 
 /** How often a connected client proves it is still there. Comfortably inside
  *  the server's liveness window, so an ordinary hiccup is not a disconnect. */
 const POLL_MS = 2000;
+
+/**
+ * Whether the spatial debug overlay EXISTS in this build.
+ *
+ * Developer-only, and off even then until someone asks for it: a grid with
+ * tile coordinates over the scene is a diagnostic, not a HUD, and shipping it
+ * on would be shipping a different game.
+ */
+const DEBUG_AVAILABLE = process.env['NEXT_PUBLIC_DEBUG_OVERLAY'] === '1';
 
 const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value));
 
@@ -106,7 +123,19 @@ export function GameWindow({ characterId, label, summary, onEnded }: GameWindowP
   const [failed, setFailed] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [now, setNow] = useState(() => Date.now());
+  const [map, setMap] = useState<TileMapView | null>(null);
+  const [showDebug, setShowDebug] = useState(false);
   const seen = useRef(-1);
+  /**
+   * The highest revision this window has APPLIED.
+   *
+   * Two polls can be in flight at once — a slow settlement and the next
+   * interval — and nothing makes the network deliver them in order. Applying
+   * the older answer rewinds the world on screen: the Character jumps back a
+   * tile, a dead creature stands up. The server's revision says which of two
+   * snapshots is newer, so the stale one is simply dropped.
+   */
+  const revision = useRef(-1);
   /**
    * The caller's callback, behind a ref.
    *
@@ -122,12 +151,17 @@ export function GameWindow({ characterId, label, summary, onEnded }: GameWindowP
 
   const poll = useCallback(async () => {
     try {
-      // A GET that advances the simulation, deliberately: advance-on-read is
-      // the model (P2-D1), and this same request is the heartbeat that proves
-      // the connection is alive.
-      const next = await api<RunView | null>(`/api/characters/${characterId}/hunt`);
+      // A POST, because this ADVANCES the simulation. The same request is the
+      // heartbeat that proves the connection is alive; what it must not be is
+      // a GET, which the browser, a proxy or React itself may repeat at will.
+      const next = await api<RunView | null>(`/api/characters/${characterId}/hunt/advance`, {
+        method: 'POST',
+      });
       setFailed(false);
       if (!next) return;
+      // Out of order. The world on screen is already newer than this answer.
+      if (next.revision < revision.current) return;
+      revision.current = next.revision;
       setRun(next);
       // Only the events from ticks this client has not shown yet, so a
       // settlement that arrives twice does not print twice.
@@ -164,6 +198,40 @@ export function GameWindow({ characterId, label, summary, onEnded }: GameWindowP
     const timer = setInterval(() => void poll(), POLL_MS);
     return () => clearInterval(timer);
   }, [poll]);
+
+  /**
+   * The tile map, fetched ONCE, AT THE VERSION THE SIMULATION IS USING.
+   *
+   * The cache key is `contentVersion:mapKey`, not `mapKey`. An Activity pins
+   * its bundle and keeps simulating against it after a publish; asking for
+   * "the current map" would draw the new geometry over the old collision, and
+   * the player would watch the Character walk through a wall that is only on
+   * their screen.
+   *
+   * It is content, immutable for the life of that version, and two orders of
+   * magnitude larger than a snapshot — so it is fetched once and never polled.
+   */
+  const mapKey = run?.space?.mapKey ?? null;
+  const mapVersion = run?.space?.contentVersion ?? null;
+  useEffect(() => {
+    if (!mapKey || !mapVersion) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const loaded = await api<MapResponse>(
+          `/api/content/${encodeURIComponent(mapVersion)}/maps/${encodeURIComponent(mapKey)}`,
+        );
+        if (!cancelled) setMap(loaded.map);
+      } catch {
+        // A map that will not load costs the scene, not the hunt: the readouts
+        // and the log are the same information and they still work.
+        if (!cancelled) setMap(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [mapKey, mapVersion]);
 
   // The grace countdown is the only clock this component runs, and it only
   // DISPLAYS: the deadline itself is the server's, and it is the server that
@@ -205,6 +273,17 @@ export function GameWindow({ characterId, label, summary, onEnded }: GameWindowP
             {summary}
           </p>
         </div>
+        {DEBUG_AVAILABLE ? (
+          <button
+            type="button"
+            className="ghost small"
+            data-testid="debug-toggle"
+            aria-pressed={showDebug}
+            onClick={() => setShowDebug((on) => !on)}
+          >
+            Debug
+          </button>
+        ) : null}
         <span
           className={`badge connection-${run.connection}`}
           data-testid="connection"
@@ -231,7 +310,12 @@ export function GameWindow({ characterId, label, summary, onEnded }: GameWindowP
           ) : null}
         </div>
 
-        <div className="scene-floor">
+        {/* The map, when the Hunt has one. A Hunt without a map is still a
+            legitimate run — every Phase 2 fixture is one — so the readouts
+            below are the scene in that case, not a fallback for a failure. */}
+        {map && run.space ? <TileScene map={map} run={run} debug={showDebug} /> : null}
+
+        <div className={`scene-floor ${map && run.space ? 'with-map' : ''}`}>
           <figure className="actor character" data-testid="character">
             <div className="sprite character-sprite" aria-hidden="true" />
             <figcaption>
@@ -251,7 +335,7 @@ export function GameWindow({ characterId, label, summary, onEnded }: GameWindowP
           <ul className="actors" data-testid="creatures">
             {run.creatures.map((creature, index) => (
               <li
-                key={`${creature.key}-${index}`}
+                key={creature.id ?? `${creature.key}-${index}`}
                 className={`actor creature ${creature.health <= 0 ? 'dead' : ''}`}
                 data-testid="creature"
                 data-creature={creature.key}

@@ -73,10 +73,19 @@ activity (§8) is exactly correct: no connection, no progress.
 
 ### 2.2 Determinism
 
-Every settlement constructs its generator from the durable seed and the tick it starts at:
+> **SUPERSEDED by Phase 3.5 §10.** What this section fixes — that a settlement is deterministic
+> from durable state, that a rollback replays identically, that draw ordering inside a tick is
+> part of the contract — still holds. HOW the generator is obtained does not. The rule below made
+> the NUMBER of settlements an input: sixty one-second advances reseeded sixty times where one
+> sixty-second advance ran a single stream, so a client's poll cadence changed the fight. A run now
+> persists its position in each stream and RESUMES it; the old rule survives only as the seeding of
+> a stream that has no stored position, which for a new run at tick 0 is the same stream this
+> section describes. Phase 2's golden fixture is unaffected and still byte-identical.
+
+Every settlement constructed its generator from the durable seed and the tick it starts at:
 
 ```text
-rng = createSeededRandom(`${activity.rngSeed}:${state.tick}`)
+rng = createSeededRandom(`${activity.rngSeed}:${state.tick}`)   // superseded — see Phase 3.5 §10
 ```
 
 So a settlement is a pure function of `(persisted state, tick count, seed)`. A rolled-back
@@ -383,9 +392,16 @@ originate one. **No WASD, no manual attack, no click-to-move** — the Character
 
 ## 11. API
 
+> **SUPERSEDED by Phase 3.5 §8.** The `GET` below no longer advances anything. A GET is the one
+> verb a retry, a prefetch, a strict-mode double render or a proxy may repeat, and every repetition
+> was a settlement; Phase 3.5 split the two, so `GET` is pure and `no-store` and a new
+> `POST …/hunt/advance` is what settles. The table is kept as written because the phases below it
+> were verified against it.
+
 | Method | Path | Notes |
 |---|---|---|
-| `GET` | `/api/characters/:id/hunt` | advances the simulation and returns the run state |
+| `GET` | `/api/characters/:id/hunt` | ~~advances the simulation and~~ returns the run state — **pure since Phase 3.5** |
+| `POST` | `/api/characters/:id/hunt/advance` | **Phase 3.5** — settles the run and returns the new state |
 | `POST` | `/api/characters/:id/hunt/heartbeat` | liveness; also advances |
 | `DELETE` | `/api/characters/:id/activity` | Leave — already exists, now also ends the run |
 

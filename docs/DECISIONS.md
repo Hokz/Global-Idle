@@ -59,6 +59,32 @@ Decided during Phase 0A architecture, because a generic dungeon engine cannot ca
 incompatible names for its own progression unit. See
 `docs/architecture/DOMAIN_MODEL.md` §5.8.
 
+## Determinism, and what is allowed to influence it
+
+**HTTP heartbeat and advance frequency is transport and liveness behaviour. It is NOT a
+gameplay-randomness input.**
+
+A durable Activity, its seed, its content version and the authoritative elapsed time define the
+run. The number of settlements used to reach that time does not. The same run advanced once by
+sixty seconds and sixty times by one second must land on the same tick, the same health, the same
+tiles, the same XP, the same Gold and the same loot.
+
+- an Activity owns deterministic RNG streams, and the run persists its POSITION in each of them, so
+  a settlement resumes a stream instead of reseeding it;
+- combat, physical loot and item identity are separate streams, so a new drop table or a new rarity
+  cannot move a hit;
+- the stream positions are written in the same transaction as the state they produced, so a
+  rollback un-consumes them and a replayed checkpoint re-consumes nothing;
+- a settlement that advances no whole tick consumes nothing;
+- pathfinding and every other spatial decision consume no randomness at all.
+
+A foreground tab, a backgrounded one, a slow network and a future mobile client must receive the
+same luck. This matters before rankings, PvP, Warzones and Market-valued rare drops exist, not
+after — which is why it is locked here rather than left to an implementation.
+
+Decided during the Phase 3.5 determinism correction, after the reverse was found to be true. See
+`docs/specs/phase-3-5/PHASE_3_5_TILE_SPATIAL_GAME_WINDOW_SPEC.md` §10 and the `RNGC` cases.
+
 ## Death
 
 - punitive by design;

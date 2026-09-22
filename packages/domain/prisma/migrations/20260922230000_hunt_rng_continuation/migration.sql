@@ -1,0 +1,22 @@
+-- Phase 3.5 correction — the run owns its place in its own random streams.
+--
+-- Before this, every settlement built its generators from
+-- `${activity.rngSeed}:${run.tick}`. That made a settlement reproducible, but
+-- it also made the NUMBER OF SETTLEMENTS an input: sixty one-second advances
+-- restarted the stream sixty times, while one sixty-second advance ran it
+-- once, and the two produced different damage, different Gold and different
+-- loot from the same durable state and the same elapsed time. The client
+-- chooses when to POST, so the client was choosing the luck.
+--
+-- One nullable column holding the continuation state of each stream — combat,
+-- physical loot, and the item identity roll — so a settlement RESUMES rather
+-- than reseeds. Nullable because rows written before this migration have no
+-- stored position; the domain seeds those once from the old rule at their
+-- persisted tick and writes the continuation from then on.
+--
+-- Opaque JSON on purpose: it is a versioned engine value (`sfc32-v1`), never
+-- queried by field and never joined to. If the algorithm ever changes, the
+-- version string changes with it and a stored state from the old one is
+-- refused rather than silently continued into a different stream.
+
+ALTER TABLE "HuntRun" ADD COLUMN "rngState" JSONB;
