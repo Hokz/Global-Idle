@@ -177,6 +177,18 @@ model Character {
   /// Canary curve and stored alongside so a read does not have to compute it;
   /// the XP is the truth and the level is its consequence.
   baseXp    BigInt    @default(0)
+  /// Phase 2 correction — the DEATH POLICY SEAM.
+  ///
+  /// Regular blessings held, 0 to 7 (Canary's blessings 2 through 8; Twist of
+  /// Fate is not one of them). Nothing in Phase 2 raises this: there is no
+  /// blessing shop and no NPC yet. It exists as authoritative state so the
+  /// death policy READS protection rather than assuming "unblessed forever"
+  /// inside Hunt code, and so the acquisition flow attaches in one place.
+  blessings Int       @default(0)
+  /// Promotion. FALSE for a vocation-less Character, which is the SOURCE's
+  /// answer: nothing promotes from vocation 0, so `Player::isPromoted()` is
+  /// false for it. A CHECK enforces the pairing rather than trusting callers.
+  promoted  Boolean   @default(false)
   createdAt DateTime
   /// ADR-007: retirement, not deletion. A Character is never hard-deleted
   /// (I12) — history stays referentially intact.
@@ -463,6 +475,11 @@ model SettlementOperation {
 model LedgerEntry {
   id          String       @id
   accountId   String
+  /// ADR-019 — WHERE the value sits, and WHOSE it is. `subjectId` is the
+  /// Account for BANK and the Character for POUCH; `accountId` stays on the
+  /// row so an account-wide audit never joins through Character.
+  subjectId   String
+  custody     CurrencyCustody
   currency    CurrencyKind
   /// Signed. Credit is positive, debit is negative; the balance projection is
   /// their sum (ADR-003).
@@ -474,6 +491,7 @@ model LedgerEntry {
   account Account @relation(fields: [accountId], references: [id])
 
   @@index([accountId, currency, createdAt])
+  @@index([subjectId, custody, currency, createdAt])
   @@index([operationId])
   @@map("LedgerEntry")
 }
@@ -481,16 +499,36 @@ model LedgerEntry {
 /// A projection of the ledger, updated in the SAME transaction as the entry it
 /// reflects (ADR-003). It is never the source of truth; test I5's
 /// reconciliation compares it against the sum of entries.
+/// ADR-019 — one projection per CUSTODY SCOPE, not one per account.
+///
+/// A Character's POUCH and its Account's BANK are different numbers because
+/// they are different money: one is carried and can be forfeited on death, the
+/// other is stored and cannot. Both are projections of the same append-only
+/// ledger, and reconciliation recomputes each from its own entries.
 model CurrencyBalance {
-  accountId String
+  /// The Account for BANK, the Character for POUCH.
+  subjectId String
+  custody   CurrencyCustody
   currency  CurrencyKind
+  /// Always the owning Account, denormalised, for account-wide queries.
+  accountId String
   amount    BigInt
   updatedAt DateTime
 
   account Account @relation(fields: [accountId], references: [id])
 
-  @@id([accountId, currency])
+  @@id([subjectId, custody, currency])
+  @@index([accountId, currency])
   @@map("CurrencyBalance")
+}
+
+/// Where value sits. A scope is safe or it is not; nothing else about it
+/// changes how the ledger treats it (ADR-019).
+enum CurrencyCustody {
+  /// Account-scoped and safe. Death does not touch it.
+  BANK
+  /// Character-scoped and CARRIED. Forfeited on death without Full Bless.
+  POUCH
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

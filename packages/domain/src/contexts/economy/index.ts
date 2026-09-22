@@ -9,5 +9,20 @@
 // ItemInstance, no custody, no Market, no Forge (§19).
 export const CONTEXT_NAME = 'economy' as const;
 
-export type { CurrencyKind, LedgerPosting, Reconciliation } from './ledger.js';
-export { countReconciliationMismatches, post, readBalance, reconcile } from './ledger.js';
+export type {
+  CurrencyCustody,
+  CurrencyKind,
+  CustodySubject,
+  LedgerPosting,
+  Reconciliation,
+} from './ledger.js';
+export {
+  bankOf,
+  countReconciliationMismatches,
+  post,
+  pouchOf,
+  readBalance,
+  reconcile,
+  subjectIdOf,
+  transfer,
+} from './ledger.js';

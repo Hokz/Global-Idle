@@ -108,12 +108,16 @@ export async function lockAccount(tx: UnitOfWork, accountId: string): Promise<vo
 
 export async function lockBalance(
   tx: UnitOfWork,
-  accountId: string,
+  subjectId: string,
+  custody: string,
   currency: string,
 ): Promise<void> {
   await tx.$queryRawUnsafe(
-    `SELECT "accountId" FROM "CurrencyBalance" WHERE "accountId" = $1 AND currency = $2::"CurrencyKind" FOR UPDATE`,
-    accountId,
+    `SELECT "subjectId" FROM "CurrencyBalance"
+      WHERE "subjectId" = $1 AND custody = $2::"CurrencyCustody" AND currency = $3::"CurrencyKind"
+      FOR UPDATE`,
+    subjectId,
+    custody,
     currency,
   );
 }
