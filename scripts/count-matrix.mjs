@@ -2,7 +2,7 @@
 /**
  * Count the implemented matrix cases and compare them with what the approved
  * specifications fix: Phase 0B §14 at **92**, Phase 1 §16 at **87**, Phase 2
- * §12 at **106**, Phase 3 §20 at **169**, Phase 3.5 §20 at **70**.
+ * §12 at **106**, Phase 3 §20 at **169**, Phase 3.5 §20 at **82**.
  *
  * The convention this relies on: every matrix case is exactly ONE test whose
  * title begins with its id and a colon — `it('W1: ...')` for a Vitest case,
@@ -130,19 +130,21 @@ const MATRICES = {
       TIL: [1, 6],
       // The spatial architecture correction continues PTH rather than opening
       // a group: eight directions are the same question the first six asked.
-      PTH: [1, 12],
+      PTH: [1, 15],
       SPC: [1, 10],
       SNP: [1, 7],
       RND: [1, 3],
-      VIS: [1, 11],
+      VIS: [1, 12],
       // The correction's own groups: one authoritative movement timeline,
       // three collision questions, the floor seam, static reachability, and
       // the map the browser draws being the map the server simulates.
-      STP: [1, 7],
+      STP: [1, 8],
       COL: [1, 4],
-      FLR: [1, 3],
+      FLR: [1, 4],
       RCH: [1, 2],
-      MPV: [1, 5],
+      MPV: [1, 6],
+      // The correctness pass: a step in flight survives the database.
+      PER: [1, 6],
     },
   },
 };
@@ -151,6 +153,7 @@ const MATRICES = {
 // `2`. Regex alternation is ordered, and that order is the whole contract.
 const PREFIXES = [
   'TIL',
+  'PER',
   'STP',
   'COL',
   'FLR',

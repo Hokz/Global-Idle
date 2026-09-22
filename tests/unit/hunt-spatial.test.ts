@@ -1,11 +1,13 @@
 /**
- * Phase 3.5 §20 — SPC1 to SPC8.
+ * Phase 3.5 §20 — SPC, RND and STP.
  *
  * The simulator WITH a map. Everything here is the pure engine: a state in, a
  * state out, no database and no clock. What these cases pin is the part of the
  * fight that space actually changed — who may be hit, who walks, who wins a
  * tile — and the part it must not have changed at all.
  */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   BEAT_MS,
@@ -24,6 +26,7 @@ import {
   type SpatialPlan,
   type TilePosition,
 } from '@global-idle/game-engine';
+import { REPO_ROOT } from '../support/repo.js';
 
 const LEGEND = { '#': 'wall', '.': 'floor', '~': 'water' } as const;
 
@@ -567,5 +570,41 @@ describe('§20 STP — one authoritative movement timeline', () => {
     expect(flight.arrivesAtMs - flight.startsAtMs).toBe(
       stepDurationMs(PROFILE.stepSpeed!) * DIAGONAL_STEP_FACTOR,
     );
+  });
+
+  it('STP8: no authored creature steps at the Character’s cadence', () => {
+    /**
+     * Why this is a case and not a comment.
+     *
+     * Two actors that are idle on the same beat, each taking a genuinely
+     * cheapest step toward the other, flip each other's cheapest route around
+     * a symmetric obstacle: they circle it and never meet (notes §7). That is
+     * emergent from a correct pathfinder, not a defect in one, and the source's
+     * answer — caching a route instead of re-deriving one every beat — is Phase
+     * 5's. What keeps it unreachable HERE is the authored data: a Character
+     * steps in 550 ms or less and a Rat in 900. This case fails the day a
+     * creature is authored at the Character's cadence, which is the day that
+     * assumption stops holding.
+     */
+    const source = JSON.parse(
+      readFileSync(join(REPO_ROOT, 'packages', 'game-data', 'content', 'rookgaard.json'), 'utf8'),
+    ) as { definitions: { kind: string; speed?: number; baseSpeed?: number }[] };
+
+    const baseline = source.definitions.find((entry) => entry.baseSpeed !== undefined);
+    expect(baseline?.baseSpeed).toBeDefined();
+    const creatures = source.definitions.filter((entry) => entry.kind === 'creature');
+    expect(creatures.length).toBeGreaterThan(0);
+
+    // Every level a Character can reach only makes it faster, so checking the
+    // slowest one it is ever allowed to be covers all of them.
+    const slowestCharacter = stepDurationMs(baseline!.baseSpeed!);
+    for (const creature of creatures) {
+      expect(creature.speed, `${JSON.stringify(creature)} has no speed`).toBeDefined();
+      const creatureStep = stepDurationMs(creature.speed!);
+      expect(creatureStep, `creature speed ${creature.speed}`).not.toBe(slowestCharacter);
+      // And it is SLOWER, which is the direction that makes a level-up safe:
+      // a faster Character moves further from the cadence, never onto it.
+      expect(creatureStep).toBeGreaterThan(slowestCharacter);
+    }
   });
 });

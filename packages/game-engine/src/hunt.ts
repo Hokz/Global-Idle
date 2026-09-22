@@ -16,7 +16,6 @@ import { normalRandom, uniformRandom } from './distributions.js';
 import type { SeededRandom } from './random.js';
 import {
   canOccupy,
-  connectorAt,
   isAdjacent,
   meleeGoals,
   samePosition,
@@ -169,10 +168,10 @@ export interface HuntCreatureState {
  * A step IN FLIGHT, on the simulation's own millisecond timeline.
  *
  * This is one authoritative state, not a server hint plus a client guess. An
- * actor with an `activeMovement` is STILL STANDING on `from` — it cannot
- * attack from `to`, cannot be attacked at `to`, and does not occupy `to` — but
- * `to` is RESERVED, so nothing else may claim it. On `arrivesAtMs` the actor
- * commits to `to` and the reservation ends.
+ * actor with a `movement` is STILL STANDING on `from` — it cannot attack from
+ * `to`, cannot be attacked at `to`, and does not occupy `to` — but `to` is
+ * RESERVED, so nothing else may claim it. On `arrivesAtMs` the actor commits
+ * to `to` and the reservation ends.
  *
  * The browser interpolates between `from` and `to` using these two instants
  * and the simulation time the snapshot was taken at. It invents no duration of
@@ -431,9 +430,9 @@ export function simulateHunt(
 
   // ── space ────────────────────────────────────────────────────────────────
   //
-  // One authoritative movement state. An actor is on `position`; if it has an
-  // `activeMovement` it is still on `position` and will be on `movement.to`
-  // at `arrivesAtMs`, and nothing else may take that tile in the meantime.
+  // One authoritative movement state. An actor is on `position`; if it has a
+  // `movement` it is still on `position` and will be on `movement.to` at
+  // `arrivesAtMs`, and nothing else may take that tile in the meantime.
   let position = state.position ?? space?.map.entry;
   let movement: Movement | undefined = state.movement;
 
@@ -500,13 +499,16 @@ export function simulateHunt(
     return started;
   };
 
-  /** A step that has run its time COMMITS, and a connector under the arrival
-   *  tile takes the actor to the floor it leads to (spec §6). */
-  const arrive = (at: Movement): TilePosition => {
-    if (!space) return at.to;
-    const link = connectorAt(space.map, at.to);
-    return link ? { ...link.to } : at.to;
-  };
+  /**
+   * A step that has run its time COMMITS to its destination tile.
+   *
+   * A connector authored on that tile is NOT followed. A map compiles one
+   * floor of geometry, so the floor a connector names has no walls, no water
+   * and no regions of its own — moving an actor there would hand it this
+   * floor's collision under a different `z`, which is not a second floor. The
+   * seam is declared (spec §6) and Phase 5 owns making it executable.
+   */
+  const arrive = (at: Movement): TilePosition => at.to;
 
   /**
    * One beat of movement, for every actor, in a fixed order.

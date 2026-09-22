@@ -77,9 +77,17 @@ export interface MapSource {
   readonly entry: { readonly x: number; readonly y: number };
   readonly regions: readonly MapRegionSource[];
   /**
-   * Floor links. Phase 3.5 ships none in the live map and builds no dungeon;
-   * this is the SEAM that proves the world model does not assume one `z`
-   * forever (spec §6).
+   * Floor links — a DECLARED, DEFERRED contract (spec §6).
+   *
+   * A map compiles ONE floor of geometry. A connector may therefore be
+   * authored and validated, and it is NOT executable: nothing in Phase 3.5
+   * moves an actor to a floor whose walls, water and regions do not exist,
+   * because those bytes would have to be borrowed from this floor and that is
+   * not a second floor, it is the same floor wearing a different number.
+   *
+   * Phase 5 owns real multi-floor map geometry. What is here is the shape the
+   * authoring format will keep, so that adding it later is a new field rather
+   * than a migration of every published map.
    */
   readonly connectors?: readonly MapConnectorSource[];
 }
@@ -119,9 +127,13 @@ export interface TileMap {
   readonly key: string;
   readonly width: number;
   readonly height: number;
-  /** Every floor the map declares, lowest first. Usually one. */
-  readonly floors: readonly number[];
-  /** The floor the authored rows describe. */
+  /**
+   * THE floor this map has geometry for. Singular, and deliberately so.
+   *
+   * `flags` and `kind` are indexed by `y * width + x` with no `z` term, so a
+   * second floor would be reading this floor's collision. Until a map can
+   * author per-floor rows, a map IS one floor.
+   */
   readonly z: number;
   /** Per tile: the OR of `BLOCK_*`. Three questions, one byte. */
   readonly flags: Uint8Array;
@@ -272,15 +284,10 @@ export function compileMap(source: MapSource): TileMap {
     };
   });
 
-  const floors = [...new Set([source.z, ...connectors.map((connector) => connector.to.z)])].sort(
-    (a, b) => a - b,
-  );
-
   const map: TileMap = {
     key: source.key,
     width,
     height,
-    floors,
     z: source.z,
     flags,
     kind,
@@ -296,7 +303,7 @@ export function compileMap(source: MapSource): TileMap {
 export const tileIndex = (map: TileMap, x: number, y: number): number => y * map.width + x;
 
 export const isInside = (map: TileMap, position: TilePosition): boolean =>
-  map.floors.includes(position.z) &&
+  position.z === map.z &&
   position.x >= 0 &&
   position.y >= 0 &&
   position.x < map.width &&
@@ -320,7 +327,14 @@ export const blocksProjectile = (map: TileMap, position: TilePosition): boolean 
 /** The old name, kept meaning exactly "may be stood on". */
 export const isWalkable = canOccupy;
 
-/** The floor link leaving this tile, if there is one. */
+/**
+ * The floor link AUTHORED on this tile, if there is one.
+ *
+ * Declared, validated, and not executable in Phase 3.5: the destination floor
+ * has no geometry in this map, so nothing here moves an actor onto it. It
+ * exists so the authoring format and the position type are already the right
+ * shape when Phase 5 gives floors their own rows.
+ */
 export const connectorAt = (map: TileMap, position: TilePosition): MapConnector | null =>
   map.connectors.find((connector) => samePosition(connector.from, position)) ?? null;
 
@@ -385,16 +399,27 @@ export function stepToward(
   const start = tileIndex(map, from.x, from.y);
   if (goalIds.has(start)) return null;
 
-  // Admissible and consistent for costs of 10 and 35: walk the diagonal part
-  // first, then the straight remainder.
+  /**
+   * MANHATTAN × the cardinal cost, and the arithmetic matters.
+   *
+   * An earlier version charged `35 · min(dx,dy) + 10 · (max−min)` — the cost of
+   * walking the diagonal part first — and called it the exact optimal cost on
+   * empty floor. It is not, because with these edge costs the diagonal is NOT
+   * the cheap way: for a displacement of (1, 1) it estimates 35 while two
+   * cardinal steps cost 20. A heuristic that overestimates is inadmissible, and
+   * an inadmissible A* returns "a path", not "the cheapest path". It really did
+   * pick an 80-cost route where a 70-cost one existed (`PTH13`).
+   *
+   * This one never overestimates: every cardinal step costs 10 and reduces the
+   * Manhattan distance by exactly 1, and every diagonal step costs 35 and
+   * reduces it by at most 2, so `h` falls by at most 10 or 20 against edges of
+   * 10 and 35. Admissible, and consistent — which is what makes the first
+   * closed node the cheapest one.
+   */
   const heuristic = (x: number, y: number) => {
     let best = Infinity;
     for (const goal of here) {
-      const dx = Math.abs(goal.x - x);
-      const dy = Math.abs(goal.y - y);
-      const diagonal = Math.min(dx, dy);
-      const straight = Math.max(dx, dy) - diagonal;
-      const estimate = diagonal * DIAGONAL_WALK_COST + straight * NORMAL_WALK_COST;
+      const estimate = (Math.abs(goal.x - x) + Math.abs(goal.y - y)) * NORMAL_WALK_COST;
       if (estimate < best) best = estimate;
     }
     return best;

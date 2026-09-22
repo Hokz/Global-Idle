@@ -1,5 +1,5 @@
 /**
- * Phase 3.5 §20 — VIS1 to VIS7. The tile scene, in a real browser.
+ * Phase 3.5 §20 — VIS1 to VIS12. The tile scene, in a real browser.
  *
  * Every case runs twice, on the desktop viewport and on the touch one
  * (playwright.config.ts), because a 61-tile map on a 390-wide screen is where
@@ -218,35 +218,49 @@ test.describe('§20 VIS — the locked logical viewport', () => {
     await expect(page.getByTestId('tile-scene')).toBeVisible();
 
     /**
-     * Where is the Character actually drawn?
+     * Which column is the Character DRAWN in?
      *
-     * The Character is blue and the sewer floor is brown, so one pixel inside
-     * its body answers it: blue beats red, or it does not. This asserts what
-     * the player sees rather than what the renderer was asked to do.
+     * Its body is the only strongly blue thing in the sewers — the floor, the
+     * masonry and the Rats are all warm — so the centroid of the blue pixels
+     * is where the player sees it, read off the canvas rather than taken from
+     * the renderer. A column of `-1` means nothing blue is on screen at all.
+     *
+     * Reading the DRAWN position matters here: the window deliberately draws
+     * one poll behind the newest snapshot, so the tile the server reports and
+     * the tile on screen are not the same tile while the Character is walking.
      */
-    const bodyAt = (column: number) =>
-      page.evaluate(async (tileColumn) => {
+    const drawnColumn = () =>
+      page.evaluate(() => {
         const canvas = document.querySelector('.tile-scene canvas') as HTMLCanvasElement;
+        const context = canvas.getContext('2d', { willReadFrequently: true })!;
         const scale = canvas.width / 480;
-        const context = canvas.getContext('2d')!;
+        const frame = context.getImageData(0, 0, canvas.width, canvas.height).data;
+        let sumX = 0;
+        let count = 0;
+        for (let index = 0; index < frame.length; index += 4) {
+          const red = frame[index] ?? 0;
+          const blue = frame[index + 2] ?? 0;
+          if (blue - red < 50) continue;
+          sumX += (index / 4) % canvas.width;
+          count += 1;
+        }
+        return count > 0 ? sumX / count / scale / 32 : -1;
+      });
+
+    const serverTile = () =>
+      page.evaluate(async () => {
         const id = location.pathname.split('/').pop();
         const response = await fetch(`http://127.0.0.1:3001/api/characters/${id}/hunt`, {
           credentials: 'include',
         });
         const snapshot = (await response.json()) as { space: { tile: { x: number; y: number } } };
-        // Logical y inside the body, from the tile the server says it is on.
-        const y = snapshot.space.tile.y * 32 + 20;
-        const x = tileColumn * 32 + 16;
-        const pixel = context.getImageData(Math.round(x * scale), Math.round(y * scale), 1, 1).data;
-        return { blue: (pixel[2] ?? 0) > (pixel[0] ?? 0), tile: snapshot.space.tile };
-      }, column);
+        return snapshot.space.tile;
+      });
 
     // At the entry the map's left edge is already on screen, so the camera
-    // CLAMPS: the Character is drawn at its own column, not the centre one.
-    await expect.poll(async () => (await bodyAt(7)).blue, { timeout: 15_000 }).toBe(false);
-    const atEntry = await bodyAt(1);
-    expect(atEntry.tile.x).toBeLessThan(7);
-    expect(atEntry.blue).toBe(true);
+    // CLAMPS: the Character is drawn in its own column, far left of centre.
+    await expect.poll(async () => (await drawnColumn()) < 3, { timeout: 15_000 }).toBe(true);
+    expect((await serverTile()).x).toBeLessThan(7);
 
     const prisma = connect();
     try {
@@ -259,8 +273,39 @@ test.describe('§20 VIS — the locked logical viewport', () => {
       await prisma.$disconnect();
     }
 
-    // Now the Character is on the CENTRE column, 7 of 0..14, wherever it walks.
-    await expect.poll(async () => (await bodyAt(7)).blue, { timeout: 25_000 }).toBe(true);
+    // Now the Character is drawn inside the CENTRE tile — column 7 of 0..14,
+    // whose body spans 7.0 to 8.0 — and the map edges are nowhere near, so it
+    // is the centring doing this and not another clamp.
+    await expect
+      .poll(
+        async () => {
+          const column = await drawnColumn();
+          return column >= 7 && column < 8;
+        },
+        { timeout: 25_000 },
+      )
+      .toBe(true);
+    const free = await serverTile();
+    expect(free.x).toBeGreaterThan(14);
+    expect(free.x).toBeLessThan(46);
+
+    // And it STAYS there: the camera follows the walk rather than letting the
+    // Character drift toward an edge of the window.
+    const columns: number[] = [];
+    for (let sample = 0; sample < 10; sample += 1) {
+      columns.push(await drawnColumn());
+      await page.waitForTimeout(200);
+    }
+    for (const column of columns) {
+      expect(
+        column,
+        `drawn columns: ${columns.map((n) => n.toFixed(2)).join(', ')}`,
+      ).toBeGreaterThan(6.5);
+      expect(column, `drawn columns: ${columns.map((n) => n.toFixed(2)).join(', ')}`).toBeLessThan(
+        8.5,
+      );
+    }
+
     // The map is exactly eleven rows and the viewport is eleven tiles deep, so
     // the camera cannot move vertically at all — which is the clamp doing its
     // job, not the centring failing.
@@ -270,7 +315,6 @@ test.describe('§20 VIS — the locked logical viewport', () => {
     });
     expect(rows).toBe(11);
   });
-
   test('VIS11: the map is fetched at the Activity’s pinned version', async ({ page }) => {
     const urls: string[] = [];
     page.on('request', (request) => {
@@ -289,5 +333,90 @@ test.describe('§20 VIS — the locked logical viewport', () => {
       // resource's identity, which is what makes `immutable` true.
       expect(path).toMatch(/^\/api\/content\/v[0-9a-f]+\/maps\/map\.rookgaard\.sewers$/);
     }
+  });
+});
+
+test.describe('§20 VIS — movement continuity, measured', () => {
+  test('VIS12: the drawn Character does not jump between authoritative steps', async ({ page }) => {
+    const characterId = await play(page);
+    await enterHunt(page);
+    await expect(page.getByTestId('tile-scene')).toBeVisible();
+
+    const prisma = connect();
+    try {
+      // A long unobstructed walk: the Character at one end of a cleared
+      // chamber, its encounter at the other, nothing in the way.
+      await prisma.huntRun.updateMany({
+        where: { characterId },
+        data: { room: 4, creatures: [], position: { tile: { x: 19, y: 8, z: 7 } } },
+      });
+    } finally {
+      await prisma.$disconnect();
+    }
+    await page.waitForTimeout(2500);
+
+    /**
+     * Where is the Character DRAWN, in tiles, this frame?
+     *
+     * Its body is the only strongly blue thing on screen — the floor and the
+     * Rats are brown and the masonry is desaturated — so the centroid of the
+     * blue pixels is the rendered position without instrumenting the renderer.
+     */
+    const samples = await page.evaluate(
+      () =>
+        new Promise<{ x: number; y: number; at: number }[]>((resolve) => {
+          const canvas = document.querySelector('.tile-scene canvas') as HTMLCanvasElement;
+          const context = canvas.getContext('2d', { willReadFrequently: true })!;
+          const scale = canvas.width / 480;
+          const taken: { x: number; y: number; at: number }[] = [];
+          const started = performance.now();
+
+          const sample = () => {
+            const frame = context.getImageData(0, 0, canvas.width, canvas.height).data;
+            let sumX = 0;
+            let sumY = 0;
+            let count = 0;
+            for (let index = 0; index < frame.length; index += 4) {
+              const red = frame[index] ?? 0;
+              const blue = frame[index + 2] ?? 0;
+              if (blue - red < 50) continue;
+              const pixel = index / 4;
+              sumX += pixel % canvas.width;
+              sumY += Math.floor(pixel / canvas.width);
+              count += 1;
+            }
+            if (count > 0) {
+              taken.push({
+                x: sumX / count / scale / 32,
+                y: sumY / count / scale / 32,
+                at: performance.now(),
+              });
+            }
+            if (performance.now() - started < 6000) requestAnimationFrame(sample);
+            else resolve(taken);
+          };
+          requestAnimationFrame(sample);
+        }),
+    );
+
+    expect(samples.length).toBeGreaterThan(30);
+
+    // This is the SCREEN position, in tiles. The camera follows the Character
+    // but EASES into place — a quarter of the remaining distance per frame —
+    // so a teleport of a whole tile cannot be absorbed by it and still shows
+    // up here as three quarters of a tile in a single frame.
+    let worst = 0;
+    for (let index = 1; index < samples.length; index += 1) {
+      const previous = samples[index - 1]!;
+      const current = samples[index]!;
+      const moved = Math.hypot(current.x - previous.x, current.y - previous.y);
+      if (moved > worst) worst = moved;
+    }
+
+    // One authoritative step is one tile. A renderer that replayed only the
+    // step in flight would sit still through a poll and then teleport several
+    // tiles when the next snapshot landed; a continuous one never crosses more
+    // than a fraction of a tile between two frames.
+    expect(worst, `largest single-frame displacement: ${worst.toFixed(3)} tiles`).toBeLessThan(0.5);
   });
 });

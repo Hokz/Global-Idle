@@ -234,12 +234,33 @@ export async function startRun(
 }
 
 /**
- * Advance a run to `now` and return what a client should see.
+ * The Character's durable spatial state, read in ONE place.
  *
- * `seen` marks this call as a sign of life — a heartbeat or a read from a live
- * client. A server-side sweep passes `false`, so it can expire a grace without
- * pretending the player is still there.
+ * `HuntRun.position` holds `{ tile, movement? }`. An earlier version pulled
+ * `.tile` out here and `.movement` out there, and the reconstruction path
+ * quietly took only the tile — so a step in flight at a settlement boundary
+ * was persisted correctly and then thrown away on the next read. The actor
+ * went back to being free, its destination stopped being reserved, and the
+ * "identical future after a restart" guarantee held only for runs that
+ * happened to end a settlement standing still.
+ *
+ * One parser, one shape, both callers.
  */
+interface StoredSpatialState {
+  readonly tile: TilePosition;
+  readonly movement?: Movement;
+}
+
+function readStoredSpatialState(
+  stored: unknown,
+  entry: TilePosition | undefined,
+): StoredSpatialState | null {
+  const value = stored as { tile?: TilePosition; movement?: Movement } | null;
+  const tile = value?.tile ?? entry;
+  if (!tile) return null;
+  return { tile, ...(value?.movement ? { movement: value.movement } : {}) };
+}
+
 /** Everything the view needs that does not change between two settlements. */
 interface ProjectionContext {
   readonly activityId: string;
@@ -354,6 +375,13 @@ function project(
   };
 }
 
+/**
+ * Advance a run to `now` and return what a client should see.
+ *
+ * `seen` marks this call as a sign of life — a heartbeat or a read from a live
+ * client. A server-side sweep passes `false`, so it can expire a grace without
+ * pretending the player is still there.
+ */
 export async function advance(
   tx: UnitOfWork,
   input: {
@@ -506,7 +534,7 @@ export async function advance(
   );
   const pouchUsed = await items.pouchSpaces(tx, run.characterId);
 
-  const storedPosition = run.position as RunProjection['position'] | null;
+  const storedSpatial = readStoredSpatialState(run.position, space?.map.entry);
   const stored: RunProjection = {
     room: run.room,
     cycle: run.cycle,
@@ -521,7 +549,14 @@ export async function advance(
     baseXp: character.baseXp,
     staminaRemainingMs: stamina.remaining,
     revision: run.checkpointSequence,
-    ...(storedPosition ? { position: storedPosition } : {}),
+    ...(storedSpatial
+      ? {
+          position: {
+            tile: storedSpatial.tile,
+            ...(storedSpatial.movement ? { movement: storedSpatial.movement } : {}),
+          },
+        }
+      : {}),
   };
 
   // ── ended ────────────────────────────────────────────────────────────────
@@ -585,11 +620,9 @@ export async function advance(
       return view(stored, 'ONLINE_ACTIVE', null, []);
     }
 
-    // The persisted tile, or the map's entry the first time a spatial run
-    // advances. Never a pixel, never interpolated: the row holds a TILE.
-    const persistedPosition =
-      (run.position as { tile?: TilePosition } | null)?.tile ?? space?.map.entry ?? null;
-
+    // The persisted tile AND the step in flight, or the map's entry the first
+    // time a spatial run advances. Never a pixel, never interpolated: the row
+    // holds a TILE, and the movement that tile is part way out of.
     const state: HuntState = {
       tick: run.tick,
       room: run.room,
@@ -599,7 +632,8 @@ export async function advance(
       creatures: stored.creatures,
       characterNextAttackTick: run.characterNextAttackTick,
       ended: null,
-      ...(persistedPosition === null ? {} : { position: persistedPosition }),
+      ...(storedSpatial === null ? {} : { position: storedSpatial.tile }),
+      ...(storedSpatial?.movement === undefined ? {} : { movement: storedSpatial.movement }),
     };
 
     // The seed includes the tick, so a settlement is a pure function of the
@@ -928,7 +962,7 @@ export async function snapshot(
       ? 'RECONNECT_GRACE_PAUSED'
       : 'ONLINE_ACTIVE';
 
-  const storedPosition = run.position as RunProjection['position'] | null;
+  const storedSpatial = readStoredSpatialState(run.position, space?.map.entry);
   return project(
     {
       activityId: String(input.activityId),
@@ -953,7 +987,14 @@ export async function snapshot(
       baseXp: character.baseXp,
       staminaRemainingMs: stamina.remainingMs,
       revision: run.checkpointSequence,
-      ...(storedPosition ? { position: storedPosition } : {}),
+      ...(storedSpatial
+        ? {
+            position: {
+              tile: storedSpatial.tile,
+              ...(storedSpatial.movement ? { movement: storedSpatial.movement } : {}),
+            },
+          }
+        : {}),
     },
     connection,
     paused ? (bound?.graceExpiresAt ?? null) : null,

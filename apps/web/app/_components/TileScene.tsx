@@ -57,29 +57,60 @@ function hash(x: number, y: number): number {
 }
 
 /**
+ * How far BEHIND the newest snapshot the scene is drawn.
+ *
+ * Measured, not chosen: with a two-second poll and a 550 ms step, a settlement
+ * can contain three completed steps the client never sees the middle of. A
+ * renderer that draws the newest instant has nothing to show for them and
+ * teleports when the next snapshot lands — 3.000 tiles in one frame, on the
+ * real stack (`VIS12`).
+ *
+ * So the scene is drawn one poll interval in the past, where every step is
+ * already described by the `move` events the snapshot carries. The picture
+ * lags by two seconds and is continuous; nothing extra is sent, nothing extra
+ * is settled, and the server stays the only thing that decides where anyone is.
+ */
+const RENDER_DELAY_MS = 2000;
+
+/** A step the server stated, kept until the drawing has gone past it. */
+type Leg = Movement;
+
+/**
  * Where an actor is, in tiles, at a simulation instant.
  *
- * This is the whole interpolation contract: the fraction comes from the
- * server's own `startsAtMs`/`arrivesAtMs` and the simulation time being drawn,
- * and it is clamped, so a late snapshot draws an arrival rather than a slide
- * past it. Nothing here invents a duration.
+ * The whole interpolation contract: the fraction comes from the server's own
+ * `startsAtMs`/`arrivesAtMs` and the instant being drawn. Nothing here invents
+ * a duration, and nothing extrapolates past a step's arrival.
  */
 export function placeActor(
   tile: Tile,
-  movement: Movement | null,
+  legs: readonly Leg[],
   atMs: number,
 ): {
   x: number;
   y: number;
 } {
-  if (!movement) return { x: tile.x, y: tile.y };
-  const span = movement.arrivesAtMs - movement.startsAtMs;
-  if (span <= 0) return { x: movement.to.x, y: movement.to.y };
-  const progress = Math.min(1, Math.max(0, (atMs - movement.startsAtMs) / span));
-  return {
-    x: lerp(movement.from.x, movement.to.x, progress),
-    y: lerp(movement.from.y, movement.to.y, progress),
-  };
+  let current: Leg | null = null;
+  let last: Leg | null = null;
+  let next: Leg | null = null;
+  for (const leg of legs) {
+    if (leg.startsAtMs <= atMs && atMs < leg.arrivesAtMs) current = leg;
+    if (leg.arrivesAtMs <= atMs && (!last || leg.arrivesAtMs > last.arrivesAtMs)) last = leg;
+    if (leg.startsAtMs > atMs && (!next || leg.startsAtMs < next.startsAtMs)) next = leg;
+  }
+  if (current) {
+    const span = current.arrivesAtMs - current.startsAtMs;
+    const progress = span <= 0 ? 1 : Math.min(1, Math.max(0, (atMs - current.startsAtMs) / span));
+    return {
+      x: lerp(current.from.x, current.to.x, progress),
+      y: lerp(current.from.y, current.to.y, progress),
+    };
+  }
+  // Between two steps: standing on the last arrival, or waiting on the next
+  // departure. Both are tiles the server named.
+  if (last) return { x: last.to.x, y: last.to.y };
+  if (next) return { x: next.from.x, y: next.from.y };
+  return { x: tile.x, y: tile.y };
 }
 
 export function TileScene({ map, run, debug = false }: TileSceneProps) {
@@ -96,10 +127,60 @@ export function TileScene({ map, run, debug = false }: TileSceneProps) {
    */
   const anchor = useRef<{ nowMs: number; at: number } | null>(null);
   const camera = useRef<{ x: number; y: number } | null>(null);
+  /**
+   * Every step the server has stated lately, per actor.
+   *
+   * The snapshot already carries them: each `move` event is an authoritative
+   * leg with its own start and arrival. Keeping a bounded window of them is
+   * what lets the scene draw the steps BETWEEN two polls instead of jumping
+   * over them — and it costs nothing, because the bytes were already sent.
+   */
+  const timeline = useRef(new Map<string, Leg[]>());
 
   useEffect(() => {
     latest.current = { map, run, debug };
-    if (run.space) anchor.current = { nowMs: run.space.nowMs, at: performance.now() };
+    if (!run.space) return;
+    anchor.current = { nowMs: run.space.nowMs, at: performance.now() };
+
+    const add = (actor: string, leg: Leg) => {
+      const legs = timeline.current.get(actor) ?? [];
+      if (legs.some((known) => known.startsAtMs === leg.startsAtMs)) return;
+      legs.push(leg);
+      timeline.current.set(actor, legs);
+    };
+    for (const event of run.events) {
+      if (event.kind !== 'move') continue;
+      if (!event.actor || !event.from || !event.to) continue;
+      if (event.startsAtMs === undefined || event.arrivesAtMs === undefined) continue;
+      add(event.actor, {
+        from: event.from,
+        to: event.to,
+        startsAtMs: event.startsAtMs,
+        arrivesAtMs: event.arrivesAtMs,
+      });
+    }
+    if (run.space.movement) add('character', run.space.movement);
+    for (const creature of run.creatures) {
+      if (creature.id && creature.movement) add(creature.id, creature.movement);
+    }
+
+    // Bounded: anything the drawing has long gone past is dropped, and an
+    // actor that no longer exists takes its legs with it.
+    const living = new Set<string>([
+      'character',
+      ...run.creatures.map((creature) => creature.id ?? ''),
+    ]);
+    const horizon = run.space.nowMs - RENDER_DELAY_MS * 3;
+    for (const [actor, legs] of timeline.current) {
+      if (!living.has(actor)) {
+        timeline.current.delete(actor);
+        continue;
+      }
+      timeline.current.set(
+        actor,
+        legs.filter((leg) => leg.arrivesAtMs >= horizon),
+      );
+    }
   }, [map, run, debug]);
 
   useEffect(() => {
@@ -145,8 +226,11 @@ export function TileScene({ map, run, debug = false }: TileSceneProps) {
       const mapHeight = rows.length * size;
 
       // ── the simulation instant being drawn ───────────────────────────
+      //
+      // One poll behind the newest snapshot, which is exactly the window the
+      // snapshot's own `move` events describe.
       const held = anchor.current;
-      const simNow = held ? held.nowMs + (performance.now() - held.at) : 0;
+      const simNow = held ? held.nowMs - RENDER_DELAY_MS + (performance.now() - held.at) : 0;
 
       // ── who is on the board ──────────────────────────────────────────
       const actors: Drawn[] = [];
@@ -174,8 +258,10 @@ export function TileScene({ map, run, debug = false }: TileSceneProps) {
 
       const placed = new Map<string, { x: number; y: number; facing: number }>();
       for (const actor of actors) {
-        const at = placeActor(actor.tile, actor.movement, simNow);
-        const facing = actor.movement && actor.movement.to.x < actor.movement.from.x ? -1 : 1;
+        const legs = timeline.current.get(actor.id) ?? [];
+        const at = placeActor(actor.tile, legs, simNow);
+        const heading = legs.find((leg) => leg.startsAtMs <= simNow && simNow < leg.arrivesAtMs);
+        const facing = heading && heading.to.x < heading.from.x ? -1 : 1;
         placed.set(actor.id, { ...at, facing });
       }
 
@@ -388,19 +474,21 @@ export function TileScene({ map, run, debug = false }: TileSceneProps) {
       // checks before an attack, Chebyshev one — so drawing a clash between
       // two actors that are next to each other states something true rather
       // than guessing at a fight the client cannot see.
-      const heroTile = view.space?.tile;
-      if (heroTile) {
+      const heroSpot = placed.get('character');
+      if (heroSpot) {
         for (const creature of view.creatures) {
-          if (!creature.tile || creature.health <= 0) continue;
+          if (!creature.id || creature.health <= 0) continue;
+          const spot = placed.get(creature.id);
+          if (!spot) continue;
+          // Measured on what is DRAWN. The scene is a moment behind the
+          // snapshot, so marking contact from the newest tiles would put
+          // sparks where nobody is standing yet.
           const touching =
-            creature.tile.z === heroTile.z &&
-            Math.max(
-              Math.abs(creature.tile.x - heroTile.x),
-              Math.abs(creature.tile.y - heroTile.y),
-            ) === 1;
+            Math.max(Math.abs(spot.x - heroSpot.x), Math.abs(spot.y - heroSpot.y)) < 1.05 &&
+            Math.max(Math.abs(spot.x - heroSpot.x), Math.abs(spot.y - heroSpot.y)) > 0.7;
           if (!touching) continue;
-          const mx = ((creature.tile.x + heroTile.x) / 2 + 0.5) * size - cam.x;
-          const my = ((creature.tile.y + heroTile.y) / 2 + 0.5) * size - cam.y;
+          const mx = ((spot.x + heroSpot.x) / 2 + 0.5) * size - cam.x;
+          const my = ((spot.y + heroSpot.y) / 2 + 0.5) * size - cam.y;
           const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 90);
           context.strokeStyle = `rgba(255, 216, 140, ${0.25 + pulse * 0.45})`;
           context.lineWidth = Math.max(1.5, size * 0.06);

@@ -94,6 +94,23 @@ carries neither yet: it has no fields, and it treats an occupied tile as impassa
 expensive, because a deterministic single-settlement simulation has no tolerance for "walk through
 the rat if it is cheaper".
 
+### The heuristic is NOT source-backed — it is a Global Idle engine decision
+
+The two EDGE COSTS above are the source's. The **heuristic** an A* uses to order its frontier is
+not, and Global Idle does not claim Canary's: the source builds its own node table with
+`((dX - sX) << 3) + ((dY - sY) << 3) + (max(dX, dY) << 3)` (`src/map/map.cpp:1136-1138`), which is
+tuned to its own bounded node budget and its own expansion order.
+
+Global Idle uses `manhattan × NORMAL_WALK_COST`, chosen for one property: it never overestimates
+the cheapest remaining cost under edges of 10 and 35, so A* is guaranteed to return a cheapest
+path. An earlier version used `35·min(dx,dy) + 10·(max−min)`, which **overestimates** — a (1,1)
+displacement costs 20 by two cardinals and that heuristic says 35 — and it really did return an
+80-cost route where a 70-cost one existed. What this project needs from the source is topology and
+cost semantics; what it needs from itself is a correct search (`PTH13`–`PTH15`).
+
+The **deterministic tie-break** (lowest `f`, then lowest `g`, then lowest tile index) and the
+**occupancy/reservation policy** are likewise Global Idle engine decisions, not source rules.
+
 ---
 
 ## 4. Step duration — ground speed, step speed and the 50 ms beat
@@ -220,9 +237,16 @@ TILESTATE_FLOORCHANGE = <all of the above>
 A* runs on one floor. Changing floor is a property of a **tile you step onto**, not a path the
 search plans through, and a diagonal step never triggers it (§2).
 
-Global Idle adopts exactly that shape: `z` exists on every position from the first map, a
-**connector** is a tile-to-tile link declared in content, and the pathfinder stays single-floor.
-Phase 3.5 proves the seam with one fixture and builds no dungeon (`FLR1`–`FLR3`).
+Global Idle adopts exactly that shape, and stops there honestly: `z` exists on every position from
+the first map, a **connector** is a tile-to-tile link declared and validated in content, and the
+pathfinder stays single-floor.
+
+What Phase 3.5 does NOT do is execute the connector. A map compiles **one** floor of geometry —
+`flags` and `kind` are indexed by `y · width + x` with no `z` term — so a second floor would be
+reading this floor's walls under a different number. That is not a second floor. Until a map can
+author per-floor rows, `isInside` admits exactly one `z` and an arrival never changes floor
+(`FLR1`–`FLR4`). Phase 5 owns real multi-floor geometry; what is here is the shape the authoring
+format will keep.
 
 ---
 
@@ -248,3 +272,6 @@ Phase 3.5 proves the seam with one fixture and builds no dungeon (`FLR1`–`FLR3
 | Step duration from a constant base rather than the log curve | `creature.hpp:1089-1096` | no vocation speed stat yet; the curve is the named successor |
 | `WALK_TARGET_NEARBY_EXTRA_COST` not applied | `creature.cpp:1700-1705` | it slows a monster that is already next to its target; Global Idle's creatures stop when adjacent, so it would change nothing |
 | A* frontier is a scanned set, not the source's node table | `astarnodes.cpp` | maps are small; a heap is a data structure to get wrong |
+| A* heuristic is `manhattan × 10`, not the source's shifted estimate | `map.cpp:1136-1138` | the source's is tuned to its own node budget; ours is chosen to be provably admissible under these edge costs (§3) |
+| A connector is authored but NOT executable | `items_definitions.hpp:446-476` | a map compiles one floor of geometry; moving an actor to an unauthored floor would hand it this floor's collision (§7) |
+| A chasing actor re-derives its route every beat; the source CACHES one | `creature.hpp:900` (`listWalkDir`), `creature.cpp:1122-1192` (`hasFollowPath`, `getPathTo`) | re-deriving is correct per beat and simpler to persist, but two actors of the same cadence then circle a symmetric obstacle forever. Unreachable on the authored data — a Character steps in ≤ 550 ms and a Rat in 900 (`STP8`) — and the cached route is Phase 5's to add |

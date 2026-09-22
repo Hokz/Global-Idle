@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DIAGONAL_WALK_COST,
   MapError,
+  STEPS,
   NORMAL_WALK_COST,
   blocksProjectile,
   canOccupy,
@@ -167,7 +168,7 @@ describe('§20 PTH — deterministic pathfinding to a GOAL SET', () => {
 });
 
 describe('§20 PTH — eight directions, as the source has them', () => {
-  it('PTH7: a diagonal step is taken when it is the shorter way', () => {
+  it('PTH7: a diagonal is not a shortcut — two cardinals are cheaper than one', () => {
     const map = compileMap(source(['#####', '#...#', '#...#', '#...#', '#####']));
     const goals = meleeGoals(map, at(3, 3), free);
     // From the opposite corner the diagonal is one step of 35 against two
@@ -292,7 +293,7 @@ describe('§20 COL — three collision questions, not one', () => {
   });
 });
 
-describe('§20 FLR — the floor seam, proved and not built', () => {
+describe('§20 FLR — the floor seam is declared, and honestly not executable', () => {
   const twoFloors = compileMap(
     source(['#####', '#...#', '#####'], {
       entry: { x: 1, y: 1 },
@@ -301,10 +302,32 @@ describe('§20 FLR — the floor seam, proved and not built', () => {
     }),
   );
 
-  it('FLR1: a connector is content, and the map knows which floors it touches', () => {
-    expect(twoFloors.floors).toEqual([6, 7]);
+  it('FLR1: a connector is authored content, and the map still has ONE floor', () => {
     expect(connectorAt(twoFloors, at(3, 1))?.kind).toBe('STAIRS_UP');
     expect(connectorAt(twoFloors, at(1, 1))).toBeNull();
+    // The map compiles one floor of geometry. Declaring a link to z=6 does not
+    // conjure walls, water or regions there, so z=6 is NOT part of this map.
+    expect(twoFloors.z).toBe(7);
+    expect(isWalkable(twoFloors, { x: 1, y: 1, z: 6 })).toBe(false);
+    expect(canPathThrough(twoFloors, { x: 1, y: 1, z: 6 })).toBe(false);
+    // And the only way to read collision is through the floor that authored it.
+    expect(blocksProjectile(twoFloors, { x: 1, y: 1, z: 6 })).toBe(true);
+  });
+
+  it('FLR4: a second Z cannot borrow this floor’s collision bytes', () => {
+    // The defect this case exists for: `flags` is indexed by `y * width + x`
+    // with no Z term, so admitting a second Z would have made every tile of
+    // the "other floor" answer with THIS floor's walls. A floor that is not
+    // authored is simply not there.
+    for (const z of [6, 8, 0, -1]) {
+      expect(isWalkable(twoFloors, { x: 1, y: 1, z })).toBe(false);
+      expect(canOccupy(twoFloors, { x: 2, y: 1, z })).toBe(false);
+      expect(canPathThrough(twoFloors, { x: 2, y: 1, z })).toBe(false);
+    }
+    // The same tiles on the authored floor are open, so the refusal above is
+    // about the FLOOR and not about the coordinates.
+    expect(isWalkable(twoFloors, at(1, 1))).toBe(true);
+    expect(canPathThrough(twoFloors, at(2, 1))).toBe(true);
   });
 
   it('FLR2: a connector that changes nothing, or stands on a wall, is refused', () => {
@@ -326,7 +349,8 @@ describe('§20 FLR — the floor seam, proved and not built', () => {
 
   it('FLR3: pathfinding stays on ONE floor — a goal upstairs is not a step', () => {
     // The source's A* holds `z` constant too; changing floor is a property of
-    // the tile you arrive on, which is exactly what a connector is.
+    // a tile you arrive on, which is what a connector will be when a floor has
+    // geometry of its own.
     const upstairs = [{ x: 3, y: 1, z: 6 }];
     expect(stepToward(twoFloors, at(1, 1), upstairs, free)).toBeNull();
   });
@@ -353,5 +377,193 @@ describe('§20 RCH — a map that cannot be played is not published', () => {
     expect(() => compileMap(sewerish(['########', '#..##..#', '########']))).toThrow(
       /progression is broken/,
     );
+  });
+});
+
+describe('§20 PTH — the path is the CHEAPEST path', () => {
+  /**
+   * The regression this group exists for.
+   *
+   * ```
+   *  01234567
+   * 0########
+   * 1#S.#.T.#     S = start (1,1); T = target (5,1), its tile occupied
+   * 2#.#.#..#
+   * 3#......#
+   * 4#......#
+   * 5#......#
+   * 6#......#
+   * 7########
+   * ```
+   *
+   * The first heuristic charged `35 · min(dx,dy) + 10 · (max−min)` and called
+   * itself the exact optimal cost. With a diagonal edge of 35 against two
+   * cardinals of 20 it OVERESTIMATES, which makes A* inadmissible — and on
+   * this map it really did take an 80-cost route past a 70-cost one.
+   */
+  const COUNTEREXAMPLE = [
+    '########',
+    '#..#...#',
+    '#.#.#..#',
+    '#......#',
+    '#......#',
+    '#......#',
+    '#......#',
+    '########',
+  ];
+
+  const counterexample = compileMap(
+    source(COUNTEREXAMPLE, {
+      entry: { x: 1, y: 1 },
+      regions: [{ id: 'r', rect: [1, 1, 6, 6], room: 1, spawns: [{ x: 1, y: 1 }] }],
+    }),
+  );
+
+  /** The target's own tile is occupied, as a hostile target's always is. */
+  const onTarget = (position: { x: number; y: number }) => position.x === 5 && position.y === 1;
+
+  /** Walk `stepToward` to a goal and add up what it actually cost. */
+  const walk = (
+    map: TileMap,
+    from: typeof at extends never ? never : ReturnType<typeof at>,
+    goals: ReturnType<typeof at>[],
+    blocked: (p: { x: number; y: number }) => boolean,
+  ) => {
+    const reached = new Set(goals.map((goal) => `${goal.x},${goal.y}`));
+    let here = from;
+    let cost = 0;
+    const route = [`${from.x},${from.y}`];
+    for (let guard = 0; guard < 64; guard += 1) {
+      const next = stepToward(map, here, goals, blocked);
+      if (!next) break;
+      cost += stepCost(next.x - here.x, next.y - here.y);
+      here = next;
+      route.push(`${here.x},${here.y}`);
+      if (reached.has(`${here.x},${here.y}`)) break;
+    }
+    return { cost, route, arrived: reached.has(`${here.x},${here.y}`) };
+  };
+
+  /**
+   * An exhaustive shortest path over the SAME edge model, in the test only.
+   *
+   * It is deliberately a different algorithm — no heuristic at all — so it can
+   * disagree with the production one when the production one is wrong.
+   */
+  function cheapestCost(
+    map: TileMap,
+    from: ReturnType<typeof at>,
+    goals: ReturnType<typeof at>[],
+    blocked: (p: { x: number; y: number }) => boolean,
+  ): number {
+    const key = (p: { x: number; y: number }) => `${p.x},${p.y}`;
+    const goalKeys = new Set(goals.map(key));
+    const distance = new Map<string, number>([[key(from), 0]]);
+    const settled = new Set<string>();
+    for (;;) {
+      let best: string | null = null;
+      let bestCost = Infinity;
+      for (const [node, cost] of distance) {
+        if (!settled.has(node) && cost < bestCost) {
+          best = node;
+          bestCost = cost;
+        }
+      }
+      if (best === null) return Infinity;
+      settled.add(best);
+      if (goalKeys.has(best)) return bestCost;
+      const [bx, by] = best.split(',').map(Number) as [number, number];
+      for (const [dx, dy] of STEPS) {
+        const candidate = at(bx + dx, by + dy);
+        const id = key(candidate);
+        if (!canOccupy(map, candidate)) continue;
+        if (!goalKeys.has(id) && !canPathThrough(map, candidate)) continue;
+        if (!goalKeys.has(id) && blocked(candidate)) continue;
+        const next = bestCost + stepCost(dx, dy);
+        if (next < (distance.get(id) ?? Infinity)) distance.set(id, next);
+      }
+    }
+  }
+
+  it('PTH13: the chosen route costs 70, not the 80 an inadmissible heuristic took', () => {
+    const goals = meleeGoals(counterexample, at(5, 1), onTarget);
+    expect(goals.map((goal) => `${goal.x},${goal.y}`).sort()).toEqual(['4,1', '5,2', '6,1', '6,2']);
+
+    const taken = walk(counterexample, at(1, 1), goals, onTarget);
+    expect(taken.arrived).toBe(true);
+    expect(taken.cost).toBe(70);
+    // The first step is the one that makes the cheap route possible. The old
+    // heuristic chose (2,1) and paid 80 for it.
+    expect(taken.route[1]).toBe('1,2');
+
+    // And it equals what an exhaustive search says the cheapest route costs.
+    expect(taken.cost).toBe(cheapestCost(counterexample, at(1, 1), goals, onTarget));
+  });
+
+  it('PTH14: on every small fixture, the route matches an exhaustive oracle', () => {
+    const fixtures: {
+      rows: readonly string[];
+      from: [number, number];
+      target: [number, number];
+    }[] = [
+      { rows: COUNTEREXAMPLE, from: [1, 1], target: [5, 1] },
+      {
+        rows: ['#######', '#.....#', '#.###.#', '#.....#', '#######'],
+        from: [1, 1],
+        target: [5, 3],
+      },
+      {
+        rows: ['#######', '#..#..#', '#..#..#', '#.....#', '#######'],
+        from: [1, 1],
+        target: [5, 1],
+      },
+      { rows: ['######', '#....#', '#.##.#', '#....#', '######'], from: [1, 1], target: [4, 3] },
+      { rows: ['#####', '#...#', '#...#', '#...#', '#####'], from: [1, 1], target: [3, 3] },
+    ];
+
+    for (const fixture of fixtures) {
+      const map = compileMap(
+        source(fixture.rows, {
+          entry: { x: 1, y: 1 },
+          regions: [
+            {
+              id: 'r',
+              rect: [1, 1, fixture.rows[0]!.length - 2, fixture.rows.length - 2],
+              room: 1,
+              spawns: [{ x: 1, y: 1 }],
+            },
+          ],
+        }),
+      );
+      const target = at(fixture.target[0], fixture.target[1]);
+      const occupied = (p: { x: number; y: number }) => p.x === target.x && p.y === target.y;
+      const goals = meleeGoals(map, target, occupied);
+      const from = at(fixture.from[0], fixture.from[1]);
+      const taken = walk(map, from, goals, occupied);
+      const cheapest = cheapestCost(map, from, goals, occupied);
+      expect(taken.arrived, JSON.stringify(fixture.rows)).toBe(true);
+      expect(taken.cost, JSON.stringify(fixture.rows)).toBe(cheapest);
+    }
+  });
+
+  it('PTH15: the heuristic never overestimates, on any displacement', () => {
+    // The property the fix restores, stated directly: `manhattan * 10` cannot
+    // exceed the cheapest reachable cost, because every cardinal edge costs 10
+    // and cuts Manhattan by 1, and every diagonal costs 35 and cuts it by 2.
+    for (let dx = 0; dx <= 6; dx += 1) {
+      for (let dy = 0; dy <= 6; dy += 1) {
+        if (dx === 0 && dy === 0) continue;
+        const estimate = (dx + dy) * NORMAL_WALK_COST;
+        const diagonal = Math.min(dx, dy);
+        const straight = Math.max(dx, dy) - diagonal;
+        // The cheapest route on empty floor is the better of "all cardinals"
+        // and "diagonals then cardinals".
+        const cheapest = Math.min(
+          (dx + dy) * NORMAL_WALK_COST,
+          diagonal * DIAGONAL_WALK_COST + straight * NORMAL_WALK_COST,
+        );
+        expect(estimate).toBeLessThanOrEqual(cheapest);
+      }
+    }
   });
 });

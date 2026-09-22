@@ -179,4 +179,39 @@ describe('§20 MPV — the map the browser draws is the map the server simulates
     expect(body).not.toContain('rows');
     expect(body).not.toContain('legend');
   });
+
+  it('MPV6: a route parameter never becomes a filesystem path', async () => {
+    // `toContentVersion` is a branded cast, and the filesystem resolver builds
+    // `join(directory, `${version}.json`)`. So the grammar is checked BEFORE
+    // anything is looked up: a published version is `v` and sixteen hex
+    // characters, and a content key is lowercase dot-separated segments.
+    // Everything else names a resource that cannot exist.
+    const refused = [
+      '/api/content/not-a-version/maps/map.rookgaard.sewers',
+      `/api/content/v${'f'.repeat(15)}/maps/map.rookgaard.sewers`,
+      `/api/content/v${'f'.repeat(17)}/maps/map.rookgaard.sewers`,
+      '/api/content/vZZZZZZZZZZZZZZZZ/maps/map.rookgaard.sewers',
+      `/api/content/${'v0123456789abcdef'.repeat(40)}/maps/map.rookgaard.sewers`,
+      '/api/content/..%2f..%2fetc%2fpasswd/maps/map.rookgaard.sewers',
+      '/api/content/v0123456789abcdef/maps/..%2f..%2fsecrets',
+      '/api/content/v0123456789abcdef/maps/NOT A KEY',
+      '/api/content/v0123456789abcdef/maps/Map.Rookgaard.Sewers',
+    ];
+    for (const path of refused) {
+      const response = await call<{ error?: { code?: string } }>(base, path, { cookie });
+      expect([404, 400], `${path} -> ${response.status}`).toContain(response.status);
+      expect(JSON.stringify(response.body)).not.toContain('ENOENT');
+    }
+
+    // A WELL-FORMED version that was simply never published is equally absent,
+    // and a well-formed key that is not a map stays a 404.
+    const unpublished = await call(
+      base,
+      '/api/content/v0123456789abcdef/maps/map.rookgaard.sewers',
+      { cookie },
+    );
+    expect(unpublished.status).toBe(404);
+    const notAMap = await call(base, `/api/content/${versionOne}/maps/${HUNT_KEY}`, { cookie });
+    expect(notAMap.status).toBe(404);
+  });
 });

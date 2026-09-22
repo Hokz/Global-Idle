@@ -41,6 +41,7 @@ import {
 } from '@global-idle/shared';
 import {
   atlasMarkerSchema,
+  isContentKey,
   mapSchema,
   regionSchema,
   type ContentBundleResolver,
@@ -48,6 +49,7 @@ import {
 import { CONTENT_RESOLVER, PRISMA } from './tokens.js';
 import { SessionGuard, type RequestWithSession } from './session.guard.js';
 import { asHttp, codeOf, fail, notFound } from './errors.js';
+import { isPublishedVersion } from './input.js';
 import { currentActivity, huntView } from './views.js';
 
 /** The responses this controller writes itself; see `activity` below. */
@@ -354,6 +356,14 @@ export class WorldController {
   @Get('content/:contentVersion/maps/:key')
   @Header('Cache-Control', 'public, max-age=31536000, immutable')
   async map(@Param('contentVersion') version: string, @Param('key') key: string) {
+    // BOTH parameters are checked against their canonical grammar before
+    // anything looks them up. The version becomes a filename inside the
+    // resolver and the key becomes a bundle lookup; neither may be arbitrary
+    // text, and `toContentVersion` is a branded cast rather than a check.
+    // Malformed input is ABSENT — it names a resource that cannot exist — so
+    // it is a 404 and never a path.
+    if (!isPublishedVersion(version) || !isContentKey(key)) throw notFound();
+
     let bundle;
     try {
       bundle = await this.resolver.resolve(toContentVersion(version));

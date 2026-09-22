@@ -68,7 +68,7 @@ So three things disagreed: where the server said the actor was, when the server 
 there, and what the player saw. Each was individually defensible and together they were not a
 movement model.
 
-There is now one: an actor is on `position`, may have an `activeMovement` with absolute
+There is now one: an actor is on `position`, may have a `movement` with absolute
 simulation-millisecond instants, **cannot attack from or be attacked at the destination before
 arriving**, and **reserves** that destination so nothing else can claim it. The simulation
 advances on a 50 ms beat for movement and resolves combat only on the 1000 ms tick — so a step
@@ -80,18 +80,94 @@ invents no duration at all.
 
 ### 0.5 What the correction cost the fight
 
-Re-running the exact deadlock regression under eight directions and source-backed step durations:
+Re-running the exact deadlock regression, 14,400 ticks in 720 settlements, with the step speeds the
+source actually gives these two actors — a level-2 Character at 111 and a Rat at `monster.speed`
+67, so 550 ms and 900 ms a step:
 
 | | kills in 14,400 ticks | end state |
 |---|---|---|
 | without space | 269 | room 10, cycle 62 |
 | with space, before the correction | 8 | **stalled at tick 1,020** |
 | with space, after the first fix (4 directions, 1 tile/s) | 266 | room 10, cycle 61 |
-| **with space, after this correction** | **269** | room 10, cycle 62 |
+| **with space, at this head** | **262** | room 10, cycle 60 |
 
-A Character that walks at 1.8 tiles per second loses no measurable throughput to travel on this
-map, and 0 overlaps occurred across 720 settlements. The number is not the point — the absence of
-a stall is — but it is worth recording that the faithful movement model is also the cheaper one.
+0 overlaps across those 720 settlements. Travel costs about 2.6% of throughput on this map; the
+number is not the point — the absence of a stall is.
+
+**A correction to an earlier measurement.** The `269 / cycle 62` figure this table used to claim for
+the corrected engine came from a probe that built its own Rat without a `stepSpeed` field, so both
+actors stepped at the engine's 110 default. Two actors of *identical* cadence is a different
+simulation from the one the content describes, and it is the one case where a mutual chase does not
+converge — see §7. The row above is the shipped content's own speeds.
+
+---
+
+## 0.6 The correctness pass
+
+A second independent review accepted the four blockers above as fixed and found two more, both in
+code the first pass had written. Both are worth recording because of what they say about where
+defects hide.
+
+### The test that could not have caught it
+
+`HuntRun.position` was written as `{ tile, movement }` and read back as `.tile`. A Character
+mid-step at a settlement boundary therefore woke up standing still: free to decide again from its
+origin, with its destination no longer reserved. Every guarantee the movement timeline was built
+for — reservation, restart continuity, an identical future — held only for runs that happened to
+end a settlement standing still.
+
+`SPC7` and `STP5` were written to prove exactly this and did not, because they round-trip the pure
+`HuntState` through `JSON.parse(JSON.stringify(...))` and hand it straight back to the engine. That
+proves the state is **serializable**. It says nothing about whether the domain **reconstructs** it.
+The two look almost identical in a diff and are completely different claims.
+
+`PER1`–`PER6` drive the real path: `advance` writes the row, a later settlement reads it, and one
+case runs the settlement in a **fresh process** through the existing restart harness. Reverting
+only the read half fails four of the six, which is how they were checked for teeth.
+
+The fix is one parser — `readStoredSpatialState` — used by the simulation, the projection and the
+pure snapshot. Half a shape read in three places is three chances to read half of it.
+
+### The heuristic that was mathematically false
+
+The first pass documented its A* heuristic as "the exact optimal cost on empty floor, admissible
+and consistent". With the source's edge costs it is neither: for a (1, 1) displacement it charges
+35 while two cardinal steps cost 20, so it **overestimates**, and an A* whose heuristic
+overestimates returns a path rather than the cheapest one.
+
+The review supplied a counterexample and it reproduced exactly: on an 8 × 8 fixture the old
+heuristic took a first step of `(2,1)` for a total of **80**, where `(1,2)` reaches a goal for
+**70**. `manhattan × 10` is admissible and consistent under edges of 10 and 35, and produces the
+70-cost route. `PTH14` now compares production against an exhaustive shortest-path oracle written
+in the test, so the next wrong heuristic fails a case rather than a review.
+
+The lesson is narrower than "test more": a comment asserting a mathematical property is a claim,
+and the claim was checkable in two lines of arithmetic that nobody did.
+
+### Two smaller corrections
+
+**The floor seam was prose.** `map.floors` admitted a connector's destination `z` and `isInside`
+accepted it — but `flags` is indexed by `y · width + x` with no `z` term, so tiles on that "floor"
+answered with this floor's walls. A grid is one floor. The connector is now declared, validated
+and **not executable**, `isInside` admits one `z`, and Phase 5 owns real multi-floor geometry.
+
+**A route parameter reached the filesystem.** `toContentVersion` is a branded cast, and the
+resolver builds `join(directory, \`${version}.json\`)`. Both parameters are now checked against
+their canonical grammar — `^v[0-9a-f]{16}$` and the content-key pattern — before anything is looked
+up.
+
+### And one thing that was only a suspicion until it was measured
+
+The review asked whether a two-second poll could show discontinuous movement now that a step takes
+550 ms. It could: measured on the real stack, the largest single-frame displacement was **3.000
+tiles**. The client was drawing the newest instant, which means it had nothing to show for the two
+or three steps completed between polls and teleported when the next snapshot landed.
+
+The correction is the smallest one available and touches no server code: the snapshot already
+carries the `move` events of the span it settled, each an authoritative leg. The scene is now drawn
+**one poll interval behind** — the window those legs describe — and replays them. **0.061 tiles**
+afterwards. No extra bytes, no extra settlements, and a two-second lag nobody can see in a game
+nobody steers.
 
 ---
 
@@ -194,12 +270,16 @@ mockups, and not renders of a design.
 
 - **No pathfinding service, no spatial index, no quadtree.** A 61 × 11 map with
   at most six actors is scanned faster than a heap can be allocated.
-- **No second clock.** Movement is what an actor does with a tick.
+- **No second clock.** Movement runs on a 50 ms beat INSIDE the settlement that
+  runs the 1000 ms combat tick — one loop, two cadences, one `nowMs`.
 - **No spatial state in Redis.** The run row already holds it, transactionally,
   beside everything else a settlement writes.
 - **No visual map editor.** The map is eleven strings in a JSON file and is
   validated at build time; an editor would be a product, not a tool.
-- **No diagonals.** See P35-D1.
+- **No ranged combat**, though the map already answers `blocksProjectile`. The
+  bit is separated because un-collapsing it later is a content migration; the
+  system that would read it is not this phase's.
+- **No executable floor change.** See P35-D15.
 
 ---
 
@@ -207,12 +287,12 @@ mockups, and not renders of a design.
 
 | | |
 |---|---|
-| New engine module | `packages/game-engine/src/space.ts`, 305 lines, pure |
-| Engine change | target selection and creature stepping in `hunt.ts` |
-| Schema change | one nullable JSONB column |
-| New routes | `POST …/hunt/advance`, `GET /api/maps/:key` |
-| New client component | `TileScene.tsx`, a camera |
-| New cases | 39 (TIL, PTH, SPC, SNP, RND, VIS) |
+| New engine module | `packages/game-engine/src/space.ts`, 528 lines, pure |
+| Engine change | target selection, the 50 ms movement beat and creature stepping in `hunt.ts` |
+| Schema change | one nullable JSONB column, holding `{ tile, movement }` |
+| New routes | `POST …/hunt/advance`, `GET /api/content/:contentVersion/maps/:key` |
+| New client component | `TileScene.tsx`, a camera, 563 lines |
+| New cases | 83 (TIL, PTH, SPC, STP, SNP, MPV, COL, FLR, RCH, RND, PER, VIS) |
 | Phase 2's golden fixture | **byte-identical** — a Hunt with no map takes the same branches and the same draws |
 
 ---
@@ -222,11 +302,20 @@ mockups, and not renders of a design.
 - **Creature idle behaviour.** A creature that cannot reach the Character stands
   still. That is correct and not interesting; real wandering is a behaviour
   system and belongs to whatever phase wants one.
-- **One tile per second is slow** next to the source engine, where a Character's
-  step duration comes from its speed. Speed is a stat this game does not have
-  yet; when it does, `TICK_MS` is not the thing that should change.
 - **The clash marks are a proxy.** They mark adjacency, which is true, rather
   than a specific swing, which the snapshot does not identify per actor.
+- **Two actors of the same cadence chase each other around a pillar forever.**
+  Each is idle on the same beat, each takes a genuinely cheapest step toward the
+  other, and each step flips which side of the obstacle is cheapest for the
+  other: they circle, or they trade the same two tiles, and never meet. This is
+  emergent from a correct pathfinder and a symmetric obstacle, not a defect in
+  either. It cannot happen on the shipped content — a Character steps in 550 ms
+  or less and a Rat in 900 (`STP8` fails the moment a creature is authored at
+  the Character's cadence) — and the fix when it can is the source's, which
+  caches a route (`listWalkDir`) rather than re-deriving one every beat. An
+  immediate-reversal ban was tried and rejected: it turns the two-tile trade
+  into a wider circle, which is the same livelock with more steps, and it
+  perturbs the shipped fight for nothing.
 
 ---
 
@@ -245,8 +334,9 @@ asserts the map is fetched once). There is no input handler on the canvas —
 RNG and reference none. RND1 changes the seed and asserts every tile and every
 move event is identical; RND2 asserts a walking span consumes zero draws.
 
-**Is there a second game clock?** No. `TICK_MS` is unchanged, movement happens
-inside the existing tick order, and the only new timer anywhere is
+**Is there a second game clock?** No. `TICK_MS` is unchanged and combat still
+resolves on whole ticks; the 50 ms movement beat is an inner step of the SAME
+settlement loop, off the same `nowMs`. The only new timer anywhere is
 `requestAnimationFrame` in the browser, which draws and decides nothing.
 
 **Are static map tiles in PostgreSQL?** No. The map is a content definition,
@@ -258,7 +348,7 @@ resolves inside one pure function during one settlement; arbitration is index
 order over one array. §8.5's lock order is untouched.
 
 **Was any existing case weakened, renamed or skipped?** No. The full matrix is
-92 + 87 + 106 + 169 + 39, every id present, counted by
+92 + 87 + 106 + 169 + 83, every id present, counted by
 `scripts/count-matrix.mjs` in CI. Phase 2's golden fixture is byte-identical.
 Two E2E route globs changed from `**/hunt` to `**/hunt/advance` because the
 route they were aiming at moved; both cases assert exactly what they asserted
@@ -272,7 +362,7 @@ bundle with moved geometry and prove the running Activity keeps its own.
 **Is mobility eight-direction and deterministic?** Yes, with the source's costs (10 / 35) and no
 corner rule, which is the source's behaviour rather than a choice. `PTH7`–`PTH12`.
 
-**Is movement timing one authoritative state?** Yes. `activeMovement` carries absolute simulation
+**Is movement timing one authoritative state?** Yes. `movement` carries absolute simulation
 milliseconds; the renderer interpolates from those and the snapshot's `nowMs` and invents nothing.
 An actor cannot attack from a destination it has not reached, and that destination is reserved.
 `STP1`–`STP7`.
@@ -284,9 +374,38 @@ An actor cannot attack from a destination it has not reached, and that destinati
 Yes, from the first map: three independent bits, with `water` and `sludge` as the cases that
 disagree. `COL1`–`COL4`.
 
-**Can a future multi-floor Hunt extend this engine?** The seam is declared and proved — connectors
-are content, floors are enumerated, pathing stays single-floor as the source's does. `FLR1`–`FLR3`.
-No dungeon is built.
+**Can a future multi-floor Hunt extend this engine?** The seam is declared and validated, and
+deliberately not executable: a connector is authored content, a compiled map is ONE floor of
+geometry, and both pathing and arrival stay on it. `FLR1`–`FLR4`. No dungeon is built, and no
+second floor is pretended.
+
+**Does a Character movement survive a real database settlement boundary?** Yes — one parser reads
+`{tile, movement}` back, and `PER1`–`PER6` prove it through `advance`, through the row, and through
+a fresh process. Reverting the read half fails four of them.
+
+**Can a reservation disappear because a request ended?** No. The reservation is the persisted
+`movement.to`, so it exists exactly as long as the step does. `PER3` holds a step open for
+twenty-eight settlements and asserts nothing else takes the tile.
+
+**Does A* return an optimal route under the production edge costs?** Yes on the regression and on
+every oracle fixture. The heuristic is `manhattan × 10`, which provably never overestimates under
+edges of 10 and 35, and `PTH14` compares against an exhaustive search rather than against itself.
+
+**Can any `z` be treated as having collision it never authored?** No. `isInside` admits one `z`,
+and `FLR4` asserts that every other floor refuses occupancy, pathing and projectiles on tiles that
+are open on the authored one.
+
+**Can a route parameter make the content resolver inspect an arbitrary path?** No. Both parameters
+are checked against their grammar before resolution; `MPV6` includes traversal-shaped input.
+
+**Does the real browser show continuous movement?** Measured: 3.000 tiles of frame-to-frame jump
+before the correction, 0.061 after. `VIS12` is that measurement, kept as a case.
+
+**Does the fight still finish, over a long horizon, with the source's own step speeds?** Yes — 262
+kills across 14,400 ticks and 720 settlements, room 10 and cycle 60, with 0 overlaps and no stall
+(§0.5). It does NOT finish when a creature and the Character are given the same cadence, which the
+authored data never does and `STP8` refuses to let it start doing (§7, P35-D19). That limitation is
+recorded rather than papered over: the fix is the source's cached route, and it is Phase 5's.
 
 **Is the acceptance evidence real?** Yes, and it is checked in:
 [`evidence/`](./evidence/) holds five `page.screenshot()` captures of the

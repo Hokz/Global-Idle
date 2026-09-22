@@ -113,3 +113,17 @@ export function lootRules(value: unknown, max = 64): LootRuleInput[] {
     return rule;
   });
 }
+
+/**
+ * A published bundle version, as `buildBundle` mints it: `v` followed by the
+ * first sixteen hex characters of the content's SHA-256.
+ *
+ * This is checked BEFORE the value reaches the content resolver, because the
+ * filesystem resolver ultimately builds `join(directory, `${version}.json`)`
+ * from it. A branded cast is a type-level promise, not a check; a route
+ * parameter is whatever the network sent.
+ */
+const CONTENT_VERSION = /^v[0-9a-f]{16}$/;
+
+export const isPublishedVersion = (value: string): boolean =>
+  value.length === 17 && CONTENT_VERSION.test(value);

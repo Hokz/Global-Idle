@@ -106,9 +106,17 @@ cardinal steps to one diagonal *everywhere it can*. Diagonals are what get an ac
 geometry that cardinals cannot — a corner, a doorway's shoulder — not a fast lane across open
 floor. The duration model agrees: a diagonal takes 3× a cardinal against the cardinal pair's 2×.
 
-Ties break on lowest `f`, then lowest `g`, then lowest tile index. The heuristic is the exact
-optimal-on-empty-floor cost, `10 · max(dx,dy) + 25 · min(dx,dy)`, which is admissible and
-consistent for these two costs.
+Ties break on lowest `f`, then lowest `g`, then lowest tile index. The **heuristic is a Global Idle
+engine decision, not a source rule**: `manhattan × 10`. It is admissible and consistent under these
+edges — a cardinal step costs 10 and cuts Manhattan by exactly 1, a diagonal costs 35 and cuts it
+by at most 2 — so A* is guaranteed to return a cheapest path.
+
+An earlier version used `35 · min(dx,dy) + 10 · (max−min)` and called it the exact optimal cost.
+It **overestimates**: a (1,1) displacement costs 20 by two cardinal steps and that heuristic says
+35. An inadmissible A* returns *a* path, not *the cheapest* one, and on an 8 × 8 fixture it really
+did take an 80-cost route past a 70-cost one (`PTH13`). `PTH14` compares production against an
+exhaustive shortest-path oracle on every small fixture; `PTH15` states the non-overestimation
+property directly.
 
 **No randomness is involved in any spatial decision** (§20 RND). A reload recomputes the same path
 from the same durable state.
@@ -188,7 +196,7 @@ An actor is described by:
 
 ```
 position: Tile                     // the tile it IS on
-activeMovement?: {                 // the step in flight, or nothing
+movement?: {                       // the step in flight, or nothing
   from, to,
   startsAtMs, arrivesAtMs          // absolute simulation milliseconds
 }
@@ -196,22 +204,37 @@ activeMovement?: {                 // the step in flight, or nothing
 
 and the rules that make it one state rather than two opinions:
 
-- an actor with an `activeMovement` **is still on `from`** — it cannot attack from `to`, cannot be
+- an actor with a `movement` **is still on `from`** — it cannot attack from `to`, cannot be
   attacked at `to`, and does not occupy `to`;
 - `to` is **reserved**: nothing else may stand on it or commit to it, so two actors can never
   claim one tile (`STP3`);
-- on `arrivesAtMs` the actor commits to `to`, the reservation ends, and a connector under that
-  tile (§6) takes effect;
+- on `arrivesAtMs` the actor commits to `to` and the reservation ends. A connector authored on
+  that tile is **not** followed (§6);
 - the decision to step is taken only when an actor is free — there is no repathing mid-step.
 
-A settlement boundary may fall inside a step. The persisted state carries the movement with
-absolute instants, so a reload resumes the identical future (`STP5`, `SPC7`).
+A settlement boundary may fall inside a step. `HuntRun.position` therefore carries
+`{ tile, movement? }`, and the reconstruction reads **both halves through one parser**. An earlier
+version wrote the whole thing and read back only the tile, so a step in flight was silently
+dropped at every boundary: the actor became free to decide again from its origin and its
+destination stopped being reserved. `PER1`–`PER6` drive the real domain and database path,
+including a settlement from a **fresh process**, because the engine's own JSON round-trip could
+not have caught it (`STP5`, `SPC7` prove serializability; they do not prove reconstruction).
 
 ### 5.1 What the renderer is given, and what it may do
 
 The snapshot carries `space.nowMs`, the simulation instant it describes, in the same milliseconds
-as `startsAtMs` and `arrivesAtMs`. The browser advances that anchor with its own wall clock — the
-simulation runs at one second per second — and draws each actor at
+as `startsAtMs` and `arrivesAtMs`, plus the `move` events of the span it settled — every one an
+authoritative leg with its own start and arrival.
+
+The browser advances that anchor with its own wall clock and draws the scene **one poll interval
+behind** it, which is exactly the window those events describe. That was measured, not assumed:
+drawing the newest instant gave a largest single-frame displacement of **3.000 tiles** on the real
+stack, because a two-second poll can contain three completed 550 ms steps the client never sees
+the middle of. Replaying the legs it was already sent brings it to **0.061 tiles** (`VIS12`). No
+extra bytes, no extra settlements, and the picture lags two seconds — which for a game nobody
+steers is invisible.
+
+Within a leg the actor is drawn at
 
 ```
 progress = clamp((simNow − startsAtMs) / (arrivesAtMs − startsAtMs), 0, 1)
@@ -225,17 +248,20 @@ two different stories; they are now one.
 
 ## 6. Floors — a seam, not a feature
 
-A `connector` is a content declaration: `{ from, to, kind }` where `from` and `to` are on
-different floors. The compiler records which floors a map touches and refuses a connector that
-changes nothing or stands on a wall.
+A map compiles **ONE** floor of geometry. `flags` and `kind` are indexed by `y · width + x` with no
+`z` term, so a second floor would be reading this floor's walls under a different number — which is
+not a second floor, it is the same floor wearing another label.
 
-Pathfinding stays **single-floor**, as the source's does: changing floor is a property of a tile
-you arrive on, not a path the search plans through, and a diagonal step never triggers it (source
-map §7). An actor arriving on a connector transitions deterministically.
+So Phase 3.5 is honestly single-floor at runtime: `isInside` admits exactly one `z`, and an
+arrival never changes floor.
 
-The live Sewers declare **no connectors**. The seam exists so a later phase adds a floor without
-migrating every published map, and it is proved by fixtures (`FLR1`–`FLR3`), not by fake stairs in
-a shipped map.
+A `connector` — `{ from, to, kind }` across floors — is **declared and validated content, and not
+executable**. It exists so the authoring format and `TilePosition` are already the right shape when
+Phase 5 gives floors their own rows; adding that is then a new field rather than a migration of
+every published map. The live Sewers declare none. `FLR1`–`FLR4` prove the honest contract,
+including that an unauthored `z` cannot borrow this floor's collision bytes.
+
+**Phase 5 owns real multi-floor map geometry and executable connectors.**
 
 ---
 
@@ -260,6 +286,12 @@ Migration `20260922200000_hunt_spatial_position` adds the column, nullable.
 | `/api/characters/:id/hunt/advance` | `POST` | settles to now and records liveness. |
 | `/api/characters/:id/hunt/heartbeat` | `POST` | the same settlement, under the name Phase 2 gave it. |
 | `/api/content/:contentVersion/maps/:key` | `GET` | the map **at a named version**. `public, max-age=31536000, immutable`. |
+
+Both parameters of the map route are checked against their canonical grammar **before anything is
+looked up**: a published version is `v` plus sixteen lowercase hex characters (`buildBundle` mints
+`v${sha256.slice(0,16)}`), and a key must satisfy the content-key grammar. `toContentVersion` is a
+branded cast, not a check, and the filesystem resolver builds `join(directory, \`${version}.json\`)`
+— so malformed input is refused as **absent** and never becomes a path (`MPV6`).
 
 A GET is the one verb the whole stack is entitled to repeat — a retry, a prefetch, a strict-mode
 double render, a proxy revalidating — and under the old contract every repetition was a
@@ -347,11 +379,15 @@ exists behind `NEXT_PUBLIC_DEBUG_OVERLAY=1` and is off even then until toggled (
 | P35-D12 | **Map URL carries the content version** | otherwise the browser can draw a map the server is not simulating, and `immutable` is a lie |
 | P35-D13 | **Fixed 15 × 11 logical viewport** | visible world is gameplay; hardware must not change it |
 | P35-D14 | Three collision bits from the first map | un-collapsing them later is a content migration |
-| P35-D15 | Connectors declared, not used | a seam costs a schema field; retrofitting floors costs every published map |
+| P35-D15 | Connectors declared and validated, NOT executable | one grid of geometry is one floor; an unauthored floor would borrow this one's collision |
+| P35-D16 | `manhattan × 10` heuristic, ours rather than the source's | provably admissible under edges of 10 and 35; the source's is tuned to its own node budget |
+| P35-D17 | Draw one poll interval behind, replaying the snapshot's own legs | measured 3.000 → 0.061 tiles of frame-to-frame jump, at no cost on the wire or in the database |
+| P35-D18 | Route parameters validated against their grammar before resolution | a branded cast is a promise; a route parameter is whatever the network sent |
+| P35-D19 | A mutual chase between actors of the SAME cadence is left as it is, and guarded in content | two correct pathfinders and a symmetric obstacle circle each other by construction; the source's answer is a cached route, which is Phase 5's. `STP8` fails if content ever creates the precondition |
 
 ---
 
-## 20. Acceptance matrix — 70 cases
+## 20. Acceptance matrix — 83 cases
 
 Counted by `scripts/count-matrix.mjs`; every case is exactly one test whose title begins with its
 id and a colon.
@@ -359,16 +395,17 @@ id and a colon.
 | Group | Cases | What it fixes |
 |---|---|---|
 | **TIL** | 1–6 | the tile model: compilation, Z, ragged rows, unknown symbols, entry/spawn on a wall, kind is not collision |
-| **PTH** | 1–12 | pathing: never onto the target, around an obstacle, repeatable, blocked tiles, unreachable, already adjacent — then eight directions, the source's costs, corner cutting, a dynamic blocker on the diagonal, Chebyshev reach, and `blockPathFind` as its own bit |
+| **PTH** | 1–15 | pathing: never onto the target, around an obstacle, repeatable, blocked tiles, unreachable, already adjacent — then eight directions, the source's costs, corner cutting, a dynamic blocker on the diagonal, Chebyshev reach, `blockPathFind` as its own bit — and **optimality**: the 80-vs-70 regression, an exhaustive oracle on every small fixture, and the heuristic never overestimating |
 | **SPC** | 1–10 | the fight with a map: reach beats index, index breaks ties, a blocked fight finishes, no overlap, determinism, reload, no map means exactly Phase 2, room transition, endless cycle |
-| **STP** | 1–7 | the movement timeline: source-backed durations, no pre-arrival attack, reservation, a coherent leg, a settlement boundary mid-step, sub-tick resolution, the diagonal factor |
+| **STP** | 1–8 | the movement timeline: source-backed durations, no pre-arrival attack, reservation, a coherent leg, a settlement boundary mid-step, sub-tick resolution, the diagonal factor — and no authored creature sharing the Character's cadence, which is what keeps a mutual chase from circling a pillar forever (P35-D19) |
 | **SNP** | 1–7 | the snapshot contract: the read is pure, the POST settles, neither is storable, identity and placement, monotonic revision, versioned map resource, literal `null` |
-| **MPV** | 1–5 | one spatial truth across a publish: a running Activity keeps its bundle, its version fetches its geometry, a new Activity gets the new one, two versions are two URLs, the map is never in the snapshot |
+| **MPV** | 1–6 | one spatial truth across a publish: a running Activity keeps its bundle, its version fetches its geometry, a new Activity gets the new one, two versions are two URLs, the map is never in the snapshot, and a route parameter never becomes a filesystem path |
 | **COL** | 1–4 | three collision questions that genuinely disagree |
-| **FLR** | 1–3 | the floor seam: connectors are content, invalid ones are refused, pathing stays on one floor |
+| **FLR** | 1–4 | the floor seam: a connector is authored content and the map still has one floor, invalid ones are refused, pathing stays on one floor, and an unauthored `z` cannot borrow this floor's collision |
 | **RCH** | 1–2 | a map whose progression is broken fails the build |
 | **RND** | 1–3 | a different seed changes the fight and not one tile; walking consumes no draws; the same exchange costs the same draws with and without a map |
-| **VIS** | 1–11 | the browser: the scene is the map the server named, the Character walks, POST advances, a stale snapshot is discarded, the map is fetched once at its pinned version, the scene fits, no overlay in a shipped build, a locked 15 × 11 logical viewport, resize reveals nothing, the camera centres and clamps |
+| **PER** | 1–6 | a step in flight survives the DATABASE: the write carries the whole step, the next settlement resumes it rather than re-departing, the reservation holds across the boundary, arrival commits, a fresh process resumes identically, and reconnect grace does not throw it away |
+| **VIS** | 1–12 | the browser: the scene is the map the server named, the Character walks, POST advances, a stale snapshot is discarded, the map is fetched once at its pinned version, the scene fits, no overlay in a shipped build, a locked 15 × 11 logical viewport, resize reveals nothing, the camera centres and clamps, and the drawn Character never jumps between authoritative steps |
 
 Inherited and unchanged: Phase 0B **92**, Phase 1 **87**, Phase 2 **106**, Phase 3 **169**.
 

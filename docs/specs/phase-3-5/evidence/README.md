@@ -4,16 +4,18 @@ Five screenshots of the running stack: a real API, a real database, a real conte
 real Chromium. Nothing here is a mockup, a render of a design, or a picture of something that does
 not exist — each one is a `page.screenshot()` of the Game Window during a live Hunt.
 
-**Recaptured at the corrected head**, after eight-direction movement, the authoritative movement
-timeline, the version-pinned map resource and the locked 15 × 11 logical viewport.
+**Recaptured at the corrected head**, after the correctness pass: the persisted step in flight, the
+admissible A\* heuristic, the honestly single-floor map, the validated map route, and — the one
+that changes what these pictures show — the scene being drawn one poll interval behind the newest
+snapshot so a walk is continuous rather than a teleport.
 
 | File | What it shows |
 |---|---|
-| `01-approach-desktop.png` | Room 1, desktop 1440×900. The Character mid-approach — the state that did not exist before this phase: a fight you have to get to. |
-| `02-combat-desktop.png` | The Character in contact, clash marks between them, the Rat's health bar down. Reach is Chebyshev one, so contact includes the diagonals. |
-| `03-room-6-desktop.png` | Room 6, three Rats converging, two already in contact — **one of them diagonally**, which is what melee range means in the source. The camera has centred the Character on logical column 7. |
-| `04-mobile.png` | 390×844 at DPR 3, showing **the same 15 × 11 world** as the desktop capture: the same chamber, the same three Rats, the same Character position. Smaller pixels, identical gameplay information. |
-| `05-debug-overlay-desktop.png` | The developer overlay, which exists only in a build made with `NEXT_PUBLIC_DEBUG_OVERLAY=1` and is off until toggled: the tile grid, coordinates every five tiles, run-local actor ids (`character`, `s0`, `s1`) and `rev 7 · tick 14 · room 3 · you 16,3,7 · 2 alive`. |
+| `01-approach-desktop.png` | Room 1, desktop 1440×900. The Character mid-approach, the Rat two chambers up and across, **nobody in reach and nobody hurt** — 150/150 and 20/20. This is the state that did not exist before this phase: a fight you have to get to. |
+| `02-combat-desktop.png` | The same encounter after contact. The clash mark sits between the two, the Rat is at 15/20, and the contact is **diagonal** — Chebyshev one is what melee range means in the source. |
+| `03-room-6-desktop.png` | Room 6, three Rats converging on the Character, all three in contact — one above and two diagonally below. The camera has centred the Character on logical column 7. |
+| `04-mobile.png` | 390×844 at DPR 3, the same account and the same run, showing **the same 15 × 11 world**: the same chamber, the same three Rats, the same Character position, the same readouts. It is a later instant of the same fight, so the health numbers have moved on; the visible world has not. |
+| `05-debug-overlay-desktop.png` | The developer overlay, which exists only in a build made with `NEXT_PUBLIC_DEBUG_OVERLAY=1` and is off until toggled: the tile grid, coordinates every five tiles, run-local actor ids (`character`, `s1`) and `rev 9 · tick 18 · room 3 · you 15,3,7 · 2 alive`. |
 
 Compare `03` and `04` directly: that pair **is** the viewport contract. A larger screen shows the
 same corridor bigger, never more of it.
