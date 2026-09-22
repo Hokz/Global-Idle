@@ -27,10 +27,14 @@ import {
   TICK_MS,
   createSeededRandom,
   initialState,
+  isSeededRandomState,
+  restoreSeededRandom,
   simulateHunt,
   type HuntEvent,
   type HuntState,
   type Movement,
+  type SeededRandom,
+  type SeededRandomState,
   type TilePosition,
 } from '@global-idle/game-engine';
 import type { ContentBundleResolver } from '@global-idle/game-data';
@@ -259,6 +263,85 @@ function readStoredSpatialState(
   const tile = value?.tile ?? entry;
   if (!tile) return null;
   return { tile, ...(value?.movement ? { movement: value.movement } : {}) };
+}
+
+/**
+ * The run's place in its own random streams, read and written in ONE place.
+ *
+ * WHY THIS EXISTS. Settlement used to build its generators from
+ * `${activity.rngSeed}:${run.tick}`. That made each settlement a pure function
+ * of the persisted state — good — but it also made the SETTLEMENT BOUNDARIES
+ * an input. Sixty one-second advances restarted the stream sixty times; one
+ * sixty-second advance ran it once; the same durable state and the same
+ * elapsed time produced different hits, different Gold and different loot. The
+ * client decides when to POST `/hunt/advance`, so the client was deciding the
+ * luck. Persisting where each stream stopped makes the boundary invisible:
+ * one long settlement and many short ones consume the same draws in the same
+ * order.
+ *
+ * THREE STREAMS, still separate (P3-D4). Combat is what Phase 2 is verified
+ * against; physical loot is its own so a new drop table cannot shift a hit;
+ * the item identity roll is its own so rarity and affixes cannot either. This
+ * correction is about each stream's CONTINUITY, never about merging them.
+ */
+const RNG_STATE_VERSION = 1;
+
+interface StoredRngState {
+  readonly version: typeof RNG_STATE_VERSION;
+  readonly combat: SeededRandomState;
+  readonly loot: SeededRandomState;
+  readonly identity: SeededRandomState;
+}
+
+interface RngStreams {
+  readonly combat: SeededRandom;
+  readonly loot: SeededRandom;
+  readonly identity: SeededRandom;
+}
+
+/**
+ * Continue this run's streams, or open them.
+ *
+ * `stored` is null exactly twice: on a row written before the streams were
+ * durable, and on the first settlement of a new run. Both take the same path
+ * and it is the OLD rule — `${seed}:${tick}` — which is why a brand new run
+ * (tick 0) begins on precisely the stream the previous implementation used,
+ * and why Phase 2's golden draw sequence is untouched. From then on the row
+ * carries the position.
+ *
+ * Anything else present but unreadable THROWS. A row that holds a state this
+ * engine cannot continue is a row whose future is unknown; reseeding it
+ * quietly would invent a different one and call it the same run.
+ */
+function restoreRngStreams(stored: unknown, seed: string, tick: number): RngStreams {
+  const open = (suffix: string): SeededRandom => createSeededRandom(`${seed}:${tick}${suffix}`);
+  if (stored === null || stored === undefined) {
+    return { combat: open(''), loot: open(':loot'), identity: open(':identity') };
+  }
+  const value = stored as Partial<StoredRngState>;
+  if (typeof value !== 'object' || value.version !== RNG_STATE_VERSION) {
+    throw new RangeError(
+      `HuntRun.rngState is version ${String(value.version)}; this build writes ${RNG_STATE_VERSION}.`,
+    );
+  }
+  const resume = (name: 'combat' | 'loot' | 'identity'): SeededRandom => {
+    const state = value[name];
+    if (!isSeededRandomState(state)) {
+      throw new RangeError(`HuntRun.rngState.${name} is not a stream this engine can continue.`);
+    }
+    return restoreSeededRandom(state);
+  };
+  return { combat: resume('combat'), loot: resume('loot'), identity: resume('identity') };
+}
+
+/** Where the streams stand now, for the row. */
+function snapshotRngStreams(streams: RngStreams): StoredRngState {
+  return {
+    version: RNG_STATE_VERSION,
+    combat: streams.combat.snapshot(),
+    loot: streams.loot.snapshot(),
+    identity: streams.identity.snapshot(),
+  };
 }
 
 /** Everything the view needs that does not change between two settlements. */
@@ -636,16 +719,13 @@ export async function advance(
       ...(storedSpatial?.movement === undefined ? {} : { movement: storedSpatial.movement }),
     };
 
-    // The seed includes the tick, so a settlement is a pure function of the
-    // persisted position: a rolled-back attempt replays identically, and a
-    // restart resumes the same future.
-    const rng = createSeededRandom(`${bound.rngSeed}:${state.tick}`);
-    // A SECOND stream for physical loot, so the fight's draw sequence is
-    // exactly what Phase 2 was verified against. Both are pure functions of
-    // the persisted position, so a replay reproduces the drops as well as the
-    // hits.
-    const lootRng = createSeededRandom(`${bound.rngSeed}:${state.tick}:loot`);
-    const step = simulateHunt(state, profile, plan, ticks, rng, lootRng, space);
+    // The streams RESUME from the row rather than being reseeded per
+    // settlement, so how the elapsed time was cut into checkpoints cannot
+    // change what the dice say. They are snapshotted back into the same
+    // `huntRun.update` below, inside this transaction: a rollback un-consumes
+    // them exactly as it un-consumes the XP.
+    const streams = restoreRngStreams(run.rngState, bound.rngSeed, state.tick);
+    const step = simulateHunt(state, profile, plan, ticks, streams.combat, streams.loot, space);
     events = step.events;
 
     const participant = await tx.activityParticipant.findUniqueOrThrow({
@@ -731,7 +811,7 @@ export async function advance(
     const collected: { definitionKey: string; quantity: number }[] = [];
     if (step.rewards.length > 0) {
       const policy = await items.readPolicy(tx, run.characterId);
-      const identityRng = createSeededRandom(`${bound.rngSeed}:${state.tick}:identity`);
+      const identityRng = streams.identity;
       const rewarded = new Set(settled.rewardedTicks);
       for (const reward of step.rewards) {
         // Zero Stamina drops the WHOLE reward, loot included (§2.3, §14).
@@ -829,6 +909,10 @@ export async function advance(
         sessionXp: next.sessionXp,
         sessionGold: next.sessionGold,
         checkpointSequence: sequence,
+        // Where the streams stopped. Same row, same statement, same
+        // transaction as the XP, the Gold, the supplies and the tick — there
+        // is no second write and no write-ahead record to reconcile.
+        rngState: snapshotRngStreams(streams) as never,
         ...(input.seen ? { lastSeenAt: input.now } : {}),
       },
     });

@@ -274,7 +274,11 @@ Actor identity is **run-local and derived**: `${creatureKey}:${regionId}:c${cycl
 survives persistence and reload because it is computed from *where* and *which*, never from a
 counter a restart would lose.
 
-Migration `20260922200000_hunt_spatial_position` adds the column, nullable.
+`HuntRun.rngState` — a JSONB column holding where this run stands in each of its random streams
+(§10). Also nullable, for the same reason and with a documented rule for what null means.
+
+Migrations `20260922200000_hunt_spatial_position` and `20260922230000_hunt_rng_continuation` add
+the two columns, both nullable.
 
 ---
 
@@ -361,7 +365,70 @@ exists behind `NEXT_PUBLIC_DEBUG_OVERLAY=1` and is off even then until toggled (
 
 ---
 
-## 10. Decisions
+## 10. Settlement boundaries are not gameplay
+
+A Hunt is settled in whatever pieces a client's cadence produces: a foreground tab every two
+seconds, a backgrounded one after a minute, a reconnect after a gap, a future worker on its own
+schedule. Those pieces are **transport**. What the run does with the time must not depend on them.
+
+The first implementation did depend on them. Each settlement built its generators from
+`${activity.rngSeed}:${run.tick}`, which made one settlement reproducible and made the NUMBER of
+settlements an input:
+
+| | |
+|---|---|
+| one 60-second advance | one stream, tick 0 → tick 60, draws taken in one continuous sequence |
+| sixty 1-second advances | sixty streams, each reseeded at the tick it started on |
+
+Same durable state, same authoritative elapsed time, different damage, different Gold, different
+loot. The client chooses when to POST, so the client was choosing the luck.
+
+### 10.1 The contract
+
+> **HTTP heartbeat and advance frequency is transport and liveness behaviour. It is NOT a
+> gameplay-randomness input.**
+
+For the same Activity state, seed, content version, equipment and supplies, the durable result of
+an authoritative interval is identical however that interval is partitioned — as long as the
+partition introduces no genuine lifecycle transition (a reconnect grace, a pause, an end). That
+covers tick, room, cycle, health, creature state, tiles and steps in flight, supplies, XP, Gold,
+physical loot, Stamina, and the streams' own positions.
+
+A settlement with **no whole tick** simulates nothing and therefore consumes nothing.
+
+### 10.2 How
+
+`HuntRun.rngState` holds the continuation state of each stream — combat, physical loot, and the
+item identity roll — as a versioned engine value (`sfc32-v1`: four uint32 words and a draw count).
+A settlement **restores** its generators from the row, simulates, **snapshots** them, and writes
+the snapshot in the same statement, the same row and the same transaction as the tick, the XP, the
+Gold, the supplies and the loot. There is no second write and no write-ahead record, so a rollback
+un-consumes randomness exactly as it un-consumes experience, and a replayed checkpoint re-consumes
+neither.
+
+The engine owns the state's shape and knows nothing about where it is kept; the domain owns
+keeping it. `simulateHunt` still takes generators and still cannot see a database.
+
+Streams stay **separate** (P3-D4): adding a drop table must not move a hit, and adding rarity must
+not move either. This is about each stream's continuity, never about merging them.
+
+### 10.3 A row with nothing stored
+
+Null means "no position recorded" — a row written before the streams were durable, and the first
+settlement of a new run. Both take one path, and it is the OLD rule: seed from
+`${activity.rngSeed}:${run.tick}` (plus `:loot`, `:identity`), then persist the continuation. A new
+run is at tick 0, so its first settlement begins on exactly the stream the previous implementation
+used, which is why Phase 2's golden draw sequence is untouched. For an old row mid-run this is a
+deterministic starting point rather than a reconstruction: draws that were never written down
+cannot be recovered, and pretending otherwise would be a worse answer than saying so.
+
+A stored state this build cannot read — an unknown version, a word that is not a uint32 — **throws**.
+A run whose stream position is unreadable has an unknown future; reseeding it quietly would invent
+a different one and call it the same run.
+
+---
+
+## 11. Decisions
 
 | Id | Decision | Why |
 |---|---|---|
@@ -384,10 +451,11 @@ exists behind `NEXT_PUBLIC_DEBUG_OVERLAY=1` and is off even then until toggled (
 | P35-D17 | Draw one poll interval behind, replaying the snapshot's own legs | measured 3.000 → 0.061 tiles of frame-to-frame jump, at no cost on the wire or in the database |
 | P35-D18 | Route parameters validated against their grammar before resolution | a branded cast is a promise; a route parameter is whatever the network sent |
 | P35-D19 | A mutual chase between actors of the SAME cadence is left as it is, and guarded in content | two correct pathfinders and a symmetric obstacle circle each other by construction; the source's answer is a cached route, which is Phase 5's. `STP8` fails if content ever creates the precondition |
+| P35-D20 | **The run owns its position in its own random streams**, persisted beside the state they produced | otherwise the number of settlements is an input, and the client picks the number |
 
 ---
 
-## 20. Acceptance matrix — 83 cases
+## 20. Acceptance matrix — 95 cases
 
 Counted by `scripts/count-matrix.mjs`; every case is exactly one test whose title begins with its
 id and a colon.
@@ -405,6 +473,7 @@ id and a colon.
 | **RCH** | 1–2 | a map whose progression is broken fails the build |
 | **RND** | 1–3 | a different seed changes the fight and not one tile; walking consumes no draws; the same exchange costs the same draws with and without a map |
 | **PER** | 1–6 | a step in flight survives the DATABASE: the write carries the whole step, the next settlement resumes it rather than re-departing, the reservation holds across the boundary, arrival commits, a fresh process resumes identically, and reconnect grace does not throw it away |
+| **RNGC** | 1–12 | **cross-phase determinism**: one settlement vs two, sixty one-second ones, a ragged partition table, identical loot, identical tiles and steps, a zero-tick settlement consuming nothing, rollback and retry, a fresh process, stream isolation, a legacy null row — and, on the engine, a stream that survives JSON and a stored state that is refused rather than reseeded |
 | **VIS** | 1–12 | the browser: the scene is the map the server named, the Character walks, POST advances, a stale snapshot is discarded, the map is fetched once at its pinned version, the scene fits, no overlay in a shipped build, a locked 15 × 11 logical viewport, resize reveals nothing, the camera centres and clamps, and the drawn Character never jumps between authoritative steps |
 
 Inherited and unchanged: Phase 0B **92**, Phase 1 **87**, Phase 2 **106**, Phase 3 **169**.

@@ -113,12 +113,32 @@ describe('§20 DTH — what a death costs now', () => {
     const before = (await readCharacter(prisma, hunt.characterId)).baseXp;
     expect(loot.length).toBeGreaterThan(0);
 
+    const earnedBefore = (
+      await prisma.huntRun.findUniqueOrThrow({ where: { activityId: String(hunt.activityId) } })
+    ).sessionGold;
+
     await nearlyDead(String(hunt.activityId));
     const died = await killIt(hunt.activityId, new Date(T0.getTime() + minutes(10)));
 
     expect(died.view!.penalty?.fullBless).toBe(true);
     expect(await pouchOf(prisma, hunt.characterId)).toHaveLength(loot.length);
-    expect(await readPouch(prisma, hunt.characterId)).toBe(carried);
+
+    /**
+     * The pouch kept everything it had, PLUS whatever the last span earned.
+     *
+     * This used to assert `toBe(carried)` — that the balance had not moved at
+     * all — and it passed only because, under the old per-settlement reseeding,
+     * the dying span happened to produce no Gold-yielding kill. It is not the
+     * rule. `killIt` plays until the Character dies, and a Character can take a
+     * Rat with it: measured here, one kill and three Gold between `carried` and
+     * the fatal blow. What Full Bless promises is that nothing is TAKEN, so
+     * that is what this asserts, against the run's own record of what it
+     * earned rather than against a number that depended on the cadence.
+     */
+    const earnedAfter = (
+      await prisma.huntRun.findUniqueOrThrow({ where: { activityId: String(hunt.activityId) } })
+    ).sessionGold;
+    expect(await readPouch(prisma, hunt.characterId)).toBe(carried + (earnedAfter - earnedBefore));
     // Full Bless is still not a free death.
     expect((await readCharacter(prisma, hunt.characterId)).baseXp).toBeLessThan(before);
   });

@@ -4,10 +4,16 @@ Five screenshots of the running stack: a real API, a real database, a real conte
 real Chromium. Nothing here is a mockup, a render of a design, or a picture of something that does
 not exist — each one is a `page.screenshot()` of the Game Window during a live Hunt.
 
-**Recaptured at the corrected head**, after the correctness pass: the persisted step in flight, the
+**Recaptured at `f795892`**, after the correctness pass: the persisted step in flight, the
 admissible A\* heuristic, the honestly single-floor map, the validated map route, and — the one
 that changes what these pictures show — the scene being drawn one poll interval behind the newest
 snapshot so a walk is continuous rather than a teleport.
+
+**Not recaptured for the determinism pass, on purpose.** Making the random streams continuous
+across settlements changes which numbers come out of them; it changes nothing about what is drawn,
+how it is drawn, or what the window is allowed to do. Re-shooting would produce five different
+fights that showed the same five things, and would say that something visible had changed when
+nothing had. The files below are the `f795892` captures, unchanged.
 
 | File | What it shows |
 |---|---|

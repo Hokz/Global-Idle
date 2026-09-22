@@ -171,6 +171,65 @@ nobody steers.
 
 ---
 
+## 0.7 The determinism pass
+
+A third review accepted the whole of §0.6 and found one thing left, and it was not in Phase 3.5 at
+all. It was inherited, it had been true since Phase 2, and it was invisible because every test that
+could have seen it settled its time the same way twice.
+
+### The client was choosing the luck
+
+Settlement built its generators from `${activity.rngSeed}:${run.tick}`. That is a real guarantee —
+a settlement is a pure function of durable state, a rollback replays identically, a restart resumes
+— and it is the *wrong* guarantee, because it quantifies over the wrong thing:
+
+| holds | does not hold |
+|---|---|
+| same state + same start tick + same tick count → same result | same run + same **elapsed time** → same result, however that time was cut up |
+
+Sixty one-second advances reseeded the stream sixty times; one sixty-second advance ran it once.
+Same row, same seed, same sixty seconds, different damage, different Gold, different loot. And the
+partition is not an internal detail: the browser decides when to `POST /hunt/advance`. A tab in the
+foreground and the same tab backgrounded were playing measurably different games.
+
+Measured on the real domain and database path at `f795892`, before the fix: **six of the ten
+`RNGC` cases fail**, including item-for-item loot and the Character's own tile.
+
+### The fix is to stop reseeding and start remembering
+
+`SeededRandom` gained a snapshot: `{ algorithm: 'sfc32-v1', seed, a, b, c, d, drawCount }` — four
+uint32 words and a tally, nothing whose JSON depends on the engine that wrote it. `HuntRun.rngState`
+holds one of those per stream. A settlement restores, simulates, snapshots, and writes the snapshot
+**in the same `huntRun.update` as the tick** — same statement, same row, same transaction as the XP
+and the Gold, so a rollback un-consumes randomness for free and a replayed checkpoint re-consumes
+nothing. There is no second write to reconcile and no write-ahead record to leak.
+
+The alternatives were all worse in the same way: rate-limiting `advance`, trusting a two-second
+poll, or declaring the cadence part of the rules would each have made a transport decision into a
+game rule. This makes the boundary *invisible* instead.
+
+### What null means, said out loud
+
+A row with no stored position takes the OLD rule — `${seed}:${tick}` — once, and then carries its
+position. For a new run that is tick 0, so its first settlement begins on exactly the stream the
+previous implementation used: Phase 2's golden fixture is byte-identical, and this is not a
+coincidence to be rediscovered later but the reason there is one code path instead of two. For a
+row already mid-run when the column arrived, it is a deterministic *starting point* and not a
+reconstruction — draws that were never written down cannot be recovered, and inventing them would
+be a worse answer than saying so.
+
+A stored state this build cannot read throws. A run whose stream position is unreadable has an
+unknown future; quietly reseeding it would invent a different one and keep the same name.
+
+### Three streams, still three
+
+Combat, physical loot and the item identity roll each keep their own position. That is Phase 3's
+decision unchanged — a new drop table must not move a hit, and rarity must not move either — and
+this pass is about each stream's continuity, never about merging them. `RNGC9` asserts the three
+are at three different places.
+
+---
+
 ## 1. The one sentence this phase is built on
 
 **A tile is the only position, and nothing derives a second one.**
@@ -289,10 +348,10 @@ mockups, and not renders of a design.
 |---|---|
 | New engine module | `packages/game-engine/src/space.ts`, 528 lines, pure |
 | Engine change | target selection, the 50 ms movement beat and creature stepping in `hunt.ts` |
-| Schema change | one nullable JSONB column, holding `{ tile, movement }` |
+| Schema change | two nullable JSONB columns — `{ tile, movement }`, and the run's place in its own random streams |
 | New routes | `POST …/hunt/advance`, `GET /api/content/:contentVersion/maps/:key` |
 | New client component | `TileScene.tsx`, a camera, 563 lines |
-| New cases | 83 (TIL, PTH, SPC, STP, SNP, MPV, COL, FLR, RCH, RND, PER, VIS) |
+| New cases | 95 (TIL, PTH, SPC, STP, SNP, MPV, COL, FLR, RCH, RND, PER, VIS, RNGC) |
 | Phase 2's golden fixture | **byte-identical** — a Hunt with no map takes the same branches and the same draws |
 
 ---
@@ -348,7 +407,7 @@ resolves inside one pure function during one settlement; arbitration is index
 order over one array. §8.5's lock order is untouched.
 
 **Was any existing case weakened, renamed or skipped?** No. The full matrix is
-92 + 87 + 106 + 169 + 83, every id present, counted by
+92 + 87 + 106 + 169 + 95, every id present, counted by
 `scripts/count-matrix.mjs` in CI. Phase 2's golden fixture is byte-identical.
 Two E2E route globs changed from `**/hunt` to `**/hunt/advance` because the
 route they were aiming at moved; both cases assert exactly what they asserted
@@ -400,6 +459,18 @@ are checked against their grammar before resolution; `MPV6` includes traversal-s
 
 **Does the real browser show continuous movement?** Measured: 3.000 tiles of frame-to-frame jump
 before the correction, 0.061 after. `VIS12` is that measurement, kept as a case.
+
+**Can a client's settlement cadence change an otherwise identical run's future?** No. The streams
+are restored from the row and snapshotted back into it, so one 60-second settlement and sixty
+1-second ones consume the same draws in the same order. `RNGC1`–`RNGC5` compare the WHOLE durable
+state — tick, room, cycle, health, creatures, tiles, steps in flight, supplies, XP, Gold, items,
+Stamina and the stream positions — across four partitions of the same span. Six of the ten failed
+before the fix.
+
+**Does a rollback consume randomness?** No. The snapshot is written in the same statement as the
+tick, so it rolls back with everything else; `RNGC7` fails a transaction after simulating and
+asserts the row is byte-identical, then that the retry produces what the first attempt would have.
+A settlement with no whole tick never opens a generator at all (`RNGC6`).
 
 **Does the fight still finish, over a long horizon, with the source's own step speeds?** Yes — 262
 kills across 14,400 ticks and 720 settlements, room 10 and cycle 60, with 0 overlaps and no stall

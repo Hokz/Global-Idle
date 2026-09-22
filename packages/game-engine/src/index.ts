@@ -8,8 +8,13 @@
 // across a process restart.
 export const GAME_ENGINE_PACKAGE = '@global-idle/game-engine' as const;
 
-export { createSeededRandom } from './random.js';
-export type { SeededRandom } from './random.js';
+export {
+  SEEDED_RANDOM_ALGORITHM,
+  createSeededRandom,
+  isSeededRandomState,
+  restoreSeededRandom,
+} from './random.js';
+export type { SeededRandom, SeededRandomState } from './random.js';
 
 export { normalRandom, uniformRandom } from './distributions.js';
 

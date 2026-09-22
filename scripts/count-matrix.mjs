@@ -2,7 +2,7 @@
 /**
  * Count the implemented matrix cases and compare them with what the approved
  * specifications fix: Phase 0B §14 at **92**, Phase 1 §16 at **87**, Phase 2
- * §12 at **106**, Phase 3 §20 at **169**, Phase 3.5 §20 at **82**.
+ * §12 at **106**, Phase 3 §20 at **169**, Phase 3.5 §20 at **95**.
  *
  * The convention this relies on: every matrix case is exactly ONE test whose
  * title begins with its id and a colon — `it('W1: ...')` for a Vitest case,
@@ -145,6 +145,9 @@ const MATRICES = {
       MPV: [1, 6],
       // The correctness pass: a step in flight survives the database.
       PER: [1, 6],
+      // Cross-phase determinism: how the elapsed time was cut into
+      // settlements is transport, and must not reach the dice.
+      RNGC: [1, 12],
     },
   },
 };
@@ -152,6 +155,7 @@ const MATRICES = {
 // Longest-first so `AC13` is not read as `A` + `C13`, and `E2E1` is not `E` +
 // `2`. Regex alternation is ordered, and that order is the whole contract.
 const PREFIXES = [
+  'RNGC',
   'TIL',
   'PER',
   'STP',
