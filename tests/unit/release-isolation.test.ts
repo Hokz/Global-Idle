@@ -12,6 +12,7 @@
  * invented (spec §9.3).
  */
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -26,6 +27,19 @@ import { REPO_ROOT } from '../support/repo.js';
 const MARKER = ['GLOBAL_IDLE', 'PRIVATE_ASSET', 'MARKER'].join('_');
 const GUARD = 'scripts/check-release-isolation.mjs';
 const FORBIDDEN = 'apps/web/public/assets/private';
+const MANIFEST = 'apps/web/public/ASSET_MANIFEST.json';
+
+/** Synthetic bytes that stand in for art. Never a real image, marked or not. */
+const fakeArt = (label: string) => Buffer.from(`not real art :: ${label}`);
+const sha256 = (buffer: Buffer) => createHash('sha256').update(buffer).digest('hex');
+
+/** Write the release allowlist a scratch repo needs to be in a valid state. */
+function writeManifest(root: string, approved: unknown[] = []): void {
+  writeFileSync(
+    join(root, MANIFEST),
+    JSON.stringify({ policy: { roots: ['apps/web/public'], rule: 'deny-by-default' }, approved }),
+  );
+}
 
 let workspace: string | undefined;
 
@@ -47,6 +61,7 @@ function scratchRepo(): string {
     join(workspace, 'apps/web/app/dev-private-asset/[...path]/route.ts'),
   );
   writeFileSync(join(workspace, 'apps/web/public/placeholder.txt'), 'public art, ships freely\n');
+  writeManifest(workspace);
   writeFileSync(join(workspace, 'apps/web/.next/static/app.js'), 'console.log("build");\n');
   return workspace;
 }
@@ -201,6 +216,84 @@ describe('§13 DIST — a private asset cannot reach a distributable artefact', 
     const result = runGuard(root);
     expect(result.status).toBe(1);
     expect(result.output).toMatch(/underscore-prefixed folders from routing/);
+  });
+
+  it('DIST11: an UNMARKED binary at any other public path fails', () => {
+    // Independent review's blocker, reproduced before it was fixed: the guard
+    // rejected one forbidden DIRECTORY and one invented MARKER, and a real
+    // client PNG has neither. `apps/web/public/rat.png` passed every check and
+    // would have shipped. Deny-by-default is the only fail-closed answer.
+    const root = scratchRepo();
+    writeFileSync(join(root, 'apps/web/public/rat.png'), fakeArt('rogue, unmarked'));
+
+    const result = runGuard(root);
+    expect(result.status).toBe(1);
+    expect(result.output).toContain('NOT on the release allowlist');
+    expect(result.output).toContain('rat.png');
+  });
+
+  it('DIST12: the same file PASSES once it is allowlisted with its hash', () => {
+    // The allowlist has to be usable, or it is a wall people climb over.
+    // Declaring provenance is the reviewable act that lets art ship.
+    const root = scratchRepo();
+    const bytes = fakeArt('project-owned placeholder');
+    writeFileSync(join(root, 'apps/web/public/rat.png'), bytes);
+    writeManifest(root, [
+      {
+        path: 'apps/web/public/rat.png',
+        sha256: sha256(bytes),
+        author: 'this project',
+        licence: 'owned',
+      },
+    ]);
+
+    const result = runGuard(root);
+    expect(result.output).toContain('release-isolation check passed');
+    expect(result.status).toBe(0);
+  });
+
+  it('DIST13: swapping the bytes behind an allowlisted path fails', () => {
+    // The hash is what stops the declaration drifting from reality — otherwise
+    // "rat.png, drawn by us" becomes a slot a proprietary file can be poured
+    // into without touching the manifest a reviewer reads.
+    const root = scratchRepo();
+    writeManifest(root, [
+      {
+        path: 'apps/web/public/rat.png',
+        sha256: sha256(fakeArt('the approved bytes')),
+        author: 'this project',
+        licence: 'owned',
+      },
+    ]);
+    writeFileSync(join(root, 'apps/web/public/rat.png'), fakeArt('something else entirely'));
+
+    const result = runGuard(root);
+    expect(result.status).toBe(1);
+    expect(result.output).toContain('does not match its allowlisted hash');
+  });
+
+  it('DIST14: a MISSING allowlist fails closed rather than skipping the check', () => {
+    // A check that quietly disables itself when its input is absent is worse
+    // than no check, because the build still says "passed".
+    const root = scratchRepo();
+    rmSync(join(root, MANIFEST));
+    writeFileSync(join(root, 'apps/web/public/rat.png'), fakeArt('rogue'));
+
+    const result = runGuard(root);
+    expect(result.status).toBe(1);
+    expect(result.output).toContain('release allowlist');
+  });
+
+  it('DIST15: TEXT under a public root still ships without an allowlist entry', () => {
+    // The allowlist is about ART and its licensing. Making `robots.txt` a
+    // provenance question would train people to bulk-approve, which is how an
+    // allowlist stops meaning anything.
+    const root = scratchRepo();
+    writeFileSync(join(root, 'apps/web/public/robots.txt'), 'User-agent: *\n');
+
+    const result = runGuard(root);
+    expect(result.output).toContain('release-isolation check passed');
+    expect(result.status).toBe(0);
   });
 
   it('DIST10: a gate that survives only in a COMMENT fails', () => {

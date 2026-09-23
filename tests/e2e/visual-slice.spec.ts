@@ -30,10 +30,22 @@ async function openAtlas(page: Page): Promise<void> {
   await expect(page.getByTestId('rookgaard-atlas')).toBeVisible();
 }
 
-/** World Atlas → the Rookgaard city plan. */
-async function descendToCity(page: Page): Promise<void> {
-  await page.getByTestId('world-atlas').getByTestId('atlas-pin').first().click();
-  await expect(page.getByTestId('city-atlas')).toBeVisible();
+/** World Atlas → the Rookgaard REGION. */
+async function descendToRegion(page: Page): Promise<void> {
+  await page.getByRole('button', { name: /^Rookgaard \(demo position\)$/ }).click();
+  await expect(page.getByTestId('region-atlas')).toBeVisible();
+}
+
+/** Rookgaard region → the town's LOCAL focus. */
+async function descendToLocal(page: Page): Promise<void> {
+  await page.getByRole('button', { name: /^Rookgaard Town/ }).click();
+  await expect(page.getByTestId('local-atlas')).toBeVisible();
+}
+
+/** The whole descent, world → region → local. */
+async function descendToTown(page: Page): Promise<void> {
+  await descendToRegion(page);
+  await descendToLocal(page);
 }
 
 test.describe('§13 CTY — World Atlas → Rookgaard → a Hunt', () => {
@@ -52,20 +64,112 @@ test.describe('§13 CTY — World Atlas → Rookgaard → a Hunt', () => {
     await expect(page.getByTestId('atlas')).toBeVisible();
   });
 
-  test('CTY2: descending to the city and returning keeps the breadcrumb honest', async ({
-    page,
-  }) => {
+  test('CTY2: the four levels descend in order, and each names itself', async ({ page }) => {
+    // The owner-approved hierarchy:
+    //   WORLD ATLAS → REGIONAL MINI-ATLAS → LOCAL FOCUS → PLAYABLE HUNT
+    // The fourth is the Game Window and belongs to the run; the first three
+    // are this surface, and each must be independently reachable.
     await play(page);
     await openAtlas(page);
-    await expect(page.getByTestId('atlas-breadcrumb-current')).toHaveText('Choose a region');
+    const stack = page.getByTestId('rookgaard-atlas');
 
-    await descendToCity(page);
-    await expect(page.getByTestId('rookgaard-atlas')).toHaveAttribute('data-view', 'city');
-    await expect(page.getByTestId('atlas-breadcrumb-current')).toHaveText('Rookgaard');
+    await expect(stack).toHaveAttribute('data-level', 'world');
+    await expect(page.getByTestId('atlas-breadcrumb-current')).toHaveText('World');
 
+    await descendToRegion(page);
+    await expect(stack).toHaveAttribute('data-level', 'region');
+    await expect(page.getByTestId('atlas-breadcrumb-current')).toHaveText('Rookgaard Region');
+
+    await descendToLocal(page);
+    await expect(stack).toHaveAttribute('data-level', 'local');
+    await expect(page.getByTestId('atlas-breadcrumb-current')).toHaveText('Rookgaard Town');
+  });
+
+  test('CTY7: navigation returns in BOTH directions, by breadcrumb and by back', async ({
+    page,
+  }) => {
+    // A map you can only descend is a trap. Both affordances are tested
+    // because they are two different controls, and one working is not the
+    // other working.
+    await play(page);
+    await openAtlas(page);
+    await descendToTown(page);
+
+    // Back: one level at a time.
+    await page.getByTestId('atlas-back').click();
+    await expect(page.getByTestId('region-atlas')).toBeVisible();
+    await page.getByTestId('atlas-back').click();
+    await expect(page.getByTestId('world-atlas')).toBeVisible();
+    // At the top there is nowhere further back to go.
+    await expect(page.getByTestId('atlas-back')).toHaveCount(0);
+
+    // Breadcrumb: jump straight out from the deepest level.
+    await descendToTown(page);
     await page.getByTestId('atlas-breadcrumb-world').click();
     await expect(page.getByTestId('world-atlas')).toBeVisible();
-    await expect(page.getByTestId('atlas-breadcrumb-current')).toHaveText('Choose a region');
+    await expect(page.getByTestId('rookgaard-atlas')).toHaveAttribute('data-level', 'world');
+    // …and to the middle level, which is the one a two-level atlas could not do.
+    await descendToTown(page);
+    await page.getByTestId('atlas-breadcrumb-region').click();
+    await expect(page.getByTestId('region-atlas')).toBeVisible();
+  });
+
+  test('CTY8: the three levels cannot be conflated — different surface, art and pins', async ({
+    page,
+  }) => {
+    // Two levels that draw the same picture are one level with two names. This
+    // asserts they are genuinely distinct: only one surface exists at a time,
+    // each has its own raster size, and each shows its own KIND of pin.
+    await play(page);
+    await openAtlas(page);
+
+    await expect(page.getByTestId('world-atlas')).toBeVisible();
+    await expect(page.getByTestId('region-atlas')).toHaveCount(0);
+    await expect(page.getByTestId('local-atlas')).toHaveCount(0);
+    const world = await page.getByTestId('world-atlas').locator('canvas').getAttribute('width');
+
+    await descendToRegion(page);
+    await expect(page.getByTestId('world-atlas')).toHaveCount(0);
+    await expect(page.getByTestId('local-atlas')).toHaveCount(0);
+    const region = await page.getByTestId('region-atlas').locator('canvas').getAttribute('width');
+
+    await descendToLocal(page);
+    await expect(page.getByTestId('world-atlas')).toHaveCount(0);
+    await expect(page.getByTestId('region-atlas')).toHaveCount(0);
+    const local = await page.getByTestId('local-atlas').locator('canvas').getAttribute('width');
+
+    // Three different rasters, macro to narrow — not one picture enlarged.
+    expect(new Set([world, region, local]).size).toBe(3);
+    expect(Number(world)).toBeGreaterThan(Number(region));
+    expect(Number(region)).toBeGreaterThan(Number(local));
+
+    // The world names REGIONS and nothing smaller: no Hunt pin at macro scale.
+    await page.getByTestId('atlas-breadcrumb-world').click();
+    await expect(page.getByTestId('world-atlas').locator('[data-kind="HUNT"]')).toHaveCount(0);
+  });
+
+  test('CTY9: a LOCKED destination is visible, announced, and not a way through', async ({
+    page,
+  }) => {
+    // A map with holes where the unbuilt places are teaches a wrong world. A
+    // locked pin stays on the map, says it is locked, and refuses — it must
+    // never offer an activity that does not exist.
+    await play(page);
+    await openAtlas(page);
+
+    const mainland = page.getByRole('button', { name: /^Mainland/ });
+    await expect(mainland).toBeVisible();
+    await expect(mainland).toHaveAttribute('data-locked', 'true');
+    await expect(mainland).toHaveAttribute('aria-disabled', 'true');
+    await expect(mainland).toContainText('locked');
+
+    await mainland.click({ force: true });
+    // Still on the world surface, and told why.
+    await expect(page.getByTestId('world-atlas')).toBeVisible();
+    await expect(page.getByTestId('rookgaard-atlas')).toHaveAttribute('data-level', 'world');
+    await expect(page.getByTestId('atlas-locked-notice')).toBeVisible();
+    // A locked pin carries no content key, so there is nothing to enter.
+    await expect(mainland).not.toHaveAttribute('data-kind', 'HUNT');
   });
 
   test('CTY3: EVERY pin on both surfaces is marked as a demonstration', async ({ page }) => {
@@ -75,20 +179,24 @@ test.describe('§13 CTY — World Atlas → Rookgaard → a Hunt', () => {
     await play(page);
     await openAtlas(page);
 
-    const world = page.getByTestId('world-atlas').getByTestId('atlas-pin');
-    await expect(world).toHaveCount(1);
-    for (const pin of await world.all()) {
-      await expect(pin).toHaveAttribute('data-demo', 'true');
+    for (const [testId, expected] of [
+      ['world-atlas', 2],
+      ['region-atlas', 2],
+      ['local-atlas', 5],
+    ] as const) {
+      if (testId === 'region-atlas') await descendToRegion(page);
+      if (testId === 'local-atlas') await descendToLocal(page);
+      const pins = page.getByTestId(testId).getByTestId('atlas-pin');
+      await expect(pins, testId).toHaveCount(expected);
+      for (const pin of await pins.all()) {
+        await expect(pin).toHaveAttribute('data-demo', 'true');
+        await expect(pin).toContainText('demo');
+      }
     }
-
-    await descendToCity(page);
-    const city = page.getByTestId('city-atlas').getByTestId('atlas-pin');
-    await expect(city).toHaveCount(5);
-    for (const pin of await city.all()) {
-      await expect(pin).toHaveAttribute('data-demo', 'true');
-    }
-    // And the surface says why in words, not only in an attribute.
-    await expect(page.getByTestId('city-atlas-caption')).toContainText('no world origin');
+    // And the surfaces say why in words, not only in an attribute.
+    await expect(page.getByTestId('local-atlas-caption')).toContainText('no Temple');
+    await page.getByTestId('atlas-breadcrumb-region').click();
+    await expect(page.getByTestId('region-atlas-caption')).toContainText('no world origin');
   });
 
   test('CTY4: the raster zooms and pans by KEYBOARD', async ({ page }) => {
@@ -135,7 +243,7 @@ test.describe('§13 CTY — World Atlas → Rookgaard → a Hunt', () => {
   test('CTY6: the Hunt pin enters the Hunt, on pointer and on touch', async ({ page }) => {
     await play(page);
     await openAtlas(page);
-    await descendToCity(page);
+    await descendToTown(page);
 
     await page.getByRole('button', { name: /Rookgaard Sewers/ }).click();
     // The server's answer is what changes the screen: the play surface
@@ -316,18 +424,18 @@ test.describe('§13 AUTH — the Atlas navigates; the server decides', () => {
     writes.length = 0;
 
     await openAtlas(page);
-    await descendToCity(page);
+    await descendToTown(page);
     // Zoom in and back out: magnifying is browsing too, and at zoom 1 the
-    // 256 px city plan fits both viewports, so every pin is reachable on a
+    // 256 px town plan fits both viewports, so every pin is reachable on a
     // 390-wide screen as well as on a 1440-wide one.
-    await page.getByTestId('city-atlas-zoom-in').click();
-    await page.getByTestId('city-atlas-zoom-out').click();
+    await page.getByTestId('local-atlas-zoom-in').click();
+    await page.getByTestId('local-atlas-zoom-out').click();
     await page.getByRole('button', { name: /^Temple/ }).click();
     await page.getByRole('button', { name: /^Shop/ }).click();
 
     expect(writes).toEqual([]);
     // Still on the Atlas, still no Activity.
-    await expect(page.getByTestId('city-atlas')).toBeVisible();
+    await expect(page.getByTestId('local-atlas')).toBeVisible();
     expect(page.url()).toContain(characterId);
   });
 
@@ -347,7 +455,7 @@ test.describe('§13 AUTH — the Atlas navigates; the server decides', () => {
 
     const characterId = await play(page);
     await openAtlas(page);
-    await descendToCity(page);
+    await descendToTown(page);
     await page.getByRole('button', { name: /Rookgaard Sewers/ }).click();
     await expect(page.getByTestId('game-window')).toBeVisible({ timeout: 20_000 });
 

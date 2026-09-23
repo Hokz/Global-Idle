@@ -171,6 +171,15 @@ export interface AtlasPin {
    * every pin in Phase 3.7, and why each renders with a visible marking.
    */
   readonly sourced?: boolean;
+  /**
+   * A destination that exists in the world but is not reachable yet.
+   *
+   * It stays VISIBLE — a map with holes in it teaches a wrong world — but it
+   * is announced as unavailable, cannot be activated, and must never offer an
+   * activity that is not implemented. `reason` is shown to the player.
+   */
+  readonly locked?: boolean;
+  readonly reason?: string;
 }
 
 /**

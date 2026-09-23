@@ -38,6 +38,12 @@ export interface PixelAtlasProps {
   readonly testId: string;
   /** Shown above the surface, so the viewer knows what they are looking at. */
   readonly title: string;
+  /**
+   * A DEVELOPMENT-ONLY private map reference to draw instead of the procedural
+   * placeholder. `null` in every public build, so the placeholder is what
+   * ships and what CI sees.
+   */
+  readonly privateRaster?: string | null;
 }
 
 const PIN_COLOUR: Readonly<Record<AtlasPin['kind'], string>> = {
@@ -57,6 +63,7 @@ export function PixelAtlas({
   caption,
   testId,
   title,
+  privateRaster = null,
 }: PixelAtlasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const frameRef = useRef<HTMLDivElement | null>(null);
@@ -96,7 +103,21 @@ export function PixelAtlas({
     // copy keeps it that way.
     const data = new Uint8ClampedArray(raster);
     context.putImageData(new ImageData(data, size, size), 0, 0);
-  }, [raster, size]);
+
+    // The private reference, if development supplied one, painted OVER the
+    // placeholder rather than instead of it: until it loads — and forever, if
+    // it is absent — the public picture is already there and complete.
+    if (!privateRaster) return;
+    let live = true;
+    const image = new Image();
+    image.onload = () => {
+      if (live) context.drawImage(image, 0, 0, size, size);
+    };
+    image.src = privateRaster;
+    return () => {
+      live = false;
+    };
+  }, [raster, size, privateRaster]);
 
   const zoomBy = useCallback(
     (delta: number, anchor?: { x: number; y: number }) => {
@@ -234,14 +255,21 @@ export function PixelAtlas({
           <canvas ref={canvasRef} width={size} height={size} className="atlas-surface__canvas" />
           {pins.map((pin) => {
             const demo = pinIsDemo(pin, calibration);
+            const locked = pin.locked === true;
             return (
               <button
                 key={pin.id}
                 type="button"
-                className="atlas-pin"
+                className={`atlas-pin${locked ? ' atlas-pin--locked' : ''}`}
                 data-testid="atlas-pin"
                 data-kind={pin.kind}
                 data-demo={demo ? 'true' : 'false'}
+                data-locked={locked ? 'true' : 'false'}
+                // Visible, announced, and NOT a way through. `aria-disabled`
+                // rather than `disabled` keeps it reachable by keyboard, so a
+                // screen-reader user learns the place exists and why it is shut.
+                aria-disabled={locked || undefined}
+                title={locked ? pin.reason : undefined}
                 style={{
                   left: pin.rasterX,
                   top: pin.rasterY,
@@ -249,12 +277,22 @@ export function PixelAtlas({
                   // a marker rather than a growing blob.
                   transform: `translate(-50%, -100%) scale(${1 / view.zoom})`,
                 }}
+                // The click is FORWARDED even when locked, and the handler
+                // decides. Swallowing it here looked safer and was worse: the
+                // surface that knows what a pin MEANS could no longer explain
+                // the refusal, so a locked pin did nothing at all and the
+                // player learned nothing. One decision, one place.
                 onClick={() => onPin?.(pin)}
-                aria-label={`${pin.label}${demo ? ' (demo position)' : ''}`}
+                aria-label={
+                  `${pin.label}` +
+                  `${locked ? ' (locked — not available yet)' : ''}` +
+                  `${demo ? ' (demo position)' : ''}`
+                }
               >
                 <span className="atlas-pin__dot" style={{ background: PIN_COLOUR[pin.kind] }} />
                 <span className="atlas-pin__label">
                   {pin.label}
+                  {locked ? <em className="atlas-pin__locked">locked</em> : null}
                   {demo ? <em className="atlas-pin__demo">demo</em> : null}
                 </span>
               </button>

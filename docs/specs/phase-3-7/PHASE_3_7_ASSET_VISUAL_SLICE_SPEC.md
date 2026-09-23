@@ -292,6 +292,25 @@ This is a private technical prototype. It is not permission to redistribute CipS
    and no pixels-per-tile scale. The full island is therefore **not** verifiably covered, and no pin
    can be exact. Every Rookgaard pin in this phase is `demo`.
 
+### Gaps carried IN THE CODE, so a reader of the record meets them too
+
+Each is a `gaps[]` entry on the reference itself (`apps/web/app/_lib/sprites.ts`), and `PRV1`
+requires the field to exist on every record:
+
+| gap | where it bites |
+|---|---|
+| the ORDER of the rat's four pattern-width slots — which index is north — is an assumption, not a manifest statement | cosmetic only: a wrong-facing rat is a wrong picture, never a wrong game. The RANGE and the index arithmetic are the manifest's and are verified |
+| outfit **128** is a PARTIAL base layer: 4×3×2 with 2 layers is 48 cells per group and 8 frames exist, so a direction mapping is **not derivable** | the citizen draws one static frame and has no per-facing selection. No complete outfit animation or colouring is claimed |
+| no **town-scale** private map reference exists | the local focus surface uses its public placeholder even in development. Cropping the minimap to fake one would manufacture detail the source does not contain |
+| no candidate carries collision or ground-speed metadata | every candidate stays decoration over an authored tile kind, and Phase 3.6's sourced 150 fallback is untouched |
+
+### What is proven where
+
+The rat's frame arithmetic was checked against the manifest **and against the files on disk**: the
+36 ids the renderer can select (4 idle + 32 walking) are exactly the manifest's declared ranges, and
+every one resolves to an extracted PNG. That check is a private, local one — public CI proves the
+arithmetic and the ranges, never the bytes. See §13, *What public CI can prove, and what it cannot*.
+
 ---
 
 ## 11. What the feasibility spike already established
@@ -334,39 +353,50 @@ The spike is disposable and private. Its screenshot is not in this repository.
 
 ---
 
-## 13. Acceptance matrix — **45 cases, all implemented and passing**
+## 13. Acceptance matrix — **61 cases, all implemented and passing**
 
-`scripts/count-matrix.mjs` now registers `phase-3-7` and counts **45/45**. The convention is the
-project's: one case is one test whose title begins with its id and a colon, so "45 pass" is a
-countable claim rather than an assertion. Every id below EXISTS as a test; nothing here is planned.
+`scripts/count-matrix.mjs` registers `phase-3-7` and counts **61/61**. One case is one test whose
+title begins with its id and a colon, so "61 pass" is countable rather than asserted. Every id
+below EXISTS as a test; nothing here is planned.
 
 | Group | Cases | Where | What it fixes |
 |---|---|---|---|
-| **DIST** | 10 | `tests/unit/release-isolation.test.ts` | the forbidden `public/assets/private/` path fails the build; a marked synthetic private file never reaches the artefact by bytes, path or marker; private bytes outside the build graph are allowed; the dev loader must gate on `NODE_ENV`, must carry no opt-in flag, must sit at a ROUTABLE path, and its gate must be code rather than a comment; the real repository passes its own guard |
-| **ATL** | 5 | `tests/unit/atlas-view.test.ts` | world ⇄ screen round-trips under zoom, pan and resize; zoom-about keeps the anchored raster point fixed; pan clamps to the raster |
-| **PIN** | 3 | `tests/unit/atlas-view.test.ts` | a pin renders `demo` unless BOTH it and its raster are sourced; nothing in this phase is, so every pin is a demonstration |
-| **PRV** | 6 | `tests/unit/sprites.test.ts` | a private reference carries real source identity; a public placeholder carries NONE; 32 px and 64 px cells both land on the right tile; the subset has no cave wall and says so by omission; a CANDIDATE is cosmetic |
-| **FALL** | 4 | `tests/unit/sprites.test.ts` | production resolves no private sprite at all; outside production the URL is local; an absent key degrades silently rather than exceptionally; the placeholder is deterministic |
-| **CTY** | 6 | `tests/e2e/visual-slice.spec.ts` | the Atlas is an extra surface, not a replacement; world → city → back; every pin marked `demo`; keyboard zoom and pan; button zoom with bounds; the Hunt pin enters the Hunt |
-| **SLC** | 5 | `tests/e2e/visual-slice.spec.ts` | the running build draws PUBLIC placeholders and says so; no asset request leaves this origin and none fails; the 15 × 11 window is unchanged; the slice is drawn; a production server REFUSES the dev loader with private bytes on disk |
-| **HUD** | 3 | `tests/e2e/visual-slice.spec.ts` | the HUD shows the server's own character fields; every dormant panel says `inactive`; the Game Window is inside the frame and is still the Game Window |
-| **AUTH** | 3 | `tests/e2e/visual-slice.spec.ts` | browsing the Atlas writes nothing; a pin enters through the SAME `POST /hunt` with only a content key; during a run the surface is the Game Window |
+| **DIST** | 15 | `tests/unit/release-isolation.test.ts` | the forbidden public path; the private marker in bytes, path or reference; private bytes outside the build graph allowed; the dev loader gated on `NODE_ENV`, flag-free, ROUTABLE, and gated in code rather than in a comment; **and the release allowlist — an unmarked binary at any public path fails, an allowlisted one passes, swapped bytes fail, a missing manifest fails closed, text stays exempt** |
+| **ATL** | 5 | `tests/unit/atlas-view.test.ts` | world ⇄ screen round-trips under zoom, pan and resize; zoom-about keeps its anchor; pan clamps |
+| **PIN** | 3 | `tests/unit/atlas-view.test.ts` | a pin renders `demo` unless BOTH it and its raster are sourced; nothing here is |
+| **PRV** | 7 | `tests/unit/sprites.test.ts` | the **whole five-link chain** resolves per reference; a public placeholder carries none of it; 32/64 px cells land right; no cave wall, and the omission says so; a CANDIDATE is cosmetic; the rat's idle map is derived; **the citizen declares a PARTIAL extraction** |
+| **FALL** | 4 | `tests/unit/sprites.test.ts` | production resolves no private sprite; outside it the URL is local; an absent key degrades silently; the placeholder is deterministic |
+| **FRM** | 7 | `tests/unit/sprites.test.ts` | **the frame the renderer actually selects** — idle ids reproduce the manifest range, the 32 walking frames are covered once each, facing comes from the server's leg, the phase from its timestamps, dev selects real per-facing files, production selects none, and the atlas map references are dev-only |
+| **CTY** | 9 | `tests/e2e/visual-slice.spec.ts` | the Atlas is an extra surface; **the four levels descend in order and each names itself**; every pin `demo`; keyboard and button zoom; the Hunt pin enters; **return in both directions by breadcrumb and by back**; **the levels cannot be conflated**; **a locked destination is visible, announced and not a way through** |
+| **SLC** | 5 | `tests/e2e/visual-slice.spec.ts` | the build draws PUBLIC placeholders and says so; no asset leaves this origin and none fails; the 15 × 11 window is unchanged; the slice is drawn; a production server REFUSES the dev loader with private bytes on disk |
+| **HUD** | 3 | `tests/e2e/visual-slice.spec.ts` | the server's own character fields; every dormant panel says `inactive`; the Game Window is inside the frame and still the Game Window |
+| **AUTH** | 3 | `tests/e2e/visual-slice.spec.ts` | browsing writes nothing; a pin enters through the SAME `POST /hunt` with only a content key; during a run the surface is the Game Window |
 
-Every e2e case runs twice — desktop 1440 × 900 and touch 390 × 844 — so the 17 browser cases are
-34 executions. Screenshots are taken of the public placeholder scene only, after asserting
-`data-sprites="public"`, and land in the gitignored `test-results/`; no proprietary image is
-captured, uploaded or committed.
+Every e2e case runs twice — desktop 1440 × 900 and touch 390 × 844 — so the 20 browser cases are
+40 executions. Screenshots are taken of the public placeholder scene only, after asserting
+`data-sprites="public"`, into the gitignored `test-results/`.
 
-**Bite checks** (disposable mutations, reverted, never committed):
+### What public CI can prove, and what it cannot
+
+| Claim | Where it is settled |
+|---|---|
+| no private asset reaches a distributable artefact | **public CI** — `pnpm release:check`, deny-by-default |
+| the placeholder build is complete and requests nothing private | **public CI** — SLC1–SLC5 |
+| the five-link chain is well formed and internally consistent | **public CI** — PRV1 |
+| frame selection arithmetic matches the manifest's declared ranges | **public CI** — FRM1–FRM7 |
+| the chain's ids correspond to the OWNER'S actual client files | **private, local, owner-visible only** |
+| source graphics look right on screen | **private, local** — never from a public placeholder screenshot |
+
+A public screenshot shows placeholder art. It is not evidence about source graphics, and this
+document does not treat it as any.
+
+### Bite checks (disposable mutations, reverted, never committed)
 
 | mutation | what failed, and why that is the right failure |
 |---|---|
-| the guard's forbidden-path check made unconditional | `DIST2` failed: the guard reported a pass with a private file at the forbidden path |
-| the loader's `NODE_ENV` gate replaced by `if (true)` | `SLC5` failed with **200 instead of 404** — the synthetic private bytes were served by a production build |
-
-The second bite check also found a hole in the guard itself: the header comment still contained the
-gate's text, so the substring check passed while the loader served. The guard now strips comments
-before scanning, and `DIST10` is that case.
+| the guard's forbidden-path check made unconditional | `DIST2` — a pass was reported with a private file at the forbidden path |
+| the loader's `NODE_ENV` gate replaced by `if (true)` | `SLC5` — **200 instead of 404**; a production build served synthetic private bytes |
+| an unmarked `rat.png` placed under `apps/web/public/` **before** the allowlist existed | the guard **passed** and counted it as an approved static file. That is blocker 3, reproduced; `DIST11` is the case that now fails it |
 
 ---
 
@@ -385,6 +415,7 @@ systems.
 |---|---|
 | initial | the reviewed specification |
 | **after independent review** | **A1** — §9 rewritten around DISTRIBUTION rather than Git history: the `public/assets/private/` path is forbidden and build-failing, the override moves to `private/assets/`, the dev loader is `NODE_ENV`-gated with no opt-in flag, a fail-closed release guard scans the artefact, and both the absent and the marked-fake states are tested. New decisions P37-D11–D14 and the **DIST** acceptance group. **A2** — §3.1 separates public-placeholder provenance (semantic key, own licence) from client-derived provenance (five-link chain, never fabricated); §4 states transform tests use SYNTHETIC calibration and prove nothing about real geography; §5 adds that a 512 × 512 crop does not demonstrate island coverage; §6 fixes walls as independently authored placeholders and CANDIDATE ids as cosmetic-only, with Phase 3.6's 150 fallback retained. New decisions P37-D15–D16. |
+| **independent review corrections** | **Blocker 1** — the Atlas becomes the owner-approved FOUR-level hierarchy (world → regional mini-atlas → local focus → playable hunt), with per-level rasters, two-way navigation, `data-level`, and a visible LOCKED destination that refuses. **Blocker 2** — `PrivateSpriteRef` records the whole five-link chain (appearance, class, frame group, pattern geometry, sprite, source sheet + first sprite id + sheet type, cell size) with named SOURCE GAPS; the renderer now SELECTS a rat frame per facing and per animation phase from the authoritative leg; the citizen is declared a partial base-layer extraction; the private map references are wired into the atlas surfaces, dev-only. **Blocker 3** — a deny-by-default release allowlist (`apps/web/public/ASSET_MANIFEST.json`) hashes every distributable binary, because marker matching passed an unmarked proprietary file at any other public path. Matrix 45 → 61. |
 | **implementation pass** | §13 replaced: the matrix is now 45 IMPLEMENTED cases rather than a plan, with the bite checks and what they found. §16 moved to `IMPLEMENTATION_COMPLETE — PENDING INDEPENDENT REVIEW`. Three measured corrections to the reviewed design are recorded in §16: the dev loader's path (an underscore-prefixed folder is not routable in Next), the guard accepting a comment as a gate, and a pin label large enough to swallow a neighbouring pin's click. |
 
 ---
@@ -398,8 +429,8 @@ checkout and with synthetic private bytes present. **Phase 3.7 is NOT `VERIFIED`
 Product Owner's after independent review, and nothing in this document or in the implementation PR
 may be read as claiming it.
 
-Three things are worth a reviewer's attention first, because all three were found by measurement
-rather than by reading, and each changed the implementation:
+Independent review of `06c33e7` returned three blockers; all three are addressed above and in §15.
+Six further defects were found by measurement while doing so, and each changed the implementation:
 
 1. **the loader was dead code.** It first lived at `app/_dev/private-asset/`. Next's App Router
    excludes underscore-prefixed folders from routing, so it returned 404 in development too. It is
@@ -409,3 +440,14 @@ rather than by reading, and each changed the implementation:
 3. **a pin's label could swallow a click.** The "Rookgaard Sewers" label overlapped the Shop pin, so
    aiming at the shop entered a Hunt. A pin's hit area is now its dot; the label is
    `pointer-events: none`.
+4. **the release guard approved an unmarked rogue file.** Reproduced before fixing: an unmarked
+   `apps/web/public/rat.png` passed, and the guard *counted* it as an approved static file. A real
+   client PNG carries no sentinel this project invented, so marker matching could never have caught
+   one. Deny-by-default replaces it (`DIST11`–`DIST15`).
+5. **the locked short-circuit swallowed its own explanation.** Blocking the click inside `PixelAtlas`
+   meant the surface that knows what a pin MEANS could not say why it refused, so a locked pin did
+   nothing at all. The decision now lives in one place: the pin's handler.
+6. **the three-level breadcrumb overflowed a phone.** Measured at 390 wide: the atlas surface became
+   405px, putting zoom-in off-screen and unclickable while the page looked correct. Fixed by letting
+   the trail wrap and by giving the flex column `min-width: 0`, which closes the whole class of bug
+   rather than this one instance.

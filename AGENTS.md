@@ -181,12 +181,15 @@ this file said *"Current phase: Phase 1"* for two entire phases.
 Active phase: **Phase 3.7 — First real asset visual slice**
 (`IMPLEMENTATION_COMPLETE — PENDING INDEPENDENT REVIEW`). Its specification is
 [`docs/specs/phase-3-7/PHASE_3_7_ASSET_VISUAL_SLICE_SPEC.md`](docs/specs/phase-3-7/PHASE_3_7_ASSET_VISUAL_SLICE_SPEC.md)
-and its 45 matrix cases pass. It has NOT been independently reviewed and is NOT VERIFIED.
+and its 61 matrix cases pass. It has been independently reviewed once, at `06c33e7`; those
+corrections are applied and it is back in review. It is **NOT VERIFIED**.
 User-supplied client assets are a PRIVATE reference and must never be committed — see its §9. The
 boundary is enforced, not merely documented: `pnpm release:check`
 (`scripts/check-release-isolation.mjs`) fails the build if a private asset can reach a
-distributable artefact, and `apps/web/public/assets/private/` is a forbidden path. Private files
-belong at `private/assets/`, which no bundler input covers.
+distributable artefact. `apps/web/public/assets/private/` is a forbidden path, and every
+distributable binary under `apps/web/public/` must be on the deny-by-default release allowlist
+`apps/web/public/ASSET_MANIFEST.json`, matched by hash — an unmarked file at any other public path
+would otherwise ship. Private files belong at `private/assets/`, which no bundler input covers.
 Last VERIFIED: **Phase 3.6 — Movement fidelity: Character speed and tile ground speed**, accepted
 2026-09-23 at head `f96c839d4609ecef2cf592a7f3d3c6e8a91f3ef4` (PR #10, still open and stacked on
 PR #9). Phase 3.5 remains VERIFIED at `2e67f4b` (PR #9); Phase 3 at `d46f78b` (PR #8).

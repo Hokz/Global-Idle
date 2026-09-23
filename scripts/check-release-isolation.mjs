@@ -9,19 +9,26 @@
  * boundary wearing a distribution boundary's clothes, and independent review
  * said so. This script is the distribution boundary.
  *
- * Four checks, any of which fails the build:
+ * Five checks, any of which fails the build:
  *
  *   1. the FORBIDDEN path `apps/web/public/assets/private/` does not exist;
  *   2. no distributable static root carries a private-asset signature;
- *   3. no build output contains a private path or the private MARKER;
- *   4. the dev-only loader is absent from, or inert in, a production build.
+ *   3. every distributable static BINARY is on the release allowlist, by hash;
+ *   4. no build output contains a private path or the private MARKER;
+ *   5. the dev-only loader is absent from, or inert in, a production build.
  *
- * The marker is the trick that makes (3) provable. A scan cannot recognise
- * bytes it has never seen, so the fixture that stands in for private art
- * carries a known, non-proprietary sentinel. If that sentinel is ever found in
- * an artefact, the pipeline that put it there would have shipped real private
- * art the same way.
+ * The marker makes (4) provable for bytes the scan has never seen: the fixture
+ * that stands in for private art carries a known, non-proprietary sentinel, so
+ * a pipeline that ships the sentinel would ship real art the same way.
+ *
+ * (3) exists because the marker is NOT enough on its own, and independent
+ * review proved it: a real client PNG carries no sentinel this project
+ * invented, so an unmarked proprietary file at any public path other than the
+ * one forbidden directory passed every other check and would have shipped.
+ * Marker matching recognises what it was told to look for; an allowlist
+ * recognises everything it was NOT told about. Only the second is fail-closed.
  */
+import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, resolve, dirname, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -45,6 +52,36 @@ export const PRIVATE_MARKER = ['GLOBAL_IDLE', 'PRIVATE_ASSET', 'MARKER'].join('_
 
 /** Directories whose whole contents are shipped to a browser. */
 const DISTRIBUTABLE_STATIC = ['apps/web/public'];
+
+/**
+ * The release allowlist: which distributable binaries are approved to ship,
+ * who made them and under what licence, pinned by hash.
+ *
+ * DENY BY DEFAULT. A binary under a distributable static root that is not
+ * listed here — or whose bytes no longer match its recorded hash — fails the
+ * build. The manifest itself is text and tracked, so adding art is a
+ * deliberate act a reviewer can see in a diff.
+ */
+const ASSET_MANIFEST = 'apps/web/public/ASSET_MANIFEST.json';
+
+/**
+ * Extensions treated as TEXT under a distributable static root.
+ *
+ * Text still goes through checks 1 and 2 — a path or a marker in a `.txt` is
+ * caught there. What it is exempt from is the per-file provenance allowlist,
+ * which exists for ART: a `robots.txt` is not a licensing question.
+ */
+const STATIC_TEXT = new Set([
+  '.txt',
+  '.json',
+  '.xml',
+  '.md',
+  '.csv',
+  '.webmanifest',
+  '.map',
+  '.css',
+  '.js',
+]);
 
 /** Build outputs that become an artefact. */
 const BUILD_OUTPUTS = ['apps/web/.next', 'apps/web/out', 'apps/web/dist'];
@@ -91,26 +128,88 @@ if (existsSync(forbidden)) {
 }
 
 // ── 2. distributable static roots carry nothing private ──────────────────────
+// ── 3. …and every binary among them is on the release allowlist, by hash ─────
+//
+// Read the allowlist first, so a missing or malformed manifest fails CLOSED
+// rather than silently disabling the check that depends on it.
+const manifestPath = join(ROOT, ASSET_MANIFEST);
+/** @type {Map<string, {sha256: string, author?: string, licence?: string}>} */
+const approved = new Map();
+let manifestUsable = false;
+if (!existsSync(manifestPath)) {
+  fail(
+    `${ASSET_MANIFEST} is missing. It is the release allowlist for distributable art; ` +
+      `without it nothing can be approved to ship (spec §9.6).`,
+  );
+} else {
+  try {
+    const parsed = JSON.parse(readFileSync(manifestPath, 'utf8'));
+    for (const entry of parsed.approved ?? []) {
+      if (typeof entry?.path !== 'string' || typeof entry?.sha256 !== 'string') {
+        fail(`${ASSET_MANIFEST} has an entry without both a path and a sha256.`);
+        continue;
+      }
+      approved.set(entry.path, entry);
+    }
+    manifestUsable = true;
+  } catch (error) {
+    fail(`${ASSET_MANIFEST} is not valid JSON: ${error.message}`);
+  }
+}
+
 let staticScanned = 0;
+let staticBinaries = 0;
 for (const root of DISTRIBUTABLE_STATIC) {
   const full = join(ROOT, root);
   if (!existsSync(full)) continue;
   for (const file of walk(full)) {
     staticScanned += 1;
-    const rel = relative(ROOT, file);
-    if (rel.split(sep).includes('private')) {
+    const rel = relative(ROOT, file).split(sep).join('/');
+    if (rel.split('/').includes('private')) {
       fail(`${rel} sits on a "private" path inside a distributable static root.`);
       continue;
     }
     const buffer = readFileSync(file);
     if (buffer.includes(PRIVATE_MARKER)) {
       fail(`${rel} carries the private-asset marker.`);
+      continue;
+    }
+
+    // The allowlist. Text is exempt (see STATIC_TEXT); the manifest itself is
+    // not art and does not list itself.
+    const dot = rel.lastIndexOf('.');
+    const extension = dot > rel.lastIndexOf('/') ? rel.slice(dot).toLowerCase() : '';
+    if (STATIC_TEXT.has(extension) || rel === ASSET_MANIFEST) continue;
+
+    staticBinaries += 1;
+    if (!manifestUsable) continue; // already failed above; do not pile on
+    const entry = approved.get(rel);
+    if (!entry) {
+      fail(
+        `${rel} is a distributable binary that is NOT on the release allowlist. ` +
+          `Add it to ${ASSET_MANIFEST} with its author, licence and sha256 — or remove it. ` +
+          `Deny by default: an unmarked proprietary file would otherwise ship (spec §9.6).`,
+      );
+      continue;
+    }
+    const digest = createHash('sha256').update(buffer).digest('hex');
+    if (digest !== entry.sha256) {
+      fail(
+        `${rel} does not match its allowlisted hash (recorded ${entry.sha256.slice(0, 12)}…, ` +
+          `found ${digest.slice(0, 12)}…). The bytes changed after they were approved.`,
+      );
     }
   }
 }
 pass(`${staticScanned} distributable static file(s) carry no private path or marker`);
+if (manifestUsable) {
+  pass(
+    `${staticBinaries} distributable binary/binaries are release-approved by hash ` +
+      `(${approved.size} on the allowlist)`,
+  );
+}
 
-// ── 3. build outputs contain no private path and no marker ───────────────────
+// ── 4. build outputs contain no private path and no marker ───────────────────
 let outputsSeen = 0;
 let outputScanned = 0;
 for (const output of BUILD_OUTPUTS) {
@@ -146,7 +245,7 @@ if (outputsSeen === 0) {
   );
 }
 
-// ── 4. the dev-only loader cannot serve in production ────────────────────────
+// ── 5. the dev-only loader cannot serve in production ────────────────────────
 const LOADER = 'apps/web/app/dev-private-asset/[...path]/route.ts';
 const loader = join(ROOT, LOADER);
 if (existsSync(loader)) {

@@ -12,14 +12,23 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  FACING_ORDER,
   PRIVATE_ASSET_ROUTE,
+  PRIVATE_MAP_REFERENCES,
   PRIVATE_SPRITES,
   PUBLIC_PALETTE,
   RAT_IDLE_BY_FACING,
+  RAT_WALK_PHASES,
   READS_AS_WALKABLE,
+  facingFromDelta,
+  privateAtlasUrl,
   privateSpriteUrl,
+  ratFrameUrl,
+  ratIdleSpriteId,
+  ratWalkSpriteId,
   spriteDrawBox,
   tileNoise,
+  walkPhase,
   type SpriteKey,
 } from '../../apps/web/app/_lib/sprites.js';
 
@@ -39,21 +48,46 @@ afterEach(() => {
 });
 
 describe('§13 PRV — provenance, by kind of asset', () => {
-  it('PRV1: every private reference carries real source identity', () => {
-    // The five-link chain's identifying half. A filename is never the id, so
-    // each entry states the appearance and the sprite the manifest gave.
+  it('PRV1: every private reference resolves the WHOLE five-link chain', () => {
+    // Independent review's blocker: the previous record stored an appearance
+    // id, a sprite id and a cell size, and PRV1 checked that those were
+    // numbers. That is two links of five. A provenance record has to say which
+    // BYTES a sprite id resolves to, or it cannot be audited against anything.
+    //
+    //   appearanceId → frameGroup + pattern → spriteId → source sheet → PNG
     for (const [key, reference] of Object.entries(PRIVATE_SPRITES)) {
+      // 1 — the appearance, and what kind of thing it is
       expect(Number.isInteger(reference.appearanceId), key).toBe(true);
+      expect(['outfit', 'object'], key).toContain(reference.appearanceClass);
+      // 2 — the frame group and its pattern geometry, verbatim
+      expect(Number.isInteger(reference.frameGroup), key).toBe(true);
+      for (const axis of ['width', 'height', 'depth', 'layers'] as const) {
+        expect(reference.pattern[axis], `${key}.pattern.${axis}`).toBeGreaterThan(0);
+      }
+      // 3 — the sprite
       expect(Number.isInteger(reference.spriteId), key).toBe(true);
+      // 4 — the sheet those bytes came from, by name, origin id and type
+      expect(reference.source.sheet, key).toMatch(/^sprites-[0-9a-f]{64}\.bmp\.lzma$/);
+      expect(reference.source.firstSpriteId, key).toBeLessThanOrEqual(reference.spriteId);
+      expect(Number.isInteger(reference.source.sheetType), key).toBe(true);
+      // 5 — the extracted file, named for the sprite it holds
+      expect(reference.file, key).toContain(`sprite_${reference.spriteId}.png`);
+      // …and the honesty fields
       expect([32, 64], key).toContain(reference.cellPx);
       expect(['verified', 'candidate'], key).toContain(reference.role);
+      expect(Array.isArray(reference.gaps), key).toBe(true);
     }
-    // The ids are the manifest's, not invented: rat outfit 21 → idle 3821,
-    // and the two cave tiles are the appearances the ZIP actually names.
-    expect(PRIVATE_SPRITES['actor.rat']).toMatchObject({ appearanceId: 21, spriteId: 3821 });
+    // The ids are the manifest's, not invented.
+    expect(PRIVATE_SPRITES['actor.rat']).toMatchObject({
+      appearanceId: 21,
+      frameGroup: 0,
+      spriteId: 3819,
+      source: { firstSpriteId: 3791, sheetType: 3 },
+    });
     expect(PRIVATE_SPRITES['tile.cave.floor']).toMatchObject({
       appearanceId: 44092,
       spriteId: 209404,
+      source: { firstSpriteId: 209269, sheetType: 0 },
     });
   });
 
@@ -107,9 +141,28 @@ describe('§13 PRV — provenance, by kind of asset', () => {
     expect(candidates.length).toBeGreaterThan(0);
     for (const [key, reference] of candidates) {
       // The record carries no gameplay field whatsoever — not a speed, not a
-      // collision flag. If one ever appears here, this fails.
+      // collision flag. An exhaustive key list rather than a deny-list, so
+      // ANY new field fails this until someone looks at it.
       expect(Object.keys(reference).sort(), key).toEqual(
-        ['appearanceId', 'cellPx', 'file', 'role', 'spriteId'].sort(),
+        [
+          'appearanceClass',
+          'appearanceId',
+          'cellPx',
+          'file',
+          'frameGroup',
+          'gaps',
+          'pattern',
+          'role',
+          'source',
+          'spriteId',
+        ].sort(),
+      );
+      // …and the provenance sub-records are provenance only.
+      expect(Object.keys(reference.source).sort(), key).toEqual(
+        ['firstSpriteId', 'sheet', 'sheetType'].sort(),
+      );
+      expect(Object.keys(reference.pattern).sort(), key).toEqual(
+        ['boundingSquare', 'depth', 'height', 'layers', 'width'].sort(),
       );
     }
     // Presentation legibility is a separate, clearly-named table.
@@ -117,15 +170,32 @@ describe('§13 PRV — provenance, by kind of asset', () => {
     expect(READS_AS_WALKABLE['tile.cave.wall']).toBe(false);
   });
 
-  it('PRV6: the rat has one idle frame per facing, from the source range', () => {
-    // 4×1×1 patterns, frameGroup 0, sprites 3819–3822. The ORDER is an
-    // assumption about pattern order and is cosmetic; the RANGE is the
-    // manifest's and is not.
+  it('PRV6: the rat has one idle frame per facing, DERIVED from the pattern', () => {
+    // 4×1×1 pattern, one layer, frameGroup 0, sprites 3819–3822. The map is
+    // computed from the arithmetic the renderer uses, so it cannot drift from
+    // it. The ORDER is an assumption about pattern order and is cosmetic and
+    // declared as a gap; the RANGE is the manifest's and is not.
     const ids = Object.values(RAT_IDLE_BY_FACING);
     expect(ids).toHaveLength(4);
     expect(new Set(ids).size).toBe(4);
     expect(Math.min(...ids)).toBe(3819);
     expect(Math.max(...ids)).toBe(3822);
+    expect(PRIVATE_SPRITES['actor.rat']?.gaps.join(' ')).toMatch(/ORDER/);
+  });
+
+  it('PRV7: the citizen declares a PARTIAL extraction rather than implying a whole one', () => {
+    // The private reference says outfit 128 is a base-layer reference only.
+    // Pattern 4×3×2 with 2 layers is 48 cells per group; 8 frames exist. A
+    // direction mapping is therefore NOT derivable, and the record says so
+    // instead of leaving a plausible-looking outfit entry that implies it is.
+    const citizen = PRIVATE_SPRITES['actor.character'];
+    expect(citizen).toBeDefined();
+    expect(citizen!.pattern).toMatchObject({ width: 4, height: 3, depth: 2, layers: 2 });
+    expect(citizen!.pattern.layers).toBeGreaterThan(1);
+    const gaps = citizen!.gaps.join(' ');
+    expect(gaps).toMatch(/PARTIAL BASE LAYER/);
+    expect(gaps).toMatch(/not derivable/i);
+    expect(gaps).toMatch(/addon/i);
   });
 });
 
@@ -144,8 +214,10 @@ describe('§13 FALL — what happens with no private asset present', () => {
     // by the dev-only loader, so "no remote asset loading" holds in both
     // states rather than only in the one that ships.
     vi.stubEnv('NODE_ENV', 'development');
+    // The rat's record names frameGroup 0's first frame; per-facing selection
+    // is `ratFrameUrl`'s job and has its own cases (FRM).
     const url = privateSpriteUrl('actor.rat');
-    expect(url).toBe(`${PRIVATE_ASSET_ROUTE}/sprites/rat/sprite_3821.png`);
+    expect(url).toBe(`${PRIVATE_ASSET_ROUTE}/sprites/rat/sprite_3819.png`);
     expect(url?.startsWith('/')).toBe(true);
     expect(url).not.toMatch(/^https?:/);
   });
@@ -174,5 +246,103 @@ describe('§13 FALL — what happens with no private asset present', () => {
     }
     // And different tiles genuinely differ, or the mottling would be a flat fill.
     expect(tileNoise(1, 1)).not.toBe(tileNoise(2, 1));
+  });
+});
+
+describe('§13 FRM — the frame the RENDERER actually selects', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('FRM1: idle ids are computed, and reproduce the manifest range exactly', () => {
+    // Not "the constant contains four numbers" — the arithmetic the renderer
+    // runs, checked against the range the source declares.
+    expect(FACING_ORDER.map(ratIdleSpriteId)).toEqual([3819, 3820, 3821, 3822]);
+  });
+
+  it("FRM2: walking ids cover the manifest's 32 frames, once each", () => {
+    // 32 frames over a pattern width of 4 is 8 phases. If the layout were
+    // direction-major instead of phase-major the SET would still be 3823-3854,
+    // so this also pins that every (facing, phase) pair is distinct — which is
+    // what stops two directions sharing one picture.
+    const ids = new Set<number>();
+    for (let phase = 0; phase < RAT_WALK_PHASES; phase += 1) {
+      for (const facing of FACING_ORDER) ids.add(ratWalkSpriteId(facing, phase));
+    }
+    expect(ids.size).toBe(32);
+    expect(Math.min(...ids)).toBe(3823);
+    expect(Math.max(...ids)).toBe(3854);
+    // The phase wraps rather than running off the end of the sheet.
+    expect(ratWalkSpriteId('north', RAT_WALK_PHASES)).toBe(ratWalkSpriteId('north', 0));
+    expect(ratWalkSpriteId('north', -1)).toBe(ratWalkSpriteId('north', RAT_WALK_PHASES - 1));
+  });
+
+  it("FRM3: facing comes from the SERVER's leg, and a diagonal picks its dominant axis", () => {
+    expect(facingFromDelta(1, 0)).toBe('east');
+    expect(facingFromDelta(-1, 0)).toBe('west');
+    expect(facingFromDelta(0, 1)).toBe('south');
+    expect(facingFromDelta(0, -1)).toBe('north');
+    // Eight-direction movement is real, four sprite slots are all the source
+    // supplies, so a diagonal resolves rather than flickering between two.
+    expect(facingFromDelta(1, -1)).toBe('east');
+    expect(facingFromDelta(-1, 1)).toBe('west');
+    // Standing still keeps the pose it was given: a creature that snapped back
+    // to one direction every time it stopped would look like a bug.
+    expect(facingFromDelta(0, 0, 'west')).toBe('west');
+  });
+
+  it('FRM4: the animation phase is read off the authoritative timestamps', () => {
+    // Presentation derived from authority. A 1000 ms leg over 8 phases puts
+    // the boundary every 125 ms, so a SLOW step animates slowly — without the
+    // client owning a clock anything durable depends on.
+    expect(walkPhase(1000, 2000, 1000)).toBe(0);
+    expect(walkPhase(1000, 2000, 1125)).toBe(1);
+    expect(walkPhase(1000, 2000, 1999)).toBe(7);
+    // Outside the leg there is no phase at all — the caller draws idle.
+    expect(walkPhase(1000, 2000, 999)).toBeNull();
+    expect(walkPhase(1000, 2000, 2000)).toBeNull();
+    // A zero-length or inverted leg is not a division to attempt.
+    expect(walkPhase(1000, 1000, 1000)).toBeNull();
+    expect(walkPhase(2000, 1000, 1500)).toBeNull();
+  });
+
+  it('FRM5: in DEVELOPMENT the selected frame is a real per-facing file', () => {
+    vi.stubEnv('NODE_ENV', 'development');
+    expect(ratFrameUrl('north', null)).toBe(`${PRIVATE_ASSET_ROUTE}/sprites/rat/sprite_3819.png`);
+    expect(ratFrameUrl('west', null)).toBe(`${PRIVATE_ASSET_ROUTE}/sprites/rat/sprite_3822.png`);
+    // Walking selects from the walking group, never the idle one.
+    expect(ratFrameUrl('north', 0)).toBe(`${PRIVATE_ASSET_ROUTE}/sprites/rat/sprite_3823.png`);
+    expect(ratFrameUrl('east', 3)).toBe(`${PRIVATE_ASSET_ROUTE}/sprites/rat/sprite_3836.png`);
+    // Two different facings never resolve to the same picture.
+    expect(ratFrameUrl('north', 2)).not.toBe(ratFrameUrl('south', 2));
+  });
+
+  it('FRM7: the atlas surfaces draw a private map reference only in DEVELOPMENT', () => {
+    // The map references are wired the same way the sprites are, through the
+    // one dev-only loader — so "private art appears in the Atlas" is a real
+    // development behaviour rather than a claim, and a public build still
+    // paints the procedural placeholder and requests nothing.
+    vi.stubEnv('NODE_ENV', 'development');
+    expect(privateAtlasUrl('world')).toBe(`${PRIVATE_ASSET_ROUTE}/${PRIVATE_MAP_REFERENCES.world}`);
+    expect(privateAtlasUrl('region')).toBe(
+      `${PRIVATE_ASSET_ROUTE}/${PRIVATE_MAP_REFERENCES.region}`,
+    );
+    // The reference carries NO town-scale image. Cropping the minimap to fake
+    // one would manufacture detail the source does not contain.
+    expect(PRIVATE_MAP_REFERENCES.local).toBeUndefined();
+    expect(privateAtlasUrl('local')).toBeNull();
+
+    vi.stubEnv('NODE_ENV', 'production');
+    for (const surface of ['world', 'region', 'local'] as const) {
+      expect(privateAtlasUrl(surface), surface).toBeNull();
+    }
+  });
+
+  it('FRM6: a PRODUCTION build selects no frame at all', () => {
+    // The same fold as every other private path: no URL, so no request, so the
+    // placeholder is the only thing a public build can draw.
+    vi.stubEnv('NODE_ENV', 'production');
+    for (const facing of FACING_ORDER) {
+      expect(ratFrameUrl(facing, null)).toBeNull();
+      expect(ratFrameUrl(facing, 4)).toBeNull();
+    }
   });
 });

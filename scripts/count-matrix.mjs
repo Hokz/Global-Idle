@@ -3,7 +3,7 @@
  * Count the implemented matrix cases and compare them with what the approved
  * specifications fix: Phase 0B §14 at **92**, Phase 1 §16 at **87**, Phase 2
  * §12 at **106**, Phase 3 §20 at **169**, Phase 3.5 §20 at **95**, Phase 3.6
- * §16 at **25**, Phase 3.7 §13 at **45**.
+ * §16 at **25**, Phase 3.7 §13 at **61**.
  *
  * The convention this relies on: every matrix case is exactly ONE test whose
  * title begins with its id and a colon — `it('W1: ...')` for a Vitest case,
@@ -177,12 +177,15 @@ const MATRICES = {
     groups: {
       // The distribution boundary, which is the phase's blocking condition:
       // a private asset may never reach a distributable artefact.
-      DIST: [1, 10],
+      DIST: [1, 15],
       ATL: [1, 5],
       PIN: [1, 3],
-      PRV: [1, 6],
+      PRV: [1, 7],
       FALL: [1, 4],
-      CTY: [1, 6],
+      // Added by the independent review's blocker 2: the frame the RENDERER
+      // actually selects, not a constant that happens to hold four numbers.
+      FRM: [1, 7],
+      CTY: [1, 9],
       SLC: [1, 5],
       HUD: [1, 3],
       AUTH: [1, 3],
@@ -195,6 +198,7 @@ const MATRICES = {
 const PREFIXES = [
   'RNGC',
   'AUTH',
+  'FRM',
   'DIST',
   'FALL',
   'ATL',

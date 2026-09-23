@@ -20,9 +20,13 @@ import type { Movement, RunView, Tile, TileMapView } from '../_lib/api';
 import {
   PUBLIC_PALETTE,
   READS_AS_WALKABLE,
+  facingFromDelta,
   privateSpriteUrl,
+  ratFrameUrl,
   spriteDrawBox,
   tileNoise,
+  walkPhase,
+  type Facing,
   type SpriteKey,
 } from '../_lib/sprites';
 
@@ -78,23 +82,29 @@ const TILE_SPRITE: Readonly<Record<string, SpriteKey>> = {
  * resolves — and forever, if it 404s — the placeholder is what gets drawn.
  * Absent is the ORDINARY case and must never be an error path (spec §9.2).
  */
-const overrides = new Map<SpriteKey, HTMLImageElement | null>();
+const overrides = new Map<string, HTMLImageElement | null>();
 
-function overrideFor(key: SpriteKey): HTMLImageElement | null {
-  const known = overrides.get(key);
+/**
+ * The bitmap at a private URL, once it has loaded.
+ *
+ * Keyed by URL rather than by semantic key, because the rat selects a
+ * DIFFERENT frame per facing and per animation phase and each one is its own
+ * file. A frame that has not loaded yet, or that 404s, is simply `null` and
+ * the caller paints the placeholder — absent is the ordinary case.
+ */
+function imageFor(url: string | null): HTMLImageElement | null {
+  if (!url) return null;
+  const known = overrides.get(url);
   if (known !== undefined) return known && known.complete && known.naturalWidth > 0 ? known : null;
 
-  const url = privateSpriteUrl(key);
-  if (!url) {
-    overrides.set(key, null);
-    return null;
-  }
   const image = new Image();
-  image.onerror = () => overrides.set(key, null);
+  image.onerror = () => overrides.set(url, null);
   image.src = url;
-  overrides.set(key, image);
+  overrides.set(url, image);
   return null;
 }
+
+const overrideFor = (key: SpriteKey): HTMLImageElement | null => imageFor(privateSpriteUrl(key));
 
 /**
  * How far BEHIND the newest snapshot the scene is drawn.
@@ -167,6 +177,8 @@ export function TileScene({ map, run, debug = false }: TileSceneProps) {
    */
   const anchor = useRef<{ nowMs: number; at: number } | null>(null);
   const camera = useRef<{ x: number; y: number } | null>(null);
+  /** The last facing each actor was given, so stopping does not snap it north. */
+  const poses = useRef(new Map<string, Facing>());
   /**
    * Every step the server has stated lately, per actor.
    *
@@ -296,17 +308,34 @@ export function TileScene({ map, run, debug = false }: TileSceneProps) {
         });
       }
 
-      const placed = new Map<string, { x: number; y: number; facing: number }>();
+      const placed = new Map<
+        string,
+        { x: number; y: number; facing: number; heading: Facing; phase: number | null }
+      >();
       for (const actor of actors) {
         const legs = timeline.current.get(actor.id) ?? [];
         const at = placeActor(actor.tile, legs, simNow);
-        const heading = legs.find((leg) => leg.startsAtMs <= simNow && simNow < leg.arrivesAtMs);
-        const facing = heading && heading.to.x < heading.from.x ? -1 : 1;
-        placed.set(actor.id, { ...at, facing });
+        // THE SERVER'S OWN LEG decides which way an actor faces and how far
+        // through its step it is. Both are read from the authoritative
+        // timestamps; neither introduces a clock or a decision of its own.
+        const leg = legs.find((step) => step.startsAtMs <= simNow && simNow < step.arrivesAtMs);
+        const facing = leg && leg.to.x < leg.from.x ? -1 : 1;
+        const heading: Facing = leg
+          ? facingFromDelta(leg.to.x - leg.from.x, leg.to.y - leg.from.y)
+          : (poses.current.get(actor.id) ?? 'south');
+        poses.current.set(actor.id, heading);
+        const phase = leg ? walkPhase(leg.startsAtMs, leg.arrivesAtMs, simNow) : null;
+        placed.set(actor.id, { ...at, facing, heading, phase });
       }
 
       // ── camera: the Character on the centre tile, clamped at the edges ─
-      const hero = placed.get('character') ?? { x: 0, y: 0, facing: 1 };
+      const hero = placed.get('character') ?? {
+        x: 0,
+        y: 0,
+        facing: 1,
+        heading: 'south' as Facing,
+        phase: null,
+      };
       const wantX = (hero.x - CENTRE_X) * size;
       const wantY = (hero.y - CENTRE_Y) * size;
       const clampX =
@@ -457,8 +486,16 @@ export function TileScene({ map, run, debug = false }: TileSceneProps) {
         // over its tile, so a tall sprite overhangs up and left and the tile
         // under its feet stays the tile the server named. Public builds never
         // reach this: `overrideFor` is `null` for every key there.
-        const actorKey: SpriteKey = actor.kind === 'character' ? 'actor.character' : 'actor.rat';
-        const actorOverride = dead ? null : overrideFor(actorKey);
+        // THE RAT is the one appearance whose direction mapping the manifest
+        // actually determines — pattern 4x1x1, one layer — so it selects a real
+        // frame per facing and per phase. The citizen is a PARTIAL base-layer
+        // extraction (8 of 48 cells, 2 layers unrecorded), so its mapping is a
+        // SOURCE GAP and it draws the single frame the reference supplies.
+        const actorOverride = dead
+          ? null
+          : actor.kind === 'creature'
+            ? imageFor(ratFrameUrl(spot.heading, spot.phase))
+            : overrideFor('actor.character');
         if (actorOverride) {
           const box = spriteDrawBox(64, size, spot.x, spot.y);
           context.drawImage(actorOverride, box.x - cam.x, box.y - cam.y, box.width, box.height);

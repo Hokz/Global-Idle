@@ -1,0 +1,10 @@
+{
+  "$comment": "RELEASE ALLOWLIST for distributable static art (Phase 3.7 §9.6). Every binary or non-text file under a distributable static root MUST appear here with a matching sha256, or `pnpm release:check` FAILS. Marker matching alone was not enough: a real client PNG carries no sentinel this project invented, so an unmarked proprietary file at any other public path used to pass. Provenance is asserted per file, by a human, and the hash is what stops the assertion drifting from the bytes.",
+  "policy": {
+    "roots": ["apps/web/public"],
+    "rule": "deny-by-default",
+    "textIsExempt": false,
+    "note": "Adding art here is a deliberate, reviewable act. If you cannot state its author and licence, it cannot ship."
+  },
+  "approved": []
+}
