@@ -65,23 +65,63 @@ const DISTRIBUTABLE_STATIC = ['apps/web/public'];
 const ASSET_MANIFEST = 'apps/web/public/ASSET_MANIFEST.json';
 
 /**
- * Extensions treated as TEXT under a distributable static root.
+ * The ONLY files under a distributable static root that need no provenance.
  *
- * Text still goes through checks 1 and 2 — a path or a marker in a `.txt` is
- * caught there. What it is exempt from is the per-file provenance allowlist,
- * which exists for ART: a `robots.txt` is not a licensing question.
+ * An explicit, narrow path list — not an extension class. The previous version
+ * exempted every `.css`, `.js`, `.json` and `.xml`, and independent review
+ * showed what that bought: a public stylesheet can carry an unmarked
+ * `data:image;base64` payload, which is artwork, and no path or marker check
+ * sees it. "Text" is not a statement about content.
+ *
+ * Everything not on this list — text included — must be on the release
+ * allowlist, bound to its bytes.
  */
-const STATIC_TEXT = new Set([
-  '.txt',
-  '.json',
-  '.xml',
-  '.md',
-  '.csv',
-  '.webmanifest',
-  '.map',
-  '.css',
-  '.js',
+const EXEMPT_STATIC_PATHS = new Set([
+  'apps/web/public/ASSET_MANIFEST.json',
+  'apps/web/public/robots.txt',
 ]);
+
+/**
+ * Extensions that ARE artwork, wherever they appear.
+ *
+ * Used for the build-output provenance gate. `.svg` is text and is still art,
+ * which is exactly the kind of gap an extension-class rule creates.
+ */
+const MEDIA_EXTENSIONS = new Set([
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.webp',
+  '.avif',
+  '.bmp',
+  '.ico',
+  '.svg',
+  '.woff',
+  '.woff2',
+  '.ttf',
+  '.otf',
+  '.eot',
+  '.mp3',
+  '.ogg',
+  '.wav',
+  '.mp4',
+  '.webm',
+]);
+
+/** Output files worth reading as text when hunting for an inlined payload. */
+const OUTPUT_TEXTISH = new Set(['.js', '.mjs', '.cjs', '.css', '.json', '.html', '.txt', '.map']);
+
+/**
+ * An image smuggled into text as a base64 data URI.
+ *
+ * A SECONDARY signal, never the boundary — the allowlist is the boundary. This
+ * exists because a build output has no allowlist of its own, and because an
+ * exempt config file should not quietly become a carrier. The 64-character
+ * floor keeps a 1×1 tracking pixel or an inline cursor out of the results
+ * while still catching anything that could be real artwork.
+ */
+const INLINE_IMAGE = /data:image\/[a-zA-Z0-9.+-]+;base64,([A-Za-z0-9+/=]{64,})/;
 
 /** Build outputs that become an artefact. */
 const BUILD_OUTPUTS = ['apps/web/.next', 'apps/web/out', 'apps/web/dist'];
@@ -128,14 +168,20 @@ if (existsSync(forbidden)) {
 }
 
 // ── 2. distributable static roots carry nothing private ──────────────────────
-// ── 3. …and every binary among them is on the release allowlist, by hash ─────
+// ── 3. …and every file among them is EXEMPT or ALLOWLISTED, by hash ──────────
 //
 // Read the allowlist first, so a missing or malformed manifest fails CLOSED
 // rather than silently disabling the check that depends on it.
 const manifestPath = join(ROOT, ASSET_MANIFEST);
-/** @type {Map<string, {sha256: string, author?: string, licence?: string}>} */
+/** @type {Map<string, {sha256: string, author: string, licence: string}>} */
 const approved = new Map();
+/** Hashes alone, for the build-output gate: a built copy has a different path. */
+const approvedHashes = new Set();
 let manifestUsable = false;
+
+/** A path is only comparable if it is normalised the one way this file writes them. */
+const normalise = (value) => value.split(sep).join('/').replace(/^\.\//, '');
+
 if (!existsSync(manifestPath)) {
   fail(
     `${ASSET_MANIFEST} is missing. It is the release allowlist for distributable art; ` +
@@ -144,13 +190,57 @@ if (!existsSync(manifestPath)) {
 } else {
   try {
     const parsed = JSON.parse(readFileSync(manifestPath, 'utf8'));
-    for (const entry of parsed.approved ?? []) {
-      if (typeof entry?.path !== 'string' || typeof entry?.sha256 !== 'string') {
-        fail(`${ASSET_MANIFEST} has an entry without both a path and a sha256.`);
-        continue;
+    const entries = parsed.approved ?? [];
+    if (!Array.isArray(entries)) throw new Error('`approved` must be an array');
+
+    entries.forEach((entry, index) => {
+      const where = `${ASSET_MANIFEST} entry ${index}`;
+      /*
+       * A PROVENANCE record, not a checksum list.
+       *
+       * The script cannot verify that a licence claim is TRUE — only a human
+       * can. What it can do is refuse a record that makes no claim at all, and
+       * bind whatever claim was made to the exact bytes it was made about.
+       * Independent review found an entry with blank author and licence
+       * passing; a blank field is not a statement.
+       */
+      const path = typeof entry?.path === 'string' ? normalise(entry.path.trim()) : '';
+      if (!path) {
+        fail(`${where} has no path.`);
+        return;
       }
-      approved.set(entry.path, entry);
-    }
+      if (path.includes('..') || path.startsWith('/')) {
+        fail(`${where} (${path}) is not a normalised repository-relative path.`);
+        return;
+      }
+      if (!DISTRIBUTABLE_STATIC.some((root) => path.startsWith(`${root}/`))) {
+        fail(
+          `${where} (${path}) is outside every distributable static root ` +
+            `(${DISTRIBUTABLE_STATIC.join(', ')}). The allowlist approves what SHIPS.`,
+        );
+        return;
+      }
+      if (approved.has(path)) {
+        fail(`${where} (${path}) is a duplicate; one path may carry only one provenance record.`);
+        return;
+      }
+      if (typeof entry.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(entry.sha256)) {
+        fail(`${where} (${path}) has no valid sha256 — expected 64 lowercase hex characters.`);
+        return;
+      }
+      const author = typeof entry.author === 'string' ? entry.author.trim() : '';
+      const licence = typeof entry.licence === 'string' ? entry.licence.trim() : '';
+      if (!author || !licence) {
+        fail(
+          `${where} (${path}) must state a non-empty author AND licence. ` +
+            `A hash without a provenance claim records that bytes did not change, ` +
+            `not that they may ship.`,
+        );
+        return;
+      }
+      approved.set(path, { sha256: entry.sha256, author, licence });
+      approvedHashes.add(entry.sha256);
+    });
     manifestUsable = true;
   } catch (error) {
     fail(`${ASSET_MANIFEST} is not valid JSON: ${error.message}`);
@@ -158,13 +248,13 @@ if (!existsSync(manifestPath)) {
 }
 
 let staticScanned = 0;
-let staticBinaries = 0;
+let staticApproved = 0;
 for (const root of DISTRIBUTABLE_STATIC) {
   const full = join(ROOT, root);
   if (!existsSync(full)) continue;
   for (const file of walk(full)) {
     staticScanned += 1;
-    const rel = relative(ROOT, file).split(sep).join('/');
+    const rel = normalise(relative(ROOT, file));
     if (rel.split('/').includes('private')) {
       fail(`${rel} sits on a "private" path inside a distributable static root.`);
       continue;
@@ -175,18 +265,30 @@ for (const root of DISTRIBUTABLE_STATIC) {
       continue;
     }
 
-    // The allowlist. Text is exempt (see STATIC_TEXT); the manifest itself is
-    // not art and does not list itself.
-    const dot = rel.lastIndexOf('.');
-    const extension = dot > rel.lastIndexOf('/') ? rel.slice(dot).toLowerCase() : '';
-    if (STATIC_TEXT.has(extension) || rel === ASSET_MANIFEST) continue;
+    /*
+     * EXEMPT, or ALLOWLISTED. There is no third category and no extension
+     * class: "it is text" says nothing about whether it carries artwork, and
+     * a stylesheet with an embedded `data:image` payload is artwork that no
+     * path or marker check can see.
+     */
+    if (EXEMPT_STATIC_PATHS.has(rel)) {
+      // An exempt file is exempt from PROVENANCE, not from carrying art.
+      const match = INLINE_IMAGE.exec(buffer.toString('utf8'));
+      if (match) {
+        fail(
+          `${rel} is release-exempt configuration, but carries an inlined ` +
+            `${match[1].length}-character base64 image payload. Exempt means "not artwork"; ` +
+            `move the image to its own allowlisted file.`,
+        );
+      }
+      continue;
+    }
 
-    staticBinaries += 1;
     if (!manifestUsable) continue; // already failed above; do not pile on
     const entry = approved.get(rel);
     if (!entry) {
       fail(
-        `${rel} is a distributable binary that is NOT on the release allowlist. ` +
+        `${rel} is a distributable file that is NOT on the release allowlist. ` +
           `Add it to ${ASSET_MANIFEST} with its author, licence and sha256 — or remove it. ` +
           `Deny by default: an unmarked proprietary file would otherwise ship (spec §9.6).`,
       );
@@ -198,20 +300,33 @@ for (const root of DISTRIBUTABLE_STATIC) {
         `${rel} does not match its allowlisted hash (recorded ${entry.sha256.slice(0, 12)}…, ` +
           `found ${digest.slice(0, 12)}…). The bytes changed after they were approved.`,
       );
+      continue;
     }
+    staticApproved += 1;
   }
 }
 pass(`${staticScanned} distributable static file(s) carry no private path or marker`);
 if (manifestUsable) {
   pass(
-    `${staticBinaries} distributable binary/binaries are release-approved by hash ` +
-      `(${approved.size} on the allowlist)`,
+    `${staticApproved} distributable file(s) release-approved by hash, ` +
+      `${EXEMPT_STATIC_PATHS.size} exempt config path(s), ${approved.size} allowlist entries`,
   );
 }
 
 // ── 4. build outputs contain no private path and no marker ───────────────────
 let outputsSeen = 0;
 let outputScanned = 0;
+let outputMedia = 0;
+
+/** The hash of what a base64 payload DECODES to, so an inlined copy of an
+ *  approved asset is recognised as that asset rather than as a new one. */
+const hashOfBase64 = (payload) => {
+  try {
+    return createHash('sha256').update(Buffer.from(payload, 'base64')).digest('hex');
+  } catch {
+    return '';
+  }
+};
 for (const output of BUILD_OUTPUTS) {
   const full = join(ROOT, output);
   if (!existsSync(full)) continue;
@@ -219,10 +334,47 @@ for (const output of BUILD_OUTPUTS) {
   for (const file of walk(full, OUTPUT_SKIP)) {
     const rel = relative(ROOT, file);
     const dot = file.lastIndexOf('.');
-    const extension = dot > file.lastIndexOf(sep) ? file.slice(dot) : '';
+    const extension = (dot > file.lastIndexOf(sep) ? file.slice(dot) : '').toLowerCase();
+
+    /*
+     * THE ARTEFACT'S OWN PROVENANCE GATE.
+     *
+     * `public/` is not the only way art reaches a deploy. An imported asset is
+     * emitted into `.next/static/media/` under a content-hashed name, never
+     * passing through `public/` at all — so the allowlist above cannot see it,
+     * and a marker scan cannot recognise bytes it has never been shown.
+     * Independent review's counterexample was exactly this.
+     *
+     * So: anything in the artefact that IS artwork — image, font, audio,
+     * video, SVG — must hash-match something a human approved. Everything
+     * else Next emits (`.rsc`, `.meta`, chunks, maps) is scaffolding, not art,
+     * and keeps the marker and path scan it already had. That is a targeted
+     * gate rather than a blanket exception.
+     */
+    if (MEDIA_EXTENSIONS.has(extension)) {
+      outputScanned += 1;
+      outputMedia += 1;
+      const buffer = readFileSync(file);
+      if (buffer.includes(PRIVATE_MARKER)) {
+        fail(`${rel} carries the private-asset marker.`);
+        continue;
+      }
+      if (!manifestUsable) continue;
+      const digest = createHash('sha256').update(buffer).digest('hex');
+      if (!approvedHashes.has(digest)) {
+        fail(
+          `${rel} is ${extension} media in a distributable artefact whose bytes match no ` +
+            `release-approved asset (sha256 ${digest.slice(0, 12)}…). Every image, font or ` +
+            `media file that ships must have a provenance record in ${ASSET_MANIFEST}, ` +
+            `whether it came from public/ or was bundled from source (spec §9.6).`,
+        );
+      }
+      continue;
+    }
+
     if (!TEXT_LIKE.has(extension)) {
-      // A binary in the output is scanned for the marker only — it cannot
-      // contain a module path, and reading it as text would be meaningless.
+      // Not art, not text: Next's own payloads. Scanned for the marker only —
+      // they cannot contain a module path, and reading them as text is noise.
       if (readFileSync(file).includes(PRIVATE_MARKER)) fail(`${rel} carries the private marker.`);
       outputScanned += 1;
       continue;
@@ -233,6 +385,17 @@ for (const output of BUILD_OUTPUTS) {
     if (text.includes(FORBIDDEN_PUBLIC_PRIVATE)) {
       fail(`${rel} references the forbidden path ${FORBIDDEN_PUBLIC_PRIVATE}.`);
     }
+    // A SECONDARY signal, not the boundary: the artefact has no allowlist of
+    // its own, so an inlined image in a chunk would otherwise be invisible.
+    if (OUTPUT_TEXTISH.has(extension)) {
+      const match = INLINE_IMAGE.exec(text);
+      if (match && !approvedHashes.has(hashOfBase64(match[1]))) {
+        fail(
+          `${rel} inlines a ${match[1].length}-character base64 image payload that matches no ` +
+            `release-approved asset. Inlining does not change what it is.`,
+        );
+      }
+    }
   }
 }
 if (outputsSeen === 0) {
@@ -241,7 +404,8 @@ if (outputsSeen === 0) {
   console.log('  · no build output present — run `pnpm build` first to check an artefact');
 } else {
   pass(
-    `${outputScanned} built file(s) in ${outputsSeen} output(s) carry no private path or marker`,
+    `${outputScanned} built file(s) in ${outputsSeen} output(s) carry no private path or marker; ` +
+      `${outputMedia} media file(s) in the artefact are release-approved`,
   );
 }
 

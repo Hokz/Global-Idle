@@ -1,10 +1,14 @@
 {
-  "$comment": "RELEASE ALLOWLIST for distributable static art (Phase 3.7 §9.6). Every binary or non-text file under a distributable static root MUST appear here with a matching sha256, or `pnpm release:check` FAILS. Marker matching alone was not enough: a real client PNG carries no sentinel this project invented, so an unmarked proprietary file at any other public path used to pass. Provenance is asserted per file, by a human, and the hash is what stops the assertion drifting from the bytes.",
+  "$comment": "RELEASE ALLOWLIST for everything distributable (Phase 3.7 §9.6). DENY BY DEFAULT. Marker matching alone was not enough — a real client PNG carries no sentinel this project invented — and neither was an extension class: a stylesheet can embed an unmarked base64 data:image, which is artwork. So every file under a distributable static root must be either on `policy.exemptPaths` or listed here with a matching sha256, and every image/font/media file in the BUILD ARTEFACT must hash-match something listed here, whether it came from public/ or was bundled from source. `pnpm release:check` fails otherwise.",
   "policy": {
     "roots": ["apps/web/public"],
     "rule": "deny-by-default",
-    "textIsExempt": false,
-    "note": "Adding art here is a deliberate, reviewable act. If you cannot state its author and licence, it cannot ship."
+    "appliesToText": true,
+    "exemptPaths": ["apps/web/public/ASSET_MANIFEST.json", "apps/web/public/robots.txt"],
+    "exemptMeansNotArtwork": "An exempt path is exempt from stating provenance, NOT from carrying art: an inlined base64 image payload in one still fails the build.",
+    "artefactGate": "Image, font, audio, video and SVG files in apps/web/.next (or out/dist) must hash-match an entry here. Next's own .rsc/.meta/chunk payloads are scaffolding, not art, and keep the marker and forbidden-path scan.",
+    "whatTheScriptCanProve": "That a provenance claim EXISTS and is bound to exact bytes. It cannot verify that the claim is true — a human reviewer does that. This is not proof of IP ownership.",
+    "entryRequirements": "path (normalised, inside a root, unique), sha256 (64 lowercase hex), non-empty author, non-empty licence."
   },
   "approved": []
 }
