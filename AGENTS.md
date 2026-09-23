@@ -178,16 +178,17 @@ a phase marker copied into five documents is a phase marker that goes stale in f
 this file said *"Current phase: Phase 1"* for two entire phases.
 `scripts/check-project-state.mjs` fails CI if the two ever disagree again.
 
-Active phase: **Phase 3.5 — Tile / spatial Game Window**
-(`IMPLEMENTATION_COMPLETE — PENDING INDEPENDENT REVIEW`, PR #9). It is NOT verified and may not be
+Active phase: **Phase 3.6 — Movement fidelity: Character speed and tile ground speed**
+(`IMPLEMENTATION_COMPLETE — PENDING INDEPENDENT REVIEW`). It is NOT verified and may not be
 treated as accepted.
-Last VERIFIED: **Phase 3 — Itemization, inventory and loot logistics**, accepted 2026-09-22 at
-head `d46f78b` (PR #8).
+Last VERIFIED: **Phase 3.5 — Tile / spatial Game Window**, accepted 2026-09-22 at head `2e67f4b`
+(PR #9). Phase 3 remains VERIFIED at `d46f78b` (PR #8).
 
-Phase 0A (`ARCHITECTURE_APPROVED`), Phase 0B, Phase 1, Phase 2 and Phase 3 are closed and
-VERIFIED. Their
+Phase 0A (`ARCHITECTURE_APPROVED`), Phase 0B, Phase 1, Phase 2, Phase 3 and Phase 3.5 are closed
+and VERIFIED. Their
 primitives — occupancy, Stamina, active-use timers, entitlements, idempotency, content bundles,
-transactions, the deterministic Hunt simulator, currency custody, the physical item model —
+transactions, the deterministic Hunt simulator, currency custody, the physical item model, the
+tile map with its authoritative movement timeline and cadence-invariant random streams —
 are implemented and independently reviewed. **Reuse them; do not build parallel replacements.**
 
 A phase's own specification is the thing to build against, and the one in

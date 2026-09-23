@@ -14,6 +14,14 @@
  * Every rule here that claims to come from the source engine is cited in
  * `docs/specs/phase-3-5/PHASE_3_5_CANARY_SPATIAL_SOURCE_MAP.md`.
  */
+import {
+  DEFAULT_GROUND_SPEED,
+  DIAGONAL_STEP_FACTOR,
+  MAX_GROUND_SPEED,
+  MAX_STEP_DURATION_MS,
+  SLOWEST_CHARACTER_STEP_SPEED,
+  supportedStepDurationMs,
+} from './step.js';
 
 export interface TilePosition {
   readonly x: number;
@@ -67,13 +75,34 @@ export const DIAGONAL_WALK_COST = 35;
 export const stepCost = (dx: number, dy: number): number =>
   Math.abs(dx) === 1 && Math.abs(dy) === 1 ? DIAGONAL_WALK_COST : NORMAL_WALK_COST;
 
+/**
+ * What a legend symbol MEANS.
+ *
+ * The short spelling is a kind on its own — `'#': 'wall'` — because most tiles
+ * have nothing else to say. The long spelling adds the ground's own speed,
+ * which is the number the step-duration curve divides into (§3 of the source
+ * map). Both are normalised in ONE place, `readLegendEntry` below, so the two
+ * spellings never become two meanings.
+ *
+ * LOWER `groundSpeed` is a FASTER step. The duration is proportional to it:
+ * `floor(1000 × groundSpeed / calculatedStepSpeed)`. This reads backwards the
+ * first time and is the source's own arithmetic.
+ */
+export interface MapTileDefinition {
+  readonly kind: TileKindName;
+  /** The ground's own speed. Absent means the 150 fallback; never 0. */
+  readonly groundSpeed?: number | undefined;
+}
+
+export type MapLegendEntry = TileKindName | MapTileDefinition;
+
 /** One authored map, as a human writes it into content. */
 export interface MapSource {
   readonly key: string;
   readonly z: number;
   /** One character per tile. `legend` says what each means. */
   readonly rows: readonly string[];
-  readonly legend: Readonly<Record<string, TileKindName>>;
+  readonly legend: Readonly<Record<string, MapLegendEntry>>;
   readonly entry: { readonly x: number; readonly y: number };
   readonly regions: readonly MapRegionSource[];
   /**
@@ -139,6 +168,30 @@ export interface TileMap {
   readonly flags: Uint8Array;
   /** The authored kind, for the renderer. */
   readonly kind: Uint8Array;
+  /**
+   * Per tile: the ground speed a step DEPARTING from it divides by.
+   *
+   * Compiled, not parsed per step — a movement beat runs sixty times a second
+   * of simulated time and must not touch the content bundle to do it. A
+   * non-walkable tile carries the fallback because nothing ever departs from
+   * one; the array is dense so the lookup is an index rather than a branch.
+   */
+  readonly groundSpeed: Uint16Array;
+  /**
+   * Every DISTINCT ground speed this map actually uses, ascending.
+   *
+   * A property of the compiled map rather than a scan, because the question
+   * "can this actor walk anywhere on this map" is asked per Hunt plan and the
+   * answer only ever depends on the distinct values — 671 tiles of Sewers are
+   * one number. The domain uses it to prove a Hunt's creatures against the
+   * supported movement domain before a settlement runs; nothing here knows
+   * what a creature is.
+   *
+   * Only tiles an actor can OCCUPY are counted, because only those are ever
+   * departed from. A wall still carries a value in `groundSpeed` above — the
+   * array is dense on purpose — and that value is not a step anybody takes.
+   */
+  readonly groundSpeeds: readonly number[];
   readonly entry: TilePosition;
   readonly regions: readonly MapRegion[];
   readonly connectors: readonly MapConnector[];
@@ -198,14 +251,68 @@ export class MapError extends Error {
  * that walks into a wall at run time. This is the validator and the compiler,
  * and they are one function because two would let them disagree.
  */
+/**
+ * One legend symbol, normalised — the ONLY place the two spellings meet.
+ *
+ * A bad ground speed is refused here rather than clamped, and the message
+ * names the symbol, because a map whose mud is secretly stone is a map whose
+ * Hunt throughput is silently wrong.
+ *
+ * TWO different refusals, because they are two different mistakes. The first
+ * is REPRESENTATION: a ground speed the source could not store at all. The
+ * second is DOMAIN: a ground speed the source stores happily but whose step
+ * nobody could take — the duration leaves the `uint16_t` that `getStepDuration`
+ * caches and returns, where the source is undefined or wraps. The ceiling that
+ * decides the second one is not repeated here; `supportedStepDurationMs` is
+ * asked, so content and engine cannot drift apart.
+ *
+ * The yardstick is the SLOWEST Character the game can produce, taking the most
+ * expensive step it has — a diagonal. Ground that actor cannot walk is ground
+ * no Character can, so it is a map that should never have compiled. A CREATURE
+ * slower still is not checked here, because a creature and a map meet only in
+ * a plan; `stepDurationMs` refuses that pair when it is actually asked.
+ */
+function readLegendEntry(
+  key: string,
+  symbol: string,
+  entry: MapLegendEntry,
+): { kind: TileKindName; groundSpeed: number } {
+  if (typeof entry === 'string') return { kind: entry, groundSpeed: DEFAULT_GROUND_SPEED };
+  const speed = entry.groundSpeed;
+  if (speed === undefined) return { kind: entry.kind, groundSpeed: DEFAULT_GROUND_SPEED };
+  if (!Number.isInteger(speed) || speed < 1 || speed > MAX_GROUND_SPEED) {
+    throw new MapError(
+      `${key}: legend '${symbol}' has groundSpeed ${String(speed)}; it must be a whole number from 1 to ${MAX_GROUND_SPEED}. Leave it out for the ${DEFAULT_GROUND_SPEED} default.`,
+    );
+  }
+  const worstStep = supportedStepDurationMs(
+    SLOWEST_CHARACTER_STEP_SPEED,
+    speed,
+    DIAGONAL_STEP_FACTOR,
+  );
+  if (worstStep === null) {
+    throw new MapError(
+      `${key}: legend '${symbol}' has groundSpeed ${String(speed)}, which the source could store but nobody could walk: a level-1 Character's diagonal step would run past the ${MAX_STEP_DURATION_MS} ms the source can represent. Lower the ground speed.`,
+    );
+  }
+  return { kind: entry.kind, groundSpeed: speed };
+}
+
 export function compileMap(source: MapSource): TileMap {
   const height = source.rows.length;
   if (height === 0) throw new MapError(`${source.key}: a map needs at least one row.`);
   const width = source.rows[0]!.length;
   if (width === 0) throw new MapError(`${source.key}: a map needs at least one column.`);
 
+  const legend = new Map<string, { kind: TileKindName; groundSpeed: number }>();
+  for (const [symbol, entry] of Object.entries(source.legend)) {
+    legend.set(symbol, readLegendEntry(source.key, symbol, entry));
+  }
+
   const flags = new Uint8Array(width * height);
   const kind = new Uint8Array(width * height);
+  const groundSpeed = new Uint16Array(width * height);
+  const used = new Set<number>();
   for (let y = 0; y < height; y += 1) {
     const row = source.rows[y]!;
     if (row.length !== width) {
@@ -213,16 +320,23 @@ export function compileMap(source: MapSource): TileMap {
     }
     for (let x = 0; x < width; x += 1) {
       const symbol = row[x]!;
-      const name = source.legend[symbol];
-      if (!name)
+      const tile = legend.get(symbol);
+      if (!tile)
         throw new MapError(
           `${source.key}: row ${y} column ${x} uses '${symbol}', which the legend does not define.`,
         );
       const index = y * width + x;
-      kind[index] = KIND_CODES[name];
-      flags[index] = BLOCKS[name];
+      kind[index] = KIND_CODES[tile.kind];
+      flags[index] = BLOCKS[tile.kind];
+      groundSpeed[index] = tile.groundSpeed;
+      // Only tiles something can STAND on. A wall's ground speed is a value
+      // the dense array carries so the lookup stays an index, never a number
+      // any step divides by — counting it here would let a wall decide
+      // whether a creature can walk the map.
+      if ((flags[index]! & BLOCK_SOLID) === 0) used.add(tile.groundSpeed);
     }
   }
+  const groundSpeeds = [...used].sort((a, b) => a - b);
 
   const inside = (x: number, y: number) => x >= 0 && y >= 0 && x < width && y < height;
   const stand = (x: number, y: number) =>
@@ -291,6 +405,8 @@ export function compileMap(source: MapSource): TileMap {
     z: source.z,
     flags,
     kind,
+    groundSpeed,
+    groundSpeeds,
     entry: { x: source.entry.x, y: source.entry.y, z: source.z },
     regions,
     connectors,
@@ -323,6 +439,19 @@ export const canPathThrough = (map: TileMap, position: TilePosition): boolean =>
 export const blocksProjectile = (map: TileMap, position: TilePosition): boolean =>
   !isInside(map, position) ||
   (map.flags[tileIndex(map, position.x, position.y)]! & BLOCK_PROJECTILE) !== 0;
+
+/**
+ * The ground speed a step DEPARTING from this tile divides by.
+ *
+ * Off the map — or on another floor — answers the 150 fallback rather than
+ * throwing, for the same reason `canOccupy` answers `false`: a caller asking
+ * about a tile that is not there has already lost, and a second failure mode
+ * to handle would not help it.
+ */
+export const groundSpeedAt = (map: TileMap, position: TilePosition): number =>
+  isInside(map, position)
+    ? map.groundSpeed[tileIndex(map, position.x, position.y)]!
+    : DEFAULT_GROUND_SPEED;
 
 /** The old name, kept meaning exactly "may be stood on". */
 export const isWalkable = canOccupy;

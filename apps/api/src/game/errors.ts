@@ -28,6 +28,7 @@ export type ErrorCode =
   | 'OVER_CAPACITY'
   | 'CONTAINER_SLOT_LOCKED'
   | 'SERVICE_UNAVAILABLE_HERE'
+  | 'HUNT_NOT_SIMULATABLE'
   | 'INSUFFICIENT_FUNDS'
   | 'INVALID_REQUEST'
   | 'INTERNAL';
@@ -72,6 +73,13 @@ const DOMAIN_TO_HTTP: Record<string, { status: HttpStatus; code: ErrorCode }> = 
     code: 'SERVICE_UNAVAILABLE_HERE',
   },
   InsufficientFunds: { status: HttpStatus.CONFLICT, code: 'INSUFFICIENT_FUNDS' },
+  // ── Phase 3.6 — the content is each-part valid and not simulatable together.
+  // 422, like the other "we understood it and it cannot be played" answers:
+  // retrying changes nothing until the bundle does.
+  HuntNotSimulatable: {
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    code: 'HUNT_NOT_SIMULATABLE',
+  },
 };
 
 /**

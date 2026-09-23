@@ -19,7 +19,14 @@ import {
   mapSchema,
 } from '@global-idle/game-data';
 import type { ResolvedBundle } from '@global-idle/game-data';
-import { compileMap } from '@global-idle/game-engine';
+import {
+  DEFAULT_STEP_SPEED,
+  DIAGONAL_STEP_FACTOR,
+  MAX_STEP_DURATION_MS,
+  compileMap,
+  playerBaseStepSpeed,
+  supportedStepDurationMs,
+} from '@global-idle/game-engine';
 import type {
   CombatProfile,
   CreatureStats,
@@ -27,7 +34,11 @@ import type {
   SpatialPlan,
   TileMap,
 } from '@global-idle/game-engine';
-import { contentKindMismatch, huntNotFound } from '../../platform/errors/index.js';
+import {
+  contentKindMismatch,
+  huntNotFound,
+  huntNotSimulatable,
+} from '../../platform/errors/index.js';
 import { itemDefinition } from '../items/index.js';
 import type { Affix, StoredItem } from '../items/index.js';
 
@@ -88,6 +99,112 @@ export function spatialPlanFor(map: TileMap): SpatialPlan {
   const byRoom = new Map(map.regions.map((region) => [region.room, region]));
   const last = map.regions[map.regions.length - 1]!;
   return { map, regionFor: (room) => byRoom.get(room) ?? last };
+}
+
+/**
+ * Prove that every actor this Hunt places on this Hunt's map can walk it.
+ *
+ * `compileMap` refuses ground the slowest Character the DEFAULT baseline can
+ * produce could not walk — level 1 at `basespeed="110"`. That is everything a
+ * map can know on its own, and it is not everything that matters twice over:
+ *
+ *  - a map carries no CREATURES, and `monster.speed` 15 on `bank.waypoints`
+ *    1200 — both shipped values — is a 48,000 ms cardinal whose diagonal is
+ *    not representable;
+ *  - the map's 110 yardstick is the PRODUCTION baseline, not a contract.
+ *    `characterBaselineSchema` accepts any positive `baseSpeed`, and
+ *    `playerBaseStepSpeed` clamps only at `PLAYER_MIN_SPEED`, so an authored
+ *    baseline of 1 gives a real Character of step speed 10 — which on that
+ *    same ground 1200 is a 133,350 ms cardinal, twice over the ceiling.
+ *
+ * Here is where the Hunt's actual Character speed, the Hunt's creatures, the
+ * Hunt's compiled map and the movement engine's own supported-domain function
+ * are all in scope at once, so here is where the combination is refused —
+ * before an Activity starts, not halfway through a settlement. The simulator
+ * must never be the first component to discover that resolved content cannot
+ * be simulated.
+ *
+ * The ceiling is NOT restated: `supportedStepDurationMs` is asked, and it is
+ * the same function the engine itself uses. The diagonal cost is the one asked
+ * about because it is the stricter of the two the engine may schedule, and
+ * because that call checks the cardinal on the way through.
+ *
+ * Scope is this Hunt's composition and nothing wider: the actors this Hunt
+ * actually places, against the ground speeds this map actually uses. A bad
+ * pair elsewhere in the bundle is not this Hunt's problem, and the whole
+ * bundle's Cartesian product is not a question anybody asked.
+ *
+ * The Character is checked FIRST and reported as itself: "the Rat is too slow"
+ * would be a wrong and unfixable answer to "your baseline is too slow".
+ */
+function assertSimulatable(
+  huntKey: string,
+  character: { readonly stepSpeed: number; readonly baseSpeed: number; readonly level: number },
+  creatures: Readonly<Record<string, CreatureStats>>,
+  map: TileMap,
+): void {
+  const unwalkable = (stepSpeed: number): number | undefined =>
+    map.groundSpeeds.find(
+      (groundSpeed) =>
+        supportedStepDurationMs(stepSpeed, groundSpeed, DIAGONAL_STEP_FACTOR) === null,
+    );
+
+  // No immobility arm: `playerBaseStepSpeed` clamps UP to PLAYER_MIN_SPEED, so
+  // a Character always walks. That is the source's own asymmetry — it clamps
+  // players and leaves creatures alone — and it is why the loop below has one
+  // and this does not.
+  const characterGround = unwalkable(character.stepSpeed);
+  if (characterGround !== undefined) {
+    throw huntNotSimulatable(
+      `${huntKey} cannot be simulated on ${map.key}: the Character walks at step speed ` +
+        `${character.stepSpeed} (baseline base speed ${character.baseSpeed} at level ` +
+        `${character.level}), and a DIAGONAL step from ground speed ${characterGround} runs past ` +
+        `the ${MAX_STEP_DURATION_MS} ms the source can represent. Raise the baseline's base ` +
+        `speed or lower the ground.`,
+      {
+        actor: 'character',
+        huntKey,
+        mapKey: map.key,
+        characterStepSpeed: character.stepSpeed,
+        characterBaseSpeed: character.baseSpeed,
+        level: character.level,
+        groundSpeed: characterGround,
+        stepCost: DIAGONAL_STEP_FACTOR,
+        maxStepDurationMs: MAX_STEP_DURATION_MS,
+      },
+    );
+  }
+
+  for (const creature of Object.values(creatures)) {
+    // The SAME fallback the simulator applies (`hunt.ts`, `stats?.stepSpeed ??
+    // DEFAULT_STEP_SPEED`). A creature the schema built always states a speed,
+    // so this arm is unreachable from content today — but a check that assumed
+    // a different default from the engine's would be checking a different
+    // creature, and silently passing the one that walks.
+    const stepSpeed = creature.stepSpeed ?? DEFAULT_STEP_SPEED;
+    // IMMOBILE is valid content, and asking the duration curve about it is
+    // meaningless: `Creature::addEventWalk` refuses to schedule a walk at all
+    // below 1, so this creature never takes a step to be timed.
+    if (stepSpeed <= 0) continue;
+    const groundSpeed = unwalkable(stepSpeed);
+    if (groundSpeed === undefined) continue;
+    throw huntNotSimulatable(
+      `${huntKey} cannot be simulated on ${map.key}: ${creature.key} walks at step speed ` +
+        `${stepSpeed}, and a DIAGONAL step from ground speed ${groundSpeed} runs past the ` +
+        `${MAX_STEP_DURATION_MS} ms the source can represent. Give the creature more speed or ` +
+        `the ground less.`,
+      {
+        actor: 'creature',
+        huntKey,
+        mapKey: map.key,
+        creatureKey: creature.key,
+        creatureStepSpeed: stepSpeed,
+        groundSpeed,
+        stepCost: DIAGONAL_STEP_FACTOR,
+        maxStepDurationMs: MAX_STEP_DURATION_MS,
+      },
+    );
+  }
 }
 
 const affixTotal = (affixes: readonly Affix[], kind: Affix['affix']): number =>
@@ -200,6 +317,25 @@ export function buildHuntPlan(input: BuildHuntPlan): HuntPlan {
     }
   }
 
+  // `Player::updateBaseSpeed`, in the engine so a test has one target and the
+  // clamp lives with the curve. Computed HERE rather than in the returned
+  // profile because the composition check below needs the real number, and
+  // two computations of one speed is one too many.
+  const characterStepSpeed = playerBaseStepSpeed(level, baseline.data.baseSpeed);
+
+  // Space, when the Hunt names a map. A Hunt without one simulates exactly
+  // what Phase 2 verified, and has no ground for anything to be too slow on.
+  const space =
+    hunt.data.map === undefined ? undefined : spatialPlanFor(mapFor(bundle, hunt.data.map));
+  if (space) {
+    assertSimulatable(
+      huntKey,
+      { stepSpeed: characterStepSpeed, baseSpeed: baseline.data.baseSpeed, level },
+      creatures,
+      space.map,
+    );
+  }
+
   const loadout = loadoutOf(bundle, input.equipped);
 
   // `Player::getDefense` (Phase 2 source map §3.5), computed rather than
@@ -242,15 +378,12 @@ export function buildHuntPlan(input: BuildHuntPlan): HuntPlan {
         healMax: input.supplyHeal?.max ?? 0,
         useBelowPercent: baseline.data.supplyUseBelowPercent,
       },
-      // `Player::updateBaseSpeed`: the vocation's base plus one per level past
-      // the first. A level-1 Character steps in 550 ms; a Rat takes 900.
-      stepSpeed: baseline.data.baseSpeed + Math.max(0, level - 1),
+      // A level-1 Character steps in 550 ms on default ground; a Rat takes 900.
+      // Computed above, so the number the simulator walks with is the number
+      // the composition check proved.
+      stepSpeed: characterStepSpeed,
     },
     supplyCharges: input.supplyCharges,
-    // Space, when the Hunt names a map. A Hunt without one simulates exactly
-    // what Phase 2 verified.
-    ...(hunt.data.map === undefined
-      ? {}
-      : { space: spatialPlanFor(mapFor(bundle, hunt.data.map)) }),
+    ...(space === undefined ? {} : { space }),
   };
 }

@@ -1,5 +1,5 @@
 /**
- * Phase 3.5 §20 — VIS1 to VIS12. The tile scene, in a real browser.
+ * Phase 3.5 §20 — VIS1 to VIS12, and Phase 3.6 §16 REN. The tile scene, in a real browser.
  *
  * Every case runs twice, on the desktop viewport and on the touch one
  * (playwright.config.ts), because a 61-tile map on a 390-wide screen is where
@@ -10,7 +10,7 @@
  * snapshot older than the one already on screen. The simulation itself belongs
  * to SPC and the route contract to SNP; neither is re-litigated here.
  */
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { connect, enterHunt, play, runOf } from './support';
 
 test.describe('§20 VIS — the tile scene', () => {
@@ -418,5 +418,162 @@ test.describe('§20 VIS — movement continuity, measured', () => {
     // tiles when the next snapshot landed; a continuous one never crosses more
     // than a fraction of a tile between two frames.
     expect(worst, `largest single-frame displacement: ${worst.toFixed(3)} tiles`).toBeLessThan(0.5);
+  });
+});
+
+test.describe('§16 REN — the window follows the server’s own timing', () => {
+  /**
+   * Where the Character is DRAWN, in tiles, sampled every frame.
+   *
+   * Its body is the only strongly blue thing in the sewers, so the centroid of
+   * the blue pixels is the drawn position — the same measurement `VIS12` uses,
+   * and one the renderer is not told about.
+   */
+  const trace = (page: Page, forMs: number) =>
+    page.evaluate(
+      (duration) =>
+        new Promise<{ x: number; at: number }[]>((resolve) => {
+          const canvas = document.querySelector('.tile-scene canvas') as HTMLCanvasElement;
+          const context = canvas.getContext('2d', { willReadFrequently: true })!;
+          const scale = canvas.width / 480;
+          const taken: { x: number; at: number }[] = [];
+          const started = performance.now();
+          const sample = () => {
+            const frame = context.getImageData(0, 0, canvas.width, canvas.height).data;
+            let sumX = 0;
+            let count = 0;
+            for (let index = 0; index < frame.length; index += 4) {
+              const red = frame[index] ?? 0;
+              const blue = frame[index + 2] ?? 0;
+              if (blue - red < 50) continue;
+              sumX += (index / 4) % canvas.width;
+              count += 1;
+            }
+            if (count > 0) taken.push({ x: sumX / count / scale / 32, at: performance.now() });
+            if (performance.now() - started < duration) requestAnimationFrame(sample);
+            else resolve(taken);
+          };
+          requestAnimationFrame(sample);
+        }),
+      forMs,
+    );
+
+  test('REN1: a leg is drawn over ITS OWN duration, not a fixed ease', async ({ page }) => {
+    const characterId = await play(page);
+    await enterHunt(page);
+    await expect(page.getByTestId('tile-scene')).toBeVisible();
+
+    /**
+     * An authoritative step that takes 3,000 ms — six times the 550 ms a
+     * level-1 Character spends on default ground, and the shape of leg that
+     * slow authored ground produces (speed 110 on ground 850 is 3,100 ms).
+     *
+     * It is written into the run row rather than authored onto the production
+     * map, because the prototype Sewers has no sourced tile metadata yet
+     * (spec §12) and the claim here is about the RENDERER: whatever duration
+     * the server puts on a leg is the duration the picture takes.
+     */
+    /**
+     * At the map's LEFT EDGE, where the camera is clamped.
+     *
+     * The camera follows the Character, so in the middle of a 61-wide map a
+     * one-tile walk barely moves the Character on SCREEN — the world scrolls
+     * instead. Against the left wall the camera cannot scroll, so screen
+     * position is world position and the crossing is directly measurable.
+     */
+    const prisma = connect();
+    try {
+      const run = await prisma.huntRun.findFirstOrThrow({ where: { characterId } });
+      // Four seconds into the future, so the leg is still ahead of the
+      // renderer's one-poll delay when sampling starts.
+      const startsAtMs = run.tick * 1000 + 4000;
+      await prisma.huntRun.updateMany({
+        where: { characterId },
+        data: {
+          room: 1,
+          creatures: [],
+          position: {
+            tile: { x: 1, y: 5, z: 7 },
+            movement: {
+              from: { x: 1, y: 5, z: 7 },
+              to: { x: 2, y: 5, z: 7 },
+              startsAtMs,
+              arrivesAtMs: startsAtMs + 3000,
+            },
+          },
+        } as never,
+      });
+    } finally {
+      await prisma.$disconnect();
+    }
+
+    // Let the teleport settle and the camera finish easing to the edge, then
+    // watch the whole crossing.
+    await page.waitForTimeout(4500);
+    const samples = await trace(page, 10_000);
+    expect(samples.length).toBeGreaterThan(30);
+
+    // The crossing, measured across its middle so neither end's rounding nor
+    // the body's own width can dominate.
+    const first = Math.min(...samples.map((sample) => sample.x));
+    const early = samples.find((sample) => sample.x > first + 0.15);
+    const late = samples.find((sample) => sample.x > first + 0.75);
+    expect(early, 'the Character never started the injected step').toBeDefined();
+    expect(late, 'the Character never finished the injected step').toBeDefined();
+
+    const perTile = (late!.at - early!.at) / 0.6;
+    // 3,000 ms a tile, not 550. A fixed local ease would land near its own
+    // constant no matter what the server said.
+    expect(perTile, `measured ${Math.round(perTile)} ms per tile`).toBeGreaterThan(2200);
+    expect(perTile, `measured ${Math.round(perTile)} ms per tile`).toBeLessThan(3800);
+  });
+
+  test('REN2: the client changes neither the world it sees nor the clock it obeys', async ({
+    page,
+  }) => {
+    await play(page);
+    await enterHunt(page);
+    await expect(page.getByTestId('tile-scene')).toBeVisible();
+
+    // The logical world is the same 15 × 11 on both projects and at any DPR.
+    const surface = await page.evaluate(() => {
+      const canvas = document.querySelector('.tile-scene canvas') as HTMLCanvasElement;
+      const scale = canvas.width / 480;
+      return {
+        across: canvas.width / scale / 32,
+        down: canvas.height / scale / 32,
+        ratio: window.devicePixelRatio,
+      };
+    });
+    expect(surface.across).toBe(15);
+    expect(surface.down).toBe(11);
+
+    // And the durations are the SERVER's arithmetic, identical on a desktop
+    // and on a phone: a level-1 Character on the default ground steps in
+    // 550 ms, and a diagonal in three times that.
+    const durations = await page.evaluate(async () => {
+      const id = location.pathname.split('/').pop();
+      const seen = new Set<number>();
+      for (let poll = 0; poll < 12; poll += 1) {
+        const response = await fetch(`http://127.0.0.1:3001/api/characters/${id}/hunt/advance`, {
+          method: 'POST',
+          credentials: 'include',
+        });
+        const snapshot = (await response.json()) as {
+          events?: { kind: string; actor?: string; startsAtMs?: number; arrivesAtMs?: number }[];
+        };
+        for (const event of snapshot.events ?? []) {
+          if (event.kind !== 'move' || event.actor !== 'character') continue;
+          if (event.startsAtMs === undefined || event.arrivesAtMs === undefined) continue;
+          seen.add(event.arrivesAtMs - event.startsAtMs);
+        }
+        await new Promise((resolve) => setTimeout(resolve, 400));
+      }
+      return [...seen].sort((a, b) => a - b);
+    });
+    expect(durations.length).toBeGreaterThan(0);
+    for (const duration of durations) {
+      expect([550, 1650], `unexpected leg duration ${duration} ms`).toContain(duration);
+    }
   });
 });

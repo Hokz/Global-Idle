@@ -2,7 +2,8 @@
 /**
  * Count the implemented matrix cases and compare them with what the approved
  * specifications fix: Phase 0B §14 at **92**, Phase 1 §16 at **87**, Phase 2
- * §12 at **106**, Phase 3 §20 at **169**, Phase 3.5 §20 at **95**.
+ * §12 at **106**, Phase 3 §20 at **169**, Phase 3.5 §20 at **95**, Phase 3.6
+ * §16 at **25**.
  *
  * The convention this relies on: every matrix case is exactly ONE test whose
  * title begins with its id and a colon — `it('W1: ...')` for a Vitest case,
@@ -150,12 +151,42 @@ const MATRICES = {
       RNGC: [1, 12],
     },
   },
+  'phase-3-6': {
+    spec: 'docs/specs/phase-3-6/PHASE_3_6_MOVEMENT_FIDELITY_SPEC.md §16',
+    groups: {
+      SPD: [1, 6],
+      GRD: [1, 7],
+      BRK: [1, 3],
+      THR: [1, 2],
+      // PTH CONTINUES Phase 3.5's numbering, which owns 1-15, because an id
+      // means one case across the project and not one case per phase.
+      PTH: [16, 16],
+      REN: [1, 2],
+      VER: [1, 1],
+      DET: [1, 3],
+      // Added by the Phase 3.6 blocker correction: the supported movement
+      // domain, which is where the imported arithmetic is still the source's.
+      DOM: [1, 8],
+      // Added by the Phase 3.6 integration correction: a Hunt, its map and its
+      // creatures have to be simulatable TOGETHER, and the plan says so.
+      CMP: [1, 10],
+    },
+  },
 };
 
 // Longest-first so `AC13` is not read as `A` + `C13`, and `E2E1` is not `E` +
 // `2`. Regex alternation is ordered, and that order is the whole contract.
 const PREFIXES = [
   'RNGC',
+  'CMP',
+  'DOM',
+  'SPD',
+  'GRD',
+  'BRK',
+  'THR',
+  'REN',
+  'VER',
+  'DET',
   'TIL',
   'PER',
   'STP',

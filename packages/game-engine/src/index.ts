@@ -60,6 +60,7 @@ export {
   chebyshev,
   compileMap,
   connectorAt,
+  groundSpeedAt,
   isAdjacent,
   isInside,
   isWalkable,
@@ -74,18 +75,31 @@ export type {
   ConnectorKind,
   MapConnector,
   MapConnectorSource,
+  MapLegendEntry,
   MapRegion,
   MapRegionSource,
   MapSource,
+  MapTileDefinition,
   TileKindName,
   TileMap,
   TilePosition,
 } from './space.js';
+export type { Movement, SpatialPlan } from './hunt.js';
+
+// Phase 3.6 — what a step costs, and the domain that answer is valid in.
 export {
   BEAT_MS,
+  DEFAULT_GROUND_SPEED,
   DEFAULT_STEP_SPEED,
   DIAGONAL_STEP_FACTOR,
-  GROUND_SPEED,
+  MAX_GROUND_SPEED,
+  MAX_STEP_DURATION_MS,
+  PLAYER_MAX_STEP_SPEED,
+  PLAYER_MIN_STEP_SPEED,
+  SLOWEST_CHARACTER_STEP_SPEED,
+  StepDurationError,
+  calculatedStepSpeed,
+  playerBaseStepSpeed,
   stepDurationMs,
-} from './hunt.js';
-export type { Movement, SpatialPlan } from './hunt.js';
+  supportedStepDurationMs,
+} from './step.js';

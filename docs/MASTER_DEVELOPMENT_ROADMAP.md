@@ -528,6 +528,38 @@ a disconnected character.
 - rooms as physical chambers;
 - a Canvas game window that renders and decides nothing.
 
+### Phase 3.6 — Movement fidelity: Character speed and tile ground speed
+
+> Status lives in [`PROJECT_STATE.json`](./PROJECT_STATE.json), not here.
+- implementation specification:
+  [`docs/specs/phase-3-6/PHASE_3_6_MOVEMENT_FIDELITY_SPEC.md`](specs/phase-3-6/PHASE_3_6_MOVEMENT_FIDELITY_SPEC.md);
+- a Character's step speed is `110 + (level - 1)`, the source's own progression;
+- a tile's ground speed is authored content, and the step is timed by the tile it LEAVES;
+- the 50 ms staircase — plateaus, breakpoints, and a one-beat floor — from the source's arithmetic;
+- movement-heavy Hunt throughput changes with level and with terrain;
+- the pathfinder stays independent of ground speed, exactly as the source's does;
+- the supported movement domain is stated and enforced: the source caches and returns a step
+  duration as a `uint16_t`, so beyond 65,535 ms Global Idle refuses rather than clamping or
+  reproducing the C++ overflow — and a Hunt whose own creatures cannot walk its own map is refused
+  when its plan is built, never discovered mid-settlement.
+
+### Phase 3.7 — First real asset visual slice
+
+> **PLANNED — NOT STARTED.** No source assets are in the repository yet. Recorded here for product
+> visibility: after movement fidelity, the next milestone makes the game visibly resemble the
+> intended experience before Party work expands scope.
+- ingest and triage the Product Owner's client asset archive;
+- one rookie/origin Character outfit, with walking frames and directions;
+- a Rat sprite and its animation;
+- real floor, wall and corner tiles;
+- a small Rookgaard / Rookgaard Sewers visual reference slice;
+- render those assets in the verified 15 × 11 Game Window;
+- begin evolving the shell toward a Tibia-like client grammar: Game Window centred, system panels
+  at the sides, Chat and Server Log below.
+
+Phase 3.6 leaves the data shape ready for it: a tile definition already carries a kind and a ground
+speed, so the importer adds visual identity without the movement engine changing again.
+
 ### Phase 4 — Party/vocations
 - occupancy integration with dedicated Skill Training, and Stamina recovery while training;
 - character roster and Gold-based character unlocks;
