@@ -17,6 +17,14 @@
  */
 import { useEffect, useRef } from 'react';
 import type { Movement, RunView, Tile, TileMapView } from '../_lib/api';
+import {
+  PUBLIC_PALETTE,
+  READS_AS_WALKABLE,
+  privateSpriteUrl,
+  spriteDrawBox,
+  tileNoise,
+  type SpriteKey,
+} from '../_lib/sprites';
 
 /** The LOCKED Game Window. Logical pixels, not CSS pixels, not device pixels. */
 export const TILE_PX = 32;
@@ -47,13 +55,45 @@ interface Drawn {
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
 /**
- * A stable pseudo-random number for a tile, so the same stone is mottled the
- * same way every frame and after a reload. Not `Math.random` — a floor that
- * shimmered every frame would be a bug you could see.
+ * The server's tile kind → the meaning the scene asks a sprite for.
+ *
+ * A LOOKUP, not a decision. The kind comes from the compiled map's legend and
+ * is the authored gameplay classification; this only chooses which picture
+ * stands for it. Nothing here can make a tile walkable or change its ground
+ * speed — see the Phase 3.7 spec §6 and `READS_AS_WALKABLE`.
  */
-function hash(x: number, y: number): number {
-  const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
-  return n - Math.floor(n);
+const TILE_SPRITE: Readonly<Record<string, SpriteKey>> = {
+  floor: 'tile.cave.floor',
+  wall: 'tile.cave.wall',
+  water: 'tile.cave.water',
+  sludge: 'tile.cave.sludge',
+};
+
+/**
+ * A private override's bitmap, if one is present AND this is development.
+ *
+ * In a public build `privateSpriteUrl` is `null` for every key, so no `Image`
+ * is ever constructed, no request is made, and the placeholder path is the
+ * only path. When a URL does exist the load is fire-and-forget: until it
+ * resolves — and forever, if it 404s — the placeholder is what gets drawn.
+ * Absent is the ORDINARY case and must never be an error path (spec §9.2).
+ */
+const overrides = new Map<SpriteKey, HTMLImageElement | null>();
+
+function overrideFor(key: SpriteKey): HTMLImageElement | null {
+  const known = overrides.get(key);
+  if (known !== undefined) return known && known.complete && known.naturalWidth > 0 ? known : null;
+
+  const url = privateSpriteUrl(key);
+  if (!url) {
+    overrides.set(key, null);
+    return null;
+  }
+  const image = new Image();
+  image.onerror = () => overrides.set(key, null);
+  image.src = url;
+  overrides.set(key, image);
+  return null;
 }
 
 /**
@@ -285,11 +325,6 @@ export function TileScene({ map, run, debug = false }: TileSceneProps) {
       camera.current = cam;
 
       // ── the floor ────────────────────────────────────────────────────
-      //
-      // The one thing this drawing has to get right is WHICH TILES ARE SOLID.
-      // A player who cannot see the walls cannot read why the Character went
-      // around, so masonry is lighter and lit from above and the floor is the
-      // dark thing you move across — not the other way round.
       context.fillStyle = '#05070a';
       context.fillRect(0, 0, width, height);
 
@@ -307,48 +342,72 @@ export function TileScene({ map, run, debug = false }: TileSceneProps) {
           const kind = current.legend[symbol] ?? 'wall';
           const px = Math.round(x * size - cam.x);
           const py = Math.round(y * size - cam.y);
-          const noise = hash(x, y);
+          const noise = tileNoise(x, y);
 
-          if (kind === 'wall') {
+          // WHICH PICTURE stands for this tile — a meaning, never a file. In
+          // a public build the answer is always the placeholder below; the
+          // override is development-only and is painted on top, so a missing
+          // or half-loaded one still leaves a complete, readable scene.
+          const spriteKey = TILE_SPRITE[kind] ?? 'tile.cave.wall';
+          const paint = PUBLIC_PALETTE[spriteKey];
+
+          context.fillStyle = paint.base;
+          context.fillRect(px, py, size, size);
+
+          // The one thing this drawing has to get right is WHICH TILES ARE
+          // SOLID. A player who cannot see the walls cannot read why the
+          // Character went around, so masonry is lit from above and the floor
+          // is the dark thing you move across — not the other way round.
+          if (!READS_AS_WALKABLE[spriteKey]) {
             const lip = Math.max(3, size * 0.2);
-            context.fillStyle = `hsl(206 8% ${33 + noise * 7}%)`;
-            context.fillRect(px, py, size, size);
+            if (noise > 0.5) {
+              context.fillStyle = paint.speck;
+              context.fillRect(px, py, size, size);
+            }
             context.fillStyle = 'rgba(255,255,255,0.16)';
             context.fillRect(px, py, size, lip * 0.5);
             context.fillStyle = 'rgba(0,0,0,0.42)';
             context.fillRect(px, py + size - lip * 0.6, size, lip * 0.6);
-            context.fillStyle = 'rgba(0,0,0,0.22)';
-            context.fillRect(px, py + size * 0.52, size, 1);
-            context.fillRect(px + (y % 2 === 0 ? size * 0.5 : size * 0.25), py, 1, size * 0.52);
-            context.strokeStyle = 'rgba(0,0,0,0.45)';
+            if (spriteKey === 'tile.cave.wall') {
+              // Courses, so a run of wall reads as masonry rather than a slab.
+              context.fillStyle = 'rgba(0,0,0,0.22)';
+              context.fillRect(px, py + size * 0.52, size, 1);
+              context.fillRect(px + (y % 2 === 0 ? size * 0.5 : size * 0.25), py, 1, size * 0.52);
+            } else {
+              // Water: a ripple, drawn from the tile's own stable noise.
+              context.strokeStyle = 'rgba(160, 220, 255, 0.25)';
+              context.lineWidth = 1;
+              context.beginPath();
+              context.moveTo(px + size * 0.15, py + size * (0.4 + noise * 0.2));
+              context.lineTo(px + size * 0.85, py + size * (0.5 + noise * 0.2));
+              context.stroke();
+            }
+            context.strokeStyle = paint.edge;
             context.lineWidth = 1;
             context.strokeRect(px + 0.5, py + 0.5, size - 1, size - 1);
-          } else if (kind === 'water') {
-            context.fillStyle = `hsl(196 48% ${22 + noise * 6}%)`;
-            context.fillRect(px, py, size, size);
-            context.strokeStyle = 'rgba(160, 220, 255, 0.25)';
-            context.lineWidth = 1;
-            context.beginPath();
-            context.moveTo(px + size * 0.15, py + size * (0.4 + noise * 0.2));
-            context.lineTo(px + size * 0.85, py + size * (0.5 + noise * 0.2));
-            context.stroke();
           } else {
-            context.fillStyle =
-              kind === 'sludge'
-                ? `hsl(90 18% ${18 + noise * 4}%)`
-                : `hsl(30 10% ${18 + noise * 5}%)`;
-            context.fillRect(px, py, size, size);
-            context.strokeStyle = 'rgba(0,0,0,0.42)';
+            context.strokeStyle = paint.edge;
             context.lineWidth = 1;
             context.strokeRect(px + 0.5, py + 0.5, size - 1, size - 1);
             if (noise > 0.8) {
-              context.fillStyle = 'rgba(255,255,255,0.05)';
+              context.fillStyle = paint.speck;
               context.fillRect(px + size * 0.28, py + size * 0.55, size * 0.2, size * 0.1);
             }
             if (noise < 0.07) {
-              context.fillStyle = 'rgba(120, 160, 130, 0.09)';
-              context.fillRect(px + size * 0.12, py + size * 0.2, size * 0.36, size * 0.22);
+              // A loose stone on the floor. Decoration, and only decoration:
+              // a CANDIDATE prop may never define collision or ground speed.
+              const stone = PUBLIC_PALETTE['prop.stone'];
+              context.fillStyle = stone.base;
+              context.fillRect(px + size * 0.3, py + size * 0.46, size * 0.22, size * 0.16);
+              context.fillStyle = stone.edge;
+              context.fillRect(px + size * 0.3, py + size * 0.6, size * 0.22, size * 0.04);
             }
+          }
+
+          const override = overrideFor(spriteKey);
+          if (override) {
+            const box = spriteDrawBox(32, size, x, y);
+            context.drawImage(override, box.x - cam.x, box.y - cam.y, box.width, box.height);
           }
         }
       }
@@ -394,7 +453,17 @@ export function TileScene({ map, run, debug = false }: TileSceneProps) {
         context.fill();
 
         context.lineJoin = 'round';
-        if (actor.kind === 'character') {
+        // An actor's private override is a 64px cell anchored BOTTOM-RIGHT
+        // over its tile, so a tall sprite overhangs up and left and the tile
+        // under its feet stays the tile the server named. Public builds never
+        // reach this: `overrideFor` is `null` for every key there.
+        const actorKey: SpriteKey = actor.kind === 'character' ? 'actor.character' : 'actor.rat';
+        const actorOverride = dead ? null : overrideFor(actorKey);
+        if (actorOverride) {
+          const box = spriteDrawBox(64, size, spot.x, spot.y);
+          context.drawImage(actorOverride, box.x - cam.x, box.y - cam.y, box.width, box.height);
+        } else if (actor.kind === 'character') {
+          const skin = PUBLIC_PALETTE['actor.character'];
           const body = size * 0.3;
           context.strokeStyle = 'rgba(0,0,0,0.65)';
           context.lineWidth = Math.max(1.5, size * 0.05);
@@ -407,13 +476,13 @@ export function TileScene({ map, run, debug = false }: TileSceneProps) {
           context.closePath();
           context.fill();
           context.stroke();
-          context.fillStyle = '#efd7b0';
+          context.fillStyle = skin.base;
           context.beginPath();
           context.arc(cx, py + size * 0.3, size * 0.16, 0, Math.PI * 2);
           context.fill();
           context.stroke();
           // A blade, held on the side it last moved toward.
-          context.strokeStyle = '#cdd6e0';
+          context.strokeStyle = skin.speck;
           context.lineWidth = Math.max(2, size * 0.07);
           context.beginPath();
           context.moveTo(cx + spot.facing * body * 1.05, py + size * 0.72);
@@ -425,10 +494,11 @@ export function TileScene({ map, run, debug = false }: TileSceneProps) {
           context.ellipse(cx, py + size * 0.7, size * 0.3, size * 0.14, 0, 0, Math.PI * 2);
           context.fill();
         } else {
+          const pelt = PUBLIC_PALETTE['actor.rat'];
           const body = size * 0.26;
-          context.strokeStyle = 'rgba(0,0,0,0.6)';
+          context.strokeStyle = pelt.edge;
           context.lineWidth = Math.max(1.2, size * 0.04);
-          context.fillStyle = '#8a7361';
+          context.fillStyle = pelt.speck;
           context.beginPath();
           context.ellipse(cx, py + size * 0.62, body, body * 0.7, 0, 0, Math.PI * 2);
           context.fill();
@@ -447,7 +517,7 @@ export function TileScene({ map, run, debug = false }: TileSceneProps) {
             Math.PI * 2,
           );
           context.fill();
-          context.strokeStyle = '#8a7361';
+          context.strokeStyle = pelt.speck;
           context.lineWidth = Math.max(1, size * 0.05);
           context.beginPath();
           context.moveTo(cx - spot.facing * body, py + size * 0.64);
@@ -547,8 +617,23 @@ export function TileScene({ map, run, debug = false }: TileSceneProps) {
     };
   }, []);
 
+  /**
+   * Which side of the distribution boundary this scene drew from.
+   *
+   * A public build folds `privateSpriteUrl` to `null`, so this is `public` in
+   * every deployment, in CI, and on every machine without the private
+   * reference — which is what the acceptance tests assert against.
+   */
+  const spriteSource = privateSpriteUrl('actor.rat') ? 'private-override' : 'public';
+
   return (
-    <div className="tile-scene" ref={holder} data-testid="tile-scene" data-map={map.key}>
+    <div
+      className="tile-scene"
+      ref={holder}
+      data-testid="tile-scene"
+      data-map={map.key}
+      data-sprites={spriteSource}
+    >
       <canvas ref={canvas} role="img" aria-label={`The ${map.key} map, seen from above`} />
       {debug ? (
         <p className="tile-debug small" data-testid="tile-debug">

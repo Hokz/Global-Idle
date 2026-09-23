@@ -3,7 +3,7 @@
  * Count the implemented matrix cases and compare them with what the approved
  * specifications fix: Phase 0B §14 at **92**, Phase 1 §16 at **87**, Phase 2
  * §12 at **106**, Phase 3 §20 at **169**, Phase 3.5 §20 at **95**, Phase 3.6
- * §16 at **25**.
+ * §16 at **25**, Phase 3.7 §13 at **45**.
  *
  * The convention this relies on: every matrix case is exactly ONE test whose
  * title begins with its id and a colon — `it('W1: ...')` for a Vitest case,
@@ -172,12 +172,37 @@ const MATRICES = {
       CMP: [1, 10],
     },
   },
+  'phase-3-7': {
+    spec: 'docs/specs/phase-3-7/PHASE_3_7_ASSET_VISUAL_SLICE_SPEC.md §13',
+    groups: {
+      // The distribution boundary, which is the phase's blocking condition:
+      // a private asset may never reach a distributable artefact.
+      DIST: [1, 10],
+      ATL: [1, 5],
+      PIN: [1, 3],
+      PRV: [1, 6],
+      FALL: [1, 4],
+      CTY: [1, 6],
+      SLC: [1, 5],
+      HUD: [1, 3],
+      AUTH: [1, 3],
+    },
+  },
 };
 
 // Longest-first so `AC13` is not read as `A` + `C13`, and `E2E1` is not `E` +
 // `2`. Regex alternation is ordered, and that order is the whole contract.
 const PREFIXES = [
   'RNGC',
+  'AUTH',
+  'DIST',
+  'FALL',
+  'ATL',
+  'CTY',
+  'HUD',
+  'PIN',
+  'PRV',
+  'SLC',
   'CMP',
   'DOM',
   'SPD',

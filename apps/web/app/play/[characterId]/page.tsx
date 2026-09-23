@@ -21,6 +21,8 @@ import {
 import { Atlas } from '../../_components/Atlas';
 import { CharacterPanel } from '../../_components/CharacterPanel';
 import { GameWindow } from '../../_components/GameWindow';
+import { HudFrame } from '../../_components/HudFrame';
+import { RookgaardAtlas } from '../../_components/RookgaardAtlas';
 
 export default function Play() {
   const router = useRouter();
@@ -34,6 +36,11 @@ export default function Play() {
   const [error, setError] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Phase 3.7 — the pixel Atlas is an ADDITIONAL surface beside the Phase 1
+  // marker list, not a replacement for it. Both answer "where could I go";
+  // one answers it as a list and one as a map, and the verified Phase 1
+  // behaviour keeps working either way.
+  const [pixelAtlas, setPixelAtlas] = useState(false);
 
   const refresh = useCallback(async () => {
     const detail = await api<CharacterDetail>(`/api/characters/${characterId}`);
@@ -84,25 +91,39 @@ export default function Play() {
     }
   }
 
+  /**
+   * Enter a Hunt by its CONTENT KEY.
+   *
+   * The one path, whether the key came from a marker in the Phase 1 list or a
+   * pin on the Phase 3.7 map. A pin is a way of naming a key the server
+   * already has; it is not a second way of starting anything.
+   */
+  const enterHunt = useCallback(
+    async (huntKey: string) => {
+      setBusy(true);
+      setError(null);
+      try {
+        await api(`/api/characters/${characterId}/hunt`, {
+          method: 'POST',
+          // One key per CLICK. A retry of this submission replays the server's
+          // own answer instead of racing the occupancy claim; the next
+          // deliberate entry mints a new one and genuinely runs.
+          headers: { 'Idempotency-Key': crypto.randomUUID() },
+          body: JSON.stringify({ huntKey }),
+        });
+        await refresh();
+      } catch (cause) {
+        setError(cause instanceof ApiError ? cause.message : 'Could not enter.');
+      } finally {
+        setBusy(false);
+      }
+    },
+    [characterId, refresh],
+  );
+
   async function enter() {
     if (!selected) return;
-    setBusy(true);
-    setError(null);
-    try {
-      await api(`/api/characters/${characterId}/hunt`, {
-        method: 'POST',
-        // One key per CLICK. A retry of this submission replays the server's
-        // own answer instead of racing the occupancy claim; the next
-        // deliberate entry mints a new one and genuinely runs.
-        headers: { 'Idempotency-Key': crypto.randomUUID() },
-        body: JSON.stringify({ huntKey: selected.target }),
-      });
-      await refresh();
-    } catch (cause) {
-      setError(cause instanceof ApiError ? cause.message : 'Could not enter.');
-    } finally {
-      setBusy(false);
-    }
+    await enterHunt(selected.target);
   }
 
   if (failed) {
@@ -139,19 +160,21 @@ export default function Play() {
     return (
       <main className="shell stack">
         <CharacterPanel character={character} />
-        <GameWindow
-          characterId={characterId}
-          label={character.activity.hunt.label}
-          summary={`${character.activity.hunt.summary} · Primary creature: ${character.activity.hunt.primaryCreature}`}
-          onEnded={async () => {
-            // Ask the server which screen this is now, rather than assuming
-            // the Atlas: the run may have ended for a reason this client did
-            // not cause.
-            await refresh();
-            setSelected(null);
-            setHunt(null);
-          }}
-        />
+        <HudFrame character={character}>
+          <GameWindow
+            characterId={characterId}
+            label={character.activity.hunt.label}
+            summary={`${character.activity.hunt.summary} · Primary creature: ${character.activity.hunt.primaryCreature}`}
+            onEnded={async () => {
+              // Ask the server which screen this is now, rather than assuming
+              // the Atlas: the run may have ended for a reason this client did
+              // not cause.
+              await refresh();
+              setSelected(null);
+              setHunt(null);
+            }}
+          />
+        </HudFrame>
       </main>
     );
   }
@@ -160,11 +183,36 @@ export default function Play() {
     <main className="shell stack">
       <div className="world">
         <div className="stack">
-          {atlas ? (
+          {pixelAtlas ? (
+            <RookgaardAtlas onEnterHunt={(key) => void enterHunt(key)} busy={busy} />
+          ) : atlas ? (
             <Atlas data={atlas} selected={selected} onSelect={select} />
           ) : (
             <div className="skeleton" aria-busy="true" />
           )}
+          {/*
+           * BELOW the surface, deliberately.
+           *
+           * Above it, this row pushed the Atlas roughly forty pixels down, and
+           * on a 390 × 844 screen that put the Atlas's bottom-right corner past
+           * the fold — where a viewport-coordinate click cannot reach. Measured:
+           * UI3 and the touch UI2 failed on mobile and passed on the base. The
+           * Phase 1 Atlas keeps its geometry; the new surface gets a door.
+           */}
+          <div className="row" style={{ justifyContent: 'flex-end' }}>
+            <button
+              type="button"
+              data-testid="atlas-launcher"
+              onClick={() => setPixelAtlas((open) => !open)}
+            >
+              {pixelAtlas ? 'Marker list' : 'World Atlas'}
+            </button>
+          </div>
+          {pixelAtlas && error ? (
+            <p className="error small" role="alert">
+              {error}
+            </p>
+          ) : null}
         </div>
         <div className="stack">
           <CharacterPanel character={character} />
