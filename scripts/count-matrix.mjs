@@ -169,7 +169,7 @@ const MATRICES = {
       DOM: [1, 8],
       // Added by the Phase 3.6 integration correction: a Hunt, its map and its
       // creatures have to be simulatable TOGETHER, and the plan says so.
-      CMP: [1, 9],
+      CMP: [1, 10],
     },
   },
 };

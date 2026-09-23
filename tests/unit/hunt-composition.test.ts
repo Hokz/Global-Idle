@@ -11,12 +11,21 @@
  * is asserted here is WHERE the answer is demanded and WHAT it is demanded of.
  */
 import { describe, expect, it } from 'vitest';
-import type { ResolvedBundle } from '@global-idle/game-data';
+import {
+  characterBaselineSchema,
+  creatureSchema,
+  mapSchema,
+  type ResolvedBundle,
+} from '@global-idle/game-data';
 import { DomainError, hunt as huntContext } from '@global-idle/domain';
 import {
   DIAGONAL_STEP_FACTOR,
+  MAX_STEP_DURATION_MS,
+  StepDurationError,
+  calculatedStepSpeed,
   compileMap,
   playerBaseStepSpeed,
+  stepDurationMs,
   supportedStepDurationMs,
 } from '@global-idle/game-engine';
 
@@ -171,6 +180,7 @@ describe('§16 CMP — a Hunt, its map and its creatures are simulatable togethe
     expect(error.code).toBe('HuntNotSimulatable');
     // And it names everything an author needs to fix the content.
     expect(error.details).toMatchObject({
+      actor: 'creature',
       huntKey: 'hunt.heavy',
       mapKey: 'map.heavy',
       creatureKey: 'creature.slow',
@@ -333,6 +343,102 @@ describe('§16 CMP — a Hunt, its map and its creatures are simulatable togethe
     const built = plan(bundle, 'hunt.abstract');
     expect(built.space).toBeUndefined();
     expect(built.plan.creatures['creature.slow']?.stepSpeed).toBe(SLOWEST_AUTHORED_SPEED);
+  });
+
+  it('CMP10: the CHARACTER’s real speed is checked, not the map compiler’s yardstick', () => {
+    /**
+     * `compileMap` holds ground against `playerBaseStepSpeed(1)` = 110, which
+     * is the PRODUCTION baseline and not a contract: `characterBaselineSchema`
+     * accepts any positive `baseSpeed`, and `playerBaseStepSpeed` clamps only
+     * at `PLAYER_MIN_SPEED`. So an authored baseline of 1 is a real Character
+     * of step speed 10, and the map that compiled for 110 is not one it can
+     * walk.
+     *
+     * By hand, from the source arithmetic:
+     *   speed 10 -> ln(271.29) = 5.60335, × 857.36 = 4804.0
+     *               4804.0 − 4795.01 + 0.5 = 9.49  ->  floor 9
+     *               floor(1000 × 1200 / 9) = 133,333  ->  ceil to 133,350 ms
+     *   133,350 is already past 65,535 CARDINAL, before the ×3 is applied.
+     */
+    const slowBaseline = { ...BASELINE, key: 'character-baseline.slow', baseSpeed: 1 };
+    const heavyMap = map(
+      'map.heavy5',
+      { '#': 'wall', '.': { kind: 'floor', groundSpeed: SLOWEST_AUTHORED_GROUND } },
+      ['######', '#....#', '######'],
+    );
+    const rat = creature('creature.rat', 67);
+
+    // Each part is schema-valid. This is the premise, checked rather than
+    // asserted: nothing upstream has any reason to refuse any of them.
+    expect(characterBaselineSchema.safeParse(slowBaseline).success).toBe(true);
+    expect(creatureSchema.safeParse(rat).success).toBe(true);
+    expect(mapSchema.safeParse(heavyMap).success).toBe(true);
+    // And the map compiles, because the compiler's yardstick is 110.
+    expect(() => compileMap(mapSchema.parse(heavyMap) as never)).not.toThrow();
+
+    // The arithmetic, from the engine rather than from this comment.
+    expect(playerBaseStepSpeed(1, 1)).toBe(10);
+    expect(calculatedStepSpeed(10)).toBe(9);
+    expect(Math.ceil(Math.floor((1000 * SLOWEST_AUTHORED_GROUND) / 9) / 50) * 50).toBe(133_350);
+    let cardinal: unknown;
+    try {
+      stepDurationMs(10, SLOWEST_AUTHORED_GROUND);
+    } catch (error) {
+      cardinal = error;
+    }
+    expect(cardinal).toBeInstanceOf(StepDurationError);
+    expect((cardinal as StepDurationError).durationMs).toBe(133_350);
+    expect(133_350).toBeGreaterThan(MAX_STEP_DURATION_MS);
+    expect(supportedStepDurationMs(10, SLOWEST_AUTHORED_GROUND, DIAGONAL_STEP_FACTOR)).toBeNull();
+    // The Rat on that same ground is FINE, which is why misattributing this
+    // failure to the Rat would send an author to fix the wrong definition.
+    // floor(1,200,000 / 172) = 6,976 -> 7,000 cardinal, 21,000 diagonal.
+    expect(supportedStepDurationMs(67, SLOWEST_AUTHORED_GROUND, DIAGONAL_STEP_FACTOR)).toBe(21_000);
+
+    const bundle = bundleOf(slowBaseline, rat, heavyMap, {
+      ...hunt('hunt.slowchar', 'map.heavy5', [{ key: 'creature.rat', count: 1 }]),
+      characterBaseline: 'character-baseline.slow',
+      references: ['character-baseline.slow', 'map.heavy5', 'creature.rat'],
+    });
+
+    let built: unknown = 'not assigned';
+    let thrown: unknown;
+    try {
+      built = plan(bundle, 'hunt.slowchar');
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(DomainError);
+    const error = thrown as DomainError;
+    expect(error.code).toBe('HuntNotSimulatable');
+    // Reported as the CHARACTER, with the baseline and level that produced it.
+    expect(error.details).toMatchObject({
+      actor: 'character',
+      huntKey: 'hunt.slowchar',
+      mapKey: 'map.heavy5',
+      characterStepSpeed: 10,
+      characterBaseSpeed: 1,
+      level: 1,
+      groundSpeed: SLOWEST_AUTHORED_GROUND,
+      stepCost: DIAGONAL_STEP_FACTOR,
+    });
+    expect(error.details).not.toHaveProperty('creatureKey');
+    expect(error.message).toMatch(/the Character walks at step speed 10/);
+    // No plan escaped, so nothing could have started an Activity with it.
+    expect(built).toBe('not assigned');
+
+    // The SAME map and the SAME Rat with the production baseline is fine —
+    // the refusal is about that baseline, not about this Hunt's shape.
+    const production = bundleOf(BASELINE, rat, heavyMap, {
+      ...hunt('hunt.normalchar', 'map.heavy5', [{ key: 'creature.rat', count: 1 }]),
+    });
+    const ok = plan(production, 'hunt.normalchar');
+    expect(ok.profile.stepSpeed).toBe(110);
+    expect(ok.space?.map.groundSpeeds).toEqual([SLOWEST_AUTHORED_GROUND]);
+    // Dense array, one distinct speed: the check is over the distinct values
+    // and the compiled map is reused, so no settlement rescans tiles.
+    expect(ok.space?.map.groundSpeed).toHaveLength(6 * 3);
+    expect(plan(production, 'hunt.normalchar').space?.map).toBe(ok.space?.map);
   });
 
   it('CMP8: the refusal is the PLAN’s, so no simulation is ever attempted', () => {

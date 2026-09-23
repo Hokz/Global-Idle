@@ -272,6 +272,8 @@ movement engine will not need to change again to consume it.
 | P36-D22 | An **immobile** creature is skipped, not refused | `addEventWalk` never schedules a step for it, so there is no duration to be out of range; 113 shipped monsters are authored at 0 |
 | P36-D23 | Scope is **this Hunt's** creatures against **this map's** distinct ground speeds | a bad pair elsewhere in a bundle is not this Hunt's fault, and the bundle's Cartesian product is a question nobody asked |
 | P36-D24 | The failure is a typed domain error, `HuntNotSimulatable` (HTTP 422) | the caller must be able to switch on it; an engine exception crossing the domain is a 500 and tells nobody anything |
+| P36-D25 | The **actual** Character step speed is checked too, not just the creatures | `compileMap`'s yardstick is `playerBaseStepSpeed(1)` = 110, which is the production baseline; the schema accepts any positive `baseSpeed`, so the real Character can be slower than the map was compiled for |
+| P36-D26 | The Character is checked **first** and reported as itself | "the Rat is too slow" is a wrong and unfixable answer to "your baseline is too slow"; `details.actor` distinguishes them |
 
 ---
 
@@ -369,6 +371,12 @@ Rules, and why each one:
 
 - it asks `supportedStepDurationMs`, the same function the engine applies to itself. No second
   ceiling, no second formula;
+- it asks for **every actor the Hunt places**, the Character included. `compileMap`'s yardstick is
+  `playerBaseStepSpeed(1)` = 110 — the production baseline, not a contract, because
+  `characterBaselineSchema` accepts any positive `baseSpeed` and `playerBaseStepSpeed` clamps only
+  at `PLAYER_MIN_SPEED`. An authored baseline of 1 is a real Character of step speed 10, whose
+  cardinal step on ground 1,200 is 133,350 ms. The Character is checked first and `details.actor`
+  says which actor failed, because sending an author to the Rat would be a wrong answer;
 - it asks about the **diagonal**, because ×3 is the stricter of the costs the engine may schedule
   and the call checks the cardinal on the way through;
 - **immobile creatures are skipped.** `addEventWalk` never schedules a step below speed 1, so there
@@ -380,8 +388,8 @@ Rules, and why each one:
   creature, its speed, the ground and the cost. Retrying changes nothing until the bundle does;
 - a Hunt with **no map** is the Phase 2 encounter and is not checked, because it has no ground.
 
-The cost is one `supportedStepDurationMs` call per (moving creature × distinct ground speed) per
-plan — for the shipped Sewers, one. Compiled maps are cached per content version, and their distinct
+The cost is one `supportedStepDurationMs` call per (moving actor × distinct ground speed) per
+plan — for the shipped Sewers, two: the Character and the Rat. Compiled maps are cached per content version, and their distinct
 speeds are computed once when the map compiles, so no settlement scans tiles to ask.
 
 ---
@@ -397,7 +405,7 @@ a ceiling so it can never hide an unrepresentable number.
 
 ---
 
-## 16. Acceptance matrix — 42 cases
+## 16. Acceptance matrix — 43 cases
 
 Counted by `scripts/count-matrix.mjs`; every case is exactly one test whose title begins with its
 id and a colon.
@@ -412,7 +420,7 @@ id and a colon.
 | **REN** | 1–2 | the browser draws a leg over its own duration rather than a fixed ease, and the client changes neither the 15 × 11 world nor the server's timing |
 | **VER** | 1 | a running Activity keeps the ground speeds of the bundle it pinned; a run started after the publish gets the new ones |
 | **DET** | 1–3 | a variable-duration leg survives a fresh process on slow ground and on fast, and settlement partitioning still cannot change a mixed-ground run |
-| **CMP** | 1–9 | the composition: a creature too slow for its own map's ground refused when the plan is built, the cardinal fitting while the diagonal does not, real content untouched, an immobile creature still valid, the check scoped to this Hunt and this map, duplicates deduplicated, a map-less Phase 2 Hunt unchanged, no plan handed back on refusal, and a published bundle proving the whole chain — publish, compile, **start refuses** |
+| **CMP** | 1–10 | the composition: a creature too slow for its own map's ground refused when the plan is built, the cardinal fitting while the diagonal does not, real content untouched, an immobile creature still valid, the check scoped to this Hunt and this map, duplicates deduplicated, a map-less Phase 2 Hunt unchanged, no plan handed back on refusal, and a published bundle proving the whole chain — publish, compile, **start refuses** — plus the **actual Character's** speed held against the same ground, because the map compiler's yardstick is the production baseline and not a contract |
 | **DOM** | 1–8 | the supported domain: the ceiling is the source's `uint16_t` and binds in **two** places, the exact cardinal boundary, the **tighter** diagonal boundary, refusal rather than a clamp or a wrap, the asking face and the refusing face agreeing, a representable-but-unwalkable ground refused when the map compiles, the one-beat floor named as an ADAPT, and every ground the real client data authors proven inside the domain |
 
 Inherited and unchanged: Phase 0B **92**, Phase 1 **87**, Phase 2 **106**, Phase 3 **169**,

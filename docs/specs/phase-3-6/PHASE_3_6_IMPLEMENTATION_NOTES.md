@@ -240,6 +240,37 @@ cached by content version, so no settlement scans tiles to answer this.
 
 ---
 
+## 8.3 The yardstick was a number, not a contract
+
+A third review pass found the composition check still incomplete, and the argument is exact.
+`compileMap` holds ground against `SLOWEST_CHARACTER_STEP_SPEED` = `playerBaseStepSpeed(1)` = 110.
+That is the **production** baseline — `data/XML/vocations.xml` `basespeed="110"` — and nothing makes
+it a contract: `characterBaselineSchema` accepts `baseSpeed: z.number().int().positive()`, and
+`playerBaseStepSpeed` clamps only up, at `PLAYER_MIN_SPEED`. So an authored baseline of 1 produces a
+real Character of step speed 10, and a map that compiled fine for 110 is one that Character cannot
+walk: divisor 9, cardinal `floor(1,200,000 / 9) = 133,333 -> 133,350 ms`, twice past the ceiling
+before the ×3 is even applied. Every part schema-valid, the map compiling, CMP passing on the Rat,
+and `simulateHunt` throwing on the Character's first diagonal.
+
+Two ways to close it. Pin `baseSpeed` to 110 at the content boundary, or check the Character the
+plan actually computes. The second was chosen: it follows the schema that exists rather than
+narrowing it, it survives the vocation parameter `playerBaseStepSpeed` already takes for Phase 4,
+and it adds no second rule — the Character goes through the same `supportedStepDurationMs` call the
+creatures do. Pinning the schema would have been a source claim the source does not make (a
+vocation's base speed is data, and Canary's happens to be uniform today), and it would have to be
+unpinned the moment a vocation differs.
+
+The Character is checked **first**, and `details.actor` distinguishes it. "The Rat is too slow" is a
+wrong answer to "your baseline is too slow", and it sends an author to edit the wrong definition —
+on that map the Rat is fine, at 7,000 ms cardinal and 21,000 diagonal.
+
+`CMP10` proves the premise part by part with the real schemas (`characterBaselineSchema`,
+`creatureSchema`, `mapSchema` all accept it, and the map compiles), pins the arithmetic from the
+engine rather than from its own comment, asserts the failure is reported as the Character with the
+baseline and level that produced it, and shows the same map and Rat succeeding at `baseSpeed` 110.
+
+---
+
 ## 9. Self-review, against this phase's stated questions
 
 **Does the same Character move at different speeds on different authored ground?** Yes — `GRD2`,
@@ -293,6 +324,9 @@ is 13,050 ms, a fifth of the ceiling. It fires on content nobody could play.
 **Is the simulator ever the first to find out?** No — `CMP8` proves no plan is handed back on a
 refusal, and `CMP9` publishes a bundle that every upstream validator accepts and shows the START
 refusing it, with the shipped Rookgaard Hunt out of the same bundle still starting.
+
+**Is EVERY actor checked, or only the creatures?** Every actor. `CMP10` is the Character, whose real
+speed comes from an authored baseline the schema does not pin to 110 — see §8.3.
 
 **Is the project ready for the real asset archive without another movement rewrite?** Yes — the
 importer fills `groundSpeed` on a tile definition that already exists, from a protobuf field the

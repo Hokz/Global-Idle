@@ -125,7 +125,10 @@ ceiling, and spec §13 has the boundary numbers.
 
 Because the first row of that table is two SHIPPED numbers rather than a pathological one, the
 refusal cannot be left to the simulator: a Hunt is proved against its own map when its plan is
-built, so content that cannot be simulated is refused before an Activity starts (spec §13.5).
+built, so content that cannot be simulated is refused before an Activity starts (spec §13.5). That
+proof covers the CHARACTER as well as the creatures — `basespeed="110"` is what the source's
+vocations happen to carry, not a rule the source states, and Global Idle's baseline schema accepts
+any positive value.
 
 ---
 
