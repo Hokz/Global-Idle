@@ -21,3 +21,12 @@ packages/game-data/bundles/
 test-results/
 playwright-report/
 blob-report/
+
+# Phase 3.7 — private asset override. User-supplied Tibia client assets are a
+# PRIVATE technical reference, never redistributable content (spec §9). The
+# public build ships distributable placeholders and must pass with none of this
+# present; anything here is a local convenience only.
+apps/web/public/assets/private/
+private-assets/
+*.rcc
+*.rar

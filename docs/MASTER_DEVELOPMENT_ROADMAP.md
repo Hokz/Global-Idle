@@ -545,7 +545,9 @@ a disconnected character.
 
 ### Phase 3.7 — First real asset visual slice
 
-> **PLANNED — NOT STARTED.** No source assets are in the repository yet. Recorded here for product
+> **SPECIFIED — NOT IMPLEMENTED**, see
+> [`docs/specs/phase-3-7/PHASE_3_7_ASSET_VISUAL_SLICE_SPEC.md`](specs/phase-3-7/PHASE_3_7_ASSET_VISUAL_SLICE_SPEC.md).
+> No source assets are in the repository and none will be. Recorded here for product
 > visibility: after movement fidelity, the next milestone makes the game visibly resemble the
 > intended experience before Party work expands scope.
 - ingest and triage the Product Owner's client asset archive;
