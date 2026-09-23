@@ -1,18 +1,18 @@
 {
   "$comment": "THE canonical project state. AGENTS.md, the roadmaps and the design index all point HERE rather than repeating it, because a phase marker copied into five documents is a phase marker that goes stale in four of them. `scripts/check-project-state.mjs` fails CI if AGENTS.md and this file disagree.",
   "activePhase": {
-    "id": "phase-3-5",
-    "name": "Phase 3.5 — Tile / spatial Game Window",
+    "id": "phase-3-6",
+    "name": "Phase 3.6 — Movement fidelity: Character speed and tile ground speed",
     "status": "IMPLEMENTATION_COMPLETE — PENDING INDEPENDENT REVIEW",
-    "pr": 9,
-    "spec": "docs/specs/phase-3-5/PHASE_3_5_TILE_SPATIAL_GAME_WINDOW_SPEC.md"
+    "pr": null,
+    "spec": "docs/specs/phase-3-6/PHASE_3_6_MOVEMENT_FIDELITY_SPEC.md"
   },
   "lastVerifiedPhase": {
-    "id": "phase-3",
-    "name": "Phase 3 — Itemization, inventory and loot logistics",
+    "id": "phase-3-5",
+    "name": "Phase 3.5 — Tile / spatial Game Window",
     "verifiedAt": "2026-09-22",
-    "acceptedHead": "d46f78b",
-    "pr": 8
+    "acceptedHead": "2e67f4b",
+    "pr": 9
   },
   "phases": [
     {
@@ -47,8 +47,14 @@
     {
       "id": "phase-3-5",
       "name": "Tile / spatial Game Window",
-      "status": "IMPLEMENTATION_COMPLETE — PENDING INDEPENDENT REVIEW",
+      "status": "VERIFIED",
       "matrix": 95
+    },
+    {
+      "id": "phase-3-6",
+      "name": "Movement fidelity: Character speed and tile ground speed",
+      "status": "IMPLEMENTATION_COMPLETE — PENDING INDEPENDENT REVIEW",
+      "matrix": 25
     }
   ],
   "baseline": {

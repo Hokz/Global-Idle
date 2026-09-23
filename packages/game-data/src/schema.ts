@@ -98,6 +98,14 @@ export const creatureSchema = definitionSchema.extend({
   armor: z.number().int().nonnegative(),
   /** Percent, as `Creature::mitigateDamage` uses it. */
   mitigation: z.number().nonnegative(),
+  /**
+   * `monster.speed`, the creature's own step speed.
+   *
+   * Zero is legal and means IMMOBILE — the source refuses to schedule a walk
+   * at all below 1 (`Creature::addEventWalk`), rather than letting the
+   * duration curve's floor turn it into a crawl. Only a Character is clamped
+   * to a minimum; a creature is taken at its word.
+   */
   speed: z.number().int().nonnegative(),
   /** The currency a kill yields. NOT a loot table — Phase 3 owns loot,
    *  `BaseItem` and `ItemInstance`; this is the Gold the same entry produces. */
@@ -335,6 +343,31 @@ const tileRef = z
   .object({ x: z.number().int().min(0), y: z.number().int().min(0), z: z.number().int() })
   .strict();
 
+const tileKind = z.enum(['floor', 'wall', 'water', 'sludge']);
+
+/**
+ * A legend symbol: a kind on its own, or a kind with the GROUND'S OWN SPEED.
+ *
+ * `groundSpeed` is the number the source's step-duration curve divides into
+ * (`floor(1000 × groundSpeed / calculatedStepSpeed)`), so a LOWER value is a
+ * FASTER step. It is client asset metadata in the source — the appearance's
+ * `bank.waypoints` — which is why it is authored as an integer here and never
+ * as a float "friction" multiplier.
+ *
+ * Leaving it out means the source's 150 fallback. A literal `0` is refused:
+ * Canary spells "no ground speed of its own" as an absent flag, this format
+ * spells it as an absent field, and one meaning does not need two spellings.
+ */
+const mapLegendEntrySchema = z.union([
+  tileKind,
+  z
+    .object({
+      kind: tileKind,
+      groundSpeed: z.number().int().min(1).max(65535).optional(),
+    })
+    .strict(),
+]);
+
 export const mapConnectorSchema = z
   .object({
     from: tileRef,
@@ -348,7 +381,7 @@ export const mapSchema = definitionSchema.extend({
   label: z.string().min(1),
   z: z.number().int(),
   rows: z.array(z.string().min(1)).min(1),
-  legend: z.record(z.string().length(1), z.enum(['floor', 'wall', 'water', 'sludge'])),
+  legend: z.record(z.string().length(1), mapLegendEntrySchema),
   entry: z.object({ x: z.number().int().min(0), y: z.number().int().min(0) }),
   regions: z.array(mapRegionSchema).min(1),
   /**

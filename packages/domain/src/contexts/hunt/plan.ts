@@ -19,7 +19,7 @@ import {
   mapSchema,
 } from '@global-idle/game-data';
 import type { ResolvedBundle } from '@global-idle/game-data';
-import { compileMap } from '@global-idle/game-engine';
+import { compileMap, playerBaseStepSpeed } from '@global-idle/game-engine';
 import type {
   CombatProfile,
   CreatureStats,
@@ -242,9 +242,10 @@ export function buildHuntPlan(input: BuildHuntPlan): HuntPlan {
         healMax: input.supplyHeal?.max ?? 0,
         useBelowPercent: baseline.data.supplyUseBelowPercent,
       },
-      // `Player::updateBaseSpeed`: the vocation's base plus one per level past
-      // the first. A level-1 Character steps in 550 ms; a Rat takes 900.
-      stepSpeed: baseline.data.baseSpeed + Math.max(0, level - 1),
+      // `Player::updateBaseSpeed`, in the engine so a test has one target and
+      // the clamp lives with the curve. A level-1 Character steps in 550 ms on
+      // default ground; a Rat takes 900.
+      stepSpeed: playerBaseStepSpeed(level, baseline.data.baseSpeed),
     },
     supplyCharges: input.supplyCharges,
     // Space, when the Hunt names a map. A Hunt without one simulates exactly

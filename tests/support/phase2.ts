@@ -20,7 +20,12 @@ import {
   withTransaction,
   type PrismaClient,
 } from '@global-idle/domain';
-import { buildBundle, writeBundle, type ContentBundleResolver } from '@global-idle/game-data';
+import {
+  buildBundle,
+  writeBundle,
+  type BundleSource,
+  type ContentBundleResolver,
+} from '@global-idle/game-data';
 import type { HuntEvent } from '@global-idle/game-engine';
 import {
   accountId as toAccountId,
@@ -55,8 +60,18 @@ export async function publishContent(
   prisma: PrismaClient,
   directory: string,
   at: Instant,
+  /**
+   * An optional edit to the authored source before it is compiled.
+   *
+   * Phase 3.6 uses it to publish a bundle carrying a DEDICATED TEST MAP beside
+   * the real one, rather than putting invented ground speeds on the prototype
+   * Rookgaard Sewers — the production map has no sourced tile metadata yet and
+   * must stay as it is until the real client assets arrive.
+   */
+  edit?: (source: BundleSource) => BundleSource,
 ): Promise<{ version: string; resolver: ContentBundleResolver }> {
-  const artifact = buildBundle(await rookgaardSource());
+  const authored = await rookgaardSource();
+  const artifact = buildBundle(edit ? edit(authored) : authored);
   await writeBundle(directory, artifact);
   await contentContext.publish(prisma, artifact, directory, at);
   return { version: artifact.version, resolver: contentContext.createResolver(prisma, directory) };

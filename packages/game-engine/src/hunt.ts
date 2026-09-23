@@ -15,7 +15,9 @@
 import { normalRandom, uniformRandom } from './distributions.js';
 import type { SeededRandom } from './random.js';
 import {
+  DEFAULT_GROUND_SPEED,
   canOccupy,
+  groundSpeedAt,
   isAdjacent,
   meleeGoals,
   samePosition,
@@ -39,9 +41,6 @@ export const TICK_MS = 1000;
  */
 export const BEAT_MS = 50;
 
-/** Default ground speed (`src/creatures/creature.cpp:1817`). */
-export const GROUND_SPEED = 150;
-
 /** `WALK_DIAGONAL_EXTRA_COST` (`src/creatures/creature.hpp:45`). */
 export const DIAGONAL_STEP_FACTOR = 3;
 
@@ -53,6 +52,39 @@ export const DIAGONAL_STEP_FACTOR = 3;
  * one.
  */
 export const DEFAULT_STEP_SPEED = 110;
+
+/**
+ * The floor the source clamps an ordinary PLAYER's step speed to
+ * (`PLAYER_MIN_SPEED`, `src/creatures/players/player.hpp:126`, applied in
+ * `Player::getStepSpeed`).
+ *
+ * It is why a Character can never reach the "step speed <= 0, do not walk"
+ * branch a monster can (`Creature::addEventWalk`, `creature.cpp:345`): the
+ * source clamps players and leaves creatures alone, and so does this.
+ */
+export const PLAYER_MIN_STEP_SPEED = 10;
+
+/**
+ * A Character's own step speed, before any effect touches it.
+ *
+ * `Player::updateBaseSpeed` (`src/creatures/players/player.cpp:7338-7346`):
+ *
+ *     computedSpeed = vocation->getBaseSpeed() + (level - 1)
+ *
+ * Every vocation Global Idle has — and the unvocationed Character — carries
+ * `basespeed="110"` in `data/XML/vocations.xml`, promoted included, so the
+ * vocation is a PARAMETER here and not a table: there is currently nothing for
+ * a table to say. Phase 4 can pass a different base without this function
+ * changing shape.
+ *
+ * `varSpeed` — haste, paralyze, boots, mounts — is deliberately absent. When
+ * it arrives it is one more term, added before the clamp, exactly as the
+ * source does it.
+ */
+export function playerBaseStepSpeed(level: number, vocationBaseSpeed = DEFAULT_STEP_SPEED): number {
+  const computed = vocationBaseSpeed + Math.max(0, Math.floor(level) - 1);
+  return Math.max(PLAYER_MIN_STEP_SPEED, Math.min(65535, computed));
+}
 
 const SPEED_A = 857.36;
 const SPEED_B = 261.29;
@@ -70,7 +102,10 @@ const SPEED_C = -4795.01;
  * gets 550 ms; a Rat (speed 67) gets 900 ms. The Character is faster than what
  * is chasing it, which is why an approach is a chase rather than a queue.
  */
-export function stepDurationMs(stepSpeed: number, groundSpeed: number = GROUND_SPEED): number {
+export function stepDurationMs(
+  stepSpeed: number,
+  groundSpeed: number = DEFAULT_GROUND_SPEED,
+): number {
   const speed = Math.max(1, Math.floor(stepSpeed));
   const calculated = Math.max(1, Math.floor(SPEED_A * Math.log(speed + SPEED_B) + SPEED_C + 0.5));
   const raw = Math.floor((1000 * groundSpeed) / calculated);
@@ -456,10 +491,24 @@ export function simulateHunt(
     return (at: TilePosition) => taken.some((tile) => samePosition(tile, at));
   };
 
-  /** What one step costs this actor, in milliseconds. Diagonals cost three
-   *  times a cardinal, which is the source's `WALK_DIAGONAL_EXTRA_COST`. */
+  /**
+   * What one step costs this actor, in milliseconds.
+   *
+   * The ground speed is the DEPARTURE tile's, never the destination's. That is
+   * the source's own arrangement: `Creature::setParent` caches
+   * `walk.groundSpeed` from the tile the creature is placed on
+   * (`src/creatures/creature.cpp:1815-1835`), and `getStepDuration` divides by
+   * that cache — so the mud you are standing in is what slows the step out of
+   * it, and stepping ONTO stone does not make that step fast.
+   *
+   * Diagonals cost three times a cardinal, applied AFTER the base duration has
+   * been rounded up to the beat, because the source multiplies the cached,
+   * already-rounded `walk.duration` (`creature.cpp:1700-1703`). Rounding the
+   * other way round moves the breakpoints.
+   */
   const durationFor = (speed: number, from: TilePosition, to: TilePosition): number => {
-    const base = stepDurationMs(speed);
+    const ground = space ? groundSpeedAt(space.map, from) : DEFAULT_GROUND_SPEED;
+    const base = stepDurationMs(speed, ground);
     const diagonal = from.x !== to.x && from.y !== to.y;
     return diagonal ? base * DIAGONAL_STEP_FACTOR : base;
   };
@@ -477,6 +526,13 @@ export function simulateHunt(
     target: TilePosition,
   ): Movement | null => {
     if (!space) return null;
+    // IMMOBILE, not very slow. `Creature::addEventWalk` refuses to schedule a
+    // walk at all when `getStepSpeed() <= 0` (`creature.cpp:345`), and the
+    // duration curve's floor of 1 would otherwise turn a creature authored at
+    // zero into one that crawls. A Character cannot reach this branch: its
+    // speed is clamped to `PLAYER_MIN_STEP_SPEED` first, exactly as the source
+    // clamps players and leaves creatures alone.
+    if (speed <= 0) return null;
     const blocked = occupied(actor);
     const goals = meleeGoals(space.map, target, blocked);
     const next = stepToward(space.map, from, goals, blocked);

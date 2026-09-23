@@ -188,6 +188,41 @@ authoritative spatial engine the next playable slice needs, and no more:
 Not in this phase: player-driven movement, diagonals, line of sight, ranged
 attacks, multi-floor play, a map editor.
 
+## Phase 3.6 — Movement fidelity: Character speed and tile ground speed
+
+> Status lives in [`PROJECT_STATE.json`](./PROJECT_STATE.json), not here.
+
+**Specification:**
+[`docs/specs/phase-3-6/PHASE_3_6_MOVEMENT_FIDELITY_SPEC.md`](specs/phase-3-6/PHASE_3_6_MOVEMENT_FIDELITY_SPEC.md).
+Implementation is on its own branch, stacked on Phase 3.5.
+
+A step stops costing a constant. How long it takes now depends on WHO is walking and on WHAT they
+are standing on — which is the difference between an animation detail and an economy:
+
+    travel time -> combat uptime -> kills/hour -> XP, Gold and loot per hour
+
+- a Character's step speed is `110 + (level - 1)`, the source's own progression, with no invented
+  vocation differences because the source has none;
+- a tile's ground speed is authored content, an integer, and LOWER means faster;
+- the step is timed by the tile the actor DEPARTS from, as the source times it;
+- the 50 ms staircase is the whole of what "bugging speed" means: plateaus where more speed buys
+  nothing, breakpoints where it buys a whole beat, and a floor of one beat where it stops buying;
+- measured: the same Character finishes twice the encounters on fast ground in the same time.
+
+Not in this phase: haste, paralyze, equipment speed, mounts, conditions of any kind, a
+travel-time-optimised pathfinder, and any ingestion of real client assets. The shipped map keeps
+the default ground, because its tiles have no sourced metadata yet.
+
+## Phase 3.7 — First real asset visual slice
+
+**PLANNED — NOT STARTED.** No source assets are in the repository yet.
+
+After movement fidelity, the next milestone is to make the game LOOK like the thing it is meant to
+be, before Party work widens the scope again: one origin Character outfit with walking frames, a
+Rat, real floor and wall tiles, a small Rookgaard visual reference slice rendered in the verified
+15 × 11 window, and the beginning of a Tibia-like shell around it — Game Window centred, system
+panels at the sides, Chat and Server Log below.
+
 ## Phase 4 — Skills + Party + Vocations
 
 - real Skills representation, and **durable Skill death loss** (deferred from Phase 2 on purpose:
