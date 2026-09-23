@@ -25,7 +25,9 @@ export type DomainErrorCode =
   | 'NoRoomForItem'
   | 'OverCapacity'
   | 'ContainerSlotLocked'
-  | 'ServiceUnavailableHere';
+  | 'ServiceUnavailableHere'
+  // ── Phase 3.6 — movement fidelity ───────────────────────────────────────
+  | 'HuntNotSimulatable';
 
 export class DomainError extends Error {
   constructor(
@@ -145,6 +147,19 @@ export const serviceUnavailableHere = (details: Record<string, unknown> = {}) =>
 
 export const huntNotFound = (details: Record<string, unknown> = {}) =>
   new DomainError('HuntNotFound', 'No such hunt in the pinned content bundle.', details);
+
+/**
+ * The Hunt, its map and its creatures are each valid, and the COMBINATION is
+ * not: some actor this Hunt places on that map has a step the movement engine
+ * cannot express (Phase 3.6 §13).
+ *
+ * It is a composition fault rather than a definition fault, which is why it
+ * cannot be caught by a schema or by compiling the map alone — and why it is
+ * refused HERE, where the three facts first meet, instead of by the simulator
+ * halfway through a settlement.
+ */
+export const huntNotSimulatable = (message: string, details: Record<string, unknown> = {}) =>
+  new DomainError('HuntNotSimulatable', message, details);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // What the DATABASE refused, read structurally (§8.3, §8.4)

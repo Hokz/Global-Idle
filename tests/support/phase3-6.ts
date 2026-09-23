@@ -67,6 +67,79 @@ export function laneDefinitions(groundSpeed: number | undefined) {
   ];
 }
 
+export const CRAWLER = 'creature.test.crawler';
+export const HEAVY_MAP = 'map.test.heavy';
+export const HEAVY_HUNT = 'hunt.test.heavy';
+
+/**
+ * A Hunt that every individual validator accepts and nothing can simulate.
+ *
+ * Both numbers are real at the pinned commit — `monster.speed` 15 is the
+ * slowest thing that moves in the shipped monster data, `bank.waypoints` 1200
+ * the slowest authored ground in the shipped appearance data — and together
+ * they make a 48,000 ms cardinal step whose diagonal leaves the `uint16_t`
+ * `Creature::getStepDuration` returns. Published deliberately, so a case can
+ * prove the content pipeline really does accept it and the START really does
+ * refuse it.
+ */
+export function unsimulatableDefinitions() {
+  return [
+    {
+      key: CRAWLER,
+      kind: 'creature',
+      references: [],
+      label: 'Test Crawler',
+      maxHealth: 20,
+      experience: 5,
+      attack: { intervalMs: 2000, maxDamage: 8 },
+      defense: 5,
+      armor: 1,
+      mitigation: 0.07,
+      speed: 15,
+      gold: { chance: 1, min: 1, max: 4 },
+      loot: [],
+      sourceRef:
+        'Authored for Phase 3.6 CMP. Speed 15 is the slowest non-zero monster.speed in data-otservbr-global at Hokz/canary@f6b81a8; the creature itself is a fixture, not Canary content.',
+    },
+    {
+      key: HEAVY_MAP,
+      kind: 'map',
+      references: [],
+      label: 'Heavy ground',
+      z: 7,
+      rows: ['##########', '#........#', '#........#', '##########'],
+      legend: { '#': 'wall', '.': { kind: 'floor', groundSpeed: 1200 } },
+      entry: { x: 1, y: 1 },
+      regions: [{ id: 'heavy', rect: [1, 1, 8, 2], room: 1, spawns: [{ x: 8, y: 2 }] }],
+      sourceRef:
+        'Authored for Phase 3.6 CMP. Ground speed 1200 is the largest bank.waypoints in data/items/appearances.dat at Hokz/canary@f6b81a8; the geometry is a fixture.',
+    },
+    {
+      key: HEAVY_HUNT,
+      kind: 'hunt',
+      references: ['character-baseline.origin', CRAWLER, 'region.rookgaard', HEAVY_MAP],
+      label: 'Heavy ground',
+      region: 'region.rookgaard',
+      summary: 'Phase 3.6 CMP — a composition no validator rejects part by part.',
+      primaryCreature: 'Test Crawler',
+      activityTypeKey: 'hunt',
+      availability: 'AVAILABLE',
+      characterBaseline: 'character-baseline.origin',
+      map: HEAVY_MAP,
+      rooms: [{ number: 1, creatures: [{ key: CRAWLER, count: 1 }], endless: true }],
+    },
+  ];
+}
+
+/** Publish the authored content PLUS the unsimulatable Hunt. */
+export const withUnsimulatable = (source: BundleSource): BundleSource => ({
+  ...source,
+  definitions: [
+    ...source.definitions,
+    ...unsimulatableDefinitions(),
+  ] as BundleSource['definitions'],
+});
+
 /** Publish the authored content PLUS the lane, at one ground speed. */
 export const withLane =
   (groundSpeed: number | undefined) =>

@@ -18,7 +18,14 @@ import type { ContentBundleResolver } from '@global-idle/game-data';
 import { playerBaseStepSpeed, stepDurationMs } from '@global-idle/game-engine';
 import { createClient, databaseUrl, truncateAll } from '../support/db.js';
 import { advanceOnce, play, publishContent, startHunt } from '../support/phase2.js';
-import { LANE_HUNT, withLane } from '../support/phase3-6.js';
+import {
+  CRAWLER,
+  HEAVY_HUNT,
+  HEAVY_MAP,
+  LANE_HUNT,
+  withLane,
+  withUnsimulatable,
+} from '../support/phase3-6.js';
 import { REPO_ROOT } from '../support/repo.js';
 
 const prisma = createClient();
@@ -158,6 +165,52 @@ describe('§16 VER — a run keeps the ground it started on', () => {
       .filter((event) => event.kind === 'move' && event.actor === 'character')
       .map((event) => (event.kind === 'move' ? event.arrivesAtMs - event.startsAtMs : 0));
     expect([...new Set(freshLegs)]).toEqual([stepDurationMs(speed, 50)]);
+  });
+});
+
+describe('§16 CMP — the composition is refused before an Activity starts', () => {
+  it('CMP9: content that publishes and compiles is still refused at the START', async () => {
+    // The premise, proven rather than asserted: nothing upstream rejects this.
+    // The creature passes its schema, the ground passes the uint16 bound and
+    // `compileMap`'s slowest-Character gate, the Hunt's references all resolve,
+    // and the bundle PUBLISHES — which is exactly why the combination has to be
+    // caught somewhere, and why that somewhere must not be the simulator.
+    const published = await publishContent(prisma, directory, T0, withUnsimulatable);
+    const bundle = await published.resolver.resolve(published.version);
+    expect(bundle.definitions.get(CRAWLER)).toBeDefined();
+    expect(bundle.definitions.get(HEAVY_MAP)).toBeDefined();
+    expect(bundle.definitions.get(HEAVY_HUNT)).toBeDefined();
+
+    // And then starting it fails, typed, before any state exists to settle.
+    let thrown: unknown;
+    try {
+      await startHunt(prisma, published.resolver, published.version, T0, {
+        huntKey: HEAVY_HUNT,
+        baseXp: STRONG,
+      });
+    } catch (error) {
+      thrown = error;
+    }
+    expect((thrown as { code?: string } | undefined)?.code).toBe('HuntNotSimulatable');
+    expect((thrown as { details?: Record<string, unknown> }).details).toMatchObject({
+      huntKey: HEAVY_HUNT,
+      mapKey: HEAVY_MAP,
+      creatureKey: CRAWLER,
+      creatureStepSpeed: 15,
+      groundSpeed: 1200,
+    });
+
+    // No Activity, no run: the simulator was never handed anything.
+    expect(await prisma.huntRun.count()).toBe(0);
+
+    // The same bundle's SHIPPED Hunt is unaffected — the refusal is about one
+    // composition, not about the publish. This is the real Rookgaard Sewers
+    // with the real Rat, out of the very bundle that carries the bad pair.
+    const ok = await startHunt(prisma, published.resolver, published.version, T0, {
+      baseXp: STRONG,
+    });
+    expect(ok.activityId).toBeDefined();
+    expect(await prisma.huntRun.count()).toBe(1);
   });
 });
 

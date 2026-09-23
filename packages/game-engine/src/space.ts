@@ -177,6 +177,21 @@ export interface TileMap {
    * one; the array is dense so the lookup is an index rather than a branch.
    */
   readonly groundSpeed: Uint16Array;
+  /**
+   * Every DISTINCT ground speed this map actually uses, ascending.
+   *
+   * A property of the compiled map rather than a scan, because the question
+   * "can this actor walk anywhere on this map" is asked per Hunt plan and the
+   * answer only ever depends on the distinct values — 671 tiles of Sewers are
+   * one number. The domain uses it to prove a Hunt's creatures against the
+   * supported movement domain before a settlement runs; nothing here knows
+   * what a creature is.
+   *
+   * Only tiles an actor can OCCUPY are counted, because only those are ever
+   * departed from. A wall still carries a value in `groundSpeed` above — the
+   * array is dense on purpose — and that value is not a step anybody takes.
+   */
+  readonly groundSpeeds: readonly number[];
   readonly entry: TilePosition;
   readonly regions: readonly MapRegion[];
   readonly connectors: readonly MapConnector[];
@@ -297,6 +312,7 @@ export function compileMap(source: MapSource): TileMap {
   const flags = new Uint8Array(width * height);
   const kind = new Uint8Array(width * height);
   const groundSpeed = new Uint16Array(width * height);
+  const used = new Set<number>();
   for (let y = 0; y < height; y += 1) {
     const row = source.rows[y]!;
     if (row.length !== width) {
@@ -313,8 +329,14 @@ export function compileMap(source: MapSource): TileMap {
       kind[index] = KIND_CODES[tile.kind];
       flags[index] = BLOCKS[tile.kind];
       groundSpeed[index] = tile.groundSpeed;
+      // Only tiles something can STAND on. A wall's ground speed is a value
+      // the dense array carries so the lookup stays an index, never a number
+      // any step divides by — counting it here would let a wall decide
+      // whether a creature can walk the map.
+      if ((flags[index]! & BLOCK_SOLID) === 0) used.add(tile.groundSpeed);
     }
   }
+  const groundSpeeds = [...used].sort((a, b) => a - b);
 
   const inside = (x: number, y: number) => x >= 0 && y >= 0 && x < width && y < height;
   const stand = (x: number, y: number) =>
@@ -384,6 +406,7 @@ export function compileMap(source: MapSource): TileMap {
     flags,
     kind,
     groundSpeed,
+    groundSpeeds,
     entry: { x: source.entry.x, y: source.entry.y, z: source.z },
     regions,
     connectors,

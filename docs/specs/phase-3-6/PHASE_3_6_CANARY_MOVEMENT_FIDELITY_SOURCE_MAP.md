@@ -123,6 +123,10 @@ outside the domain and says which two numbers caused it. Copying a C++ narrowing
 defect and calling it fidelity. The engine's `MAX_STEP_DURATION_MS` is the single statement of the
 ceiling, and spec §13 has the boundary numbers.
 
+Because the first row of that table is two SHIPPED numbers rather than a pathological one, the
+refusal cannot be left to the simulator: a Hunt is proved against its own map when its plan is
+built, so content that cannot be simulated is refused before an Activity starts (spec §13.5).
+
 ---
 
 ## 3. Ground speed belongs to the tile the actor is STANDING ON — SOURCE, KEEP

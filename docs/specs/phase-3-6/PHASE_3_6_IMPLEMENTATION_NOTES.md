@@ -204,6 +204,42 @@ the same 150,000 ms claim). Nothing else about Phase 3.5 moved.
 
 ---
 
+## 8.2 The integration gap the domain check closes
+
+The blocker pass put the ceiling in one place and taught `compileMap` to ask about it. Independent
+review found what that still could not cover: a map carries no creatures, so the only actor
+`compileMap` can hold ground against is the slowest **Character**. The pair the source makes real —
+`monster.speed` 15 on `bank.waypoints` 1200 — passed the schema, passed the map compile, passed
+reference resolution, and would have failed in `simulateHunt` the first time that creature took a
+diagonal step. The simulator discovering that published content cannot be simulated is the wrong
+failure boundary: by then an Activity exists and a player is in it.
+
+`buildHuntPlan` is where the Hunt's creatures, the Hunt's compiled map and the movement engine's own
+supported-domain function are all in scope at once, and it already resolves every other reference
+exactly once, so that is where the combination is proved. It asks `supportedStepDurationMs` — the
+engine's function, not a copy of its arithmetic — about the diagonal, because ×3 is the stricter of
+the two costs and the call checks the cardinal on the way through.
+
+Three details took a moment to get right rather than merely working:
+
+- **immobile is not slow.** A creature authored at 0 never schedules a step (`addEventWalk`), so
+  asking the duration curve about it would invent a refusal the source does not have. 113 shipped
+  monsters are authored at exactly 0, and skipping them is the rule, not an exception;
+- **a wall's ground speed is not a step.** The compiled map's new `groundSpeeds` counts only tiles
+  something can OCCUPY. The dense `groundSpeed` array still carries a value for every tile so the
+  per-step lookup stays an index — but letting a wall's fallback into the check would have let a
+  wall decide whether a creature may walk the map. The first version of CMP6 caught this by
+  reporting `[100, 150, 200]` for a map that authors two speeds;
+- **scope is the composition, not the bundle.** This Hunt's creatures against this map's distinct
+  speeds. CMP5 puts a bad pair in the same bundle as three good Hunts and proves none of them is
+  condemned by it.
+
+The cost is one call per moving creature per distinct ground speed, per plan. For the shipped
+Sewers that is one. The distinct speeds are computed when the map compiles, and compiled maps are
+cached by content version, so no settlement scans tiles to answer this.
+
+---
+
 ## 9. Self-review, against this phase's stated questions
 
 **Does the same Character move at different speeds on different authored ground?** Yes — `GRD2`,
@@ -253,6 +289,10 @@ function applying it, `compileMap` asking that same function rather than repeati
 **Can the refusal fire on real content?** No — `DOM8` walks every ground speed the pinned client
 data authors against every Character level from 1 to 2,000, cardinal and diagonal; the worst case
 is 13,050 ms, a fifth of the ceiling. It fires on content nobody could play.
+
+**Is the simulator ever the first to find out?** No — `CMP8` proves no plan is handed back on a
+refusal, and `CMP9` publishes a bundle that every upstream validator accepts and shows the START
+refusing it, with the shipped Rookgaard Hunt out of the same bundle still starting.
 
 **Is the project ready for the real asset archive without another movement rewrite?** Yes — the
 importer fills `groundSpeed` on a tile definition that already exists, from a protobuf field the

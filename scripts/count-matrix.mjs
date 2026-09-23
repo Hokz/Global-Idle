@@ -167,6 +167,9 @@ const MATRICES = {
       // Added by the Phase 3.6 blocker correction: the supported movement
       // domain, which is where the imported arithmetic is still the source's.
       DOM: [1, 8],
+      // Added by the Phase 3.6 integration correction: a Hunt, its map and its
+      // creatures have to be simulatable TOGETHER, and the plan says so.
+      CMP: [1, 9],
     },
   },
 };
@@ -175,6 +178,7 @@ const MATRICES = {
 // `2`. Regex alternation is ordered, and that order is the whole contract.
 const PREFIXES = [
   'RNGC',
+  'CMP',
   'DOM',
   'SPD',
   'GRD',

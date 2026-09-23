@@ -540,7 +540,8 @@ a disconnected character.
 - the pathfinder stays independent of ground speed, exactly as the source's does;
 - the supported movement domain is stated and enforced: the source caches and returns a step
   duration as a `uint16_t`, so beyond 65,535 ms Global Idle refuses rather than clamping or
-  reproducing the C++ overflow.
+  reproducing the C++ overflow — and a Hunt whose own creatures cannot walk its own map is refused
+  when its plan is built, never discovered mid-settlement.
 
 ### Phase 3.7 — First real asset visual slice
 
