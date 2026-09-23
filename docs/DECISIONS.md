@@ -85,6 +85,28 @@ after — which is why it is locked here rather than left to an implementation.
 Decided during the Phase 3.5 determinism correction, after the reverse was found to be true. See
 `docs/specs/phase-3-5/PHASE_3_5_TILE_SPATIAL_GAME_WINDOW_SPEC.md` §10 and the `RNGC` cases.
 
+## Imported fidelity has a stated domain
+
+**Where Global Idle reproduces a Canary formula, it also states the range in which that formula is
+the source's — and it refuses outside it rather than returning a number.**
+
+A source's arithmetic and a source's *representation* are two different facts. Canary's step
+duration is a log curve with no upper bound, but `Creature::getStepDuration` caches it into a
+`uint16_t` and returns a `uint16_t`, so past 65,535 ms the C++ is undefined on one path and a
+silent modular wrap on the other. Neither is behaviour to reproduce, and clamping to the ceiling
+would be a number the source never produced.
+
+- an imported formula carries ONE named constant for its limit, and ONE function that applies it;
+- outside the domain the engine refuses, naming the inputs — it does not clamp, wrap or guess;
+- content validation bounds what can be STORED; the engine bounds what can be COMPUTED, and the
+  content build asks the engine rather than restating its limit;
+- a deliberate divergence at an edge is labelled ADAPT in the phase's source map, with what the
+  source does instead.
+
+Decided during the Phase 3.6 blocker correction, after tests were found asserting a 150,000 ms step
+the source cannot express. See `docs/specs/phase-3-6/PHASE_3_6_MOVEMENT_FIDELITY_SPEC.md` §13 and
+the `DOM` cases.
+
 ## Death
 
 - punitive by design;

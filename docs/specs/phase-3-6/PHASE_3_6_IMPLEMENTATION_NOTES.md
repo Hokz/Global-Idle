@@ -156,6 +156,54 @@ said.
 
 ---
 
+## 8.1 The blocker: a claim larger than the source
+
+Independent review of `97c147b` found one: `stepDurationMs` could return a duration Canary's
+`uint16_t walk.duration` cannot hold, and `SPD6` asserted exactly such a number —
+`stepDurationMs(1) === 150_000`. The docs and tests were claiming more fidelity than the source
+representation supports.
+
+Re-reading the pinned source before touching anything changed the shape of the fix twice.
+
+**The reviewer's framing was right but incomplete.** The `uint16_t` binds in two places, not one:
+the cached cardinal (`static_cast<uint16_t>` of a `double` — undefined behaviour above the range)
+and the returned value (`auto duration = walk.duration` is a `uint16_t`, so `duration *=
+WALK_DIAGONAL_EXTRA_COST` narrows the product back, a defined and silent wrap). A fix that only
+bounded the cardinal would have left the worse case in: a cardinal of 21,850 ms returns a diagonal
+of **14 ms**.
+
+**And a fact this phase had already recorded was wrong.** The source map's §3.1 histogram called
+`800 · 850` "the slowest authored ground". Re-decoding `appearances.dat` found 1,000 (×2) and 1,200
+(×1) as well — three appearances the first table dropped. That is not cosmetic: 1,200 is where the
+shipped `monster.speed` of 15 produces a diagonal that wraps. The overflow region is reachable from
+real content, so the guard is a guard and not a formality. The table is corrected and the omission
+is marked as one.
+
+The fix is small and has one authority. `packages/game-engine/src/step.ts` is a new leaf module —
+neither `space.ts` nor `hunt.ts` owns it, so both can ask it — holding the curve, the beat, the
+ground constants, `MAX_STEP_DURATION_MS` and the two faces of one computation:
+`supportedStepDurationMs` answers `null` outside the domain and `stepDurationMs` throws
+`StepDurationError` naming both inputs. The step cost moved INTO the function, because the source
+narrows the product as well as the cardinal and a caller multiplying afterwards could not be
+checked.
+
+Three things were deliberately not done:
+
+- **no clamp.** 65,535 is a number the source never produces;
+- **no wrap.** Reproducing a modular narrowing the source reaches through undefined behaviour on
+  one path is copying a defect, not fidelity;
+- **no new limit in a second place.** `MAX_GROUND_SPEED` still means what `uint16_t iType.speed`
+  can hold. Whether a stored ground is one anybody can walk is a different question, asked of the
+  same authority at map-compile time against the slowest Character the game can produce. `DOM6`
+  pins content and engine together; `GRD6` now shows the two refusals are different sentences.
+
+Two tests changed their assertions, both because they were wrong rather than inconvenient, and
+both keep their ids and say so in place: `SPD6` (the curve's guard is about the DIVISOR, so the
+divisor is what it asserts) and Phase 3.5's `STP1` (whose `stepDurationMs(0) >= BEAT_MS` line was
+the same 150,000 ms claim). Nothing else about Phase 3.5 moved.
+
+---
+
 ## 9. Self-review, against this phase's stated questions
 
 **Does the same Character move at different speeds on different authored ground?** Yes — `GRD2`,
@@ -195,7 +243,16 @@ is a fixture.
 **Did we avoid Phase 4 scope?** Yes. No Party, no tactical AI, no automation, no conditions, no
 asset importer.
 
-**Are Phase 3.5's 95 cases still green?** Yes, along with every earlier matrix.
+**Are Phase 3.5's 95 cases still green?** Yes, along with every earlier matrix — `STP1` with one
+assertion corrected, for the reason §8.1 gives and marked in the test itself.
+
+**Is the supported domain stated once, and enforced?** Yes — one `MAX_STEP_DURATION_MS`, one
+function applying it, `compileMap` asking that same function rather than repeating the number, and
+`DOM1`–`DOM8` on the boundary from both sides.
+
+**Can the refusal fire on real content?** No — `DOM8` walks every ground speed the pinned client
+data authors against every Character level from 1 to 2,000, cardinal and diagonal; the worst case
+is 13,050 ms, a fifth of the ceiling. It fires on content nobody could play.
 
 **Is the project ready for the real asset archive without another movement rewrite?** Yes — the
 importer fills `groundSpeed` on a tile definition that already exists, from a protobuf field the

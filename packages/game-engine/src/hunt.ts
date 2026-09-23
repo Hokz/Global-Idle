@@ -15,7 +15,6 @@
 import { normalRandom, uniformRandom } from './distributions.js';
 import type { SeededRandom } from './random.js';
 import {
-  DEFAULT_GROUND_SPEED,
   canOccupy,
   groundSpeedAt,
   isAdjacent,
@@ -26,91 +25,16 @@ import {
   type TileMap,
   type TilePosition,
 } from './space.js';
+import {
+  BEAT_MS,
+  DEFAULT_GROUND_SPEED,
+  DEFAULT_STEP_SPEED,
+  DIAGONAL_STEP_FACTOR,
+  stepDurationMs,
+} from './step.js';
 
 /** The COMBAT tick, unchanged since Phase 2 and pinned by its golden file. */
 export const TICK_MS = 1000;
-
-/**
- * `SERVER_BEAT` (`src/game/game.hpp:64`) — 50 ms, and the resolution movement
- * is decided at.
- *
- * A combat tick is a second; a step is not. Iterating the settlement in beats
- * and resolving combat only on the tick boundaries gives movement real timing
- * WITHOUT a second clock and without moving a single Phase 2 draw: a Hunt with
- * no map iterates whole ticks exactly as it always did.
- */
-export const BEAT_MS = 50;
-
-/** `WALK_DIAGONAL_EXTRA_COST` (`src/creatures/creature.hpp:45`). */
-export const DIAGONAL_STEP_FACTOR = 3;
-
-/**
- * The vocation base speed every Character starts from
- * (`data/XML/vocations.xml`, `basespeed="110"`), used when a profile or a
- * creature does not state one. It is a real number from the source rather than
- * a placeholder, so a missing speed produces a slow actor and never a stalled
- * one.
- */
-export const DEFAULT_STEP_SPEED = 110;
-
-/**
- * The floor the source clamps an ordinary PLAYER's step speed to
- * (`PLAYER_MIN_SPEED`, `src/creatures/players/player.hpp:126`, applied in
- * `Player::getStepSpeed`).
- *
- * It is why a Character can never reach the "step speed <= 0, do not walk"
- * branch a monster can (`Creature::addEventWalk`, `creature.cpp:345`): the
- * source clamps players and leaves creatures alone, and so does this.
- */
-export const PLAYER_MIN_STEP_SPEED = 10;
-
-/**
- * A Character's own step speed, before any effect touches it.
- *
- * `Player::updateBaseSpeed` (`src/creatures/players/player.cpp:7338-7346`):
- *
- *     computedSpeed = vocation->getBaseSpeed() + (level - 1)
- *
- * Every vocation Global Idle has — and the unvocationed Character — carries
- * `basespeed="110"` in `data/XML/vocations.xml`, promoted included, so the
- * vocation is a PARAMETER here and not a table: there is currently nothing for
- * a table to say. Phase 4 can pass a different base without this function
- * changing shape.
- *
- * `varSpeed` — haste, paralyze, boots, mounts — is deliberately absent. When
- * it arrives it is one more term, added before the clamp, exactly as the
- * source does it.
- */
-export function playerBaseStepSpeed(level: number, vocationBaseSpeed = DEFAULT_STEP_SPEED): number {
-  const computed = vocationBaseSpeed + Math.max(0, Math.floor(level) - 1);
-  return Math.max(PLAYER_MIN_STEP_SPEED, Math.min(65535, computed));
-}
-
-const SPEED_A = 857.36;
-const SPEED_B = 261.29;
-const SPEED_C = -4795.01;
-
-/**
- * How long ONE cardinal step takes, from the source's own arithmetic
- * (`Creature::getStepDuration`, `src/creatures/creature.cpp:1690-1709`):
- *
- *     calculated = floor(857.36 * ln(speed + 261.29) - 4795.01 + 0.5)
- *     duration   = floor(1000 * groundSpeed / calculated)
- *                  rounded UP to a multiple of SERVER_BEAT
- *
- * A level-1 Character (speed 110, the vocation base in `data/XML/vocations.xml`)
- * gets 550 ms; a Rat (speed 67) gets 900 ms. The Character is faster than what
- * is chasing it, which is why an approach is a chase rather than a queue.
- */
-export function stepDurationMs(
-  stepSpeed: number,
-  groundSpeed: number = DEFAULT_GROUND_SPEED,
-): number {
-  const speed = Math.max(1, Math.floor(stepSpeed));
-  const calculated = Math.max(1, Math.floor(SPEED_A * Math.log(speed + SPEED_B) + SPEED_C + 0.5));
-  const raw = Math.floor((1000 * groundSpeed) / calculated);
-  return Math.max(BEAT_MS, Math.ceil(raw / BEAT_MS) * BEAT_MS);
-}
 
 export interface CreatureStats {
   readonly key: string;
@@ -504,13 +428,15 @@ export function simulateHunt(
    * Diagonals cost three times a cardinal, applied AFTER the base duration has
    * been rounded up to the beat, because the source multiplies the cached,
    * already-rounded `walk.duration` (`creature.cpp:1700-1703`). Rounding the
-   * other way round moves the breakpoints.
+   * other way round moves the breakpoints. The cost is passed INTO
+   * `stepDurationMs` rather than applied to its result, because the source
+   * narrows the product to `uint16_t` as well as the cardinal and only the
+   * function that owns both limits can say whether the step is representable.
    */
   const durationFor = (speed: number, from: TilePosition, to: TilePosition): number => {
     const ground = space ? groundSpeedAt(space.map, from) : DEFAULT_GROUND_SPEED;
-    const base = stepDurationMs(speed, ground);
     const diagonal = from.x !== to.x && from.y !== to.y;
-    return diagonal ? base * DIAGONAL_STEP_FACTOR : base;
+    return stepDurationMs(speed, ground, diagonal ? DIAGONAL_STEP_FACTOR : 1);
   };
 
   /**

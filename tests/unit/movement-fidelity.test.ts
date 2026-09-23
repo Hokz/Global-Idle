@@ -14,11 +14,16 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  BEAT_MS,
   DEFAULT_GROUND_SPEED,
   DIAGONAL_STEP_FACTOR,
   MAX_GROUND_SPEED,
+  MAX_STEP_DURATION_MS,
   MapError,
   PLAYER_MIN_STEP_SPEED,
+  SLOWEST_CHARACTER_STEP_SPEED,
+  StepDurationError,
+  calculatedStepSpeed,
   compileMap,
   createSeededRandom,
   groundSpeedAt,
@@ -27,6 +32,7 @@ import {
   simulateHunt,
   stepDurationMs,
   stepToward,
+  supportedStepDurationMs,
   type CombatProfile,
   type CreatureStats,
   type HuntState,
@@ -34,6 +40,8 @@ import {
   type RoomPlan,
   type SpatialPlan,
 } from '@global-idle/game-engine';
+
+import { CONTENT_MAX_GROUND_SPEED } from '@global-idle/game-data';
 
 const at = (x: number, y: number, z = 7) => ({ x, y, z });
 
@@ -123,13 +131,33 @@ describe('§16 SPD — an actor’s own speed', () => {
     expect(playerBaseStepSpeed(1_000_000)).toBe(65535);
   });
 
-  it('SPD6: the curve never divides by zero, however slow the actor', () => {
-    // `max(formula, 1.)` in the source. At speed 1 the formula is negative;
-    // the floor of 1 turns that into the slowest possible step rather than a
-    // division by zero — and the beat floor keeps it a whole beat.
-    expect(stepDurationMs(1)).toBe(150_000);
-    expect(stepDurationMs(0)).toBe(150_000);
-    expect(stepDurationMs(-1000)).toBe(150_000);
+  it('SPD6: the curve’s DIVISOR floors at 1, which is not a claim about the step', () => {
+    /**
+     * CORRECTED in the Phase 3.6 blocker pass. This case used to be titled
+     * "the curve never divides by zero, however slow the actor" and asserted
+     * `stepDurationMs(1) === 150_000`. The first half was right about the
+     * wrong thing and the second half was wrong outright:
+     *
+     *  - what `max(formula, 1.)` protects is the DIVISOR
+     *    (`updateCalculatedStepSpeed`, `creature.hpp:1089-1097`). It says
+     *    nothing about the duration that divisor produces;
+     *  - 150,000 ms is not a duration the source can hold. `walk.duration` is
+     *    a `uint16_t`, so at speed 1 on default ground Canary performs
+     *    `static_cast<uint16_t>(150000.0)` — undefined behaviour, not 150,000.
+     *
+     * So the divisor is asserted directly, and the duration is asked on ground
+     * the answer fits on. DOM1-DOM8 own the boundary itself.
+     */
+    // ln(262.29) = 5.5695, × 857.36 = 4775.1, − 4795.01 + 0.5 = −19.4 -> the
+    // floor of 1 is what is left. Below −261.29 the branch is not taken at all.
+    expect(calculatedStepSpeed(1)).toBe(1);
+    expect(calculatedStepSpeed(0)).toBe(1);
+    expect(calculatedStepSpeed(-1000)).toBe(1);
+    // And a divisor of 1 means the duration IS the ground speed in seconds:
+    // floor(1000 × 21 / 1) = 21000, already on the beat.
+    expect(stepDurationMs(1, 21)).toBe(21_000);
+    expect(stepDurationMs(0, 21)).toBe(21_000);
+    expect(stepDurationMs(-1000, 21)).toBe(21_000);
     // Immobility is a MOVEMENT decision, not a duration: see SPC/STP for the
     // engine refusing to schedule a step at all below 1.
   });
@@ -347,8 +375,14 @@ describe('§16 GRD — the ground an actor departs from', () => {
       expect(() => bad(value), String(value)).toThrow(MapError);
       expect(() => bad(value), String(value)).toThrow(/legend 'f' has groundSpeed/);
     }
-    // The largest legal value is the source's own uint16 ceiling.
-    expect(() => bad(MAX_GROUND_SPEED)).not.toThrow();
+    // Those are REPRESENTATION failures: a number `uint16_t iType.speed`
+    // (`items.cpp:230`) could not have held. The largest it CAN hold is
+    // MAX_GROUND_SPEED, and that is where this case used to stop — asserting
+    // that 65535 compiled. It does not, and DOM6 is why: a ground speed the
+    // source can store is not automatically one an actor can walk. The two
+    // refusals are deliberately different sentences.
+    expect(() => bad(MAX_GROUND_SPEED)).toThrow(/nobody could walk/);
+    expect(() => bad(MAX_GROUND_SPEED + 1)).toThrow(/whole number from 1 to/);
   });
 
   it('GRD7: the diagonal factor multiplies the ALREADY-ROUNDED base', () => {
@@ -415,7 +449,9 @@ describe('§16 BRK — the staircase 50 ms quantization makes', () => {
     expect(stepDurationMs(playerBaseStepSpeed(8), 100)).toBe(350);
 
     // And slow ground keeps limiting a high-level Character: level 200 is
-    // still 1350 ms a step on the slowest authored ground in the client data.
+    // still 1350 ms a step on ground 850. (850 is a real authored value but
+    // NOT the slowest: the pinned appearance data also carries 1000 and 1200,
+    // which the source map's §3.1 table originally omitted — corrected there.)
     expect(stepDurationMs(playerBaseStepSpeed(200), 850)).toBe(1350);
     expect(stepDurationMs(playerBaseStepSpeed(200), 150)).toBe(250);
 
@@ -456,5 +492,222 @@ describe('§16 PTH — the route is still chosen the source’s way', () => {
     expect(first).toEqual(at(2, 2));
     // Prove the temptation was real: the fast row would have been quicker.
     expect(stepDurationMs(110, 850)).toBeGreaterThan(stepDurationMs(110, 50) * 3);
+  });
+});
+
+/**
+ * §16 DOM — the supported movement domain.
+ *
+ * Added by the Phase 3.6 blocker correction. Everything above says what a step
+ * costs; this group says where that answer is the SOURCE'S answer and what
+ * happens outside, because `Creature::getStepDuration` returns a `uint16_t`
+ * and Phase 3.6 originally asserted a 150,000 ms step against its 65,535 ms.
+ *
+ * The numbers here are worked out from the source arithmetic by hand, the same
+ * rule the rest of the file follows.
+ */
+describe('§16 DOM — where the source’s answer is still the source’s', () => {
+  it('DOM1: the ceiling is the source’s uint16, and it binds in TWO places', () => {
+    /**
+     * Verified at the pinned commit rather than assumed, because "the cached
+     * value only" is the tempting reading and it is wrong:
+     *
+     *   walk.duration = static_cast<uint16_t>(ceil(duration / SERVER_BEAT) * SERVER_BEAT);
+     *   auto duration = walk.duration;                    // uint16_t
+     *   if (diagonal) duration *= WALK_DIAGONAL_EXTRA_COST;
+     *   return duration;                                  // uint16_t
+     *
+     * The first narrows a `double` — undefined behaviour above the range. The
+     * second narrows the PRODUCT back into the same 16 bits, a defined modular
+     * wrap. Both are the ceiling, and each has its own sentence.
+     */
+    expect(MAX_STEP_DURATION_MS).toBe(65535);
+
+    const cardinalRefusal = (): number => stepDurationMs(1, 66);
+    const diagonalRefusal = (): number => stepDurationMs(1, 22, DIAGONAL_STEP_FACTOR);
+    expect(cardinalRefusal).toThrow(StepDurationError);
+    expect(diagonalRefusal).toThrow(StepDurationError);
+    expect(cardinalRefusal).toThrow(/66000 ms cardinal step/);
+    expect(diagonalRefusal).toThrow(/66000 ms step \(22000 ms × 3\)/);
+  });
+
+  it('DOM2: the CARDINAL boundary is exact, to the beat', () => {
+    // At speed 1 the curve's divisor is 1 (SPD6), so the cardinal duration is
+    // 1000 × groundSpeed exactly and the boundary can be read off:
+    //   ground 65 -> 65,000 ms, inside 65,535
+    //   ground 66 -> 66,000 ms, outside it
+    expect(stepDurationMs(1, 65)).toBe(65_000);
+    expect(() => stepDurationMs(1, 66)).toThrow(StepDurationError);
+    // Every duration is a whole beat, so the largest step the source can
+    // express is 65,500 — the last multiple of 50 inside 65,535 — and the next
+    // one is already outside. A level-1 Character on ground 18,209 reaches it:
+    //   floor(18,209,000 / 278) = 65,500 -> 65,500 (an exact multiple already)
+    //   floor(18,210,000 / 278) = 65,503 -> 65,550
+    expect(65_500 % BEAT_MS).toBe(0);
+    expect(65_500 + BEAT_MS).toBeGreaterThan(MAX_STEP_DURATION_MS);
+    expect(stepDurationMs(SLOWEST_CHARACTER_STEP_SPEED, 18_209)).toBe(65_500);
+    expect(() => stepDurationMs(SLOWEST_CHARACTER_STEP_SPEED, 18_210)).toThrow(StepDurationError);
+  });
+
+  it('DOM3: the DIAGONAL boundary is a different, tighter one', () => {
+    // A cardinal that fits can still have a diagonal that does not — this is
+    // the case the reviewer asked to be checked rather than assumed:
+    //   ground 21 -> 21,000 cardinal, 63,000 diagonal    both inside
+    //   ground 22 -> 22,000 cardinal, 66,000 diagonal    cardinal ONLY
+    expect(stepDurationMs(1, 21)).toBe(21_000);
+    expect(stepDurationMs(1, 21, DIAGONAL_STEP_FACTOR)).toBe(63_000);
+    expect(stepDurationMs(1, 22)).toBe(22_000);
+    expect(() => stepDurationMs(1, 22, DIAGONAL_STEP_FACTOR)).toThrow(StepDurationError);
+    // The tighter bound is exactly a third of the looser one, rounded to the
+    // beat: 21,845 is the largest third, and 21,800 the largest one on a beat.
+    expect(21_800 * DIAGONAL_STEP_FACTOR).toBeLessThanOrEqual(MAX_STEP_DURATION_MS);
+    expect(21_850 * DIAGONAL_STEP_FACTOR).toBeGreaterThan(MAX_STEP_DURATION_MS);
+  });
+
+  it('DOM4: outside the domain it REFUSES — it does not clamp and does not wrap', () => {
+    /**
+     * The two numbers a lazy fix would have produced, and neither is returned:
+     *
+     *  - a clamp gives 65,535 ms, which the source never produces;
+     *  - the source's own narrowing gives (21850 × 3) mod 65536 = 14 ms, a
+     *    diagonal EIGHT HUNDRED times faster than cardinal. Reproducing it
+     *    would be copying a defect and calling it fidelity.
+     */
+    let thrown: unknown;
+    try {
+      stepDurationMs(SLOWEST_CHARACTER_STEP_SPEED, 6061, DIAGONAL_STEP_FACTOR);
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(StepDurationError);
+    const error = thrown as StepDurationError;
+    // It carries the TRUE duration, unnarrowed, so a reader can see the size
+    // of the problem: ground 6061 at speed 110 is 21,850 ms × 3.
+    expect(error.durationMs).toBe(65_550);
+    expect(error.stepSpeed).toBe(110);
+    expect(error.groundSpeed).toBe(6061);
+    expect(error.stepCost).toBe(DIAGONAL_STEP_FACTOR);
+    // Not the clamp, and not the wrap.
+    expect(error.durationMs).not.toBe(MAX_STEP_DURATION_MS);
+    expect(error.durationMs % 65_536).toBe(14);
+    expect(supportedStepDurationMs(110, 6061, DIAGONAL_STEP_FACTOR)).toBeNull();
+  });
+
+  it('DOM5: asking is the same arithmetic as demanding, minus the refusal', () => {
+    // One implementation, two faces. `supportedStepDurationMs` answers null
+    // exactly where `stepDurationMs` throws, and the identical number where it
+    // does not — so content can ask the question without catching anything and
+    // the limit still lives in one place.
+    for (const speed of [1, 10, 15, 67, 110, 300, 1000, 65_535]) {
+      for (const ground of [1, 21, 22, 65, 66, 150, 850, 1200, 6060, 6061, MAX_GROUND_SPEED]) {
+        for (const cost of [1, DIAGONAL_STEP_FACTOR]) {
+          const asked = supportedStepDurationMs(speed, ground, cost);
+          if (asked === null) {
+            expect(() => stepDurationMs(speed, ground, cost), `${speed}/${ground}/${cost}`).toThrow(
+              StepDurationError,
+            );
+          } else {
+            expect(stepDurationMs(speed, ground, cost), `${speed}/${ground}/${cost}`).toBe(asked);
+            expect(asked).toBeLessThanOrEqual(MAX_STEP_DURATION_MS);
+          }
+        }
+      }
+    }
+  });
+
+  it('DOM6: a ground speed nobody could walk is refused when the MAP compiles', () => {
+    const withGround = (groundSpeed: number) =>
+      compileMap(
+        mapOf(['####', '#.f#', '####'], {
+          '#': 'wall',
+          '.': 'floor',
+          f: { kind: 'floor', groundSpeed },
+        }),
+      );
+    /**
+     * The yardstick is the slowest Character the game can produce — level 1 at
+     * the vocation base, speed 110, divisor 278 — taking the most expensive
+     * step there is:
+     *
+     *   ground 6060 -> floor(6,060,000 / 278) = 21,798 -> 21,800 × 3 = 65,400
+     *   ground 6061 -> floor(6,061,000 / 278) = 21,802 -> 21,850 × 3 = 65,550
+     *
+     * so 6060 compiles and 6061 does not. Ground no Character can walk is
+     * ground nobody can, and a map is the last moment that is cheap to say.
+     */
+    expect(SLOWEST_CHARACTER_STEP_SPEED).toBe(110);
+    expect(() => withGround(6060)).not.toThrow();
+    expect(() => withGround(6061)).toThrow(MapError);
+    expect(() => withGround(6061)).toThrow(/nobody could walk/);
+    // And the check is the SAME authority the engine uses, not a second rule.
+    expect(supportedStepDurationMs(SLOWEST_CHARACTER_STEP_SPEED, 6060, DIAGONAL_STEP_FACTOR)).toBe(
+      65_400,
+    );
+    expect(
+      supportedStepDurationMs(SLOWEST_CHARACTER_STEP_SPEED, 6061, DIAGONAL_STEP_FACTOR),
+    ).toBeNull();
+    // The Content context cannot import the engine (§5.2), so it states the
+    // REPRESENTATION bound itself. This is the only thing holding the two
+    // copies of that one number together, and it is not a movement rule:
+    // 65535 is what a `uint16_t` ground speed can be, and 6061 is what an
+    // actor can walk. Content owns the first; the engine owns the second.
+    expect(CONTENT_MAX_GROUND_SPEED).toBe(MAX_GROUND_SPEED);
+  });
+
+  it('DOM7: the beat floor is an ADAPT, and the source’s alternative is a freeze', () => {
+    /**
+     * At the FAST end the source's arithmetic reaches zero:
+     *
+     *   speed 1000 -> divisor 1326;  floor(1000 × 1 / 1326) = 0
+     *
+     * and `walk.duration = 0` makes `needRecache()` (`creature.hpp:1081`)
+     * permanently true, so `getStepDuration` keeps returning 0,
+     * `getEventStepTicks` returns 0 and `addEventWalk` declines to schedule
+     * anything: that creature stops walking for good. Ground speed 1 is real —
+     * 120 appearances carry it — so this is reachable, not hypothetical.
+     *
+     * Global Idle issues one beat instead. A step is not a state; refusing to
+     * move forever is not a speed. DELIBERATE DIVERGENCE, recorded as ADAPT in
+     * the source map, and it is a floor rather than a ceiling so it can never
+     * hide an unrepresentable number.
+     */
+    expect(calculatedStepSpeed(1000)).toBe(1326);
+    expect(Math.floor((1000 * 1) / 1326)).toBe(0);
+    expect(stepDurationMs(1000, 1)).toBe(BEAT_MS);
+    // And one beat is genuinely the floor, from every direction.
+    for (const speed of [600, 1000, 5000, 65_535]) {
+      expect(stepDurationMs(speed, 1), `speed ${speed}`).toBe(BEAT_MS);
+    }
+  });
+
+  it('DOM8: every ground the client data authors is inside the domain', () => {
+    /**
+     * The refusal must be unreachable from real content, or it is a bug rather
+     * than a guard. Every `bank.waypoints` value in the pinned
+     * `data/items/appearances.dat` (source map §3.1), against every Character
+     * level from 1 to 2000, cardinal and diagonal.
+     */
+    const authored = [
+      1, 50, 70, 90, 95, 100, 110, 115, 120, 121, 125, 130, 140, 150, 160, 170, 180, 200, 250, 260,
+      300, 350, 400, 450, 500, 800, 850, 1000, 1200,
+    ];
+    let worst = 0;
+    for (const ground of authored) {
+      for (let level = 1; level <= 2000; level += 1) {
+        const speed = playerBaseStepSpeed(level);
+        for (const cost of [1, DIAGONAL_STEP_FACTOR]) {
+          const duration = supportedStepDurationMs(speed, ground, cost);
+          expect(duration, `ground ${ground}, level ${level}, cost ${cost}`).not.toBeNull();
+          worst = Math.max(worst, duration!);
+        }
+      }
+    }
+    // The worst case in the whole reachable space is a level-1 Character
+    // taking a diagonal on the slowest authored ground: 4350 × 3.
+    expect(worst).toBe(13_050);
+    expect(stepDurationMs(playerBaseStepSpeed(1), 1200, DIAGONAL_STEP_FACTOR)).toBe(13_050);
+    // 1200 is the real maximum; 850 is NOT, which §3.1 of the source map
+    // originally said and this case is the reason it was corrected.
+    expect(Math.max(...authored)).toBe(1200);
   });
 });

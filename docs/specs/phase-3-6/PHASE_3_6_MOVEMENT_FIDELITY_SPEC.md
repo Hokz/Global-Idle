@@ -259,24 +259,112 @@ movement engine will not need to change again to consume it.
 | P36-D9 | A creature at speed 0 is **immobile** | `Creature::addEventWalk` refuses, rather than letting the curve's floor make it crawl |
 | P36-D10 | The pathfinder stays **independent** of ground speed | the source's A\* is topology; a time-optimal route is a product feature and is deferred |
 | P36-D11 | The production Sewers keeps the 150 fallback | no sourced tile metadata exists yet; invented values would be fake fidelity |
+| P36-D12 | A step duration above **65,535 ms** is **refused**, not clamped and not wrapped | `Creature::getStepDuration` caches into `uint16_t walk.duration` and returns `uint16_t`; beyond that the source is undefined on one path and silently wrong on the other, and neither is behaviour worth reproducing |
+| P36-D13 | The ceiling binds the **cardinal** duration *and* the cost-multiplied one | verified at the pinned commit: the cast narrows the cache, and `duration *= WALK_DIAGONAL_EXTRA_COST` narrows the product back into the same 16 bits |
+| P36-D14 | The step cost (1 or 3) is an **argument to** `stepDurationMs`, not a multiplier applied to its result | only the function that owns both limits can say whether a step is representable |
+| P36-D15 | `MAX_GROUND_SPEED` stays **65,535** and means *representation*, not walkability | it is `uint16_t iType.speed`; whether a stored ground can be walked is a question about the resulting duration, and a different check answers it |
+| P36-D16 | `compileMap` refuses ground the **slowest Character** could not walk diagonally | ground no Character can use is a map that should never have compiled, and a map is the cheapest place to say so |
+| P36-D17 | The engine still refuses at **step time** for a creature slower than that yardstick | a creature and a map meet only in a plan; the guard has to live where the pair is actually known |
+| P36-D18 | The one-beat **floor** stays, as a documented ADAPT | where the source's cardinal rounds to 0 it stores 0, permanently fails `needRecache()` and stops walking for good; a frozen creature is not a speed |
 
 ---
 
-## 16. Acceptance matrix — 25 cases
+## 13. The supported movement domain
+
+Added by the blocker correction. Everything above says what a step costs; this section says where
+that answer is still the SOURCE'S answer, because the first pass shipped durations the source
+cannot express and tests that asserted them.
+
+### 13.1 What Canary can represent
+
+`Creature::getStepDuration` narrows to `uint16_t` in **two** places, and the difference matters:
+
+```cpp
+if (walk.needRecache()) {
+    auto duration = std::floor(1000 * walk.groundSpeed / walk.calculatedStepSpeed);
+    walk.duration = static_cast<uint16_t>(std::ceil(duration / SERVER_BEAT) * SERVER_BEAT);
+}                                        //  (1) double -> uint16_t
+
+auto duration = walk.duration;           //  uint16_t
+if ((dir & DIRECTION_DIAGONAL_MASK) != 0) {
+    duration *= WALK_DIAGONAL_EXTRA_COST; //  (2) product narrowed back to 16 bits
+}
+return duration;                          //  uint16_t
+```
+
+1. the cached **cardinal** duration. The operand is a `double`; a `double` outside the destination
+   integer's range is **undefined behaviour** in C++, not a wrap with a value;
+2. the **returned** duration. `auto` deduces `uint16_t`, so the diagonal product — and the
+   `WALK_TARGET_NEARBY_EXTRA_COST` one beside it — is narrowed modulo 65,536, which for an unsigned
+   type is defined and silent. `getWalkDelay` multiplies by `lastStepCost` into a `uint16_t` the
+   same way.
+
+So the tempting reading — "the limit is on the cached value" — is wrong on its own. A cardinal
+duration can fit perfectly and still have its diagonal wrap.
+
+### 13.2 Both regions are reachable from real content
+
+| Case | Cardinal | Diagonal | What Canary does |
+|---|---|---|---|
+| monster speed 15 on ground 1200 | 48,000 ms, fits | 144,000 ms | returns **12,928 ms** — a diagonal faster than the cardinal it triples |
+| monster speed 25 on ground 1200 | 21,850 ms, fits | 65,550 ms | returns **14 ms** |
+| a player at `PLAYER_MIN_SPEED` (10) on ground 1200 | 133,350 ms | — | `static_cast<uint16_t>(133350.0)` — undefined |
+
+1,200 is the largest `bank.waypoints` in the pinned `appearances.dat` and 15 the slowest non-zero
+`monster.speed` in the shipped data, so none of those rows needs a debuff or invented content.
+
+### 13.3 What Global Idle does instead
+
+**Refuses.** Reproducing undefined behaviour is not fidelity; reproducing a silent modular wrap is
+not fidelity either; clamping to 65,535 would be a number the source never produced. Outside the
+domain `stepDurationMs` throws `StepDurationError` naming both inputs and the duration it would
+have taken, and `supportedStepDurationMs` answers `null` for callers that want the question without
+the exception. There is exactly one ceiling constant, `MAX_STEP_DURATION_MS`, and one function that
+applies it.
+
+The boundary in numbers, at the level-1 Character's divisor of 278:
+
+| | Largest supported | First refused |
+|---|---|---|
+| cardinal | 65,500 ms (ground 18,209) | 65,550 ms (ground 18,210) |
+| diagonal | 65,400 ms (ground 6,060) | 65,550 ms (ground 6,061) |
+
+### 13.4 Where the refusal is enforced
+
+- `compileMap` refuses an authored ground speed the **slowest Character the game can produce** could
+  not walk diagonally — level 1 at the vocation base, speed 110. That is what reconciles content
+  with the engine: `MAX_GROUND_SPEED` stays 65,535 because that is what `uint16_t iType.speed` can
+  hold, and walkability is asked separately, of the same authority, at compile time;
+- `stepDurationMs` refuses at step time, which is the only place a CREATURE's speed and a map's
+  ground actually meet.
+
+### 13.5 The one-beat floor is an ADAPT, and it is the other end
+
+Where `floor(1000 × groundSpeed / calculatedStepSpeed)` rounds to zero — a fast actor on ground
+speed 1, of which the client data has 120 — the source stores `walk.duration = 0`. `needRecache()`
+is `duration == 0`, so it never clears, `getStepDuration` keeps returning 0, `getEventStepTicks`
+returns 0 and `addEventWalk` declines to schedule anything: that creature stops walking for good.
+Global Idle issues one beat. A deliberate divergence, recorded as **ADAPT**, and a floor rather than
+a ceiling so it can never hide an unrepresentable number.
+
+---
+
+## 16. Acceptance matrix — 33 cases
 
 Counted by `scripts/count-matrix.mjs`; every case is exactly one test whose title begins with its
 id and a colon.
 
 | Group | Cases | What it fixes |
 |---|---|---|
-| **SPD** | 1–6 | the actor's own speed: the source constants reproduce known durations, level 1 is 110, +1 per level, every vocation is 110, the player floor and uint16 ceiling, and the curve never divides by zero |
-| **GRD** | 1–7 | the ground: the 150 fallback, an authored value per tile, **the leg is timed by the tile it leaves**, lower means faster, an O(1) compiled array, invalid values refused by symbol, and the diagonal factor applied after the beat rounding |
+| **SPD** | 1–6 | the actor's own speed: the source constants reproduce known durations, level 1 is 110, +1 per level, every vocation is 110, the player floor and uint16 ceiling, and the curve's **divisor** floors at 1 |
+| **GRD** | 1–7 | the ground: the 150 fallback, an authored value per tile, **the leg is timed by the tile it leaves**, lower means faster, an O(1) compiled array, unrepresentable values refused by symbol, and the diagonal factor applied after the beat rounding |
 | **BRK** | 1–3 | the staircase: a plateau absorbs added speed, a breakpoint changes the duration by a whole beat, and the same Character sits on different steps on different ground — down to the one-beat floor |
 | **THR** | 1–2 | the point: faster ground finishes more encounters in the same authoritative time, and a higher level shortens the legs and covers more ground |
 | **PTH** | 16 | ground speed is not a term in the A\* cost — **continues Phase 3.5's numbering**, which owns PTH1–PTH15 |
 | **REN** | 1–2 | the browser draws a leg over its own duration rather than a fixed ease, and the client changes neither the 15 × 11 world nor the server's timing |
 | **VER** | 1 | a running Activity keeps the ground speeds of the bundle it pinned; a run started after the publish gets the new ones |
 | **DET** | 1–3 | a variable-duration leg survives a fresh process on slow ground and on fast, and settlement partitioning still cannot change a mixed-ground run |
+| **DOM** | 1–8 | the supported domain: the ceiling is the source's `uint16_t` and binds in **two** places, the exact cardinal boundary, the **tighter** diagonal boundary, refusal rather than a clamp or a wrap, the asking face and the refusing face agreeing, a representable-but-unwalkable ground refused when the map compiles, the one-beat floor named as an ADAPT, and every ground the real client data authors proven inside the domain |
 
 Inherited and unchanged: Phase 0B **92**, Phase 1 **87**, Phase 2 **106**, Phase 3 **169**,
 Phase 3.5 **95**.

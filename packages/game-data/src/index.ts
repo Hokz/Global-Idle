@@ -23,6 +23,7 @@ export {
   itemCategory,
   itemSchema,
   markerCategory,
+  MAX_GROUND_SPEED as CONTENT_MAX_GROUND_SPEED,
   parseTyped,
   rarity,
   rarityTableSchema,

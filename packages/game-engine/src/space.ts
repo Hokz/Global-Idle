@@ -14,6 +14,14 @@
  * Every rule here that claims to come from the source engine is cited in
  * `docs/specs/phase-3-5/PHASE_3_5_CANARY_SPATIAL_SOURCE_MAP.md`.
  */
+import {
+  DEFAULT_GROUND_SPEED,
+  DIAGONAL_STEP_FACTOR,
+  MAX_GROUND_SPEED,
+  MAX_STEP_DURATION_MS,
+  SLOWEST_CHARACTER_STEP_SPEED,
+  supportedStepDurationMs,
+} from './step.js';
 
 export interface TilePosition {
   readonly x: number;
@@ -67,20 +75,6 @@ export const DIAGONAL_WALK_COST = 35;
 export const stepCost = (dx: number, dy: number): number =>
   Math.abs(dx) === 1 && Math.abs(dy) === 1 ? DIAGONAL_WALK_COST : NORMAL_WALK_COST;
 
-/** One authored map, as a human writes it into content. */
-/**
- * The default ground speed, hard-coded in the source before anything is looked
- * up (`Creature::setParent`, `src/creatures/creature.cpp:1817`).
- *
- * A tile that authors nothing uses this, which is also the most common
- * authored value in the real client data — 1,097 of the appearances at the
- * pinned commit carry exactly 150.
- */
-export const DEFAULT_GROUND_SPEED = 150;
-
-/** `walk.groundSpeed` is a `uint16_t` in the source, and so is the array here. */
-export const MAX_GROUND_SPEED = 65535;
-
 /**
  * What a legend symbol MEANS.
  *
@@ -102,6 +96,7 @@ export interface MapTileDefinition {
 
 export type MapLegendEntry = TileKindName | MapTileDefinition;
 
+/** One authored map, as a human writes it into content. */
 export interface MapSource {
   readonly key: string;
   readonly z: number;
@@ -247,6 +242,20 @@ export class MapError extends Error {
  * A bad ground speed is refused here rather than clamped, and the message
  * names the symbol, because a map whose mud is secretly stone is a map whose
  * Hunt throughput is silently wrong.
+ *
+ * TWO different refusals, because they are two different mistakes. The first
+ * is REPRESENTATION: a ground speed the source could not store at all. The
+ * second is DOMAIN: a ground speed the source stores happily but whose step
+ * nobody could take — the duration leaves the `uint16_t` that `getStepDuration`
+ * caches and returns, where the source is undefined or wraps. The ceiling that
+ * decides the second one is not repeated here; `supportedStepDurationMs` is
+ * asked, so content and engine cannot drift apart.
+ *
+ * The yardstick is the SLOWEST Character the game can produce, taking the most
+ * expensive step it has — a diagonal. Ground that actor cannot walk is ground
+ * no Character can, so it is a map that should never have compiled. A CREATURE
+ * slower still is not checked here, because a creature and a map meet only in
+ * a plan; `stepDurationMs` refuses that pair when it is actually asked.
  */
 function readLegendEntry(
   key: string,
@@ -259,6 +268,16 @@ function readLegendEntry(
   if (!Number.isInteger(speed) || speed < 1 || speed > MAX_GROUND_SPEED) {
     throw new MapError(
       `${key}: legend '${symbol}' has groundSpeed ${String(speed)}; it must be a whole number from 1 to ${MAX_GROUND_SPEED}. Leave it out for the ${DEFAULT_GROUND_SPEED} default.`,
+    );
+  }
+  const worstStep = supportedStepDurationMs(
+    SLOWEST_CHARACTER_STEP_SPEED,
+    speed,
+    DIAGONAL_STEP_FACTOR,
+  );
+  if (worstStep === null) {
+    throw new MapError(
+      `${key}: legend '${symbol}' has groundSpeed ${String(speed)}, which the source could store but nobody could walk: a level-1 Character's diagonal step would run past the ${MAX_STEP_DURATION_MS} ms the source can represent. Lower the ground speed.`,
     );
   }
   return { kind: entry.kind, groundSpeed: speed };

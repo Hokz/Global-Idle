@@ -405,11 +405,21 @@ describe('§20 STP — one authoritative movement timeline', () => {
     expect(stepDurationMs(67)).toBe(900);
     // Faster is shorter, monotonically, and never below one beat.
     expect(stepDurationMs(300)).toBeLessThan(stepDurationMs(110));
-    expect(stepDurationMs(0)).toBeGreaterThanOrEqual(BEAT_MS);
+    // CORRECTED in the Phase 3.6 blocker pass. This line used to read
+    // `stepDurationMs(0) >= BEAT_MS`, and speed 0 on default ground is a
+    // 150,000 ms step — more than twice the 65,535 ms the source's `uint16_t`
+    // `walk.duration` can hold, so it was asserting a number Canary never
+    // produces; there the source performs an undefined cast. The beat
+    // floor it was really about is reached from the OTHER end, on ground fast
+    // enough that the division rounds to nothing, and that case is inside the
+    // supported domain. See DOM1-DOM8 for the domain itself.
+    expect(stepDurationMs(1000, 1)).toBe(BEAT_MS);
     // Every duration lands on the 50 ms beat.
-    for (const speed of [1, 40, 67, 110, 220, 1000]) {
+    for (const speed of [40, 67, 110, 220, 1000]) {
       expect(stepDurationMs(speed) % BEAT_MS).toBe(0);
     }
+    // Including the slowest actor the curve has, asked on ground it can walk.
+    expect(stepDurationMs(1, 21) % BEAT_MS).toBe(0);
   });
 
   it('STP2: an actor cannot swing from a tile it has not reached yet', () => {

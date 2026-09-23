@@ -207,7 +207,10 @@ are standing on — which is the difference between an animation detail and an e
 - the step is timed by the tile the actor DEPARTS from, as the source times it;
 - the 50 ms staircase is the whole of what "bugging speed" means: plateaus where more speed buys
   nothing, breakpoints where it buys a whole beat, and a floor of one beat where it stops buying;
-- measured: the same Character finishes twice the encounters on fast ground in the same time.
+- measured: the same Character finishes twice the encounters on fast ground in the same time;
+- and the imported arithmetic carries its own limits: a step longer than the 65,535 ms the source
+  can represent is **refused**, at map-compile time where it can be, so authored content can never
+  quietly get a duration Canary never produced.
 
 Not in this phase: haste, paralyze, equipment speed, mounts, conditions of any kind, a
 travel-time-optimised pathfinder, and any ingestion of real client assets. The shipped map keeps

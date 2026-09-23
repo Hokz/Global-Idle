@@ -164,6 +164,9 @@ const MATRICES = {
       REN: [1, 2],
       VER: [1, 1],
       DET: [1, 3],
+      // Added by the Phase 3.6 blocker correction: the supported movement
+      // domain, which is where the imported arithmetic is still the source's.
+      DOM: [1, 8],
     },
   },
 };
@@ -172,6 +175,7 @@ const MATRICES = {
 // `2`. Regex alternation is ordered, and that order is the whole contract.
 const PREFIXES = [
   'RNGC',
+  'DOM',
   'SPD',
   'GRD',
   'BRK',

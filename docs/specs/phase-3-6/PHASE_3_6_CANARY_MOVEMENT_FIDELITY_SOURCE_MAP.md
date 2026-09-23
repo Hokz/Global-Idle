@@ -41,10 +41,14 @@ Two guards worth naming, because both are observable:
 
 - `stepSpeed > -speedB` — a step speed at or below `-261.29` leaves `calculatedStepSpeed` at **1**,
   so the logarithm is never taken of a non-positive number;
-- `max(formula, 1.)` — the curve is floored at **1**, so an extremely slow actor gets a very long
-  step rather than a division by zero.
+- `max(formula, 1.)` — the DIVISOR is floored at **1**, so there is never a division by zero.
 
-Global Idle's `stepDurationMs` implements both. **KEEP.**
+Global Idle's `calculatedStepSpeed` implements both. **KEEP.**
+
+What the second guard does *not* say is that the resulting step is one the source can express. A
+divisor of 1 makes the duration 1,000 × the ground speed, which passes `uint16_t walk.duration` at
+ground 65 and fails at 66. The first pass read the floor as a statement about durations and
+asserted `stepDurationMs(1) === 150_000`; §2.1 is the correction.
 
 ---
 
@@ -80,6 +84,44 @@ staircase this produces is §8 of the spec. **KEEP.**
 `WALK_TARGET_NEARBY_EXTRA_COST = 2` (`creature.hpp:43`, applied at `creature.cpp:1703-1707`) slows a
 monster that is already beside its target. Global Idle's creatures stop when adjacent, so it would
 change nothing. **DEFER** — recorded in Phase 3.5's map for the same reason.
+
+### 2.1 What that arithmetic can REPRESENT — ADAPT
+
+Added by the blocker correction, after re-reading the pinned source rather than assuming. Five
+things are deliberately kept apart here, because the first pass ran them together:
+
+| | |
+|---|---|
+| the mathematical curve | unbounded above; at a divisor of 1 the duration is 1,000 × ground speed |
+| the source's storage | `uint16_t` — `walk.groundSpeed`, `walk.calculatedStepSpeed` and `walk.duration` are all `uint16_t` (`creature.hpp:1077-1079`), and `getStepDuration` **returns** `uint16_t` |
+| the reachable source-content domain | ground speed 0–1,200 and monster speed 0 or 15–530, from the shipped data (§3.1 and below) |
+| Global Idle's supported domain | every pair whose cardinal **and** cost-multiplied duration is ≤ 65,535 ms |
+| the deliberate adaptation | outside it Global Idle **refuses**; and at the other end it floors at one beat |
+
+The `uint16_t` binds in **two** places, which is the question a reviewer asked to have checked
+rather than assumed:
+
+1. the **cached cardinal** — `walk.duration = static_cast<uint16_t>(...)` converts a `double`. A
+   `double` whose truncated value is outside the destination's range is **undefined behaviour** in
+   C++ ([conv.fpint]); there is no defined result to reproduce;
+2. the **returned** value — `auto duration = walk.duration` deduces `uint16_t`, so
+   `duration *= WALK_DIAGONAL_EXTRA_COST` narrows the product back into 16 bits. For an unsigned
+   type that is a defined, silent modular wrap. `getWalkDelay` (`creature.cpp:108-120`) multiplies
+   by `lastStepCost` into a `uint16_t` the same way.
+
+So a cardinal duration that fits perfectly can still have its diagonal wrap, and it is not a corner
+of invented content:
+
+| Pair (both from shipped data) | Cardinal | Diagonal, unnarrowed | What Canary returns |
+|---|---|---|---|
+| `monster.speed` 15 on ground 1200 | 48,000 ms | 144,000 ms | **12,928 ms** — faster than the cardinal it triples |
+| `monster.speed` 25 on ground 1200 | 21,850 ms | 65,550 ms | **14 ms** |
+| a player at `PLAYER_MIN_SPEED` 10 on ground 1200 | 133,350 ms | — | undefined |
+
+**ADAPT.** Global Idle reproduces neither the undefined cast nor the wrap: `stepDurationMs` refuses
+outside the domain and says which two numbers caused it. Copying a C++ narrowing would be copying a
+defect and calling it fidelity. The engine's `MAX_STEP_DURATION_MS` is the single statement of the
+ceiling, and spec §13 has the boundary numbers.
 
 ---
 
@@ -151,7 +193,14 @@ of authored ground speeds is:
 | 160 · 170 · 180 | 257 | |
 | 200 | 105 | slow |
 | 250 · 260 · 300 · 350 · 400 · 450 · 500 | 89 | very slow |
-| 800 · 850 | 4 | the slowest authored ground |
+| 800 · 850 | 4 | very slow |
+| 1000 · 1200 | 3 | the slowest authored ground |
+
+**CORRECTED** by the blocker correction: the last row was missing. The first pass's table stopped at
+`800 · 850` and called that "the slowest authored ground", dropping three appearances — two at
+1,000 and one at 1,200. The omission mattered, because 1,200 is exactly where a slow creature's
+diagonal step leaves the `uint16_t` the source returns (§2.1). The histogram was re-decoded from the
+same file to produce this row.
 
 Those are the numbers Phase 3.6's fixtures use where a representative value is needed — 50, 100,
 150, 200 and 850 — rather than invented ones.
@@ -227,6 +276,24 @@ unclamped.
 
 Global Idle mirrors both halves: a Character's step speed is clamped to a floor, and a creature
 authored at speed 0 is **immobile** rather than very slow. **KEEP.**
+
+### 5.1 The reachable monster-speed domain — SOURCE
+
+Every `monster.speed` in `data-otservbr-global/monster/**` and `data-canary/monster/**` at the
+pinned commit:
+
+| value | count | reading |
+|---|---|---|
+| 0 | 113 | immobile — the branch above |
+| 15 | 1 | the slowest thing that moves |
+| 25 – 530 | the rest | ordinary creatures; a Rat is 67 |
+
+Recorded here because it decides whether the representation problem in §2.1 is theoretical. It is
+not: 15 with ground speed 1,200 is two shipped numbers, and their diagonal wraps.
+
+A condition can drive a live creature below 15 — the source clamps players and leaves creatures
+alone — so the reachable range is wider still in a running server. Global Idle has no such condition
+(`varSpeed` is deferred, §7), so its creature speeds are the authored ones.
 
 ---
 

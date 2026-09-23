@@ -537,7 +537,10 @@ a disconnected character.
 - a tile's ground speed is authored content, and the step is timed by the tile it LEAVES;
 - the 50 ms staircase — plateaus, breakpoints, and a one-beat floor — from the source's arithmetic;
 - movement-heavy Hunt throughput changes with level and with terrain;
-- the pathfinder stays independent of ground speed, exactly as the source's does.
+- the pathfinder stays independent of ground speed, exactly as the source's does;
+- the supported movement domain is stated and enforced: the source caches and returns a step
+  duration as a `uint16_t`, so beyond 65,535 ms Global Idle refuses rather than clamping or
+  reproducing the C++ overflow.
 
 ### Phase 3.7 — First real asset visual slice
 
