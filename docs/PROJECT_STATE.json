@@ -1,18 +1,16 @@
 {
   "$comment": "THE canonical project state. AGENTS.md, the roadmaps and the design index all point HERE rather than repeating it, because a phase marker copied into five documents is a phase marker that goes stale in four of them. `scripts/check-project-state.mjs` fails CI if AGENTS.md and this file disagree.",
   "activePhase": {
-    "id": "phase-3-6",
-    "name": "Phase 3.6 — Movement fidelity: Character speed and tile ground speed",
-    "status": "IMPLEMENTATION_COMPLETE — PENDING INDEPENDENT REVIEW",
-    "pr": 10,
-    "spec": "docs/specs/phase-3-6/PHASE_3_6_MOVEMENT_FIDELITY_SPEC.md"
+    "id": "phase-3-7",
+    "name": "Phase 3.7 — First real asset visual slice",
+    "status": "PLANNED"
   },
   "lastVerifiedPhase": {
-    "id": "phase-3-5",
-    "name": "Phase 3.5 — Tile / spatial Game Window",
-    "verifiedAt": "2026-09-22",
-    "acceptedHead": "2e67f4b",
-    "pr": 9
+    "id": "phase-3-6",
+    "name": "Phase 3.6 — Movement fidelity: Character speed and tile ground speed",
+    "verifiedAt": "2026-09-23",
+    "acceptedHead": "f96c839d4609ecef2cf592a7f3d3c6e8a91f3ef4",
+    "pr": 10
   },
   "phases": [
     {
@@ -53,8 +51,13 @@
     {
       "id": "phase-3-6",
       "name": "Movement fidelity: Character speed and tile ground speed",
-      "status": "IMPLEMENTATION_COMPLETE — PENDING INDEPENDENT REVIEW",
+      "status": "VERIFIED",
       "matrix": 43
+    },
+    {
+      "id": "phase-3-7",
+      "name": "First real asset visual slice",
+      "status": "PLANNED"
     }
   ],
   "baseline": {
