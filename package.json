@@ -28,6 +28,7 @@
     "format:check": "prettier --check .",
     "format": "prettier --write .",
     "boundaries": "depcruise --config .dependency-cruiser.cjs apps packages",
+    "release:check": "node ./scripts/check-release-isolation.mjs",
     "migrate:check": "pnpm --filter @global-idle/domain run migrate:check",
     "clean": "tsc -b --clean && rm -rf packages/*/dist apps/*/dist packages/domain/src/generated"
   },

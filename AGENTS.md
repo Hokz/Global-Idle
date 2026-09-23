@@ -178,12 +178,22 @@ a phase marker copied into five documents is a phase marker that goes stale in f
 this file said *"Current phase: Phase 1"* for two entire phases.
 `scripts/check-project-state.mjs` fails CI if the two ever disagree again.
 
-Active phase: **Phase 3.7 — First real asset visual slice** (`IMPLEMENTATION_SPEC_READY`). Its
-specification is
-[`docs/specs/phase-3-7/PHASE_3_7_ASSET_VISUAL_SLICE_SPEC.md`](docs/specs/phase-3-7/PHASE_3_7_ASSET_VISUAL_SLICE_SPEC.md).
-It has NOT been independently reviewed and no implementation exists; the implementation PR is gated
-on review of that spec. User-supplied client assets are a PRIVATE reference and must never be
-committed — see its §9.
+Active phase: **Phase 3.7 — First real asset visual slice**
+(`IMPLEMENTATION_COMPLETE — PENDING INDEPENDENT REVIEW`). Its specification is
+[`docs/specs/phase-3-7/PHASE_3_7_ASSET_VISUAL_SLICE_SPEC.md`](docs/specs/phase-3-7/PHASE_3_7_ASSET_VISUAL_SLICE_SPEC.md)
+and its 69 matrix cases pass. It has been independently reviewed twice — at `06c33e7` and at
+`fb7defc` — and both sets of corrections are applied. It is back in review and **NOT VERIFIED**.
+User-supplied client assets are a PRIVATE reference and must never be committed — see its §9. The
+boundary is enforced, not merely documented: `pnpm release:check`
+(`scripts/check-release-isolation.mjs`) fails the build if a private asset can reach a
+distributable artefact. `apps/web/public/assets/private/` is a forbidden path; every file under
+`apps/web/public/` — text included — must be on the deny-by-default release allowlist
+`apps/web/public/ASSET_MANIFEST.json`, matched by hash, unless it is on the narrow exempt-path
+list; and every image, font or media file in the BUILD ARTEFACT must hash-match an allowlist entry,
+because a bundled asset never passes through `public/`. An allowlist entry must state a non-empty
+author and licence: the script can require that a claim exists and bind it to exact bytes, but only
+a human can verify the claim is true. Private files belong at `private/assets/`, which no bundler
+input covers.
 Last VERIFIED: **Phase 3.6 — Movement fidelity: Character speed and tile ground speed**, accepted
 2026-09-23 at head `f96c839d4609ecef2cf592a7f3d3c6e8a91f3ef4` (PR #10, still open and stacked on
 PR #9). Phase 3.5 remains VERIFIED at `2e67f4b` (PR #9); Phase 3 at `d46f78b` (PR #8).

@@ -417,3 +417,336 @@ input {
   flex-direction: column;
   gap: 2px;
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Phase 3.7 — the pixel Atlas and the HUD grammar.
+
+   All of it is CSS. No image is loaded, so a public build with no private
+   asset present looks exactly like a developer's own (spec §7, §9).
+   ───────────────────────────────────────────────────────────────────────── */
+
+.atlas-stack {
+  /* A flex item's default `min-width: auto` lets its widest unbreakable
+     child push the whole column past the viewport. Measured: the
+     three-level breadcrumb made this 405px wide inside a 390px phone,
+     putting zoom-in off-screen and unclickable while it LOOKED fine. */
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.atlas-stack__crumbs {
+  /* Four levels of names do not fit on one phone line. Wrapping keeps the
+     trail complete instead of overflowing the surface it belongs to. */
+  flex-wrap: wrap;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--muted, #8fa3b8);
+}
+.atlas-stack__crumbs button {
+  font: inherit;
+}
+.atlas-stack__hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--muted, #8fa3b8);
+}
+
+.atlas-surface {
+  /* A flex item's default `min-width: auto` lets its widest unbreakable
+     child push the whole column past the viewport. Measured: the
+     three-level breadcrumb made this 405px wide inside a 390px phone,
+     putting zoom-in off-screen and unclickable while it LOOKED fine. */
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.atlas-surface__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  /* At 390 wide the title and the controls do not both fit on one line.
+     Wrapping is what keeps the controls usable instead of crushed. */
+  flex-wrap: wrap;
+}
+.atlas-surface__head h2 {
+  margin: 0;
+  font-size: 1rem;
+  /* Allows the title to shrink so the controls never have to. */
+  min-width: 0;
+}
+.atlas-surface__zoom {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  /* NEVER shrink. Measured: as a shrinkable flex item the buttons collapsed
+     under the zoom readout at 390 wide and the label intercepted the pointer,
+     so zoom-in was unclickable on a phone while looking perfectly fine. */
+  flex: none;
+}
+.atlas-surface__zoom button {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  font: inherit;
+  line-height: 1;
+}
+.atlas-surface__zoom span {
+  min-width: 2.5em;
+  text-align: center;
+}
+
+/* The viewport. `overflow: hidden` is load-bearing: the raster is magnified
+   inside it, and without clipping a zoomed island would escape the panel. */
+.atlas-surface__frame {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  /* Tall enough to be a map, short enough to leave room on a phone. */
+  height: clamp(240px, 46vh, 420px);
+  background: #0d1117;
+  border: 1px solid var(--line, #33455a);
+  border-radius: 6px;
+  cursor: grab;
+  touch-action: none; /* one-finger pan is ours, not the browser's scroll */
+}
+.atlas-surface__frame:active {
+  cursor: grabbing;
+}
+.atlas-surface__frame:focus-visible {
+  outline: 2px solid #9fd0ff;
+  outline-offset: 2px;
+}
+.atlas-surface__world {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+}
+/* Nearest-neighbour: a pixel preview, never a resample. */
+.atlas-surface__canvas {
+  display: block;
+  image-rendering: pixelated;
+}
+.atlas-surface__caption {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--muted, #8fa3b8);
+}
+
+/*
+ * A PIN'S HIT AREA IS ITS DOT.
+ *
+ * The label is drawn beside the dot but takes no pointer events, because a
+ * button sized to its text is a button that covers its neighbours: measured,
+ * the "Rookgaard Sewers" label sat over the Shop pin, so aiming at the shop
+ * entered a Hunt. A marker whose target is the marker cannot do that, however
+ * the pins are arranged later.
+ */
+.atlas-pin {
+  position: absolute;
+  transform-origin: 50% 100%;
+  width: 13px;
+  height: 13px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.atlas-pin__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 2px solid #0d1117;
+}
+.atlas-pin__label {
+  position: absolute;
+  bottom: 100%;
+  margin-bottom: 2px;
+  pointer-events: none;
+  font-size: 10px;
+  color: #e6edf3;
+  background: #1b2430ee;
+  border: 1px solid #4a6076;
+  border-radius: 3px;
+  padding: 1px 4px;
+}
+.atlas-pin__demo {
+  margin-left: 4px;
+  font-style: normal;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #e8c37a;
+}
+.atlas-pin:focus-visible {
+  outline: 2px solid #9fd0ff;
+  outline-offset: 2px;
+}
+
+/* ── HUD ─────────────────────────────────────────────────────────────────── */
+
+.hud {
+  display: grid;
+  grid-template-columns: minmax(150px, 190px) minmax(0, 1fr) minmax(150px, 190px);
+  gap: 12px;
+  align-items: start;
+}
+.hud-column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.hud-centre {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.hud-panel,
+.hud-log {
+  background: var(--panel, #222d3b);
+  border: 1px solid var(--line, #33455a);
+  border-radius: 6px;
+  padding: 9px 10px;
+}
+.hud-panel h3,
+.hud-log h3 {
+  margin: 0 0 6px;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #9fd0ff;
+}
+.hud-panel__tag {
+  font-style: normal;
+  font-size: 0.62rem;
+  color: #e8c37a;
+  border: 1px solid #6b5326;
+  border-radius: 3px;
+  padding: 0 4px;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+.hud-panel__reason {
+  margin: 6px 0 0;
+  font-size: 0.7rem;
+  line-height: 1.45;
+  color: var(--muted, #8fa3b8);
+}
+.hud-stats {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 8px;
+  margin: 0;
+  font-size: 0.8rem;
+}
+.hud-stats dt {
+  color: var(--muted, #8fa3b8);
+}
+.hud-stats dd {
+  margin: 0;
+}
+.hud-slots {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+.hud-slot {
+  aspect-ratio: 1;
+  background: #0f1620;
+  border: 1px solid #3a4c63;
+  border-radius: 3px;
+}
+.hud-vitals {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.hud-bar {
+  position: relative;
+  height: 16px;
+  background: #0f1620;
+  border: 1px solid #3a4c63;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.hud-bar__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+}
+.hud-bar__fill--stamina {
+  background: #6fbf73;
+}
+.hud-bar__label {
+  position: relative;
+  display: block;
+  font-size: 0.66rem;
+  line-height: 16px;
+  padding: 0 6px;
+  color: #e6edf3;
+}
+.hud-bar--dormant .hud-bar__label {
+  color: var(--muted, #8fa3b8);
+}
+
+/* A phone gets one column: the Game Window first, the panels under it. The
+   world it shows is still 15 × 11 — the layout moved, the game did not. */
+@media (max-width: 860px) {
+  .hud {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .hud-centre {
+    order: -1;
+  }
+  .hud-column {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .hud-column > * {
+    flex: 1 1 150px;
+  }
+}
+
+/* ── Atlas: locked destinations and the four-level breadcrumb ─────────────── */
+.atlas-pin--locked {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+.atlas-pin--locked .atlas-pin__dot {
+  filter: grayscale(1);
+}
+.atlas-pin__locked {
+  margin-left: 4px;
+  font-style: normal;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #9aa7b4;
+}
+.atlas-stack__crumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.atlas-stack__crumb-current {
+  margin-left: 8px;
+  color: #9aa7b4;
+  font-size: 12px;
+}
+.atlas-stack__back {
+  align-self: flex-start;
+}
+.atlas-stack__blocked {
+  margin: 0;
+  color: #e8c37a;
+}

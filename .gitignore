@@ -37,3 +37,8 @@ apps/web/public/assets/private/
 private-assets/
 *.rcc
 *.rar
+
+# `next dev` writes an agent-rules file into the app it runs. The repository's
+# own AGENTS.md is at the root; this generated copy is a dev-server artefact.
+apps/web/AGENTS.md
+apps/web/CLAUDE.md
