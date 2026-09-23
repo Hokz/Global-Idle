@@ -219,7 +219,12 @@ the default ground, because its tiles have no sourced metadata yet.
 
 ## Phase 3.7 — First real asset visual slice
 
-**PLANNED — NOT STARTED.** No source assets are in the repository yet.
+**SPECIFIED — NOT IMPLEMENTED.** Its specification is
+[`docs/specs/phase-3-7/PHASE_3_7_ASSET_VISUAL_SLICE_SPEC.md`](specs/phase-3-7/PHASE_3_7_ASSET_VISUAL_SLICE_SPEC.md),
+pending independent review. No source assets are in the repository, and none will be: user-supplied
+client graphics are a PRIVATE reference, the public build ships distributable placeholders, and the
+three surfaces are deliberately distinct — a macro Atlas over a raster, a Rookgaard city overlay,
+and ORIGINAL compact hunt arenas that do not reconstruct Tibia's dungeons.
 
 After movement fidelity, the next milestone is to make the game LOOK like the thing it is meant to
 be, before Party work widens the scope again: one origin Character outfit with walking frames, a

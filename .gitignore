@@ -21,3 +21,19 @@ packages/game-data/bundles/
 test-results/
 playwright-report/
 blob-report/
+
+# Phase 3.7 — private client assets. Never redistributable content (spec §9).
+#
+# `.gitignore` protects COMMITS and nothing else: a gitignored file under
+# apps/web/public/ is still copied into .next, into an image layer and onto a
+# CDN. So this list is DEFENCE IN DEPTH, not the distribution guarantee —
+# `scripts/check-release-isolation.mjs` is (spec §9.3).
+#
+# The private override lives at private/assets/, OUTSIDE every bundler input.
+# apps/web/public/assets/private/ is FORBIDDEN and fails the release guard; it
+# is listed here only so an accident cannot also become a commit.
+private/
+apps/web/public/assets/private/
+private-assets/
+*.rcc
+*.rar
