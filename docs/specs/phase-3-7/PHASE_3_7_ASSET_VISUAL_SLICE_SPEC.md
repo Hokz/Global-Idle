@@ -66,6 +66,12 @@ appearanceId          21 (outfit)  ·  44092 (object)
                   └─ PNG
 ```
 
+**This chain describes PRIVATE, CLIENT-DERIVED sprites only.** A public placeholder is
+independently authored, so it has its own provenance and its own licence, and it is addressed by a
+**semantic asset key** (`tile.cave.floor`, `actor.rat.idle.south`). Giving a placeholder a fabricated
+`appearanceId` or `spriteId` would be inventing a source record for art that has no source —
+see §3.1.
+
 **Rules.**
 
 1. an asset record stores `appearanceId`, `frameGroup`, `spriteId`, `sourceSheet`,
@@ -82,6 +88,19 @@ appearanceId          21 (outfit)  ·  44092 (object)
    authoring it;
 5. an appearance's **name is not its role.** See §10 — the spike disproved a name-based guess.
 
+### 3.1 Two kinds of asset, two kinds of record
+
+| | public placeholder | private client-derived |
+|---|---|---|
+| addressed by | semantic key — `tile.cave.floor` | `appearanceId` + `frameGroup` + `spriteId` |
+| provenance | its own author and licence, recorded in the public manifest | the five-link chain above |
+| ships in | every build | **no** build — dev-only (§9.2) |
+| may claim a source id | **never** | yes, the real one |
+
+The renderer asks for a **semantic key**. Resolution picks the private sprite in development when
+one is present, and the public placeholder otherwise. The key is the contract; the source id is a
+property of one possible answer to it.
+
 ---
 
 ## 4. Pixel atlas — zoom, pan, pins
@@ -90,7 +109,10 @@ appearanceId          21 (outfit)  ·  44092 (object)
   a pixel preview of a single raster, not a multi-resolution tile pyramid. A pyramid is a later
   option **only if source data at that resolution exists**;
 - a **coordinate transform** converts source tile/world position ⇄ atlas screen position. It is a
-  pure function of (origin, pixelsPerTile, zoom, pan) and is round-trip tested;
+  pure function of (origin, pixelsPerTile, zoom, pan) and is round-trip tested **with SYNTHETIC
+  calibration parameters**. The maths is testable; the calibration is not supplied. A passing
+  transform test proves the function is correct, and proves **nothing** about where anything really
+  is in Rookgaard;
 - **pins carry typed metadata** — `CITY | HUNT | NPC | SHOP | QUEST` — and may reference an existing
   content key. The renderer holds no persistent state and invents none; a pin without a verified
   coordinate renders with a visible `demo` marking;
@@ -105,7 +127,9 @@ back to the world atlas and forward into one hunt. Keyboard and touch both work.
 
 **Every position is `demo` until calibrated.** The supplied rasters carry no world-coordinate origin
 and no pixels-per-tile scale (§10), so no NPC or Temple coordinate in this phase may be presented as
-exact.
+exact. Nor does a 512 × 512 crop demonstrate that the island is completely covered — that is an
+unproven claim about the raster, and the UI must not imply it. Real geographic precision arrives
+with calibration data or not at all.
 
 ---
 
@@ -114,6 +138,16 @@ exact.
 The existing 15 × 11 server-authoritative Game Window renders: a rat, an origin/citizen character
 (or a distributable fallback), a cave floor/wall/corner palette, one decorative prop, real
 authoritative movement and a basic encounter.
+
+**The wall palette is an independently authored placeholder, and stays one.** The private subset
+contains no verified cave wall or corner: 44110 was tested and is not a wall (§11). Until an
+appearance *and its gameplay role* are both verified from the source, walls are public art.
+
+**A CANDIDATE id is COSMETIC, always.** 44092, 44091, 1780 and 44078 may be drawn; none of them may
+become a collision flag or a `groundSpeed`, because the manifest carries no `unpass`,
+no `blockPathFind` and no `bank.waypoints` for any of them. Walkability keeps coming from the
+authored tile KIND, and ground speed keeps Phase 3.6's sourced 150 fallback wherever a real
+`bank.waypoints` is not known. Sprites decorate the tile; they never define it.
 
 The renderer keeps every Phase 3.5/3.6 guarantee: it draws the leg the server put on the run over
 that leg's own duration, it does not choose tiles, it does not advance anything, and the sprite
@@ -152,12 +186,68 @@ truth in React: no client-side simulation, no optimistic combat, no locally inve
 
 ---
 
-## 9. Legal and source boundary
+## 9. Legal and source boundary — DISTRIBUTION, not just Git history
+
+> **Amended after independent review of this spec (condition A1).** The first version relied on
+> `.gitignore`, which protects *commits* and protects nothing else. A file under
+> `apps/web/public/assets/private/` is gitignored and **still** copied into `.next`, into a Docker
+> image, into a static export and onto a CDN. Ignoring a path is not a distribution guarantee.
+
+### 9.1 Where private assets may live — and where they may not
+
+- **`apps/web/public/assets/private/` is FORBIDDEN.** Not "discouraged", not "gitignored" —
+  forbidden, and its presence **fails the build**. Everything under `public/` is a distributable
+  input by definition; a private file there is a published file waiting for a deploy;
+- the private override lives at **`private/assets/`** in the repository root: outside `public/`,
+  outside every bundler input, outside every static-copy root. Nothing in the production build
+  graph reads that directory;
+- `.gitignore` still covers both paths. It is **defence in depth**, not the guarantee.
+
+### 9.2 The dev-only loader
+
+A private preview is served by a **development-only** route that:
+
+- keys on `process.env.NODE_ENV !== 'production'`, which the bundler substitutes at build time so
+  the branch is eliminated from a release build;
+- refuses in production **regardless of any environment variable**. There is no opt-in flag, because
+  a flag is a way to ship it by accident;
+- resolves only inside `private/assets/`, with traversal rejected;
+- returns 404 when the file is absent, and the caller falls back to the public placeholder silently.
+
+### 9.3 The fail-closed release guard
+
+`scripts/check-release-isolation.mjs` runs in CI and in the release path, and **fails closed**:
+
+1. the forbidden `apps/web/public/assets/private/` path does not exist;
+2. no file under any distributable static root carries a private-asset signature;
+3. the built output (`.next`, and any export or image layer) contains **no** private asset path and
+   **no** private marker string;
+4. the dev-only loader is not reachable in a production build.
+
+The marker is a reproducible, non-proprietary sentinel — `GLOBAL_IDLE_PRIVATE_ASSET_MARKER` —
+written into the *fake* bytes a test places at the override location. It is a tracer, so the scan
+can prove a negative about bytes it has never seen.
+
+### 9.4 What the tests must prove
+
+Both states, not one:
+
+| state | must hold |
+|---|---|
+| **no private file present** (a clean checkout) | install, build and test succeed; the public placeholder resolves; no request 404s |
+| **fake private bytes at `private/assets/`** | a dev build may show them; the **release artefact contains neither the bytes, the path, nor the marker** |
+| **anything at `apps/web/public/assets/private/`** | the guard **fails the build** |
+
+- public CI and E2E **never** require the private ZIP or any original client image;
+- **no proprietary screenshot** is uploaded as a CI artefact or added to a public PR. Public E2E
+  screenshots show public placeholders only;
+- **no real private PNG is copied into a committed fixture or snapshot.** Test fixtures are
+  synthetic bytes carrying the marker.
+
+### 9.5 Unchanged from the reviewed version
 
 - **public build:** deterministic, legally distributable placeholder art. CI, tests and every public
-  artefact use it and must pass without any private file;
-- **private override:** an optional, gitignored local path. Absent → the public placeholder is used,
-  silently and without error;
+  artefact use it and must pass with no private file present;
 - **never committed:** Tibia sprite sheets, extracted PNGs, satellite/minimap originals, RCC images,
   reconstructed proprietary UI textures, the ZIP, or screenshots containing any of them;
 - **no remote asset loading** from unsanctioned endpoints. Assets are local or they do not exist.
@@ -235,6 +325,12 @@ The spike is disposable and private. Its screenshot is not in this repository.
 | P37-D8 | The asset record keys on `appearanceId` + `frameGroup` + `spriteId`, never a filename | filenames are not source identity |
 | P37-D9 | Sprite cells may be 32px or 64px, per sheet | both exist in the supplied subset; assuming 32 would misplace every creature |
 | P37-D10 | An appearance's name is never evidence of its role | 44110 "cave wall panel" is not a wall |
+| P37-D11 | `apps/web/public/assets/private/` is FORBIDDEN and fails the build | everything under `public/` is a distributable input; a private file there is a published file waiting for a deploy |
+| P37-D12 | The private override lives at `private/assets/`, outside every bundler input | a path the production build graph never reads cannot be shipped by it |
+| P37-D13 | The dev loader keys on `NODE_ENV !== 'production'` and has no opt-in flag | a flag is a way to ship it by accident; a build-time substitution is eliminated from the bundle |
+| P37-D14 | A fail-closed release guard scans distributable output for private paths and a marker | `.gitignore` protects commits; only a scan of the artefact protects a release |
+| P37-D15 | A public placeholder carries its own licence and a semantic key, never a fabricated `appearanceId` | inventing a source record for art with no source is the same lie as inventing a coordinate |
+| P37-D16 | Transform tests use SYNTHETIC calibration; a CANDIDATE id stays cosmetic | the maths is testable without calibration, and a sprite must never become collision or `groundSpeed` |
 
 ---
 
@@ -255,6 +351,7 @@ script gains `phase-3-7` in the implementation PR, with the counts it can actual
 | **HUD** | HUD grammar | every panel renders with no private asset present; layout holds at desktop and at 390 × 844 |
 | **AUTH** | authority | navigation mutates no combat, RNG, timing, persistence, economy or pinning |
 | **FALL** | fallback | a missing private override degrades to the placeholder silently; no remote fetch |
+| **DIST** | release isolation (A1) | the forbidden `public/assets/private/` path fails the build; a marked fake private file never reaches the artefact by bytes, path or marker; the dev loader is unreachable in production; a clean checkout builds and serves placeholders with no 404 |
 
 ---
 
@@ -267,8 +364,17 @@ systems.
 
 ---
 
-## 15. Status
+## 15. Amendment history
 
-`PLANNED` — specification only. This document has not been independently reviewed, no
+| when | what |
+|---|---|
+| initial | the reviewed specification |
+| **after independent review** | **A1** — §9 rewritten around DISTRIBUTION rather than Git history: the `public/assets/private/` path is forbidden and build-failing, the override moves to `private/assets/`, the dev loader is `NODE_ENV`-gated with no opt-in flag, a fail-closed release guard scans the artefact, and both the absent and the marked-fake states are tested. New decisions P37-D11–D14 and the **DIST** acceptance group. **A2** — §3.1 separates public-placeholder provenance (semantic key, own licence) from client-derived provenance (five-link chain, never fabricated); §4 states transform tests use SYNTHETIC calibration and prove nothing about real geography; §5 adds that a 512 × 512 crop does not demonstrate island coverage; §6 fixes walls as independently authored placeholders and CANDIDATE ids as cosmetic-only, with Phase 3.6's 150 fallback retained. New decisions P37-D15–D16. |
+
+---
+
+## 16. Status
+
+`IMPLEMENTATION_SPEC_READY` — specification only. This document has not been independently reviewed, no
 implementation exists, and Phase 3.7 may not be treated as designed-and-accepted. The implementation
 PR is gated on independent review of this spec and of the private spike.
