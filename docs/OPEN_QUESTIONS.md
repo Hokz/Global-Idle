@@ -121,6 +121,46 @@ locked in `docs/DECISIONS.md` and are **not** open.
 - anti-manipulation rules;
 - premium-currency transfer restrictions.
 
+## World, Atlas and regions
+
+Owned by Phase 9, except where noted. Direction:
+[`design/world/ATLAS_NAVIGATION_AND_REGION_BOUNDARIES.md`](design/world/ATLAS_NAVIGATION_AND_REGION_BOUNDARIES.md).
+
+- where calibrated region polygons come from, and what licence covers them;
+- whether a region boundary is one polygon or a multi-polygon with holes;
+- whether the world atlas and the regional mini-atlas share one coordinate space or two;
+- what the region highlight does at a boundary two regions share.
+
+The navigation hierarchy itself and the "no invented coordinate" rule are **not** open: they are
+approved direction in that document.
+
+## Cooperative play
+
+Owned by Phase 5B unless a gate is named. Direction:
+[`design/multiplayer/COOPERATIVE_QUEST_STRATEGY.md`](design/multiplayer/COOPERATIVE_QUEST_STRATEGY.md).
+
+- whether a dead participant still receives rewards, and whether revival exists at all
+  (slice 2 — **do not invent this**);
+- what a cross-account disconnect does. Decided and tested **separately** from one-account Party
+  behaviour; one player's disconnect must not automatically pause everybody without a separately
+  approved rule (**PRE-5B gate**);
+- how contribution is measured, and whether it affects reward;
+- how loot is distributed across accounts, and whether the Reward Chest is the vehicle;
+- how much conditional logic the plan-authoring surface should allow;
+- what happens when a frozen plan becomes unsatisfiable mid-run;
+- scheduling and matchmaking for Warzone entry;
+- the real Warzone entrant ceiling. The ~25–50 target is **tentative and to be benchmarked**, not
+  a locked balance parameter (slice 3).
+
+## Pre-phase gates
+
+Stated in full in [`PHASE_GATES.md`](PHASE_GATES.md). Open where the answer is not yet written:
+
+- which of `baseXp` and `baseLevel` is authoritative and which is derived (**PRE-4 gate**);
+- the shape of the Actor/Participant combat contract, and which compatibility adapters keep the
+  verified Hunt fixtures intact (**PRE-4 gate**);
+- `ItemDefinition` version semantics for live `ItemInstance` rows (**PRE-MARKET gate**).
+
 ## IP / launch
 
 - final product name;

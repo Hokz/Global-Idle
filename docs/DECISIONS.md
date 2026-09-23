@@ -175,10 +175,22 @@ Two distinct build systems:
 
 ## Party and character roster
 
-- one player/account controls the entire Party; there is no multi-human party;
+> **Scope of this section: the PERSONAL Active Party — the Characters of ONE account.**
+> Every rule below is about that. None of them is a statement about several *humans* sharing an
+> Activity: a cross-account **Expedition Group** is explicitly supported future direction, owned
+> by Phase 5B. See
+> [`design/MULTIPLAYER_ACTIVITIES_FOUNDATION.md`](design/MULTIPLAYER_ACTIVITIES_FOUNDATION.md) §1
+> and [`design/multiplayer/COOPERATIVE_QUEST_STRATEGY.md`](design/multiplayer/COOPERATIVE_QUEST_STRATEGY.md).
+>
+> This note adds the scope the wording always implied; it reverses nothing.
+
+- one player/account controls the entire personal Party; **there is no multi-human PERSONAL
+  Party**. A shared cross-account Activity is a different system, not a larger Party;
 - the account **Character Roster** holds at most **5** characters;
 - the **Active Party** holds at most **4** characters, minimum 1;
-- five simultaneous active characters do not exist;
+- five simultaneous active characters **of one account** do not exist. (A future Expedition Group
+  may place five Characters in one Activity — one per account, five accounts — which is not this
+  rule and does not relax it);
 - at most **one playable (non-retired) roster Character per vocation** per account;
 - while a playable Knight exists, Knight is unavailable as a new vocation choice. If that Knight
   is **retired**, Knight becomes available again;

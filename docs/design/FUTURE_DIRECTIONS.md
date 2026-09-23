@@ -91,9 +91,15 @@ forgotten OPEN notes.
 
 ### Before Phase 5B (multiplayer)
 
+> These, and the Phase 4 and market gates, are now stated in full in
+> [`../PHASE_GATES.md`](../PHASE_GATES.md). This list is the origin; that document is the
+> canonical statement.
+
 - **Multi-account Activity membership**, the Character→membership invariant, and competitive
-  liveness semantics. `MULTIPLAYER_ACTIVITIES_FOUNDATION.md` has the design; the invariants are
-  the part that must exist before two accounts share one Activity.
+  liveness semantics. `MULTIPLAYER_ACTIVITIES_FOUNDATION.md` has the design,
+  [`multiplayer/COOPERATIVE_QUEST_STRATEGY.md`](multiplayer/COOPERATIVE_QUEST_STRATEGY.md) has
+  the player-facing model, and the invariants are the part that must exist before two accounts
+  share one Activity.
 
 ### Before beta / scale
 
@@ -112,6 +118,7 @@ Each shapes Phase 4+ design. None expands Phase 3.5.
 | **Tactical Automation Profiles** | target priorities, movement policy, supply thresholds, risk/retreat behaviour — the player's *strategy* rather than their *reflexes* | Phase 4 |
 | **Hunt Route Strategy** | Safe / Balanced / Aggressive / Loot-oriented route policy over a real map | after Phase 3.5 gives routes a map |
 | **Spatial Party Formation** | frontline, range, support radius, vocation positioning | Phase 5B |
+| **Tactical policy primitives** | target selection, healing, supply use, risk/retreat, role — baseline gameplay, never paywalled | Phase 4 |
 | **Run Analyzer** | XP/h, Gold/h, loot, supply burn, movement vs combat time, damage/healing, capacity utilisation | Phase 4 |
 | **Balance Simulation Laboratory** | a headless bulk-run tool for balancing, over the deterministic simulator that already exists | Phase 4 |
 | **Deterministic Run Replay / Debug Inspector** | reproduce one Activity from seed + content + state | Phase 4 |

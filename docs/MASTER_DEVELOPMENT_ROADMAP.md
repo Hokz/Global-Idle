@@ -545,65 +545,197 @@ a disconnected character.
 
 ### Phase 3.7 — First real asset visual slice
 
-> **SPECIFIED — NOT IMPLEMENTED**, see
+> Status lives in [`PROJECT_STATE.json`](./PROJECT_STATE.json), not here.
+> Specification:
 > [`docs/specs/phase-3-7/PHASE_3_7_ASSET_VISUAL_SLICE_SPEC.md`](specs/phase-3-7/PHASE_3_7_ASSET_VISUAL_SLICE_SPEC.md).
-> No source assets are in the repository and none will be. Recorded here for product
-> visibility: after movement fidelity, the next milestone makes the game visibly resemble the
-> intended experience before Party work expands scope.
-- ingest and triage the Product Owner's client asset archive;
-- one rookie/origin Character outfit, with walking frames and directions;
-- a Rat sprite and its animation;
-- real floor, wall and corner tiles;
-- a small Rookgaard / Rookgaard Sewers visual reference slice;
-- render those assets in the verified 15 × 11 Game Window;
-- begin evolving the shell toward a Tibia-like client grammar: Game Window centred, system panels
-  at the sides, Chat and Server Log below.
+> No source assets are in the repository and none will be.
 
-Phase 3.6 leaves the data shape ready for it: a tile definition already carries a kind and a ground
+- finish the visual slice and take it through independent review;
+- the navigation hierarchy, recorded in
+  [`design/world/ATLAS_NAVIGATION_AND_REGION_BOUNDARIES.md`](design/world/ATLAS_NAVIGATION_AND_REGION_BOUNDARIES.md):
+
+  ```text
+  WORLD ATLAS → REGIONAL MINI-ATLAS → LOCAL FOCUS (city / subarea) → PLAYABLE HUNT / QUEST
+  ```
+
+- one rookie/origin Character outfit, a Rat, floor/wall/decoration tiles, and a small Rookgaard
+  visual reference slice, rendered in the verified 15 × 11 Game Window;
+- the shell evolves toward a client-like grammar: Game Window centred, system panels at the
+  sides, Chat and Server Log below;
+- **DEFERRED:** accurate geographic polygons, raster calibration, and the golden region
+  border/glow. The architecture must **accept region boundaries later** as data separate from
+  raster pixels; until a calibrated polygon exists, an uncalibrated pin renders `demo` and no
+  coordinate is invented.
+
+Phase 3.6 leaves the data shape ready: a tile definition already carries a kind and a ground
 speed, so the importer adds visual identity without the movement engine changing again.
 
-### Phase 4 — Party/vocations
-- occupancy integration with dedicated Skill Training, and Stamina recovery while training;
-- character roster and Gold-based character unlocks;
-- unique vocations;
-- Active Party formation (1-4) and Frontline positioning;
-- all vocation identities;
-- Shared XP eligibility;
-- party rules;
-- combat behavior.
+### PRE-PHASE-4 GATE
 
-### Phase 5 — Quest/dungeon/boss framework
-- dungeon engine;
-- puzzles;
-- unlocks;
-- boss limits;
-- boss rotation.
+Full text: [`PHASE_GATES.md`](PHASE_GATES.md) § *Pre-Phase-4*.
+
+- **character retirement integrity** — consistent filtering on every read path, roster and
+  vocation invariants, and item/currency recovery at retirement;
+- **`baseXp` vs `baseLevel` projection truth** — which is authoritative, proven in both
+  directions, and never divergent across a settlement or its rollback;
+- **an Actor/Participant combat contract** that supports up to 4 same-account actors now and
+  participants from several accounts later. Compatibility adapters keep previously VERIFIED Hunt
+  behaviour and fixtures intact. **Do not implement a generic multiplayer platform yet.**
+
+### Phase 4 — Party / vocations
+
+- base Skills, training, and death loss;
+- all five vocations and their identities;
+- occupancy integration with dedicated Skill Training, and Stamina recovery while training;
+- character roster (5) and Gold-based unlocks; **Active Party formation (1-4)** and Frontline;
+- Shared XP eligibility;
+- **tactical policy primitives** — target selection, healing, supply use, risk/retreat, role.
+  These are the player's *strategy*, not their reflexes, and they are baseline gameplay;
+- **a one-account Party is NOT a co-op group.** Do not entangle combat actor identity with the
+  account id or with one hard-coded Character;
+- server authority, deterministic replay, pinned content and transactional settlement are
+  retained unchanged.
+
+Recorded in full: [`design/party/PARTY_SYSTEM_FOUNDATION.md`](design/party/PARTY_SYSTEM_FOUNDATION.md).
+
+### Phase 5 — Quest / dungeon / boss framework
+
+The **generic** engine. Solo and one-account Party only; no networking, no lobby.
+
+- dungeon rooms, objectives, rewards and mechanically configurable encounters;
+- **pure, versioned, data-driven mechanics**: triggers, guards, assignments and roles,
+  priorities, ordered steps, success and failure conditions, quest items collected and used, and
+  optional conditional fallback strategies;
+- the same definitions must work solo and with a one-account Party;
+- **no boss implemented as bespoke code**, and **no lobby in Phase 5**;
+- the Requirement / Cost / Reward primitive, built when the first content slice needs it;
+- Reward Chest — persistent and safe from Hunt death — and blessing acquisition, where this is
+  the natural owning slice;
+- travel and access foundations; unlock framework; first-completion rules; boss daily limits and
+  rotation.
+
+The cooperative layer that later drives this engine:
+[`design/multiplayer/COOPERATIVE_QUEST_STRATEGY.md`](design/multiplayer/COOPERATIVE_QUEST_STRATEGY.md).
+
+### PRE-5B GATE
+
+Full text: [`PHASE_GATES.md`](PHASE_GATES.md) § *Pre-5B*.
+
+Multi-account membership invariants; **cross-account disconnect decided and tested separately**
+from one-account Party behaviour; reward ledger safety across accounts.
+
+### Phase 5B — Multiplayer activities
+
+Three slices, in order. Recorded in
+[`design/MULTIPLAYER_ACTIVITIES_FOUNDATION.md`](design/MULTIPLAYER_ACTIVITIES_FOUNDATION.md) and
+[`design/multiplayer/COOPERATIVE_QUEST_STRATEGY.md`](design/multiplayer/COOPERATIVE_QUEST_STRATEGY.md).
+
+#### Slice 1 — social and multi-account infrastructure
+
+- friends and invitations; chat; lobby; readiness; membership;
+- per-character occupancy across accounts; one shared run identity; liveness rules;
+- reward ledger safety; spectator-only reads;
+- **do not re-label a personal Party as a large Party**; cross-account disconnect behaviour is
+  decided separately, and one player's disconnect must not automatically pause everybody without
+  a separately approved rule.
+
+#### Slice 2 — the first cooperative complex quest
+
+Up to **five human players, one selected Character per account**.
+
+- a pre-room lobby exposing the encounter mechanic checklist and role slots;
+- players collectively author a **conditional strategy** — when to change targets, who collects
+  an item, where and when it is used, an alternate assignee if the primary cannot act;
+- all ready → plan validated and **frozen** → server-authoritative simulation → everyone watches
+  the **same** run. **No runtime input bypasses the frozen plan;**
+- a dead character immediately stops participating and exits the fight; that human may leave or
+  keep watching as a **spectator**, who cannot act, claim combat occupancy or influence RNG;
+- **OPEN:** whether death grants rewards, and whether revival exists. Do not invent either.
+
+#### Slice 3 — Warzones
+
+- large public activities on the same multi-account infrastructure;
+- tentative target **~25 minimum to ~50 maximum entrants — TUNABLE and TO BE BENCHMARKED**, not a
+  locked balance parameter;
+- shared objectives with sectors or subgroups, not fifty independent agents in one small arena;
+- stress-test simulation cost, fairness and per-account settlement before launch.
+
+**PvP Arena, matchmaking and ranking** stay a later, post-combat-balance milestone. The early
+obligation is only neutrality of the Actor / Target / Side concepts.
 
 ### Phase 6 — Economy
-- gold sinks;
-- market;
-- premium-currency market;
-- escrow;
-- audit.
+
+- Bank services and history; player-to-player transfer; Market, escrow, fees, price history;
+- gold sinks; premium-currency market; transaction ledger; anti-duplication tests; audit.
+
+**Ordering note:** the *minimum* multi-account reward and penalty settlement is a **Phase 5B
+prerequisite**, proven before the first shared quest — it does not wait for the full Market.
+Definition versioning and rarity/affix validation are gates before market, forge or imbuement:
+[`PHASE_GATES.md`](PHASE_GATES.md) § *Pre-market*.
+
+Recorded in full: [`design/ECONOMY_CUSTODY_AND_REWARD_DESTINATIONS.md`](design/ECONOMY_CUSTODY_AND_REWARD_DESTINATIONS.md).
 
 ### Phase 7 — Forge / Imbuement / Wheel / Skill Tree
-- Imbuements: Powerful only, 12h active-use duration on the item, boss-progression unlock gate;
-- item sinks;
-- progression;
-- unlock dependencies.
 
-### Phase 8 — Premium/automation
-- Premium purchase, renewal, expiry and entitlement transitions;
-- future boost products use `ActiveUseTimer`, never wall-clock countdowns;
-- automation;
-- advanced convenience;
-- Party-management Premium benefits (OPEN - roster capacity is a Gold sink, not a Premium one).
+- Forge target and sacrifices, Tier 0-10, classification and rarity validation;
+- Imbuements: **Powerful only**, 12h **active-use** duration on the item, boss-progression unlock
+  gate, transaction-safe apply/remove/consume;
+- quest unlocks; Wheel; gems; vocation Skill Tree; item sinks.
+
+Combat must accept **stable modifier interfaces** before these subsystems are implemented, so a
+new modifier source is configuration rather than a combat rewrite.
+
+### Phase 7A — Advanced progression
+
+- **Bestiary and Charms** — kill counters, Bestiary entries, Charm Points, Charm Runes and the
+  multi-stage Charm progression. Owned here, not by Phase 9: it is a progression system with its
+  own counters and unlocks, and content that feeds it is a consumer rather than its owner;
+- outfits and achievements.
+
+Recorded in full: [`design/FUTURE_DIRECTIONS.md`](design/FUTURE_DIRECTIONS.md) §3.
+
+### Phase 8 — Premium / automation
+
+- Premium purchase, renewal, expiry and entitlement transitions, splitting any unsettled interval
+  at the transition;
+- the Stamina benefits Phase 2 already consumes; future boost products use `ActiveUseTimer`,
+  never wall-clock countdowns;
+- advanced Auto-Sell with item / category / rarity / default rules and protected-state overrides;
+- automation, remote services, loot and boss automation, analytics, final Free/Premium balance;
+- Party-management convenience benefits (OPEN — no fifth active Party slot).
+
+**Not paywalled:** foundational tactical strategy (Phase 4) and the quest mechanic checklist and
+plan authoring (Phases 5 / 5B) are **baseline gameplay**.
 
 ### Phase 9 — Content expansion
-- region-by-region content;
-- endgame;
-- telemetry;
-- economy rebalance.
+
+- **world and regional progression rollout** — regional objectives and tasks, progression points,
+  and the region-by-region gating they unlock. Owned here because it is the ROLLOUT; the
+  requirement/cost/reward primitive it leans on is Phase 5's;
+- more regions, hunts, items, quests, bosses and puzzles; quest lines; endgame; telemetry;
+  economy rebalance;
+- **VERIFIED Atlas calibration and region polygons**, and the region-wide gold hover/selection
+  highlight, once actual map geometry is available. **Do not fabricate borders or map
+  coordinates** —
+  [`design/world/ATLAS_NAVIGATION_AND_REGION_BOUNDARIES.md`](design/world/ATLAS_NAVIGATION_AND_REGION_BOUNDARIES.md) §5.
+
+Recorded in full: [`design/FUTURE_DIRECTIONS.md`](design/FUTURE_DIRECTIONS.md) §1.
+
+### Phase 10 — Scale / hardening
+
+- whole-system load profiling; backup and restore rehearsal; retention and compaction;
+- anti-abuse at real traffic; customer-support tooling; selective performance rewrites if
+  profiling proves them necessary.
+
+> **Security, retry/idempotency, economy correctness and realistic load tests MUST occur at the
+> phase that introduces their risk — never all postponed to Phase 10.**
+> [`PHASE_GATES.md`](PHASE_GATES.md) § *Pre-launch*.
+
+### Operational gate
+
+Do not endlessly stack open pull requests. Integrate accepted PRs in order, with the Product
+Owner's authorization, and verify CI on the **actual integration base**. Every `VERIFIED` status
+applies to a **named reviewed commit**, never to an evolving head.
 
 ## 21. Working philosophy
 
@@ -636,6 +768,14 @@ Current detailed design documents:
 - [`docs/design/tutorial/TUTORIAL_ROOKGAARD_ROADMAP.md`](design/tutorial/TUTORIAL_ROOKGAARD_ROADMAP.md) — Level 1–8 Rookgaard onboarding through vocation selection.
 - [`docs/design/combat/COMBAT_LEVEL_SKILLS_FOUNDATION.md`](design/combat/COMBAT_LEVEL_SKILLS_FOUNDATION.md) — Base Level, Skills, training systems and the layered Combat System architecture.
 - [`docs/design/party/PARTY_SYSTEM_FOUNDATION.md`](design/party/PARTY_SYSTEM_FOUNDATION.md) — character roster, unique vocations, Gold unlocks, the 1-4 Active Party, Frontline and Shared XP eligibility.
+- [`docs/design/world/ATLAS_NAVIGATION_AND_REGION_BOUNDARIES.md`](design/world/ATLAS_NAVIGATION_AND_REGION_BOUNDARIES.md) — the four navigation surfaces, region boundaries as data rather than pixels, calibration honesty and the deferred gold region highlight.
+- [`docs/design/multiplayer/COOPERATIVE_QUEST_STRATEGY.md`](design/multiplayer/COOPERATIVE_QUEST_STRATEGY.md) — the co-op lobby checklist as a player-authored conditional strategy, the frozen plan, spectators, and the Party / Expedition / Warzone distinction.
 
 Each design document carries its own status marker and its own list of open decisions. Those
 open items are not resolved by this roadmap.
+
+## 23. Gates
+
+Cross-phase correctness obligations — what must be true *before* a phase starts — live in
+[`docs/PHASE_GATES.md`](PHASE_GATES.md), referenced inline from §20 above. A gate records
+requirements; it never records status.

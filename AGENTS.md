@@ -40,6 +40,10 @@ Before meaningful work, read:
 10. `docs/OPEN_QUESTIONS.md`
 11. any task-specific design document.
 
+Read these **fresh at the start of every phase**. They are the canonical record of product
+direction; conversation history is not. A requirement that exists only in a chat is not a
+requirement — if it matters, it is in one of these documents first.
+
 ## 3. Agent workflow
 
 Use this workflow:
@@ -103,6 +107,23 @@ configuration input. Defer it as a parameter and continue, rather than stopping 
 - documentation updates.
 
 Never silently override a locked product decision.
+
+### Recording a direction change
+
+An approved change of product direction is a **documentation change first**, in its own PR:
+
+1. update the **single owning document** — the one that owns that topic, not whichever is open;
+2. update `docs/DESIGN_INDEX.md` and every affected cross-reference;
+3. mark each statement `APPROVED`, `OPEN` or `TENTATIVE`, and name the owning phase or gate;
+4. open a **docs-only PR**, have it independently reviewed, and merge only with the Product
+   Owner's authorization.
+
+A direction handoff is **never** by itself authorization to implement. Implementation needs its
+own specification, tests, PR and review. A docs PR never advances `activePhase` and never marks a
+phase `VERIFIED`.
+
+Where a new direction appears to contradict a **LOCKED** rule, raise it for the Product Owner's
+decision in the PR. Do not quietly rewrite the rule.
 
 ## 5. Architectural principles
 

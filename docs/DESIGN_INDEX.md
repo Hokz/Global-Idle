@@ -45,12 +45,26 @@ documents exist, what each one covers and how far each one has been approved.
   - status: `BASELINE` — nothing implemented; Phase 3 owns it
   - scope: five Hunt container slots and their Gold unlocks, stacking/space/capacity as three separate limits, Loot Pouch, Loot Policy, Auto-Sell, Depot, Stash, item movement, Manage Containers routing.
 
+### World / Atlas
+
+- **Atlas navigation and region boundaries**
+  - path: `docs/design/world/ATLAS_NAVIGATION_AND_REGION_BOUNDARIES.md`
+  - status: `APPROVED DIRECTION` (hierarchy, boundaries-as-data, calibration honesty) · `FUTURE / NOT IMPLEMENTED` (polygons, calibration, gold highlight)
+  - scope: the four navigation surfaces — World Atlas → regional mini-atlas → local focus → Game Window — region boundaries stored as data rather than raster pixels, the no-invented-coordinate rule, and the deferred region highlight.
+  - owners: hierarchy and demo-pin rule -> Phase 3.7 · verified calibration, polygons and highlight -> Phase 9.
+
 ### Multiplayer
 
 - **Multiplayer activities foundation**
   - path: `docs/design/MULTIPLAYER_ACTIVITIES_FOUNDATION.md`
   - status: `BASELINE` — nothing implemented; Phases 4 and 5B own it
-  - scope: Active Party vs Expedition Group, Warzones, PvP Arena, and the one architectural guardrail (do not make Team A vs Team B impossible).
+  - scope: Active Party vs Expedition Group vs Warzone, the tentative ~25–50 Warzone target, PvP Arena, and the one architectural guardrail (do not make Team A vs Team B impossible).
+
+- **Cooperative quest strategy**
+  - path: `docs/design/multiplayer/COOPERATIVE_QUEST_STRATEGY.md`
+  - status: `APPROVED DIRECTION` for the model · `OPEN` for §9 · `FUTURE / NOT IMPLEMENTED`
+  - scope: the co-op lobby's encounter checklist and role slots, the player-authored **conditional** strategy, readiness → validated → frozen plan → one authoritative run, the death/spectator rule, and per-account settlement.
+  - owners: generic quest engine -> Phase 5 · infrastructure -> Phase 5B slice 1 · first cooperative quest -> slice 2 · Warzones -> slice 3.
 
 ### Future directions
 
@@ -122,7 +136,9 @@ everything under `docs/design/`:
 
 | Document | Role |
 |---|---|
-| `docs/MASTER_DEVELOPMENT_ROADMAP.md` | Full product and production roadmap |
+| `docs/MASTER_DEVELOPMENT_ROADMAP.md` | **The one canonical phase sequence** — ownership, gates and deliverables (§20) |
+| `docs/PHASE_GATES.md` | Cross-phase correctness obligations: what must be true BEFORE a phase starts |
+| `docs/ROADMAP.md` | Navigational overview only; it defines no phase of its own |
 | `docs/GAME_SYSTEMS.md` | System-by-system overview |
 | `docs/DECISIONS.md` | Locked decisions that must not be silently reversed |
 | `docs/OPEN_QUESTIONS.md` | Project-level unresolved design questions |
