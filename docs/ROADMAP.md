@@ -54,6 +54,21 @@ Detail for every entry is in the master roadmap; nothing below adds to it.
 10  Scale / hardening                   (but risk is hardened where it is introduced)
 ```
 
+---
+
+## Historical note — superseded phrasing
+
+This page's Phase 1 list once read **"one vocation"**. The accepted Phase 1 specification
+([`specs/phase-1/PHASE_1_WORLD_CHARACTER_VERTICAL_SLICE_SPEC.md`](specs/phase-1/PHASE_1_WORLD_CHARACTER_VERTICAL_SLICE_SPEC.md)
+§§ *Vocation at creation*) cites that exact phrase as the wording it had to reconcile against
+`TUTORIAL_ROOKGAARD_ROADMAP.md`, and resolved it: Rookgaard characters start **without** a
+vocation and choose one at Level 8.
+
+The phrase is recorded here so that reasoning stays checkable. It is **history, not a
+requirement** — the current Phase 1 entry is in the master roadmap.
+
+---
+
 **Phase status is not shown here on purpose.** A phase marker copied into a second document is a
 phase marker that goes stale in one of them. `PROJECT_STATE.json` is the canonical state, and
 `scripts/check-project-state.mjs` fails CI if `AGENTS.md` disagrees with it.
