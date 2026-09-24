@@ -409,8 +409,11 @@ ships before all of the following hold, each proven by a test:
 - a concurrent Depot move and a deletion request or purge are safely serialised;
 - if bound items are stackable, a split or merge never changes the binding.
 
-Every restriction is enforced on the server; a hidden button is never the test. The binding is a
-foreign key the `ADR-020` closure test can see, and it declares its purge action before it ships.
+Every restriction is enforced on the server; a hidden button is never the test. The binding is
+referentially safe — it can never name a Character that does not exist — and the `ADR-020` closure
+test and reference inventory can enumerate it, a bound item in the Depot included. It declares its
+purge action before it ships. Its physical representation, like the Store Container's, is the
+implementing phase's choice (`ADR-021` §3, §7).
 
 **Owner:** the first phase that introduces a Character-bound consumable.
 **Acceptance:** the tests above, not a manual audit.

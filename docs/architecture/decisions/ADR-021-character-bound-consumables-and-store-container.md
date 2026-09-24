@@ -1,7 +1,9 @@
 # ADR-021 — Character-bound consumables and the Store Container
 
-**Status:** `ACCEPTED` — the product rule is `LOCKED` by the Product Owner (2026-09-24). This
-record has not yet been independently reviewed.
+**Status:** `ACCEPTED` — the product rule is `LOCKED` by the Product Owner (2026-09-24). Reviewed
+independently at PR #13 head `5ed5b26` and returned for two narrow corrections, both applied here:
+the Store Container's representation (§3) and the binding's representation (§6, §7) are no longer
+fixed. Not yet accepted.
 **Extends:** [ADR-004](./ADR-004-item-single-custody.md) — one new custody scope, and a binding
 that is independent of custody; ADR-004 itself is unchanged.
 [ADR-020](./ADR-020-character-deletion-grace-and-purge.md) — the purge reaches a bound item
@@ -68,7 +70,7 @@ binding is such a reference.
 | C1 | Every Character may have a **Store Container** custody. |
 | C2 | It is a system custody. It is not a physical backpack and not one of the five Hunt Container Slots, and it consumes none of them. |
 | C3 | It is not equipment, and it is not the Loot Pouch. |
-| C4 | Its capacity or slot count is **not** decided (§10), and no weight or capacity limit is invented for it. |
+| C4 | Its capacity or slot count is **not** decided (§10), and no weight or capacity limit is invented for it unless another locked rule forces one. |
 
 **Custody**
 
@@ -144,8 +146,12 @@ sites (F8).
 - **A new custody scope, per Character.** `ADR-004` anticipated this: *"Adding a new custody
   scope … should be a deliberate, reviewed change."* This record is that change.
 - **Character-owned.** The purge deletes it (§6).
-- **Not physical.** It has no weight and no space count; its capacity is open (C4). It is not a
-  Hunt Container Slot and not a container instance.
+- **What is decided, and what is not.** It is not a physical backpack, not a Hunt Container Slot —
+  it consumes none of the five — not equipment and not the Loot Pouch (C2, C3). Its capacity or
+  slot count is open (C4). How it is represented — a container row or entity, a virtual custody, a
+  projection, or something else — and whether any weight or space rule applies to it are **not**
+  decided here. The implementing phase chooses, within C1–C4, and invents no limit that a locked
+  rule does not force.
 - **What it holds.** It exists for Character-bound consumables. Whether anything else — an
   unbound item from the same sources, say — may ever be placed in it is not decided (§10).
 
@@ -212,11 +218,13 @@ a Store purchase, a Daily Reward, an Event grant — is refused (X2).
   stays. It must not keep the Character's identity (`ADR-020` L12): the simplest way is the rule
   BANK entries already follow — name no Character in any column, the operation id included
   (`ADR-020` §6.3).
-- **Found by the closure test.** The binding is a reference to `Character`, so `ADR-020` §7's
-  schema-derived closure test must see it. It is a real foreign key, not a value inside JSON, and
-  it declares DELETE-OWNED.
+- **Found by the closure test.** The binding is a relation to `Character`, so `ADR-020`'s closure
+  test and reference inventory must enumerate it and act on it — every binding, a bound item
+  stored in the Depot included — and it declares DELETE-OWNED. Referential integrity is mandatory:
+  a binding can never name a Character that does not exist. Which physical mechanism provides it
+  is the implementing phase's choice (§7).
 - **Nothing left behind.** `ADR-020` §7's post-purge scan finds the purged Character's id in no
-  row, so no orphaned `boundCharacterId` can survive.
+  row, so no orphaned binding can survive.
 - **Only its own.** The purge selects exactly the rows bound to the Character being purged, so a
   retry after a crash, or a repeated purge, can never delete another Character's items
   (`ADR-020` §7, idempotence).
@@ -225,22 +233,26 @@ a Store purchase, a Daily Reward, an Event grant — is refused (X2).
 
 ```text
 ItemInstance
-  location            the custody scope — gains STORE_CONTAINER
+  location            the custody scope (the Store Container is one more, however represented)
   characterId?        the custody carrier, where the scope has one (every scope today but DEPOT)
   binding?            CHARACTER_PERMANENT, when the item is bound
   boundCharacterId?   the bound Character — immutable, independent of location
 ```
 
-Names are illustrative. The implementing phase may choose a cleaner representation, provided
-these hold:
+Names and shapes are illustrative and conceptual. The implementing phase chooses the cleanest
+schema representation, provided the binding is **enforceable, discoverable by the purge closure and
+reference inventory, immutable, and impossible to orphan**:
 
 - **non-negotiable:** a Store Container ↔ Depot move never erases or changes whom the item is bound
   to;
-- `boundCharacterId` never changes once set, and the binding and its Character are present
-  together, enforced by a constraint rather than a convention;
-- in the Store Container, the custody carrier is the bound Character. In the Depot, `characterId`
-  stays `null`, and `boundCharacterId` still names the Character;
-- the binding is a foreign key to `Character`, visible to the closure test (§6);
+- the binding never changes once set, and a binding always names exactly one Character — both
+  enforced, never left to convention;
+- a bound item in a Store Container is always in its bound Character's own Store Container. In the
+  Depot the item has no custody Character (`characterId` is `null` today), and its binding still
+  names the Character;
+- the binding is a durable, referentially safe relation to exactly one `Character`, which the
+  purge's closure test and reference inventory can enumerate (§6). Whether that is a foreign-key
+  column, a separate binding row or another mechanism is not fixed here;
 - **stacks**, if bound consumables are ever stackable: a stack never merges across different
   bound Characters, or with an unbound instance, and a split or merge preserves the binding. No
   further stack behaviour is invented here.
@@ -312,6 +324,9 @@ BOUND-CONSUMABLE gate passes** (`PHASE_GATES.md` § *GBC.1*). That implementatio
 - Exercise Weapon Store pricing and charge counts;
 - the use UI, and whether a use starts from the Store Container, the Depot or a dedicated panel;
 - the outfit and mount storage and unlock model.
+
+Left to the implementing phase, within §1 and §6–§7: how the Store Container is represented,
+whether any weight or space rule applies to it, and the physical representation of the binding.
 
 ## Consequences
 

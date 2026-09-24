@@ -2,8 +2,8 @@
 
 **Status:** `ACCEPTED` — the product rule is `LOCKED` by the Product Owner (2026-09-24). The
 architecture was independently reviewed and accepted at PR #13 head `45d95f6`, and G4.1b (§5) and
-G4.1c (§5.1) at `f249771`. G4.1c's pre-completion case (§5.2), locked after that head, is recorded
-here and has not yet been reviewed, and neither has the reconciliation with `ADR-021` (§4, §6).
+G4.1c (§5.1) at `f249771`, and G4.1c's pre-completion case (§5.2) at `395b9ce`. The reconciliation
+with `ADR-021` (§4, §6), added after that, is not yet accepted.
 **Supersedes:** [ADR-007](./ADR-007-character-retirement.md), in full.
 **Amends:** [ADR-019](./ADR-019-currency-custody-scopes.md) — one guarantee row (§8); the rest of
 it stands.

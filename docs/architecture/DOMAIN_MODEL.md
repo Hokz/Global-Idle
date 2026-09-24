@@ -687,8 +687,9 @@ character, since their custody is not frozen — **except** a Bootstrap Kit item
 Character-bound consumable, which are never sold, listed or forged at all (§5.13).
 
 `LOCKED BY PRODUCT`, **not implemented** — each Character will also have a **Store Container**
-(`ADR-021`): a system custody for Character-bound consumables. It is not a container instance, not
-a Hunt Container Slot, not equipment and not the Loot Pouch.
+(`ADR-021`): a system custody for Character-bound consumables. It is not a physical backpack and
+not a Hunt Container Slot — it consumes none of the five — and it is not equipment or the Loot
+Pouch. Its capacity, and how it is represented, are not decided.
 
 **Loot Capacity** is pooled across the Active Party for the duration of an activity (§5.7) and
 consumed by the engine as an input. Full capacity stops collection without stopping combat —
@@ -959,7 +960,7 @@ application-only check loses a race.
 | I19 | After a purge, no product-persistence row names the purged Character, and every Account-owned row and balance is unchanged apart from documented scrubs | schema-derived closure test + post-purge scan (`ADR-020` §7) |
 | I20 | A Bootstrap Kit item never leaves its Character: no Depot, Stash, other Character, listing, trade, sale or conversion into Account value; it never merges with an unbound instance, and it is destroyed with its Character | a binding on the instance, checked server-side on every item path (`ADR-020` §5.2) |
 | I21 | A one-time Tutorial Reward is awarded at most once per Account, whatever Characters are created, deleted or purged | Account-owned reward state, checked in the awarding transaction (`ADR-020` §5.1) |
-| I22 | A Character-bound consumable's binding is immutable and independent of its custody: a move between its Store Container and the Depot never changes it | a constraint on the item row; the binding is a foreign key the purge closure test sees (`ADR-021` §7) |
+| I22 | A Character-bound consumable's binding is immutable and independent of its custody: a move between its Store Container and the Depot never changes it | enforced, never by convention; the binding is a referentially safe relation to one Character that the purge closure test and reference inventory can enumerate — its physical form is the implementing phase's choice (`ADR-021` §6–§7) |
 | I23 | A Character-bound consumable is only ever in its bound Character's Store Container or the Account's Depot, is used only by that Character, never reaches the Stash, another Character, a market, a trade, an NPC sale, a Forge input or any currency conversion, and is deleted by that Character's purge wherever it is stored | server-side check on every custody, use and sale path, per instance; the purge selects by binding (`ADR-021`) |
 
 I17–I23 are **not implemented**. I17–I21 are requirements of the PRE-PHASE-4 gate

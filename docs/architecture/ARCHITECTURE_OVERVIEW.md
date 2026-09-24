@@ -45,8 +45,8 @@
 | [017](decisions/ADR-017-idempotency-key-contract.md) | Idempotency keys are account-scoped and fingerprinted | `ACCEPTED` |
 | [018](decisions/ADR-018-domain-package-source-layout.md) | Bounded contexts live in `packages/domain` — amends `ADR-012`'s source layout | `ACCEPTED` |
 | [019](decisions/ADR-019-currency-custody-scopes.md) | Currency lives in custody scopes (`BANK`, `POUCH`), and the ledger says which — amends `ADR-003` | `ACCEPTED`; one row amended by 020 |
-| [020](decisions/ADR-020-character-deletion-grace-and-purge.md) | Character deletion is a 30-day reversible grace, then a hard purge — supersedes `ADR-007` | `ACCEPTED` — product rule `LOCKED`; reviewed at PR #13 heads `45d95f6` and `f249771`, later additions pending review; **not implemented** (PRE-4 gate) |
-| [021](decisions/ADR-021-character-bound-consumables-and-store-container.md) | Character-bound consumables and the Store Container: binding separate from custody; purged with the Character wherever stored — extends `ADR-004` and `ADR-020` | `ACCEPTED` — product rule `LOCKED`; pending independent review; **not implemented** (gate GBC.1) |
+| [020](decisions/ADR-020-character-deletion-grace-and-purge.md) | Character deletion is a 30-day reversible grace, then a hard purge — supersedes `ADR-007` | `ACCEPTED` — product rule `LOCKED`; reviewed and accepted at PR #13 heads `45d95f6`, `f249771` and `395b9ce`; the `ADR-021` reconciliation pending acceptance; **not implemented** (PRE-4 gate) |
+| [021](decisions/ADR-021-character-bound-consumables-and-store-container.md) | Character-bound consumables and the Store Container: binding separate from custody; purged with the Character wherever stored — extends `ADR-004` and `ADR-020` | `ACCEPTED` — product rule `LOCKED`; reviewed at PR #13 head `5ed5b26`, two corrections applied, pending acceptance; **not implemented** (gate GBC.1) |
 
 ---
 
