@@ -85,27 +85,23 @@ and everything it owns, with nothing moved to the Bank or to a recovery custody 
   rules **derive from time** instead of storing — today Stamina recovery (`ADR-014`) — keeps
   running during the grace, exactly as it would for any idle Character (`ADR-020` §4).
 
-**2. An Origin Character purged before the account completes Rookgaard — a reading of G4.1c,
-for confirmation.** G4.1c is `LOCKED` (`ADR-020` §5.1, rules C1–C8). C3 and C4 say what a Character
-created after a purge does once the account **has** completed Rookgaard; they do not say what
-happens when the Origin Character is purged **before** that. Today that is the only case the code
-can reach: every Character the API creates is a Level-1 Origin Character, and no path completes the
-tutorial yet. The builder's reading:
+**2. Which items of the current starting grant are the Bootstrap Kit — Product Owner (PRE-4
+gate).** The pre-completion rule is `LOCKED` (`ADR-020` §5.2): a new pre-completion Origin
+Character receives a fresh, Character-bound Bootstrap Kit, while one-time Tutorial Rewards are
+never reissued. `ADR-020` §5.2 classifies today's grant item by item. The four armour pieces, the
+dagger and the backpack are Bootstrap Kit: the reference game's own pre-vocation armour, a weapon
+measured as necessary, and the container that loot needs. Still to decide:
 
-- the next Character is a new Level-1 Origin Character, because the tutorial is mandatory while it
-  has never been completed (`TUTORIAL_ROOKGAARD_ROADMAP.md` §2);
-- it does **not** receive the Rookgaard tutorial grant, or any other one-time grant, a second time
-  (C5, C6);
-- the account keeps a durable record of the one-time grants it has received, naming no Character.
-  C8 names tutorial completion as the only fact that survives for the Origin role's purpose; this
-  record would survive for C5 and C6's purpose instead.
+- **the 20 small health potions.** No document records why the pre-vocation kit needs them: they
+  came from Phase 2's temporary tutorial profile, and Canary's own pre-vocation kit has none — the
+  same file gives ten at the Knight trial, after a vocation is chosen. They are also the most
+  valuable part of the grant: the Rookgaard counter sells the same potion for 20 Gold. Are they
+  Bootstrap Kit, and if so is 20 the number the tutorial needs, or are they a Tutorial Reward?
+- **whether the binding ends when Rookgaard is complete.** The locked rules set no end, so
+  `ADR-020` §5.2 records the binding as permanent: a kit item can never be sold or stored in the
+  Depot or the Stash for as long as its Character exists, after the tutorial as well.
 
-Consequence to weigh: that new Origin Character starts without the grant's armour, dagger,
-backpack and potions — unless the player moved them to the Depot before the request, since Account
-custody survives the purge. The grant exists because a Character with no container cannot carry
-loot and one with no weapon measurably loses to a Rat
-(`packages/domain/src/contexts/items/grant.ts`). Product Owner. Confirming or correcting this
-reading changes only this case; C1–C8 stand.
+Both are decided before the kit is implemented (`PHASE_GATES.md` § *G4.1*).
 
 **3. A non-identifying record of what a purge destroyed.** The purge destroys the Pouch balance and
 every item the Character owned, and deletes the Pouch's ledger history with them. The rule forbids
@@ -143,8 +139,12 @@ Product Owner and architecture.
   never fails;
 - tutorial completion and one-time grants after a purge — decided by the Product Owner (gate item
   G4.1c, `RESOLVED`): completion belongs to the Account and survives the purge; once Rookgaard is
-  complete, a later Character starts at Base Level 8 and skips Rookgaard; no one-time grant is
-  awarded again. Only the pre-completion case above awaits confirmation of its reading.
+  complete, a later Character starts at Base Level 8 and skips Rookgaard; no one-time reward is
+  awarded again;
+- an Origin Character purged **before** Rookgaard is complete — decided by the Product Owner with
+  G4.1c: a new Level-1 Origin Character replaces it, must complete Rookgaard, and receives a fresh
+  Bootstrap Kit that can never leave it or become Account value. One-time Tutorial Rewards are
+  never reissued.
 
 **Unchanged by this decision:** Character names are unique **per account**, as Phase 1
 implemented. `ADR-020` changes *when* a name is released, not *where* it must be unique; making
@@ -239,8 +239,8 @@ Owned by Phase 5B unless a gate is named. Direction:
 
 Stated in full in [`PHASE_GATES.md`](PHASE_GATES.md). Open where the answer is not yet written:
 
-- how G4.1c applies to an Origin Character purged **before** the account completes Rookgaard — a
-  reading awaiting confirmation (**PRE-4 gate**), detailed under *Character deletion*, above;
+- which items of the current starting grant are the Bootstrap Kit, and whether the kit's binding
+  ends with the tutorial (**PRE-4 gate**) — detailed under *Character deletion*, above;
 - the shape of the Actor/Participant combat contract, and which compatibility adapters keep the
   verified Hunt fixtures intact (**PRE-4 gate**);
 - `ItemDefinition` version semantics for live `ItemInstance` rows (**PRE-MARKET gate**).
@@ -251,8 +251,9 @@ Stated in full in [`PHASE_GATES.md`](PHASE_GATES.md). Open where the answer is n
 that contract across every write path; it does not revisit it.
 
 **No longer open:** the fate of a deleted Character's Gold Pouch (G4.1a), what a pending
-Character still holds (G4.1b), and tutorial completion and one-time grants after a purge (G4.1c).
-The Product Owner decided all three — see *Character deletion*, above.
+Character still holds (G4.1b), and tutorial completion and one-time grants after a purge (G4.1c),
+including an Origin Character purged before Rookgaard is complete. The Product Owner decided all of
+them — see *Character deletion*, above.
 
 ## IP / launch
 

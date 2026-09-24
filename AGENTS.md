@@ -205,17 +205,18 @@ open and stacked on PR #11). Its specification is
 [`docs/specs/phase-3-7/PHASE_3_7_ASSET_VISUAL_SLICE_SPEC.md`](docs/specs/phase-3-7/PHASE_3_7_ASSET_VISUAL_SLICE_SPEC.md)
 and its 69 matrix cases pass.
 
-It remains the active phase only because **nothing after it has started. Phase 4 has NOT
-started.** Phase 4 is gated by the PRE-PHASE-4 gate in [`docs/PHASE_GATES.md`](docs/PHASE_GATES.md),
-which has **not** been passed. Its first item, G4.1, is now the **Character deletion lifecycle**
-(`ADR-020`, `LOCKED` by the Product Owner on 2026-09-24, superseding `ADR-007`'s retirement): a
-30-day reversible grace, then a hard purge of the Character and everything it owns. It is **not
-implemented** — the code still carries `retiredAt`. Its three product questions are resolved by
-the Product Owner: G4.1a, the Gold Pouch is destroyed at the purge; G4.1b, a pending Character
-keeps its vocation, the Origin slot and its roster place until the purge; G4.1c, tutorial
-completion belongs to the Account and survives the purge, and no one-time grant is awarded twice.
-Resolved is not implemented. Do not begin Phase 4 work, implement the deletion lifecycle, or mark
-the gate passed until the Product Owner says so.
+It remains the active phase only because **nothing after it has started. Phase 4 has NOT started.**
+Phase 4 is gated by the PRE-PHASE-4 gate in [`docs/PHASE_GATES.md`](docs/PHASE_GATES.md), which has
+**not** been passed. Its first item, G4.1, is now the **Character deletion lifecycle** (`ADR-020`,
+`LOCKED` by the Product Owner on 2026-09-24, superseding `ADR-007`'s retirement): a 30-day
+reversible grace, then a hard purge of the Character and everything it owns. It is **not
+implemented** — the code still carries `retiredAt`. Its three product questions are resolved by the
+Product Owner: G4.1a, the Gold Pouch is destroyed at the purge; G4.1b, a pending Character keeps its
+vocation, the Origin slot and its roster place until the purge; G4.1c, tutorial completion belongs
+to the Account and survives the purge, no one-time Tutorial Reward is awarded twice, and an Origin
+Character purged before Rookgaard is complete is replaced by a new Level-1 Origin with a fresh,
+Character-bound Bootstrap Kit. Resolved is not implemented. Do not begin Phase 4 work, implement the
+deletion lifecycle, or mark the gate passed until the Product Owner says so.
 
 User-supplied client assets are a PRIVATE reference and must never be committed — see the Phase
 3.7 specification's §9. The

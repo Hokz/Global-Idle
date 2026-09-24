@@ -1,9 +1,9 @@
 # ADR-020 — Character deletion is a 30-day reversible grace, then a hard purge
 
 **Status:** `ACCEPTED` — the product rule is `LOCKED` by the Product Owner (2026-09-24). The
-architecture was independently reviewed and accepted at PR #13 head `45d95f6`. The two product
-decisions locked after that head — G4.1b (§5) and G4.1c (§5.1) — are recorded here and have not
-yet been reviewed.
+architecture was independently reviewed and accepted at PR #13 head `45d95f6`, and G4.1b (§5) and
+G4.1c (§5.1) at `f249771`. G4.1c's pre-completion case (§5.2), locked after that head, is recorded
+here and has not yet been reviewed.
 **Supersedes:** [ADR-007](./ADR-007-character-retirement.md), in full.
 **Amends:** [ADR-019](./ADR-019-currency-custody-scopes.md) — one guarantee row (§8); the rest of
 it stands.
@@ -65,7 +65,8 @@ no player holds a recovery promise that this decision could break.
 
 Two further rules were locked by the Product Owner the same day, as gate items G4.1b and G4.1c:
 what a pending Character keeps holding (§5), and what survives a purge of the Origin Character
-for tutorial completion and one-time grants (§5.1).
+for tutorial completion and one-time grants (§5.1) — including the case of an Origin Character
+purged before Rookgaard is complete, and the Bootstrap Kit it introduces (§5.2).
 
 These rules are Global Idle's rule. Nothing further is inferred from how any other game
 handles deletion.
@@ -231,37 +232,124 @@ Tutorial completion belongs to the **Account**, not to the lifetime of the Origi
 - an **Account-owned tutorial-completion fact** — `TUTORIAL_ROOKGAARD_ROADMAP.md` §2 names it
   `tutorialCompleted` and `tutorialVersionCompleted`, and §37 updates it when Rookgaard ends,
   after the vocation is chosen. It is Account state (L11): no purge ever touches it (§6.2);
-- **Character creation routed on that fact**, never on a count of existing Characters (§2 of the
-  tutorial roadmap already forbids that): an account that has completed Rookgaard creates through
-  the later-character path only;
-- **one-time grants kept off the later-character path.** Today the only such grant is the
-  *Rookgaard tutorial grant* (`starting-grant.origin.rookgaard`: armour, a dagger, a backpack and
-  potions). The current code applies it to **every** Character it creates, because every
-  Character created so far is an Origin Character, and it records nothing at account level. That
-  is correct for Phase 1–3 and wrong the moment a purge exists, so this routing ships **with** the
-  purge, never after it (§9).
+- **Account-owned state for one-time Tutorial Rewards**, wherever a reward is defined as
+  one-time. The Character that earned such a reward may be purged, so only the Account can
+  remember it; the state names rewards, never a Character. None is needed yet, because no
+  Tutorial Reward exists in code (§5.2);
+- **Character creation routed on the completion fact**, never on a count of existing Characters
+  (§2 of the tutorial roadmap already forbids that): an account that has completed Rookgaard
+  creates through the later-character path only, and one that has not creates a new Origin
+  Character (§5.2).
 
-**One case the locked rules do not state, read for confirmation.** C3 and C4 cover an account that
-has completed Rookgaard. An Origin Character can also be purged **before** the account completes
-it — and today that is the only case the code can reach: every Character the API creates is a
-Level-1 Origin Character, and no path completes the tutorial yet (there is no Oracle). The
-builder's reading of the locked rules for that case:
+The current starting grant is **not** a one-time grant. §5.2 classifies it: its items are the
+Bootstrap Kit, which a new pre-completion Origin Character receives again, bound to that
+Character.
 
-- the next Character is a new Level-1 Origin Character, because the tutorial is mandatory while it
-  has never been completed (`TUTORIAL_ROOKGAARD_ROADMAP.md` §2);
-- C5 and C6 still apply, so it does **not** receive the Rookgaard tutorial grant — or any other
-  one-time grant — a second time;
-- the account therefore needs a durable, Account-owned record of the **one-time grants it has
-  received**. Tutorial completion alone cannot show that a mid-tutorial Origin Character already
-  received its grant. The record names grants, never a Character, so it is not a residue of the
-  purged Character (L10, L12). C8 names tutorial completion as the only fact that survives *for
-  the Origin role's purpose*; this record would survive for C5 and C6's purpose instead, and
-  whether that is acceptable is part of the confirmation.
+#### 5.2 Before Rookgaard is complete — the Bootstrap Kit — `LOCKED BY PRODUCT` (G4.1c, 2026-09-24)
 
-This reading is listed for Product Owner confirmation in
-[`OPEN_QUESTIONS.md`](../../OPEN_QUESTIONS.md), with its consequence for the new Character's
-starting equipment. It does not reopen G4.1c: C1–C8 stand as locked, and only this case's reading
-can change.
+The one case C1–C8 did not state — an Origin Character permanently purged **before** the account
+has ever completed Rookgaard — is decided:
+
+| # | Rule |
+|---|---|
+| P1 | The next Character created is a **new Origin Character**. |
+| P2 | It starts at Base Level 1. |
+| P3 | It must complete the mandatory Rookgaard tutorial journey. |
+| P4 | It receives a fresh **Bootstrap Kit**, sufficient to make the tutorial playable. |
+| P5 | The Bootstrap Kit is **not** a one-time Account reward. |
+| P6 | It may be issued again to a new pre-completion Origin Character after the previous Origin Character was permanently purged. |
+| P7 | Its items are non-exploitable. They cannot be moved to the Depot or the Stash, transferred to another Character, traded or listed, sold or converted into Gold or any other Account-wide value, or used to generate durable Account-wide rewards or value outside the tutorial flow. |
+| P8 | If that Origin Character is later purged, its Bootstrap Kit is purged with it. |
+| P9 | The replacement Origin Character receives a new, clean Bootstrap Kit, so the tutorial stays playable. |
+
+**Two concepts, never conflated:**
+
+| | Bootstrap Kit | Tutorial Rewards |
+|---|---|---|
+| Purpose | make the mandatory Level-1 tutorial playable | reward progression and completion |
+| Governed by | the Character it was issued to | Account-level completion and reward state |
+| Issued again? | yes — to each new pre-completion Origin Character (P6, P9) | no — one-time where defined as one-time, and never reissued because a Character was deleted or purged |
+| Can it leave the Character or become value? | never (P7) | as the reward's own definition allows |
+| At the purge | destroyed with its Character (P8) | the Account's reward state survives (L11); an item the reward gave the Character is destroyed with it, like everything the Character owned (L8) |
+
+**The locked flow:**
+
+```text
+Case 1 — the Account has NOT completed Rookgaard
+  Origin purged
+  -> new Origin Character, Base Level 1
+  -> Rookgaard mandatory
+  -> fresh Bootstrap Kit
+  -> no replay of any already-consumed one-time Account reward
+
+Case 2 — the Account HAS completed Rookgaard
+  Origin or later Character purged
+  -> the next Character follows the later-character flow
+  -> Base Level 8, skips Rookgaard
+  -> only legitimate Character-specific Level-8 starting state
+  -> no one-time Account or tutorial reward repeated
+```
+
+**Why issuing the kit again is not farming.** C6 forbids farming starting items and containers
+through *delete → purge → recreate*. The Bootstrap Kit does not break it: no kit item can ever
+leave its Character or become value (P7), and every kit is destroyed with its Character (P8).
+However many cycles run, the Account ends with nothing it did not already have.
+
+**What the architecture must provide** (PRE-4; none of it exists yet):
+
+- **a binding on the instance, not the definition.** The kit is made of ordinary item
+  definitions: the same backpack and small health potions the Rookgaard counter sells, and the
+  same dagger and armour that other sources may give. Binding a definition would bind every copy.
+  A kit item carries its binding on its own `ItemInstance`, set when the kit is issued and never
+  cleared by any command;
+- **enforcement in the domain, on every path.** Every command that moves, stows, transfers,
+  sells, lists, trades or converts an item refuses a bound instance server-side, whatever the
+  client shows. Today those paths are the move to the Depot, the Stash deposit, and the counter
+  sale, whose proceeds go straight to the Bank;
+- **no mixing.** A bound instance never merges with an unbound one: a stack is wholly Bootstrap
+  Kit or not at all. A bought potion never becomes bound, and a kit potion never becomes free by
+  joining a bought stack;
+- **no leak through what an item holds or produces.** Loot a kit container holds is ordinary
+  loot, not kit. Consuming a kit potion in play is the tutorial flow, and nothing it yields may be
+  value. Every future system that consumes, transforms, upgrades, lists or trades items — the
+  Market (Phase 6), the Forge and imbuement (Phase 7) — refuses a bound instance, or keeps what it
+  produces bound to the same Character;
+- **the purge destroys it.** A bound instance can only be in its Character's own custody, so the
+  DELETE-OWNED of Character-owned `ItemInstance` rows (§6.1) always reaches it;
+- **issued on one path only.** Creation issues a kit on the pre-completion Origin path, never on
+  the later-character path (Case 2).
+
+**The current starting grant, classified.** `starting-grant.origin.rookgaard` (content label
+*"Rookgaard tutorial grant"*) is the only grant in code. It is applied to every Character, because
+every Character is an Origin Character today. It credits no Gold and no entitlement.
+
+| Item | Qty | Why it is there | Needed to make Rookgaard playable? | Value and escape paths today | Classification |
+|---|---|---|---|---|---|
+| leather helmet, coat, leather legs, leather boots | 1 each | Canary's own pre-vocation kit: `addFirstItems` in `dawnport_vocation_trial.lua` gives exactly these four to a vocation-less Character (Phase 3 source map §11) | they are the Character's armour 4 in every Rookgaard fight; not measured on their own | not sellable, not stash-eligible; each can be moved to the Depot | **Bootstrap Kit** |
+| dagger | 1 | a Global Idle addition: with fists a Level-1 Character loses 88% of its fights against a Rat, and with the dagger it wins them all (Phase 2 source map §4) | **yes — measured** | its definition is `sellable`, but no current counter buys it; it can be moved to the Depot | **Bootstrap Kit** |
+| backpack | 1 | a Global Idle addition: without a container, nothing carries loot (Phase 3 source map §11) | **yes** | the counter sells the same backpack for 10 Gold; it can be moved to the Depot once empty | **Bootstrap Kit** |
+| small health potion | 20 | a Global Idle addition, inherited from Phase 2's temporary tutorial profile (`supply { charges 20 }`). Canary's own pre-vocation kit has none; the same file gives ten at the Knight trial, after a vocation is chosen (Phase 3 source map §11). No document records why the pre-vocation kit needs them | **not established** | the counter sells the same potion for 20 Gold — 400 Gold for the grant; stash-eligible and stackable, so it can reach the Stash today and would merge with bought potions | **flagged — not decided** |
+
+Every Character is also created with its own starting structure — Stamina at maximum, five Hunt
+Container Slots with slot 1 unlocked, a default loot policy. That is Character-specific starting
+state of every creation: neither kit nor reward, and destroyed with the Character.
+
+**Two points flagged, not decided.** Whether the 20 small health potions are part of the
+Bootstrap Kit — and, if so, whether 20 is the number the tutorial needs — or a Tutorial Reward.
+And whether the binding ends when Rookgaard is complete: P7 sets no end, so this record treats it
+as permanent, for as long as the Character exists. Both are Product Owner decisions, listed in
+[`OPEN_QUESTIONS.md`](../../OPEN_QUESTIONS.md), and both are settled before the kit is
+implemented (`PHASE_GATES.md` § *G4.1*).
+
+**No Tutorial Reward exists in code.** The tutorial's rewards — the guaranteed tutorial Treasure
+Chest and its Doublet (`TUTORIAL_ROOKGAARD_ROADMAP.md` §18–§19) — are design only. Which of them is
+a one-time Tutorial Reward, never replayed for a replacement Origin Character, is decided with
+their reward tables (§43 of that document).
+
+**Kit items that already exist.** No `ItemInstance` records where it came from. A kit backpack is
+indistinguishable from one bought at the counter, and kit potions merge with bought ones. The PRE-4
+specification states how items issued before the binding existed are identified and bound, or
+flags the ones that cannot be.
 
 ### 6. What the purge removes, keeps and scrubs — architecture
 
@@ -285,7 +373,7 @@ them.
 | `CharacterStamina` | Character | DELETE-OWNED |
 | `CharacterLootPolicy` | Character | DELETE-OWNED |
 | `CharacterContainerSlot`, bought unlocks included | Character | DELETE-OWNED — the unlock is destroyed; the Gold that bought it stays spent where the ledger recorded it |
-| `ItemInstance` with a `characterId` — `EQUIPPED`, `HUNT_CONTAINER`, `CHARACTER_CONTAINER`, `LOOT_POUCH` | Character | DELETE-OWNED — contents before their container, and a slot row before the container installed in it |
+| `ItemInstance` with a `characterId` — `EQUIPPED`, `HUNT_CONTAINER`, `CHARACTER_CONTAINER`, `LOOT_POUCH` | Character | DELETE-OWNED — contents before their container, and a slot row before the container installed in it. Every Bootstrap Kit instance is here, because it can never be anywhere else (§5.2) |
 | `LedgerEntry`, custody `POUCH` | Character | DELETE-HISTORY — the Pouch's history and its remaining value go together |
 | `CurrencyBalance`, custody `POUCH` | Character | DELETE-OWNED — the balance is destroyed (L7, L8) |
 | `Activity` with its `SessionBoundActivity`, `SkillTrainingActivity`, `HuntRun` and `ActivityParticipant` rows, where the Character is the only participant | Character | DELETE-HISTORY |
@@ -302,7 +390,7 @@ them.
 
 | Data | Phase | Action |
 |---|---|---|
-| the Account's tutorial-completion fact, and any Account-level record of one-time grants received (§5.1) | PRE-4 | KEEP — Account state. No purge resets either (C2, C5) |
+| the Account's tutorial-completion fact, and its state for one-time Tutorial Rewards (§5.1) | PRE-4 | KEEP — Account state. No purge resets either (C2, C5) |
 | Character skills, and any other Character-specific progression | 4 | DELETE-OWNED |
 | Active Party configuration | 4 | nothing to do — a member cannot request deletion (§3) |
 | an Activity shared with other Characters of the same account | 4 | SCRUB — its participant row and per-participant state go; the Activity and the other participants' facts stay; nothing records who the missing participant was |
@@ -418,22 +506,24 @@ the BANK legs, which are the Account's own record that it paid or received value
 For the PRE-4 implementation, forward-only and additive first (`DATA_ARCHITECTURE.md` §8):
 
 1. add the lifecycle state, both timestamps, the request and restore commands, the purge
-   capability and the purge job — together with the Account-owned tutorial-completion fact and
-   the creation routing of §5.1, so that no purge can ever be followed by a recreation that
-   receives a one-time grant again;
-2. switch every `retiredAt` read to the lifecycle-aware predicate;
-3. count the rows with `retiredAt` set, and report the number in the implementation PR. No
+   capability and the purge job — together with the Account-owned tutorial-completion and
+   one-time reward state, the creation routing of §5.1–§5.2 and the Bootstrap Kit binding, so
+   that no purge can ever be followed by a recreation that accumulates Account value;
+2. complete the classification of the current starting grant (§5.2), with no item left flagged,
+   and bind the kit items that already exist — or record the ones that cannot be identified;
+3. switch every `retiredAt` read to the lifecycle-aware predicate;
+4. count the rows with `retiredAt` set, and report the number in the implementation PR. No
    product path sets it, so any such row comes from a test or a hand edit. Recommended
    conversion: `PENDING_DELETION`, requested at the migration instant, so that no Character is
    destroyed without a full grace window;
-4. rebuild I1 and I1b without `retiredAt`, over every existing Character, `PENDING_DELETION`
+5. rebuild I1 and I1b without `retiredAt`, over every existing Character, `PENDING_DELETION`
    included (§5);
-5. only then remove `retiredAt` and `retireCharacter`;
-6. replace the VERIFIED tests that encode retirement — Phase 0B `D5` and `D6`, Phase 1 `D22`'s
+6. only then remove `retiredAt` and `retireCharacter`;
+7. replace the VERIFIED tests that encode retirement — Phase 0B `D5` and `D6`, Phase 1 `D22`'s
    retirement step and `D24`'s filter, Phase 3 `RET1`–`RET2`, and the `retiredAt` assertion in
    `tests/integration/characters.test.ts` — through explicit matrix amendments. A verified test is
    superseded visibly, never deleted quietly;
-7. correct the schema, migration-adjacent and code comments that cite `ADR-007`.
+8. correct the schema, migration-adjacent and code comments that cite `ADR-007`.
 
 No migration rewrites a ledger row, and the purge is not a migration.
 
@@ -448,8 +538,9 @@ No migration rewrites a ledger row, and the purge is not a migration.
   and no BANK row is ever deleted.
 - A restore can never fail because of a replacement: a pending Character keeps everything its
   restoration needs (§5).
-- Deletion is not a farming loop: tutorial completion survives the purge and no one-time grant is
-  awarded twice (§5.1).
+- Deletion is not a farming loop. Tutorial completion and one-time Tutorial Rewards are Account
+  state that survives the purge, and the only thing a recreated Origin Character receives again is
+  a Bootstrap Kit that can never leave it (§5.1–§5.2).
 
 **Costs.**
 
@@ -468,6 +559,8 @@ No migration rewrites a ledger row, and the purge is not a migration.
   against a lateness target, because a due Character that lingers is a visible failure.
 - Every future table that references a Character must declare a purge action, and the closure
   test has to be kept honest.
+- Every item path — today's moves, Stash deposits and sales, and every later one — has to check
+  the Bootstrap Kit binding on the instance it touches.
 
 **Constraints created.**
 
@@ -479,7 +572,9 @@ No migration rewrites a ledger row, and the purge is not a migration.
 - A pending Character's vocation, Origin slot and roster place are released only by its purge, in
   the commit that deletes it.
 - No purge resets the Account's tutorial completion, and no *delete → purge → recreate* awards a
-  one-time grant again.
+  one-time reward again.
+- A Bootstrap Kit item never reaches the Depot, the Stash, another Character, a market, a sale or
+  any conversion into Account value, and is destroyed with its Character.
 - A BANK entry never carries a Character's identity, in any column, the operation id included.
 - A new reference to `Character` is not mergeable without a declared purge action.
 
@@ -493,7 +588,7 @@ No migration rewrites a ledger row, and the purge is not a migration.
 | its vocation is freed at retirement | held through the grace, freed only by the purge (§5) |
 | it stops counting against the roster at retirement | counts through the grace, stops only at the purge (§5) |
 | roster capacity and the Gold that bought it are not refunded | **still true** — capacity is Account-owned and monotonic |
-| the Origin Character may be retired, and the tutorial flag is unaffected | the Origin Character may be deleted like any other. It keeps the Origin slot through the grace, and tutorial completion stays with the Account through the purge: a purge never restarts the tutorial for an account that completed it, and never awards a one-time grant again (§5.1) |
+| the Origin Character may be retired, and the tutorial flag is unaffected | the Origin Character may be deleted like any other. It keeps the Origin slot through the grace, and tutorial completion stays with the Account through the purge: a purge never restarts the tutorial for an account that completed it, and never awards a one-time reward again (§5.1). Purged before completion, it is replaced by a new Level-1 Origin Character with a fresh Bootstrap Kit (§5.2) |
 | reversibility is a deferred parameter | reversibility is `LOCKED`: 30 days |
 | no code may hard-delete a Character | exactly one path may: the purge |
 | vocation uniqueness is a partial index over non-retired rows | the `retiredAt` predicate goes; uniqueness spans every existing Character, `PENDING_DELETION` included (§5) |
@@ -526,7 +621,8 @@ through the path that already exists.
 
 ## Product constraints requiring this architecture
 
-- The thirteen rules of §1, and G4.1b (§5) and G4.1c (§5.1) — Product Owner, 2026-09-24.
+- The thirteen rules of §1, G4.1b (§5), and G4.1c with its pre-completion case (§5.1–§5.2) —
+  Product Owner, 2026-09-24.
 - *"Economy operations must be transactional and auditable."* — `AGENTS.md`
 - *"no item duplication"* — `docs/ARCHITECTURE.md`, security baseline
 - *"Do not determine tutorial eligibility only by counting existing characters."* —

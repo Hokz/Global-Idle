@@ -64,17 +64,27 @@ The account should still know that the tutorial was previously completed.
 > belongs to the Account, and deleting or purging the Origin Character does not reset it. A
 > Character created after that purge does not restart the first-character tutorial automatically:
 > it follows the later-character flow — Base Level 8, no Rookgaard, the post-Rookgaard state — and
-> no one-time tutorial or account grant is awarded again. See
+> no one-time tutorial or account reward is awarded again. See
 > [`DECISIONS.md`](../../DECISIONS.md) § *Character deletion* and
 > [`ADR-020`](../../architecture/decisions/ADR-020-character-deletion-grace-and-purge.md) §5.1.
 > The optional PLAY / SKIP offer below and the replay questions of §43 stay open, within that
-> rule. An Origin Character purged **before** the tutorial is complete is a case G4.1c does not
-> state; its reading awaits confirmation in [`OPEN_QUESTIONS.md`](../../OPEN_QUESTIONS.md)
-> § *Character deletion*.
+> rule.
 
 ## First character / tutorial never completed
 
 The Level 1–8 tutorial is mandatory.
+
+> **`LOCKED` — G4.1c, pre-completion case, Product Owner, 2026-09-24.** If the Origin Character is
+> permanently purged before the account completes Rookgaard, the next Character is a **new Origin
+> Character** at Base Level 1, and this mandatory tutorial starts again. It receives a fresh
+> **Bootstrap Kit** — enough to make the tutorial playable, bound to that Character, never
+> movable to the Depot, the Stash or another Character, never tradeable, sellable or convertible
+> into Account value, and destroyed with it. The kit is **not** a Tutorial Reward. Tutorial
+> Rewards — the tutorial's real rewards, such as the Doublet of §19 — are Account-governed:
+> one-time where defined as one-time (§43 decides which), and never replayed merely because the
+> Origin Character was purged. See
+> [`ADR-020`](../../architecture/decisions/ADR-020-character-deletion-grace-and-purge.md) §5.2,
+> which also classifies today's starting grant.
 
 ## Additional character after tutorial completion
 
@@ -1275,6 +1285,8 @@ Not yet locked:
 - exact visual effects/highlights;
 - exact Mainland destination flow after vocation selection;
 - whether all Rookgaard systems are replayable after tutorial completion;
-- exact tutorial reward tables besides the guaranteed Doublet.
+- exact tutorial reward tables besides the guaranteed Doublet, and which tutorial rewards —
+  the guaranteed Doublet included — are one-time per account (G4.1c): a one-time Tutorial Reward
+  is never replayed for a replacement Origin Character.
 
 These must be discussed before implementation if they materially affect behavior.

@@ -121,6 +121,12 @@ Stellar. Do not create a second enum.
 Normal accessible movement: container ↔ container · container ↔ Depot · container ↔ Stash (when
 eligible) · Depot ↔ Stash (when eligible) · Loot Pouch → any valid accessible storage.
 
+**Except a Bootstrap Kit item** (`LOCKED`, G4.1c): it stays in its own Character's custody. It is
+never moved to the Depot, the Stash or another Character, never sold, listed or traded, and it is
+destroyed with the Character — see
+[`ADR-020`](../architecture/decisions/ADR-020-character-deletion-grace-and-purge.md) §5.2. **Not
+implemented**: the PRE-4 gate adds the server-side refusal.
+
 Desktop affordances: drag and drop, context actions, stack splitting.
 Touch affordances: long press or context action, **Move**, amount selection.
 Server authoritative, both.

@@ -303,7 +303,8 @@ the lifetime of the Origin Character:
 - one-time account or tutorial starting grants are **not** awarded again merely because the Origin
   Character was deleted or purged and another Character was created. *Delete → purge → recreate*
   cannot farm starting items, Gold, containers, entitlements, tutorial rewards or any other
-  one-time account grant;
+  one-time account grant. The Bootstrap Kit below is not such a grant, and it cannot be farmed
+  either;
 - Character-specific starting state that is legitimately part of the normal Level-8
   later-character flow may still be granted by that flow. It is not a one-time grant, and the two
   are never conflated;
@@ -311,12 +312,55 @@ the lifetime of the Origin Character:
   residual Character record; the account-level tutorial-completion fact is the only thing that
   survives for this purpose.
 
-**Not implemented.** The Account has no tutorial-completion fact yet, and the code gives the
-Rookgaard tutorial grant to every Character it creates. Both change in the PRE-4 gate
-([`PHASE_GATES.md`](PHASE_GATES.md) § *G4.1*), with the purge and never after it. An Origin
-Character purged **before** the account completes Rookgaard is a case these rules do not state;
-the builder's reading is listed for confirmation in [`OPEN_QUESTIONS.md`](OPEN_QUESTIONS.md)
-§ *Character deletion*.
+### Before Rookgaard is complete — the Bootstrap Kit (G4.1c)
+
+`LOCKED` by the Product Owner, 2026-09-24. If the Origin Character is permanently purged **before**
+the account completes Rookgaard:
+
+- the next Character created is a **new Origin Character**, at Base Level 1, and it must complete
+  the mandatory Rookgaard tutorial journey;
+- it receives a fresh **Bootstrap Kit**, sufficient to make the tutorial playable;
+- the Bootstrap Kit is **not** a one-time Account reward. It may be issued again to a new
+  pre-completion Origin Character after the previous one was permanently purged;
+- Bootstrap Kit items are non-exploitable. They cannot be moved to the Depot or the Stash,
+  transferred to another Character, traded or listed, sold or converted into Gold or any other
+  Account-wide value, or used to generate durable Account-wide rewards or value outside the
+  tutorial flow;
+- if that Origin Character is later purged, its Bootstrap Kit is purged with it, and the
+  replacement Origin Character receives a new, clean kit, so the tutorial stays playable.
+
+**Tutorial Rewards are not the Bootstrap Kit.** Tutorial Rewards are real rewards or durable
+Account-level benefits. They are governed by Account-level completion and reward state, stay
+one-time where defined as one-time, are never reissued merely because a Character was deleted or
+purged, and cannot be farmed through *delete → purge → recreate*. The two are never conflated:
+
+| | Bootstrap Kit | Tutorial Rewards |
+|---|---|---|
+| purpose | make the mandatory Level-1 tutorial playable | reward progression and completion |
+| issued again | to each new pre-completion Origin Character | never because a Character was purged |
+| bound to | its Character: non-transferable, non-monetizable | the Account's completion and reward state |
+| at the purge | destroyed with the Character | the Account's reward state survives |
+
+```text
+Account has NOT completed Rookgaard:  Origin purged -> new Origin, Base Level 1 -> Rookgaard
+                                      mandatory -> fresh Bootstrap Kit -> no replay of any
+                                      already-consumed one-time Account reward
+Account HAS completed Rookgaard:      Origin or later Character purged -> later-character flow,
+                                      Base Level 8, skips Rookgaard -> only legitimate
+                                      Character-specific Level-8 starting state -> no one-time
+                                      Account or tutorial reward repeated
+```
+
+Issuing the kit again is not farming: a kit can never leave its Character or become value, and it
+is destroyed with that Character, so repeated cycles accumulate nothing.
+
+**Not implemented.** The Account has no tutorial-completion or reward state yet, and nothing binds
+a kit: the code gives every Character the same starting grant, whose items can be moved to the
+Depot, and whose potions can be stowed in the Stash. The PRE-4 gate
+([`PHASE_GATES.md`](PHASE_GATES.md) § *G4.1*) changes that, with the purge and never after it. The
+current grant is classified item by item in `ADR-020` §5.2. Two points are flagged there, not
+decided: its 20 small health potions, and whether the kit's binding ends with the tutorial — see
+[`OPEN_QUESTIONS.md`](OPEN_QUESTIONS.md) § *Character deletion*.
 
 ## Character activity occupancy
 

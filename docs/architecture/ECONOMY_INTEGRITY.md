@@ -168,7 +168,8 @@ audit trail decorative.
 | Race on roster vocation uniqueness | persistence-level constraint over every existing Character, `PENDING_DELETION` included (`ADR-020` §5, G4.1b) |
 | Deletion used to bank carried value | impossible by rule: nothing Character-owned moves to the Bank or to any recovery custody at purge — it is destroyed (`ADR-020`, L7–L8) |
 | Restore/purge race at the deadline | both lock the Character and decide against the authoritative clock after the lock; exactly one wins (`ADR-020` §7) |
-| Starting-grant farming through delete → purge → recreate | forbidden by rule (G4.1c, `LOCKED`): tutorial completion belongs to the Account and survives the purge, and no one-time grant is awarded twice. **Not implemented** — today every creation applies the Rookgaard tutorial grant; the PRE-4 gate replaces that before any purge exists (`ADR-020` §5.1, `PHASE_GATES.md` § *G4.1*) |
+| Farming through delete → purge → recreate | forbidden by rule (G4.1c, `LOCKED`). One-time Tutorial Rewards are Account-governed and never reissued. A new pre-completion Origin Character does receive a fresh Bootstrap Kit, but a kit can never leave its Character or become value and is destroyed with it, so cycles accumulate nothing (`ADR-020` §5.1–§5.2) |
+| A Bootstrap Kit item escaping into Account value | refused server-side on the instance by every move, Stash, transfer, sale, listing, trade and conversion path (`DOMAIN_MODEL.md` I20). **Not implemented** — today a kit item can be moved to the Depot and its potions stowed in the Stash, and a counter sale pays the Bank directly; the PRE-4 gate closes these before any purge exists (`PHASE_GATES.md` § *G4.1*) |
 
 `DEFERRED PARAMETER` — fee percentages, listing limits, rate-limit thresholds. They are tuning
 values; the mechanisms are architectural.

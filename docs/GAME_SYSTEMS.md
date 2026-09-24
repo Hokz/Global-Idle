@@ -102,7 +102,9 @@ One player account controls every character. There is no multi-human party.
   Nothing moves to the Bank. Until the purge it keeps its name, its vocation, its roster place
   and, as the Origin Character, the Origin slot, so no replacement can take them and a restore
   always succeeds. Deleting the Origin Character never resets the account's tutorial completion
-  and never earns a one-time grant twice — `docs/DECISIONS.md` § *Character deletion*;
+  and never earns a one-time reward twice. Purged before Rookgaard is complete, it is replaced by
+  a new Level-1 Origin Character with a fresh **Bootstrap Kit**, which can never leave that
+  Character or become Account value — `docs/DECISIONS.md` § *Character deletion*;
 - an owned vocation is removed from future unlock choices;
 - additional roster slots are unlocked with in-game Gold (costs OPEN);
 - later unlocked characters start at Base Level 8, skip Rookgaard, get no catch-up levels.

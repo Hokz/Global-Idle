@@ -581,8 +581,10 @@ Full text: [`PHASE_GATES.md`](PHASE_GATES.md) § *Pre-Phase-4*.
   Gold Pouch is kept during the grace and destroyed at the purge, never moved to the Bank (G4.1a);
   a pending Character keeps its vocation, the Origin slot and its roster place until the purge, so
   a restore never conflicts with a replacement (G4.1b); tutorial completion belongs to the Account
-  and survives the purge, and no one-time grant is awarded twice (G4.1c). **None of it is
-  implemented**, and the gate has not passed;
+  and survives the purge, no one-time Tutorial Reward is awarded twice, and an Origin Character
+  purged before Rookgaard is complete is replaced by a new Level-1 Origin with a fresh Bootstrap
+  Kit that can never leave it or become Account value (G4.1c). **None of it is implemented**, and
+  the gate has not passed;
 - **enforce the `baseXp` → `baseLevel` projection** — `baseXp` is already the durable truth and
   `baseLevel` its stored projection (schema + `progression.ts`). The gate proves and enforces that
   contract on every write path, migration and rollback; it does not choose again;

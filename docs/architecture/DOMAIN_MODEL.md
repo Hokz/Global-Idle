@@ -206,6 +206,9 @@ touching the ownership model.
 - tutorial completion is tracked at account level, not inferred from character count —
   `LOCKED BY PRODUCT` (`TUTORIAL_ROOKGAARD_ROADMAP.md` §2). No deletion or purge resets it, the
   Origin Character's included (G4.1c, `ADR-020` §5.1)
+- a one-time Tutorial Reward is Account-governed: recorded in Account-owned reward state wherever
+  a reward is defined as one-time, and never reissued because a Character was deleted or purged —
+  `LOCKED BY PRODUCT` (G4.1c, `ADR-020` §5.1). The Bootstrap Kit is not such a reward (§5.13)
 
 Roster capacity is stored against the Account row but is **owned by the Character context** —
 see §5.4. Physical location does not determine the bounded context.
@@ -320,9 +323,10 @@ hard purge.** See `ADR-020`, which supersedes the Phase 0A decision (`ADR-007`, 
 - The Origin Character may be deleted like any other; tutorial completion stays Account-level and
   is never inferred from counting Characters (`TUTORIAL_ROOKGAARD_ROADMAP.md` §2). Purging it
   never resets that completion: once Rookgaard is complete, a Character created after the purge
-  starts at Base Level 8 and skips Rookgaard, and no one-time grant is awarded again (G4.1c,
-  `ADR-020` §5.1). An Origin Character purged **before** Rookgaard is complete is a case with a
-  reading awaiting confirmation (`docs/OPEN_QUESTIONS.md` § *Character deletion*).
+  starts at Base Level 8 and skips Rookgaard, and no one-time reward is awarded again (G4.1c,
+  `ADR-020` §5.1). Purged **before** Rookgaard is complete, it is replaced by a new Level-1 Origin
+  Character that must complete Rookgaard, with a fresh Bootstrap Kit — bound to that Character,
+  never transferable or monetizable, and destroyed with it (`ADR-020` §5.2).
 
 The code still implements retirement (`retiredAt`) until the PRE-PHASE-4 gate replaces it
 (`PHASE_GATES.md` § *G4.1*).
@@ -698,7 +702,7 @@ six static copies.
 | Owner | Items context |
 | Authoritative system | server only — *"the browser must never decide loot, rarity, forge success"* |
 | State | durable |
-| Lifecycle | materialized at settlement (loot) or by an economy operation (purchase, forge) → custody transitions → consumed (forge sacrifice) or destroyed |
+| Lifecycle | materialized at settlement (loot), by an economy operation (purchase, forge), or issued at Character creation (the Bootstrap Kit) → custody transitions → consumed (forge sacrifice) or destroyed |
 | Mutable during an Activity | created by settlement; custody is otherwise frozen for participating characters |
 | Transaction / audit | **always** |
 
@@ -714,6 +718,11 @@ six static copies.
 - forge tier changes never alter rarity or affixes — `LOCKED BY PRODUCT`
 - affixes, forge tier and imbuements are **independent layers** — `LOCKED BY PRODUCT`
 - a consumed instance is terminal: it never returns to circulation
+- a **Bootstrap Kit** instance is bound to its Character: it never reaches the Depot, the Stash,
+  another Character, a listing, a trade, a sale or any conversion into Account value, and it never
+  merges with an unbound instance. The binding lives on the instance, never on the definition,
+  because the kit is made of ordinary items, and other copies of them must stay unbound —
+  `LOCKED BY PRODUCT` (G4.1c), **PRE-4, not implemented** (`ADR-020` §5.2)
 
 **Relationships.** References a BaseItem definition. Held by exactly one of: character
 inventory, character equipment, market escrow, forge input, or a terminal consumed state.
@@ -929,8 +938,10 @@ application-only check loses a race.
 | I17 | A `PENDING_DELETION` Character is frozen: no command changes anything it owns or makes it a participant, except restore and purge | lifecycle state checked in every command's transaction (`ADR-020` §4) |
 | I18 | A Character's name stays reserved while its row exists, in either lifecycle state | uniqueness over every existing row; a persistence constraint is recommended (`ADR-020` §5) |
 | I19 | After a purge, no product-persistence row names the purged Character, and every Account-owned row and balance is unchanged apart from documented scrubs | schema-derived closure test + post-purge scan (`ADR-020` §7) |
+| I20 | A Bootstrap Kit item never leaves its Character: no Depot, Stash, other Character, listing, trade, sale or conversion into Account value; it never merges with an unbound instance, and it is destroyed with its Character | a binding on the instance, checked server-side on every item path (`ADR-020` §5.2) |
+| I21 | A one-time Tutorial Reward is awarded at most once per Account, whatever Characters are created, deleted or purged | Account-owned reward state, checked in the awarding transaction (`ADR-020` §5.1) |
 
-I17–I19 are **not implemented**: they are requirements of the PRE-PHASE-4 gate
+I17–I21 are **not implemented**: they are requirements of the PRE-PHASE-4 gate
 (`PHASE_GATES.md` § *G4.1*).
 
 I8 and I10 are stated as *structural* rather than *validated*. A check that can be forgotten is

@@ -86,18 +86,39 @@ proven by a test:
 - a restore before `purgeAt` succeeds with no uniqueness or capacity conflict, after every refused
   replacement attempt.
 
-**Tutorial completion and one-time grants — G4.1c, `LOCKED`**
+**Tutorial completion, one-time rewards and the Bootstrap Kit — G4.1c, `LOCKED`**
+
+Settled in the design before implementation (`ADR-020` §5.1–§5.2):
+
+- an Account-owned tutorial-completion fact, and Account-owned state for one-time Tutorial
+  Rewards wherever a reward is defined as one-time;
+- the current starting grant classified item by item into Bootstrap Kit and Tutorial Rewards,
+  with nothing left flagged. Today its 20 small health potions are flagged, and so is whether the
+  binding ends with the tutorial;
+- Character creation routed on the Account's tutorial completion, never on a count of Characters;
+- the Bootstrap Kit binding carried by each `ItemInstance` and enforced server-side on every item
+  path — never in the UI only.
+
+Proven by tests:
 
 - the Account's tutorial completion survives the purge of its Origin Character, and of any other
   Character;
-- once the account has completed Rookgaard, a Character created after a purge takes the
-  later-character path — Base Level 8, no Rookgaard, the post-Rookgaard state — never the
-  first-character tutorial;
-- one-time tutorial and account grants — today the Rookgaard tutorial grant — are **not** reissued
-  after a purge and a recreation. Character-specific starting state of the normal Level-8 flow is
-  not a one-time grant, and the tests keep the two apart (`ADR-020` §5.1, C7);
-- repeated *delete → purge → recreate* cycles cannot farm any one-time grant: however many cycles
-  run, no one-time grant is awarded to the account more than once.
+- an Account that has completed Rookgaard never returns to it automatically: a Character created
+  after a purge takes the later-character path — Base Level 8, no Rookgaard, the post-Rookgaard
+  state;
+- a replacement pre-completion Origin Character starts at Base Level 1, in the mandatory
+  Rookgaard journey, with a fresh Bootstrap Kit;
+- the purge destroys the Bootstrap Kit with its Origin Character;
+- the Bootstrap Kit cannot escape into Account custody or value: moving a kit item to the Depot,
+  the Stash or another Character, and selling, listing, trading or converting it, are each refused
+  server-side — tested per path and per instance, including a kit stack beside a bought stack of
+  the same item;
+- one-time Tutorial Rewards and account grants are **not** reissued after a purge and a
+  recreation. Character-specific starting state of the normal Level-8 flow is not a one-time
+  grant, and the tests keep the two apart (`ADR-020` §5.1, C7);
+- repeated *delete → purge → recreate* cycles cannot accumulate Account value: with no play between
+  them, the Account's Bank, Depot, Stash, entitlements and reward state are identical after any
+  number of cycles, and no one-time reward is awarded twice.
 
 **The purge**
 
@@ -146,9 +167,10 @@ proven by a test:
 
 **Owner:** Phase 4 builder, before Party formation work. The product questions this gate names —
 G4.1a to G4.1c, below — are all decided. What still awaits Product Owner confirmation is listed in
-[`OPEN_QUESTIONS.md`](OPEN_QUESTIONS.md) § *Character deletion*. One item there — an Origin
-Character purged before the account completes Rookgaard, the only case today's code can reach
-(`ADR-020` §5.1) — the builder confirms before implementing creation after a purge.
+[`OPEN_QUESTIONS.md`](OPEN_QUESTIONS.md) § *Character deletion*. Two points there are decided
+before the kit is implemented (`ADR-020` §5.2): whether the current starting grant's 20 small
+health potions are Bootstrap Kit or a Tutorial Reward, and whether the kit's binding ends when
+Rookgaard is complete.
 **Acceptance:** invariant, race and closure tests, not a manual audit.
 
 #### G4.1a — the Gold Pouch at deletion — **RESOLVED** by the Product Owner, 2026-09-24
@@ -199,20 +221,27 @@ Origin Character:
   8, no Rookgaard, the post-Rookgaard game state;
 - one-time account or tutorial starting grants are not awarded again because the Origin Character
   was deleted or purged and another was created, so *delete → purge → recreate* cannot farm
-  starting items, Gold, containers, entitlements, tutorial rewards or any other one-time grant;
+  starting items, Gold, containers, entitlements, tutorial rewards or any other one-time grant.
+  The Bootstrap Kit, below, is not such a grant, and cannot be farmed either;
 - Character-specific starting state of the normal Level-8 flow may still be granted by that flow;
 - after its purge no Origin Character record remains. The account-level tutorial-completion fact
   is the only thing that survives for this purpose.
 
-Recorded in `ADR-020` §5.1 and `DECISIONS.md` § *Character deletion*; **implementation pending** —
-proven by the tests under *Tutorial completion and one-time grants*, above. Nothing of it exists
-yet: the Account has no tutorial-completion fact, and today's code gives the Rookgaard tutorial
-grant to every Character it creates. The creation routing ships **with** the purge, never after
-it.
+**Its pre-completion case is decided too**, the same day. If the Origin Character is purged
+before the account completes Rookgaard, the next Character is a new Origin Character at Base Level
+1 that must complete Rookgaard, and it receives a fresh **Bootstrap Kit**. The kit is not a
+one-time Account reward and may be issued again. Its items can never reach the Depot, the Stash,
+another Character, a trade, a listing, a sale or any other Account-wide value, and they are
+destroyed with their Character — so issuing a kit again is not the farming the rule above forbids.
+**Tutorial Rewards** are separate: Account-governed, one-time where defined as one-time, and never
+reissued because a Character was purged.
 
-The one case these rules do not state — an Origin Character purged **before** the account
-completes Rookgaard — is read in `ADR-020` §5.1 and listed for confirmation in
-[`OPEN_QUESTIONS.md`](OPEN_QUESTIONS.md) § *Character deletion*.
+Recorded in `ADR-020` §5.1–§5.2 and `DECISIONS.md` § *Character deletion*; **implementation
+pending** — the design items and tests under *Tutorial completion, one-time rewards and the
+Bootstrap Kit*, above. Nothing of it exists yet: the Account has no tutorial-completion or reward
+state, and today's code gives every Character the same starting grant, with nothing to stop its
+items reaching the Depot or the Stash. The creation routing and the kit binding ship **with** the
+purge, never after it.
 
 **Owner:** Phase 4 builder, as part of G4.1.
 
@@ -332,6 +361,9 @@ Every Market, Forge and Imbuement table that references a Character declares its
 before it ships (`ADR-020` §6.2): a live listing, escrow, trade or forge input **refuses** a
 deletion request, and completed trades keep the counterparty's facts — price, item definition,
 time, its own side — without naming the purged Character.
+
+A Bootstrap Kit item is never listed, escrowed, traded, or used as a Forge or imbuement input, and
+nothing any of these systems produces from one becomes Account value (`ADR-020` §5.2).
 
 **Owner:** Phase 6, before any market, forge or imbuement surface exists.
 

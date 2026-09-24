@@ -43,21 +43,24 @@ The client sends **intents**, never outcomes. `startHunt(huntId, partyConfig)` i
 | `authenticate` | credentials, rate limits, account status |
 | `setActiveParty(orderedCharacterIds)` | ownership, size 1–4, distinct, all `ACTIVE` — none pending deletion — **no running activity** (`ADR-005`, `ADR-020`) |
 | `unlockRosterSlot` | capacity < 5, sufficient Gold, transactional spend |
-| `createCharacter(vocation)` | slot available, vocation not owned, Origin slot free, name not reserved — each counted over every existing Character on the account, `PENDING_DELETION` included (`ADR-020` §5, G4.1b); the creation path from the Account's tutorial completion, never from a Character count, and no one-time grant awarded twice (`ADR-020` §5.1, G4.1c); level rules |
+| `createCharacter(vocation)` | slot available, vocation not owned, Origin slot free, name not reserved — each counted over every existing Character on the account, `PENDING_DELETION` included (`ADR-020` §5, G4.1b); the creation path from the Account's tutorial completion, never from a Character count — before completion a new Level-1 Origin with a fresh Bootstrap Kit, after it the later-character path — and no one-time reward awarded twice (`ADR-020` §5.1–§5.2, G4.1c); level rules |
 | `requestCharacterDeletion(characterId)` | ownership; `ACTIVE`; no occupancy claim or non-terminal Activity, not in the Active Party, no live obligation (`ADR-020` §3, `ADR-013`). A repeat while pending returns the existing deadline |
 | `restoreCharacter(characterId)` | ownership; `PENDING_DELETION`; server time strictly before `purgeAt` (`ADR-020` §2) |
 | `startActivity(activityDefinitionId)` | ownership, prerequisites, unlocks, party validity, no existing **account** activity claim, and — in the same transaction — **atomic acquisition of the occupancy claim for every participating Character**; fails if any participant already holds one (`ADR-013`) |
 | `stopActivity` | ownership of the running activity; releases every participant's occupancy claim in the same transaction as the lifecycle transition |
 | `equipItem(characterId, itemInstanceId, slot)` | custody, ownership, equip requirements, **character not participating in a running activity** (`DOMAIN_MODEL.md` §5.12) |
-| `sellItem` / `listItem` / `buyListing` | custody, ownership, funds, escrow, fees |
-| `forgeAttempt(target, sacrificeA, sacrificeB)` | custody of all three, classification and rarity match, costs |
+| `sellItem` / `listItem` / `buyListing` | custody, ownership, funds, escrow, fees; never a Bootstrap Kit item (`ADR-020` §5.2) |
+| `forgeAttempt(target, sacrificeA, sacrificeB)` | custody of all three, classification and rarity match, costs; none of them a Bootstrap Kit item |
 | `startSkillTraining(characterId, exerciseItemId)` | custody, charges remaining, and — in the same transaction — **atomic acquisition of that Character's occupancy claim**; fails if the Character is hunting, in a dungeon, or already training (`ADR-013`) |
 | `claimSkillTraining(characterId)` | ownership; server computes elapsed time |
 
-The two deletion commands are illustrative names; the PRE-4 implementation specification fixes
-them. The **purge** that follows a deletion's deadline is **not a command**: the client can
-neither trigger it, bring it forward nor undo it, and every command that names a
-`PENDING_DELETION` Character — other than restore — is refused (`ADR-020` §4, §7).
+The two deletion commands are illustrative names; the PRE-4 implementation specification fixes them.
+**A Bootstrap Kit item is refused by every command that would move it to the Depot, the Stash or
+another Character, or sell, list, trade or convert it** — checked on the instance, in the domain,
+whatever the client shows (`ADR-020` §5.2, `DOMAIN_MODEL.md` I20). The **purge** that follows a
+deletion's deadline is **not a command**: the client can neither trigger it, bring it forward nor
+undo it, and every command that names a `PENDING_DELETION` Character — other than restore — is
+refused (`ADR-020` §4, §7).
 
 **Every command is authorized against the Account.** A command naming a character the account
 does not own is rejected before any domain logic runs — not filtered afterwards.
