@@ -199,12 +199,20 @@ a phase marker copied into five documents is a phase marker that goes stale in f
 this file said *"Current phase: Phase 1"* for two entire phases.
 `scripts/check-project-state.mjs` fails CI if the two ever disagree again.
 
-Active phase: **Phase 3.7 — First real asset visual slice**
-(`IMPLEMENTATION_COMPLETE — PENDING INDEPENDENT REVIEW`). Its specification is
+Active phase: **Phase 3.7 — First real asset visual slice** — **`VERIFIED`**, independently
+reviewed and accepted 2026-09-24 at head `733503bccf262fbcc7790c78886684d7d239ad84` (PR #12, still
+open and stacked on PR #11). Its specification is
 [`docs/specs/phase-3-7/PHASE_3_7_ASSET_VISUAL_SLICE_SPEC.md`](docs/specs/phase-3-7/PHASE_3_7_ASSET_VISUAL_SLICE_SPEC.md)
-and its 69 matrix cases pass. It has been independently reviewed twice — at `06c33e7` and at
-`fb7defc` — and both sets of corrections are applied. It is back in review and **NOT VERIFIED**.
-User-supplied client assets are a PRIVATE reference and must never be committed — see its §9. The
+and its 69 matrix cases pass.
+
+It remains the active phase only because **nothing after it has started. Phase 4 has NOT
+started.** Phase 4 is gated by the PRE-PHASE-4 gate in [`docs/PHASE_GATES.md`](docs/PHASE_GATES.md),
+which has **not** been passed, and that gate's G4.1a — what happens to a retired Character's Gold
+Pouch — is an open Product Owner decision. Do not begin Phase 4 work or mark the gate passed until
+the Product Owner says so.
+
+User-supplied client assets are a PRIVATE reference and must never be committed — see the Phase
+3.7 specification's §9. The
 boundary is enforced, not merely documented: `pnpm release:check`
 (`scripts/check-release-isolation.mjs`) fails the build if a private asset can reach a
 distributable artefact. `apps/web/public/assets/private/` is a forbidden path; every file under
@@ -215,16 +223,17 @@ because a bundled asset never passes through `public/`. An allowlist entry must 
 author and licence: the script can require that a claim exists and bind it to exact bytes, but only
 a human can verify the claim is true. Private files belong at `private/assets/`, which no bundler
 input covers.
-Last VERIFIED: **Phase 3.6 — Movement fidelity: Character speed and tile ground speed**, accepted
-2026-09-23 at head `f96c839d4609ecef2cf592a7f3d3c6e8a91f3ef4` (PR #10, still open and stacked on
-PR #9). Phase 3.5 remains VERIFIED at `2e67f4b` (PR #9); Phase 3 at `d46f78b` (PR #8).
+Last VERIFIED: **Phase 3.7 — First real asset visual slice**, accepted 2026-09-24 at head
+`733503bccf262fbcc7790c78886684d7d239ad84` (PR #12). Phase 3.6 remains VERIFIED at `f96c839`
+(PR #10); Phase 3.5 at `2e67f4b` (PR #9); Phase 3 at `d46f78b` (PR #8).
 
-Phase 0A (`ARCHITECTURE_APPROVED`), Phase 0B, Phase 1, Phase 2, Phase 3, Phase 3.5 and Phase 3.6
-are closed and VERIFIED. Their
+Phase 0A (`ARCHITECTURE_APPROVED`), Phase 0B, Phase 1, Phase 2, Phase 3, Phase 3.5, Phase 3.6 and
+Phase 3.7 are closed and VERIFIED. Their
 primitives — occupancy, Stamina, active-use timers, entitlements, idempotency, content bundles,
 transactions, the deterministic Hunt simulator, currency custody, the physical item model, the
-tile map with its authoritative movement timeline, cadence-invariant random streams and the
-supported movement domain every actor is proved against —
+tile map with its authoritative movement timeline, cadence-invariant random streams, the
+supported movement domain every actor is proved against, and the release-isolation boundary that
+keeps private client assets out of every distributable artefact —
 are implemented and independently reviewed. **Reuse them; do not build parallel replacements.**
 
 A phase's own specification is the thing to build against, and the one in
