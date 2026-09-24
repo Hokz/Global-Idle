@@ -124,15 +124,21 @@ economy sink reporting? Separately, `ADR-020` §6.3 recommends recording which A
 lost their POUCH leg to a purge, so that a genuinely missing ledger leg is still detectable.
 Product Owner and architecture.
 
-**5. Backups, logs and restores — operations (PRE-LAUNCH gate).**
+**5. Purge lateness, backups, logs and restores — operations (PRE-LAUNCH gate).**
 
+- The **purge lateness target**: how long after `purgeAt` a due purge may take before it counts as
+  a breach. The contract is fixed — at `purgeAt` the Character is due for immediate final purge,
+  and a purge that has not committed is a retried, alerting, degraded condition, never a normal
+  state (`ADR-020` §7). Only the number is open, and it is chosen before production.
 - How long may database backups and operational logs retain a purged Character? The purge's
   guarantee covers product persistence — PostgreSQL and Redis — and nothing else yet.
 - A restore from backup brings back Characters purged after the backup point, and loses deletion
   requests and restores made after it. A pending Character whose deadline has passed would be
   purged again at once — including one its owner restored inside the lost window. Recommended
   until decided: after any restore the purge job stays paused until operators have reconciled the
-  lifecycle transitions lost in the window (`DATA_ARCHITECTURE.md` §10).
+  lifecycle transitions lost in the window (`DATA_ARCHITECTURE.md` §10). Characters that fall due
+  during that pause are overdue purges, visible and alerting — the pause is recovery, not a
+  deferral.
 
 **Not open:**
 

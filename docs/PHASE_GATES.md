@@ -66,10 +66,12 @@ proven by a test:
 
 **The name**
 
-- the name stays reserved throughout `PENDING_DELETION`, including after the deadline until the
-  purge completes;
+- the name stays reserved throughout `PENDING_DELETION`, and is released **only** by the
+  successful atomic purge, in the same commit that removes the Character and its closure. If a
+  due purge fails to commit, the name stays reserved until it succeeds — the degraded condition
+  below, never a normal state;
 - name reuse is tested **only after** a successful purge: a same-name creation is refused before
-  it and accepted after it.
+  it and accepted immediately after it.
 
 **The purge**
 
@@ -92,7 +94,17 @@ proven by a test:
 - **post-purge proof**: a scan of product persistence — PostgreSQL and Redis — finds the
   Character's id and name in no row, JSON and text columns included;
 - the purge runs under its own capability. The application role keeps no `UPDATE` or `DELETE` on
-  the ledger.
+  the ledger;
+- **due at the deadline**: at `purgeAt` the Character is due for immediate final purge, and the
+  purge job attempts it promptly. No command purges early or postpones a due purge;
+- **a failed purge is a monitored, degraded condition** (`ADR-020` §7), proven by a test that makes
+  the purge fail after the deadline and shows that the Character stays non-playable,
+  non-restorable and name-reserved, that the purge is retried automatically, that the overdue
+  Character is visible and alerts, and that the retry then purges it completely and releases the
+  name in the same commit;
+- **overdue purges are observable**: how many Characters are due but not purged, and how late the
+  oldest is. The numeric lateness target is **not** chosen here — it is a pre-launch obligation,
+  below.
 
 **Migration**
 
@@ -293,11 +305,18 @@ Carried from [`design/FUTURE_DIRECTIONS.md`](design/FUTURE_DIRECTIONS.md) § *Be
 scale*: `IdempotencyRecord` retention, `SettlementOperation` retention with a compaction proof,
 content bundle archival, an object-storage provider, production rate limiting and auth hardening.
 
-Character deletion (`ADR-020`) adds two `OPEN` operational questions here, tracked in
-[`OPEN_QUESTIONS.md`](OPEN_QUESTIONS.md) § *Character deletion*: how long **backups and logs** may
-keep a purged Character, and what the purge job does after a **restore from backup** — which brings
-back Characters purged after the backup point and loses deletion requests and restores made after
-it. The purge's own obligations — idempotency and settlement records that name the Character
+Character deletion (`ADR-020`) adds one obligation and two `OPEN` operational questions here,
+tracked in [`OPEN_QUESTIONS.md`](OPEN_QUESTIONS.md) § *Character deletion*:
+
+- **before production**, choose a measurable **purge lateness target** — how long after `purgeAt`
+  a due purge may take before it counts as a breach — and alert on it. G4.1 requires overdue
+  purges to be retried and observable; only the number is left to this gate, and nothing earlier
+  invents it;
+- how long **backups and logs** may keep a purged Character;
+- what the purge job does after a **restore from backup**, which brings back Characters purged
+  after the backup point and loses deletion requests and restores made after it.
+
+The purge's own obligations — idempotency and settlement records that name the Character
 included — are **not** deferred to this gate: they belong to G4.1.
 
 ---

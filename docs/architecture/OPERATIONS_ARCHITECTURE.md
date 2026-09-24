@@ -154,6 +154,7 @@ The ones that would actually reveal a problem:
 | Idempotent replay hits | client retry patterns, and whether retries are safe in practice |
 | Job queue depth and age | worker starvation |
 | Content version in use | whether a deployment actually rolled out |
+| Overdue Character purges — how many are due and not yet purged, and how late the oldest is past `purgeAt` | the deletion lifecycle degrading. A due purge that has not committed is a **failure condition**, never a normal state; it alerts against a lateness target chosen before production (`ADR-020` §7, pre-launch gate). **PRE-4 — not implemented** |
 
 ### Tracing
 
@@ -191,6 +192,7 @@ Shared codebase, separate entry point (`ADR-012`).
 | Ledger reconciliation | scheduled; halts economy writes for a mismatched subject |
 | Listing expiry | returns escrowed items to inventory, transactionally |
 | Skill training settlement | on claim, or swept for long-idle accounts |
+| Character purge (**PRE-4 — not implemented**) | attempts every Character whose `purgeAt` has arrived **promptly**, one atomic transaction each; a purge that cannot commit is retried automatically and alerts while overdue. It never purges early and never defers a due purge (`ADR-020` §7) |
 
 `DECIDED IN PHASE 0A` — **every job is idempotent and safe to run twice.** Job systems deliver
 at-least-once under failure; designing for exactly-once is designing for a guarantee that does
@@ -230,7 +232,9 @@ not architectural ones.
 after the target point and loses deletion requests and restores made after it; a pending Character
 whose deadline has passed would then be purged again at once, even one its owner restored inside
 the lost window. Recommended until decided: the purge job stays paused after a restore until the
-lifecycle transitions lost in the window are reconciled, as a step alongside 2 and 3 above. How
+lifecycle transitions lost in the window are reconciled, as a step alongside 2 and 3 above. That
+pause is part of disaster recovery, not a way to defer purges: every Character that falls due
+while it lasts is an **overdue purge**, visible and alerting like any other (`ADR-020` §7). How
 long backups and logs may keep a purged Character is open as well.
 See [`../OPEN_QUESTIONS.md`](../OPEN_QUESTIONS.md) § *Character deletion*.
 

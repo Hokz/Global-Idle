@@ -231,8 +231,10 @@ brings back every Character that was purged after the backup point, and loses ev
 request or restore made after it. A `PENDING_DELETION` Character whose deadline has passed would
 be purged again at once — including one whose owner restored it inside the lost window.
 Recommended until decided: after any restore the purge job stays **paused** until operators have
-reconciled the lifecycle transitions lost in the restore window. How long backups and logs may
-keep a purged Character is also open. Both are tracked in
+reconciled the lifecycle transitions lost in the restore window. The pause is disaster recovery,
+not a deferral: every Character that falls due during it is an overdue purge — the monitored,
+degraded condition of `ADR-020` §7. How long backups and logs may keep a purged Character is also
+open. Both are tracked in
 [`../OPEN_QUESTIONS.md`](../OPEN_QUESTIONS.md) § *Character deletion*.
 
 ---

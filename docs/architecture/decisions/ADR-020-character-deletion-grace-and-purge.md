@@ -70,7 +70,7 @@ handles deletion.
 | State | Stored? | Meaning |
 |---|---|---|
 | `ACTIVE` | yes | the ordinary state, and the only **playable** one |
-| `PENDING_DELETION` | yes | requested; frozen (§4); restorable until `purgeAt`, then only purgeable |
+| `PENDING_DELETION` | yes | requested; frozen (§4); restorable strictly before `purgeAt`. At `purgeAt` it becomes **due for immediate final purge**; a row still present after that is a degraded condition (§7), not a lifecycle state |
 | *restored* | no — a transition | `PENDING_DELETION → ACTIVE` |
 | *purged* | no — an absence | the row and its closure are gone, and nothing records that it existed (L10) |
 
@@ -78,7 +78,7 @@ handles deletion.
 |---|---|---|---|
 | **request** | the owning Account | `ACTIVE`, and §3's quiescence rule holds | `PENDING_DELETION`; `deletionRequestedAt` and `purgeAt` written |
 | **restore** | the owning Account | `PENDING_DELETION` **and** `now < purgeAt` | `ACTIVE`; both timestamps cleared; nothing else written |
-| **purge** | the server's purge job — **never a client command** | `PENDING_DELETION` **and** `now ≥ purgeAt` | §6's closure deleted, the Character row last |
+| **purge** | the server's purge job, **promptly** once `purgeAt` is reached — **never a client command** | `PENDING_DELETION` **and** `now ≥ purgeAt` | §6's closure deleted, the Character row last, the name released in the same commit |
 
 - **No early purge.** L2 guarantees the whole window, so no command — the player's or an
   operator's — shortens it.
@@ -89,9 +89,13 @@ handles deletion.
   clock (the injected clock of `ADR-010`), from the instant the request is accepted. It is fixed
   when written and never recomputed, so a later change to the grace length cannot move a deadline
   a player has already been shown. A client-supplied time is never an input. *Restorable* means
-  strictly before `purgeAt`; from `purgeAt` on, the Character can only be purged.
-  This is the builder's reading of "exactly 30 days". A different reading — calendar days in a
-  named time zone, for example — changes this paragraph and nothing else.
+  strictly before `purgeAt`. At `purgeAt` the grace is over and the Character is **due for
+  immediate final purge** (§7): it can only be purged, and the purge is attempted then, not at
+  some later convenience.
+  The 720-hour arithmetic is the builder's reading of "exactly 30 days", **not** a decision: it
+  remains an open Product Owner confirmation in [`OPEN_QUESTIONS.md`](../../OPEN_QUESTIONS.md). A
+  different reading — calendar days in a named time zone, for example — changes this paragraph
+  and nothing else.
 
 **Conceptual shape — names illustrative, not chosen:**
 
@@ -151,8 +155,11 @@ Value a player wants to keep must be moved into Account custody — the Bank, th
 ### 5. Name, vocation and roster place
 
 **Name — `LOCKED BY PRODUCT` (L4, L9).** A name stays reserved while its Character row exists, in
-either state — including between `purgeAt` and the moment the purge completes. Only the purge's
-deletion of the row releases it.
+either state. Only the purge's successful, atomic deletion of the row releases it — in the same
+commit that removes the Character and its closure, and never earlier. If a due purge has not yet
+committed, the name stays reserved until it does: that is the degraded condition of §7, and the
+reservation exists to keep name uniqueness intact through it, not to extend anything. Once the
+purge commits, the name is immediately available again.
 
 Scope is unchanged. Today a name is unique **per account**, checked by `createCharacter` under
 the account lock; this decision changes *when* a name is released, not *where* names must be
@@ -268,7 +275,8 @@ the BANK legs, which are the Account's own record that it paid or received value
   Character row commit together or not at all, so a half-purged Character is not a representable
   state. If measurement shows a closure too large for one transaction, the fallback is a durable
   `PURGING` marker that is terminal for restore, keeps the name reserved, makes every step
-  idempotent, and deletes the Character row — releasing the name — only as the final step.
+  idempotent, and deletes the Character row — releasing the name — only as the final step. A
+  Character whose marker is set counts as an overdue purge until that final step commits.
 - **Idempotent.** A retry after a crash either finds the Character and completes the purge, or
   finds nothing and does nothing. It can never destroy twice or touch a second Character.
 - **Serialised with restore and with creation.** Restore and purge each lock the Character row,
@@ -290,8 +298,32 @@ the BANK legs, which are the Account's own record that it paid or received value
   persistence — PostgreSQL and Redis — finds the Character's id and name in **no** row, JSON and
   text columns included, and every Account-owned row is unchanged apart from the documented
   SCRUBs.
-- **Late is allowed; early is not.** A purge may run at any time after `purgeAt`. Between the
-  deadline and the purge, the Character is neither restorable nor released.
+- **Due at the deadline — never early, never deferred.** `purgeAt` is the instant the Character
+  becomes **due for immediate final purge**. The purge job attempts it promptly at or after that
+  instant; a schedule that routinely leaves due Characters waiting is a defect, not a policy. No
+  command — the player's or an operator's — purges early, and none postpones a due purge.
+- **When a due purge cannot commit — a degraded condition.** Infrastructure failure, an
+  unavailable database, an integrity REFUSE (§6), or any other exceptional condition can stop the
+  atomic purge from committing. Until it does:
+  - the Character stays **non-playable** — it is still frozen (§4);
+  - **restore stays forbidden**, because the grace has expired;
+  - the **name stays reserved**, so that name uniqueness is never corrupted by a row that still
+    exists;
+  - the purge is **retried automatically**, and the overdue Character raises an **operational
+    alert**.
+
+  This post-deadline, pre-purge window is a **failure to be cleared**, not a lifecycle state of
+  the product. It is never a way to extend the grace, and nothing offers it to a player or an
+  operator as an option.
+- **One final boundary.** Deleting the data and releasing the name happen in one successful
+  commit. Atomicity is never weakened to release a name at the deadline while the Character or any
+  part of its closure still exists; once the purge commits, the row and closure are gone and the
+  name is immediately reusable within the normal uniqueness scope (§5).
+- **Overdue purges are observable.** Operations can always see how many Characters are due but
+  not yet purged, and how late the oldest one is (`OPERATIONS_ARCHITECTURE.md` §6). A measurable
+  lateness target — how long after `purgeAt` a purge may take before it counts as a breach — is
+  chosen **before production** (`PHASE_GATES.md`, pre-launch gate). This record deliberately does
+  not invent the number.
 
 ### 8. What this changes in other decisions
 
@@ -349,13 +381,17 @@ No migration rewrites a ledger row, and the purge is not a migration.
 - A shared run that involved a purged Character can no longer be replayed exactly.
 - The purge is a new privileged path into data that is otherwise append-only. It needs its own
   role, its own tests and its own review.
+- The purge job is an operational commitment: it must run promptly, retry, and be monitored
+  against a lateness target, because a due Character that lingers is a visible failure.
 - Every future table that references a Character must declare a purge action, and the closure
   test has to be kept honest.
 
 **Constraints created.**
 
-- Exactly one path may hard-delete a Character: the purge, after the deadline.
-- No command shortens the grace, and no command reaches a purged Character.
+- Exactly one path may hard-delete a Character: the purge, once the deadline has made it due.
+- No command shortens the grace or postpones a due purge, and no command reaches a purged
+  Character.
+- A due purge that has not committed is an alerting condition, retried until it succeeds.
 - No Character-owned value moves to the Bank or to any recovery custody at purge.
 - A BANK entry never carries a Character's identity, in any column, the operation id included.
 - A new reference to `Character` is not mergeable without a declared purge action.
