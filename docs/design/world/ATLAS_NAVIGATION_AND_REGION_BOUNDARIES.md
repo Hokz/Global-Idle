@@ -37,12 +37,25 @@ WORLD ATLAS          macro / minimap-like       navigation only
 | **World Atlas** | macro overview, minimap-like. Coarse; it exists to get a player to a region. | Region identity and navigation targets. Not exact geography. |
 | **Regional mini-atlas** | where the detailed source crop belongs. One region at readable resolution. | Region-level layout, once calibrated. Until then, nothing positional. |
 | **Local focus** | a city or subarea — narrower than the region, wider than a hunt. | Place identity and entry points. |
-| **Game Window** | the playable 15 × 11 tile scene. | Everything it draws, because the server authored it. |
+| **Game Window** | the playable 15 × 11 tile scene. | The FACTS it renders — tiles, collision, actor state, timing, outcomes — because the server owns them. Its own lighting, camera easing, interpolation and placeholder art are presentation and claim nothing. |
 
-Only the **Game Window** is playable and server-authoritative. The three atlas surfaces are
-navigation: they name content keys and let a player choose one. They start nothing, store no
-position and decide no outcome — see [`§8 of the master roadmap's authority rules`](../../MASTER_DEVELOPMENT_ROADMAP.md)
-and the `AUTH` acceptance cases in the Phase 3.7 specification.
+Only the **Game Window** is playable, and the split inside it matters:
+
+- **the server owns** the pinned content version and its playable geometry, collision, actor
+  state, movement timing, the simulation and its results;
+- **the browser renders those facts** and may add purely decorative visuals — a lantern gradient,
+  an eased camera, interpolation between two authoritative positions, and this project's own
+  placeholder art. None of that is a claim about the world.
+
+"Everything it draws is server-authored" would be too strong in one direction and misleading in
+the other: some of what is drawn is client-authored decoration, and being drawn by the client
+never makes it authoritative.
+
+The three atlas surfaces are navigation: they name content keys and let a player choose one. They
+start nothing, store no position and decide no outcome. The authority rule itself is
+[`DOMAIN_MODEL.md` §8 — *Client authority: explicitly nothing*](../../architecture/DOMAIN_MODEL.md)
+(*"The client owns: rendering, local UI preferences, and the intent to do something"*), and the
+`AUTH` acceptance cases in the Phase 3.7 specification test it.
 
 ## 3. Boundaries are data, not pixels — `APPROVED DIRECTION`
 

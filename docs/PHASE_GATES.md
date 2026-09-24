@@ -37,26 +37,64 @@ Before Phase 4 multiplies the number of Characters in play:
   it for each one rather than for a sample;
 - a retired Character does not count against roster size, does not reserve its vocation, and
   cannot enter an Active Party — each stated as an invariant test;
-- items and currency held at retirement reach the account-level recovery custody scope, with no
-  path that destroys or duplicates them.
+- **items** held at retirement reach the account-level recovery custody scope, with no path that
+  destroys or duplicates them. That is `ADR-007`'s rule verbatim, and it is about items:
+  *"hands its items to an account-level recovery custody scope rather than destroying them."*
+
+#### G4.1a — the retired Character's Gold Pouch is an OPEN product decision
+
+`ADR-007` settles items. It says nothing about currency, and `ADR-019` makes the Pouch a
+**Character**-scoped, ledger-derived custody — so a retired Character's Pouch has no stated fate
+and none may be assumed. Extending the item rule to currency would be a new economy rule invented
+in passing.
+
+Before Phase 4, decide and record it deliberately. The candidates, none of them chosen here:
+
+- **transfer to `BANK`** with paired ledger entries, so the value moves visibly and the account
+  keeps it;
+- **retain an audited, restricted `POUCH`** that survives retirement and can be inspected;
+- another authorised custody shape.
+
+Whatever is chosen must **preserve historical ledger entries**, and must never silently destroy,
+duplicate or auto-move currency without a documented rule. `ADR-019` already forbids a balance
+that is not ledger-derived, so the decision has to be expressed as entries, not as a column edit.
+It must be validated under transaction retry and rollback.
+
+**This docs PR does not make that choice.** It is listed in
+[`OPEN_QUESTIONS.md`](OPEN_QUESTIONS.md) as a PRE-4 product/architecture decision for the Product
+Owner.
 
 **Owner:** Phase 4 builder, before Party formation work.
 **Acceptance:** invariant tests, not a manual audit.
 
-### G4.2 — `baseXp` vs `baseLevel` projection truth
+### G4.2 — enforce the `baseXp` → `baseLevel` projection everywhere
 
-The Character row carries both a level and an experience total. Two stored numbers that must
-agree are two numbers that can disagree.
+**This is NOT an open question, and the gate must not reopen it.** The authority is already
+decided and implemented:
 
-Before Phase 4:
+| fact | where it is stated |
+|---|---|
+| **`baseXp` is the durable truth** | `packages/domain/prisma/schema.prisma` — *"DURABLE Base XP … the XP is the truth and the level is its consequence"* |
+| **`baseLevel` is a derived projection, stored alongside** so a read need not recompute it | the same comment |
+| the projection functions | `packages/domain/src/contexts/hunt/progression.ts` — `levelForXp`, `xpForLevel` |
+| reward and death settlement already use them | `contexts/hunt/run.ts`, `contexts/hunt/death.ts` |
 
-- state which one is **authoritative** and which is **derived**, in one place;
-- prove the projection in both directions across the level curve, including the boundaries;
-- prove that death XP loss, and any future XP source, cannot leave the pair inconsistent — and
-  that a settlement which rolls back rolls back both.
+The Character row therefore holds two numbers that must agree, and two numbers that must agree
+are two numbers that can drift. The gate is to **prove and enforce the established contract**, not
+to choose again:
+
+- every write path that touches `baseXp` also writes `baseLevel = levelForXp(baseXp)` — reward
+  settlement, death loss, any future XP source, and any migration or backfill;
+- retirement and the account-level recovery path preserve the pair where they touch it at all;
+- a settlement that rolls back rolls back **both**, so no partial write can leave them disagreeing;
+- the projection holds across the curve including its boundaries, in both directions.
+
+If any legacy or migrated row is found contradicting the contract, **document that row and its
+origin explicitly** and reconcile it to the contract. Do not infer a different rule from it.
 
 **Owner:** Phase 4 builder.
-**Acceptance:** a projection test over the curve plus an invariant that the pair never diverges.
+**Acceptance:** a projection test over the curve, a per-write-path test, and an invariant that the
+pair never diverges. **None of this is written yet** — the gate is a requirement, not a record.
 
 ### G4.3 — An Actor / Participant combat contract
 

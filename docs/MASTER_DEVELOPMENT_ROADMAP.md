@@ -575,9 +575,12 @@ speed, so the importer adds visual identity without the movement engine changing
 Full text: [`PHASE_GATES.md`](PHASE_GATES.md) § *Pre-Phase-4*.
 
 - **character retirement integrity** — consistent filtering on every read path, roster and
-  vocation invariants, and item/currency recovery at retirement;
-- **`baseXp` vs `baseLevel` projection truth** — which is authoritative, proven in both
-  directions, and never divergent across a settlement or its rollback;
+  vocation invariants, and `ADR-007`'s **item** recovery scope. The retired Character's **Gold
+  Pouch has no stated fate**: that is an open PRE-4 product decision, not an extension of the item
+  rule;
+- **enforce the `baseXp` → `baseLevel` projection** — `baseXp` is already the durable truth and
+  `baseLevel` its stored projection (schema + `progression.ts`). The gate proves and enforces that
+  contract on every write path, migration and rollback; it does not choose again;
 - **an Actor/Participant combat contract** that supports up to 4 same-account actors now and
   participants from several accounts later. Compatibility adapters keep previously VERIFIED Hunt
   behaviour and fixtures intact. **Do not implement a generic multiplayer platform yet.**

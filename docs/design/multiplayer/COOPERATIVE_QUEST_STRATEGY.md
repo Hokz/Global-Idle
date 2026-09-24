@@ -62,7 +62,32 @@ and these are *illustrative shapes, not locked content*:
   stated **alternate assignee** takes the task;
 - a retreat or regroup condition, and what the group does after it.
 
-The plan is **data**, versioned like any other content, and it is the only input the players get.
+The plan is **data**, and it is the only input the players get.
+
+### Two different kinds of data, and they must not be confused — `APPROVED DIRECTION`
+
+"Versioned like any other content" would be wrong, and would contradict `ADR-011`: content is a
+repository-authored build artifact that an Activity **pins**, and a lobby plan is authored by
+players at runtime. Writing one into the other would mean a new content bundle per lobby.
+
+| | authored by | lifetime | identity |
+|---|---|---|---|
+| **Encounter mechanics + the allowed-action schema** | the repository, immutable | a released content bundle | pinned by **content version**, exactly as every Activity already pins content (`ADR-011`) |
+| **The group's chosen roles, priorities and conditional plan** | the players, in the lobby | **ACTIVITY-BOUND** — it belongs to one run | carries the **encounter/schema version it was authored against**, plus a hash of its own frozen contents |
+
+The architectural requirements, stated without choosing tables or endpoints — those belong to
+Phase 5B, not to this document:
+
+- the plan is **validated by the server against the pinned encounter/schema version** before the
+  run may start, and a plan authored against a different version is rejected rather than migrated;
+- on start it is **frozen and persisted atomically with the run**, so there is no window in which
+  a run exists without the plan it is executing;
+- it is **integrity-protected** — the frozen contents and the version they were validated against
+  are both recoverable, so what actually ran can be shown later;
+- it is **replayable** with the run's seed and state, which is what keeps the determinism already
+  locked in [`../../DECISIONS.md`](../../DECISIONS.md) true of a cooperative run;
+- **no runtime editing after the freeze**, which §4 states as a player-facing rule and which this
+  states as a storage one.
 
 ## 4. Readiness, freezing and execution — `APPROVED DIRECTION`
 

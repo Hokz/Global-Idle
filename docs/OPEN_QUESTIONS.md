@@ -156,10 +156,19 @@ Owned by Phase 5B unless a gate is named. Direction:
 
 Stated in full in [`PHASE_GATES.md`](PHASE_GATES.md). Open where the answer is not yet written:
 
-- which of `baseXp` and `baseLevel` is authoritative and which is derived (**PRE-4 gate**);
+- **the fate of a retired Character's Gold Pouch** (**PRE-4 gate**). `ADR-007` places retired
+  **items** in an account-level recovery scope and says nothing about currency; `ADR-019` makes the
+  Pouch Character-scoped and ledger-derived. Transfer to `BANK` with paired entries, an audited
+  restricted `POUCH`, or another authorised shape — a Product Owner decision, not an inference from
+  the item rule;
 - the shape of the Actor/Participant combat contract, and which compatibility adapters keep the
   verified Hunt fixtures intact (**PRE-4 gate**);
 - `ItemDefinition` version semantics for live `ItemInstance` rows (**PRE-MARKET gate**).
+
+**Not open:** which of `baseXp` and `baseLevel` is authoritative. `baseXp` is the durable truth and
+`baseLevel` is its stored projection — decided, implemented and stated in
+`packages/domain/prisma/schema.prisma` and `contexts/hunt/progression.ts`. The PRE-4 gate enforces
+that contract across every write path; it does not revisit it.
 
 ## IP / launch
 

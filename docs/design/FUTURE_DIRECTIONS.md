@@ -74,12 +74,16 @@ forgotten OPEN notes.
 
 ### Before Phase 4 (roster)
 
-- **Character retirement, properly.** Retirement must settle occupancy, move item custody safely,
-  prevent a repeated tutorial starting-grant, and preserve history. Phase 3 only stopped a retired
-  Character from being treated as playable by the inventory surface (`RET1`, `RET2`); that is a
-  filter, not a flow.
-- **`baseLevel` projection vs `baseXp` truth.** Two representations of the same fact. Reconcile
-  which is authoritative and make the other derived, before a second system reads the wrong one.
+- **Character retirement, properly.** Retirement must settle occupancy, move **item** custody
+  safely (`ADR-007`), prevent a repeated tutorial starting-grant, and preserve history. Phase 3
+  only stopped a retired Character from being treated as playable by the inventory surface
+  (`RET1`, `RET2`); that is a filter, not a flow. The retired Character's **Gold Pouch** has no
+  stated fate — see [`../PHASE_GATES.md`](../PHASE_GATES.md) § *G4.1a*, an open decision.
+- **Enforce the `baseXp` → `baseLevel` projection.** Not a question of which is authoritative:
+  `baseXp` is the durable truth and `baseLevel` its stored projection, already decided and
+  implemented (`schema.prisma`, `contexts/hunt/progression.ts`). What is missing is enforcement on
+  every write path, migration and rollback, so the pair cannot drift —
+  [`../PHASE_GATES.md`](../PHASE_GATES.md) § *G4.2*.
 
 ### Before Market / Forge / Imbuement
 
