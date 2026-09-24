@@ -381,7 +381,9 @@ simultaneous Active Party member does not exist. See
 - larger storage/loot convenience;
 - potentially a moderate XP convenience bonus after balance review.
 
-Avoid exclusive endgame combat power as the main Premium value.
+Avoid exclusive endgame combat power as the main Premium value. **The Store does not sell combat
+equipment** for real-money or premium-currency value. Its Character-bound items are consumables
+(`ADR-021`), and outfits and mounts are cosmetic unlocks outside that model.
 
 ## 17. Market
 
@@ -394,6 +396,7 @@ Player-to-player market in gold.
 Player-to-player market in premium currency.
 
 Market principles:
+- never a Character-bound consumable, on either market (`ADR-021`);
 - server-side escrow;
 - atomic transaction;
 - listing fees/taxes;
@@ -712,7 +715,13 @@ Recorded in full: [`design/FUTURE_DIRECTIONS.md`](design/FUTURE_DIRECTIONS.md) �
   never wall-clock countdowns;
 - advanced Auto-Sell with item / category / rarity / default rules and protected-state overrides;
 - automation, remote services, loot and boss automation, analytics, final Free/Premium balance;
-- Party-management convenience benefits (OPEN — no fifth active Party slot).
+- Party-management convenience benefits (OPEN — no fifth active Party slot);
+- the Store's **Character-bound consumables** — XP Boosts, Exercise Weapons bought with Store Coin
+  — in each Character's Store Container (`ADR-021`). Phase 8 is the obvious first consumer, not the
+  owner by right: a Daily Reward or an Event may ship a bound consumable earlier, and **whichever
+  phase ships the first one implements the binding and the Store Container first**, behind the
+  BOUND-CONSUMABLE gate ([`PHASE_GATES.md`](PHASE_GATES.md) § *GBC.1*). No Store, Daily Reward or
+  Event bound item ships before it passes.
 
 **Not paywalled:** foundational tactical strategy (Phase 4) and the quest mechanic checklist and
 plan authoring (Phases 5 / 5B) are **baseline gameplay**.
@@ -788,4 +797,6 @@ open items are not resolved by this roadmap.
 
 Cross-phase correctness obligations — what must be true *before* a phase starts — live in
 [`docs/PHASE_GATES.md`](PHASE_GATES.md), referenced inline from §20 above. A gate records
-requirements; it never records status.
+requirements; it never records status. One gate belongs to no fixed phase: the BOUND-CONSUMABLE
+gate (GBC.1) must pass before the first Character-bound consumable ships, whichever phase that
+is.

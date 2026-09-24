@@ -407,6 +407,13 @@ Exercise Wand/Rod
 
 Exact item names, charges, costs and efficiency are future balance work.
 
+An Exercise Weapon bought with Store Coin or premium currency is a **Character-bound consumable**
+(`LOCKED`, [`ADR-021`](../../architecture/decisions/ADR-021-character-bound-consumables-and-store-container.md)):
+only its own Character trains with it, it is stored only in that Character's Store Container or
+the Depot, and it is never sold, traded or moved to another Character. It is a charge-based
+training consumable, not combat equipment. A Gold-bought Exercise Weapon is bound only if its
+definition says so.
+
 ---
 
 # 15. Public Training Dummy

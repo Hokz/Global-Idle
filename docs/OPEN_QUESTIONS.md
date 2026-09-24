@@ -204,6 +204,26 @@ names unique across all accounts would be a separate Product Owner decision.
 - anti-manipulation rules;
 - premium-currency transfer restrictions.
 
+## Character-bound consumables
+
+The model is **not** open: consumables permanently bound to one Character, stored only in that
+Character's Store Container or the Account's Depot, used only by that Character, never sold,
+traded, listed, stashed, forged or converted, and purged with the Character wherever they are
+stored — `LOCKED` in `docs/DECISIONS.md` § *Character-bound consumables and the Store Container*,
+architecture in `ADR-021`, work in the gate `PHASE_GATES.md` § *GBC.1*. Combat equipment is not
+sold through the Store. Open around it:
+
+- the Store Container's capacity or slot count;
+- whether the Store Container has player-facing sorting or subcontainers;
+- whether anything but Character-bound consumables may ever be placed in the Store Container;
+- exact Store Coin pricing;
+- which Daily Rewards and Events grant bound items, and which grant unbound ones;
+- exact XP Boost numbers and durations;
+- Exercise Weapon Store pricing and charge counts;
+- the use UI, and whether a use starts from the Store Container, the Depot or a dedicated panel;
+- the outfit and mount storage and unlock model — outside this item model by decision, and not yet
+  designed.
+
 ## World, Atlas and regions
 
 Owned by Phase 9, except where noted. Direction:

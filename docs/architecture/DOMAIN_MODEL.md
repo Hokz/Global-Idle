@@ -312,8 +312,10 @@ hard purge.** See `ADR-020`, which supersedes the Phase 0A decision (`ADR-007`, 
   history, and its activity history. Nothing moves to the Bank or to any recovery custody; the
   value is destroyed.
 - No record of the purged Character survives, and no surviving shared or Account-owned record
-  keeps its identity. Account-owned state — the Bank, entitlements, roster capacity, Depot and
-  Stash — is untouched, and capacity is not refunded.
+  keeps its identity. Account-owned state — the Bank, entitlements, roster capacity, and the
+  unbound items in the Depot and the Stash — is untouched, and capacity is not refunded. A
+  Character-bound consumable is the Character's even in the Depot, and the purge deletes it
+  (`ADR-021`).
 - The name stays reserved until the purge, and so do its vocation, its roster place and — for the
   Origin Character — the Origin slot. Only the successful purge releases them, in the commit that
   deletes the Character, so no replacement can take one and a restore never conflicts (G4.1b,
@@ -681,7 +683,12 @@ the boss room, swap back for the trash. Locking both closes it consistently.
 
 Characters **not** in the running Activity may be re-equipped freely; nothing about them feeds
 the run. Items may also be sold, listed or forged as long as they are not held by a participating
-character, since their custody is not frozen.
+character, since their custody is not frozen — **except** a Bootstrap Kit item and a
+Character-bound consumable, which are never sold, listed or forged at all (§5.13).
+
+`LOCKED BY PRODUCT`, **not implemented** — each Character will also have a **Store Container**
+(`ADR-021`): a system custody for Character-bound consumables. It is not a container instance, not
+a Hunt Container Slot, not equipment and not the Loot Pouch.
 
 **Loot Capacity** is pooled across the Active Party for the duration of an activity (§5.7) and
 consumed by the engine as an input. Full capacity stops collection without stopping combat —
@@ -718,6 +725,11 @@ six static copies.
 - forge tier changes never alter rarity or affixes — `LOCKED BY PRODUCT`
 - affixes, forge tier and imbuements are **independent layers** — `LOCKED BY PRODUCT`
 - a consumed instance is terminal: it never returns to circulation
+- **binding is separate from custody.** A Character-bound consumable has one immutable bound
+  Character. It is only ever in that Character's Store Container or in the Account's Depot, and a
+  move between the two never changes the binding. It is used only by its bound Character, and it
+  never reaches the Stash, another Character, a market, a trade, an NPC sale, a Forge input or any
+  conversion into value — `LOCKED BY PRODUCT`, **not implemented** (`ADR-021`, I22–I23)
 - a **Bootstrap Kit** instance is bound to its Character: it never reaches the Depot, the Stash,
   another Character, a listing, a trade, a sale or any conversion into Account value, and it never
   merges with an unbound instance. The binding lives on the instance, never on the definition,
@@ -725,7 +737,9 @@ six static copies.
   `LOCKED BY PRODUCT` (G4.1c), **PRE-4, not implemented** (`ADR-020` §5.2)
 
 **Relationships.** References a BaseItem definition. Held by exactly one of: character
-inventory, character equipment, market escrow, forge input, or a terminal consumed state.
+inventory, character equipment, the Account's Depot, a Character's Store Container (future,
+`ADR-021`), market escrow, forge input, or a terminal consumed state. A Character-bound consumable
+also names its bound Character, which is not a custody (`ADR-021` §2).
 
 ---
 
@@ -803,6 +817,8 @@ my gold go" answerable and "there are two of this sword" detectable.
   PRODUCT`, and structurally impossible under single-custody.
 - a sale is one transaction: currency debit, currency credit, fee, custody transfer, ledger
   entries. Partial application is not a state the system can be in.
+- `LOCKED BY PRODUCT` — a Bootstrap Kit item or a Character-bound consumable is never listed, in
+  Gold or in premium currency (§5.13; `ADR-020` §5.2, `ADR-021`).
 
 ---
 
@@ -824,6 +840,9 @@ optional property, not part of the definition.
 | Lifecycle | granted → active → (expired \| revoked). An entitlement with no expiry simply never leaves `active`. |
 | Mutable during an Activity | yes — but see the invariant below |
 | Transaction / audit | required; purchase is an economy operation |
+
+Outfits and mounts are outside `ADR-021`'s item binding. Whatever unlock model they get — still
+open — they are never Store Container items.
 
 **Invariants.**
 - `LOCKED BY PRODUCT` — **entitlement never grants a fifth Active Party member.** Party
@@ -940,9 +959,11 @@ application-only check loses a race.
 | I19 | After a purge, no product-persistence row names the purged Character, and every Account-owned row and balance is unchanged apart from documented scrubs | schema-derived closure test + post-purge scan (`ADR-020` §7) |
 | I20 | A Bootstrap Kit item never leaves its Character: no Depot, Stash, other Character, listing, trade, sale or conversion into Account value; it never merges with an unbound instance, and it is destroyed with its Character | a binding on the instance, checked server-side on every item path (`ADR-020` §5.2) |
 | I21 | A one-time Tutorial Reward is awarded at most once per Account, whatever Characters are created, deleted or purged | Account-owned reward state, checked in the awarding transaction (`ADR-020` §5.1) |
+| I22 | A Character-bound consumable's binding is immutable and independent of its custody: a move between its Store Container and the Depot never changes it | a constraint on the item row; the binding is a foreign key the purge closure test sees (`ADR-021` §7) |
+| I23 | A Character-bound consumable is only ever in its bound Character's Store Container or the Account's Depot, is used only by that Character, never reaches the Stash, another Character, a market, a trade, an NPC sale, a Forge input or any currency conversion, and is deleted by that Character's purge wherever it is stored | server-side check on every custody, use and sale path, per instance; the purge selects by binding (`ADR-021`) |
 
-I17–I21 are **not implemented**: they are requirements of the PRE-PHASE-4 gate
-(`PHASE_GATES.md` § *G4.1*).
+I17–I23 are **not implemented**. I17–I21 are requirements of the PRE-PHASE-4 gate
+(`PHASE_GATES.md` § *G4.1*); I22–I23 of the bound-consumable gate (§ *GBC.1*).
 
 I8 and I10 are stated as *structural* rather than *validated*. A check that can be forgotten is
 weaker than a path that does not exist.

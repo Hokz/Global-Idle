@@ -3,10 +3,13 @@
 **Status:** `ACCEPTED` — the product rule is `LOCKED` by the Product Owner (2026-09-24). The
 architecture was independently reviewed and accepted at PR #13 head `45d95f6`, and G4.1b (§5) and
 G4.1c (§5.1) at `f249771`. G4.1c's pre-completion case (§5.2), locked after that head, is recorded
-here and has not yet been reviewed.
+here and has not yet been reviewed, and neither has the reconciliation with `ADR-021` (§4, §6).
 **Supersedes:** [ADR-007](./ADR-007-character-retirement.md), in full.
 **Amends:** [ADR-019](./ADR-019-currency-custody-scopes.md) — one guarantee row (§8); the rest of
 it stands.
+**Extended by:** [ADR-021](./ADR-021-character-bound-consumables-and-store-container.md) — a
+Character-bound consumable is the Character's wherever it is stored, the Depot included, and the
+purge deletes it (§6).
 **Owning gate:** PRE-PHASE-4 — [`PHASE_GATES.md`](../../PHASE_GATES.md) § *G4.1*. **Nothing in
 this record is implemented.**
 **Date:** 2026-09-24
@@ -147,6 +150,9 @@ A `PENDING_DELETION` Character is **frozen**:
   debit or credit, no slot unlock, no loot-policy change;
 - no command names it as a destination or counterparty: nothing moves into it from the Depot, the
   Stash or the Bank;
+- nothing bound to it moves or is used: no Store Container ↔ Depot move, no use of a
+  Character-bound consumable wherever it is stored, and no new Character-bound grant that targets
+  it (`ADR-021` §6) — once that system exists;
 - its owner can still see it, with its deadline and a restore action.
 
 The stored state is therefore untouched between request and restore. What the rules **derive from
@@ -156,7 +162,9 @@ would for any idle Character, because nothing is written. That is the builder's 
 [`OPEN_QUESTIONS.md`](../../OPEN_QUESTIONS.md).
 
 Value a player wants to keep must be moved into Account custody — the Bank, the Depot, the Stash —
-**before** the request. During the grace, the only way to reach it is to restore first.
+**before** the request. During the grace, the only way to reach it is to restore first. A
+Character-bound consumable cannot be kept that way: it stays its Character's in the Depot too, and
+is purged with it (`ADR-021`).
 
 ### 5. Name, vocation and roster place
 
@@ -301,7 +309,8 @@ However many cycles run, the Account ends with nothing it did not already have.
   definitions: the same backpack and small health potions the Rookgaard counter sells, and the
   same dagger and armour that other sources may give. Binding a definition would bind every copy.
   A kit item carries its binding on its own `ItemInstance`, set when the kit is issued and never
-  cleared by any command;
+  cleared by any command. This is not the Character-bound consumable binding of `ADR-021`, whose
+  items live in the Store Container or the Depot; the two are kept distinct (`ADR-021` §7);
 - **enforcement in the domain, on every path.** Every command that moves, stows, transfers,
   sells, lists, trades or converts an item refuses a bound instance server-side, whatever the
   client shows. Today those paths are the move to the Depot, the Stash deposit, and the counter
@@ -363,7 +372,8 @@ Every reference to a Character takes exactly one of four actions:
 | **REFUSE** | a live ownership or escrow obligation exists; the request is refused (§3), and a purge that finds one anyway refuses and raises an alarm |
 
 Account-owned rows that never referenced the Character are **KEEP**, and the purge does not touch
-them.
+them. Ownership follows the binding as well as the custody: an item bound to the Character is the
+Character's even when it is stored in Account custody such as the Depot (`ADR-021` §6).
 
 #### 6.1 Every reference in the current schema
 
@@ -381,7 +391,7 @@ them.
 | `OccupancyClaim` | Character | cannot exist (§3). A purge that finds one REFUSES: that is an integrity alarm, not a race |
 | `IdempotencyRecord` for a command that named the Character | the Account's row, carrying Character identity | DELETE-HISTORY — see §6.3 |
 | `LedgerEntry` and `CurrencyBalance`, custody `BANK` | Account | KEEP — a BANK row names no Character by construction (`ADR-019`'s CHECK), and the Bank balance is identical before and after |
-| `ItemInstance` in the `DEPOT` (`characterId` null), `StashEntry` | Account | KEEP — anything moved there before the request is the Account's |
+| unbound `ItemInstance` in the `DEPOT` (`characterId` null), `StashEntry` | Account | KEEP — anything unbound moved there before the request is the Account's. No bound item exists today; once one does, a Depot item bound to the Character is not KEEP (§6.2) |
 | `Account`, `AuthIdentity`, `Entitlement`, `EntitlementAudit`, `rosterCapacity` | Account | KEEP — nothing is refunded |
 | `ContentBundle` | content | KEEP — deleting Activities may leave a bundle unreferenced; removing it stays `ADR-016`'s explicit, audited path |
 | Redis keys that name the Character | ephemeral | evicted — Redis holds nothing that cannot be rebuilt (`ADR-009`) |
@@ -402,6 +412,8 @@ them.
 | completed trades, price history | 6 | SCRUB — the counterparty keeps the price, the item definition, the time and its own side |
 | forge inputs in flight | 7 | REFUSE |
 | imbuements and their active-use timers on Character-owned items; Wheel, gems, Skill Tree | 7 | DELETE-OWNED, with the item or the Character they belong to |
+| the Store Container (`ADR-021`) | the first phase with a Character-bound consumable | DELETE-OWNED |
+| a Character-bound consumable, wherever it is stored — the Store Container or the Depot | the same | DELETE-OWNED, selected by its binding rather than its custody. It never transfers, becomes unbound, stays as an orphaned Depot item, moves to the Stash, refunds or converts (`ADR-021` §6) |
 | any table not listed here — Bestiary, Charms, outfits and achievements (7A) included | — | its phase specification declares its action; an undeclared reference fails the closure test (§7) |
 
 #### 6.3 Two references that need care
@@ -455,7 +467,8 @@ the BANK legs, which are the Account's own record that it paid or received value
   relation is redesigned. `CASCADE` is acceptable only where every row it can reach is
   Character-owned and covered by the closure test — never into an Account-owned or shared table.
 - **Proven complete.** A closure test derives every relation that references `Character` from the
-  schema itself and fails when one has no declared action. After a purge, a scan of product
+  schema itself and fails when one has no declared action — a binding that is independent of
+  custody included (`ADR-021` §6). After a purge, a scan of product
   persistence — PostgreSQL and Redis — finds the Character's id and name in **no** row, JSON and
   text columns included, and every Account-owned row is unchanged apart from the documented
   SCRUBs.
@@ -575,6 +588,8 @@ No migration rewrites a ledger row, and the purge is not a migration.
   one-time reward again.
 - A Bootstrap Kit item never reaches the Depot, the Stash, another Character, a market, a sale or
   any conversion into Account value, and is destroyed with its Character.
+- Ownership follows the binding as well as the custody: the purge deletes every item bound to the
+  purged Character, wherever it is stored (`ADR-021`).
 - A BANK entry never carries a Character's identity, in any column, the operation id included.
 - A new reference to `Character` is not mergeable without a declared purge action.
 

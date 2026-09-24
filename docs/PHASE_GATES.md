@@ -117,8 +117,8 @@ Proven by tests:
   recreation. Character-specific starting state of the normal Level-8 flow is not a one-time
   grant, and the tests keep the two apart (`ADR-020` §5.1, C7);
 - repeated *delete → purge → recreate* cycles cannot accumulate Account value: with no play between
-  them, the Account's Bank, Depot, Stash, entitlements and reward state are identical after any
-  number of cycles, and no one-time reward is awarded twice.
+  them, the Account's Bank, entitlements, reward state and the unbound contents of its Depot and
+  Stash are identical after any number of cycles, and no one-time reward is awarded twice.
 
 **The purge**
 
@@ -136,10 +136,16 @@ Proven by tests:
   never a half-purged Character;
 - **no duplication**: nothing Character-owned reaches the Bank, the Depot, the Stash or another
   Character;
-- **no collateral deletion**: the Bank balance and every BANK entry, the Depot, the Stash,
-  entitlements, roster capacity and every other Character are identical before and after;
+- **no collateral deletion**: the Bank balance and every BANK entry, the Depot — every unbound item
+  in it — the Stash, entitlements, roster capacity and every other Character are identical before
+  and after;
 - **post-purge proof**: a scan of product persistence — PostgreSQL and Redis — finds the
   Character's id and name in no row, JSON and text columns included;
+- **a closure that can follow a binding**: nothing in the purge assumes that Character-owned
+  `ItemInstance` rows are found by `characterId` alone. A future binding that is independent of
+  custody — `ADR-021`'s Character-bound consumables, stored in the Depot with `characterId` null —
+  must be able to join the closure test and the purge without a redesign. PRE-4 does **not**
+  implement bound items;
 - the purge runs under its own capability. The application role keeps no `UPDATE` or `DELETE` on
   the ledger;
 - **due at the deadline**: at `purgeAt` the Character is due for immediate final purge, and the
@@ -363,9 +369,51 @@ deletion request, and completed trades keep the counterparty's facts — price, 
 time, its own side — without naming the purged Character.
 
 A Bootstrap Kit item is never listed, escrowed, traded, or used as a Forge or imbuement input, and
-nothing any of these systems produces from one becomes Account value (`ADR-020` §5.2).
+nothing any of these systems produces from one becomes Account value (`ADR-020` §5.2). A
+Character-bound consumable is never listed on either Market, escrowed, traded, gifted, mailed,
+sold to an NPC or used as a Forge input (`ADR-021`, gate GBC.1 below).
 
 **Owner:** Phase 6, before any market, forge or imbuement surface exists.
+
+---
+
+## BOUND-CONSUMABLE GATE — before the first Character-bound consumable ships
+
+### GBC.1 — Character-bound consumables and the Store Container (`ADR-021`)
+
+The rule is `LOCKED` by the Product Owner (2026-09-24) and recorded in
+[`architecture/decisions/ADR-021-character-bound-consumables-and-store-container.md`](architecture/decisions/ADR-021-character-bound-consumables-and-store-container.md).
+**Nothing of it is implemented**: there is no Store Container, no binding and no bound item.
+
+This gate belongs to **no fixed phase**. Phase 8 (Premium) is the obvious first consumer, but a
+Daily Reward or an Event may introduce a Character-bound consumable earlier. Whichever phase ships
+the first one implements this foundation **first**. No Store, Daily Reward or Event bound item
+ships before all of the following hold, each proven by a test:
+
+- the binding survives `STORE_CONTAINER` → `DEPOT` → `STORE_CONTAINER`;
+- another Character on the same Account cannot use or move the bound item;
+- a Market listing fails, on either Market;
+- player trade, gift and mail fail;
+- an NPC sale fails;
+- a move to the Stash fails;
+- a move into a Forge input fails;
+- no currency or value conversion path exists;
+- a bound item can be used only by its own Character;
+- a `PENDING_DELETION` Character cannot move, use or receive bound items;
+- a restore preserves every bound item exactly;
+- the purge deletes the Store Container's contents;
+- the purge also deletes bound items stored in the Depot;
+- ordinary unbound Depot items survive that same purge;
+- no orphaned `boundCharacterId` remains after a purge;
+- a repeated or retried purge cannot delete another Character's items;
+- a concurrent Depot move and a deletion request or purge are safely serialised;
+- if bound items are stackable, a split or merge never changes the binding.
+
+Every restriction is enforced on the server; a hidden button is never the test. The binding is a
+foreign key the `ADR-020` closure test can see, and it declares its purge action before it ships.
+
+**Owner:** the first phase that introduces a Character-bound consumable.
+**Acceptance:** the tests above, not a manual audit.
 
 ---
 

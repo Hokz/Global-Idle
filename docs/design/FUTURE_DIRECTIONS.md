@@ -61,7 +61,9 @@ neither levelled nor earned still has something advancing.
 ## 4. Imbuement materials, outfits, achievements
 
 - creature materials feed future **Powerful Imbuements** (one tier only — `ACTIVITY_OCCUPANCY_AND_TIMERS.md` §6);
-- **outfits, addons and auras** are earned through quests, materials or the store, as configured;
+- **outfits, addons and auras** are earned through quests, materials or the store, as configured.
+  They are cosmetic unlocks, outside `ADR-021`'s Character-bound item model, and never Store
+  Container items — their own unlock model is still open;
 - **achievements** track meaningful progression milestones.
 
 ---
@@ -102,6 +104,17 @@ forgotten OPEN notes.
   bundle per Activity; a traded or forged item outlives one Activity.
 - **Validate impossible rarity/affix identities.** Today an affix array is JSON the domain writes
   and trusts. A market lets someone else's row reach your inventory.
+
+### Before the first Character-bound consumable (Store, Daily Reward or Event)
+
+- **Binding separate from custody, and the Store Container** (`LOCKED`, `ADR-021`). A consumable
+  bound permanently to one Character — an XP Boost, a Store-bought Exercise Weapon, a Daily Reward
+  or Event consumable — moves only between that Character's Store Container and the Account's
+  Depot, is used only by that Character, is never sold, traded, listed, stashed, forged or
+  converted, and is purged with the Character wherever it is stored. It belongs to no fixed phase:
+  Phase 8 is the obvious consumer, but whichever phase ships the first bound item builds this first
+  — [`../PHASE_GATES.md`](../PHASE_GATES.md) § *GBC.1*. The Store sells consumables, never combat
+  equipment.
 
 ### Before Phase 5B (multiplayer)
 

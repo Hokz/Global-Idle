@@ -48,6 +48,10 @@ Item listings priced in premium currency.
 
 The same item should not be simultaneously committed to two listings.
 
+A Character-bound consumable — an XP Boost or a Store-bought Exercise Weapon, for example — is
+never listed on either market, traded or sold
+([`architecture/decisions/ADR-021-character-bound-consumables-and-store-container.md`](architecture/decisions/ADR-021-character-bound-consumables-and-store-container.md)).
+
 ## Transaction rules
 
 Market operations need:

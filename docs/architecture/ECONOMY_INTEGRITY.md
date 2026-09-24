@@ -32,11 +32,18 @@ equipping it, or forging with it are not states the system can reach.
 
 `consumed` is terminal. Instance ids are never reused.
 
+Phase 3 built the Account's Depot and Stash beside these. `ADR-021` adds, for later, a
+per-Character **Store Container** for Character-bound consumables — and with it the rule that
+**custody is not ownership**. A Character-bound consumable has one immutable bound Character, and
+stays that Character's even when it is stored in the Depot.
+
 **There is no `account_recovery` scope.** Phase 0A listed one here, to hold a retired Character's
 items (`ADR-007`). It was never built, and `ADR-020` removes it: a Character pending deletion keeps
 its items where they are for 30 days, and its final purge **destroys** every item it still owns.
-Nothing moves to the Account at purge. Items the player moved into Account custody — the Depot or
-the Stash — before requesting deletion are the Account's, and the purge does not touch them.
+Nothing moves to the Account at purge. Unbound items the player moved into Account custody — the
+Depot or the Stash — before requesting deletion are the Account's, and the purge does not touch
+them. A Character-bound consumable is not: it is the Character's in the Depot too, and the purge
+deletes it (`ADR-021` §6).
 
 ---
 
@@ -169,6 +176,9 @@ audit trail decorative.
 | Deletion used to bank carried value | impossible by rule: nothing Character-owned moves to the Bank or to any recovery custody at purge — it is destroyed (`ADR-020`, L7–L8) |
 | Restore/purge race at the deadline | both lock the Character and decide against the authoritative clock after the lock; exactly one wins (`ADR-020` §7) |
 | Farming through delete → purge → recreate | forbidden by rule (G4.1c, `LOCKED`). One-time Tutorial Rewards are Account-governed and never reissued. A new pre-completion Origin Character does receive a fresh Bootstrap Kit, but a kit can never leave its Character or become value and is destroyed with it, so cycles accumulate nothing (`ADR-020` §5.1–§5.2) |
+| Premium-currency value turned into tradeable value through a Character-bound consumable | never listed on either Market, traded, gifted, mailed, sold to an NPC, stashed, forged, converted or moved to another Character — each refused server-side on the instance (`ADR-021`, `DOMAIN_MODEL.md` I23). **Not implemented** — gate GBC.1, before the first bound item ships |
+| A bound item parked in the Depot to outlive its Character | the purge selects by binding, not by custody, and deletes it; unbound Depot items are untouched (`ADR-021` §6) |
+| Combat power sold for real money | the Store never sells combat equipment for real-money or premium-currency value; its Character-bound items are consumables (`ADR-021` S1–S2) |
 | A Bootstrap Kit item escaping into Account value | refused server-side on the instance by every move, Stash, transfer, sale, listing, trade and conversion path (`DOMAIN_MODEL.md` I20). **Not implemented** — today a kit item can be moved to the Depot and its potions stowed in the Stash, and a counter sale pays the Bank directly; the PRE-4 gate closes these before any purge exists (`PHASE_GATES.md` § *G4.1*) |
 
 `DEFERRED PARAMETER` — fee percentages, listing limits, rate-limit thresholds. They are tuning

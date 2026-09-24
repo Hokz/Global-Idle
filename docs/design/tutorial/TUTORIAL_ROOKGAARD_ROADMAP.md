@@ -764,6 +764,10 @@ are **not yet defined**.
 
 The tutorial should explain the concept without overwhelming the player with monetization.
 
+A Store XP Boost is a **Character-bound consumable** (`LOCKED`,
+[`ADR-021`](../../architecture/decisions/ADR-021-character-bound-consumables-and-store-container.md)):
+bound to one Character, never traded or sold.
+
 ---
 
 # 27. Creature Loot vs Dungeon Treasure Chest

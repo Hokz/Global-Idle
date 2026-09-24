@@ -259,7 +259,8 @@ the count is not.
 - atomicity;
 - fees;
 - audit log;
-- price history.
+- price history;
+- never a Character-bound consumable, on either Market (`ADR-021`).
 
 ## Premium
 
@@ -281,3 +282,24 @@ Premium *convenience* benefits remain to be designed.
 Free:
 - unlocks roster characters with Gold like everyone else;
 - remains competitively viable.
+
+The Store does **not** sell combat equipment for real-money or premium-currency value.
+
+## Character-bound consumables and the Store Container
+
+`LOCKED` (`docs/DECISIONS.md`, `ADR-021`); **not implemented** — built by the first phase that ships
+one.
+
+- **What:** consumables permanently bound to one Character — XP Boosts, Exercise Weapons bought
+  with Store Coin or premium currency, Daily Reward and Event consumables, and others configured
+  the same way. A source makes an item bound only when its definition says so. Outfits and mounts
+  are not part of this.
+- **Where:** each Character's **Store Container**, a system custody — not a backpack, not one of the
+  five Hunt Container Slots — or the Account's Depot. Only Store Container ↔ Depot, and the Depot
+  never makes the item the Account's.
+- **Who:** only its bound Character may use it; no other Character can withdraw, use or receive it.
+- **Never:** either Market, player trade, gift or mail, NPC sale, the Stash, a Forge input, another
+  Character, or any conversion into Gold, premium currency or other value.
+- **Death:** never at risk — it is not in the Loot Pouch.
+- **Deletion:** frozen and restorable during the 30-day grace; at the purge, deleted with the
+  Character wherever it is stored, the Depot included — never refunded, unbound or left behind.

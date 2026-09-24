@@ -218,6 +218,15 @@ Character purged before Rookgaard is complete is replaced by a new Level-1 Origi
 Character-bound Bootstrap Kit. Resolved is not implemented. Do not begin Phase 4 work, implement the
 deletion lifecycle, or mark the gate passed until the Product Owner says so.
 
+**Character-bound consumables** (`ADR-021`, `LOCKED` by the Product Owner on 2026-09-24) are
+consumables bound permanently to one Character — XP Boosts, Store-bought Exercise Weapons, Daily
+Reward and Event consumables. The binding is separate from custody. They move only between the
+Character's Store Container and the Account's Depot, are never sold, traded, listed, stashed,
+forged or converted, and are purged with the Character even when they are stored in the Depot. The
+Store does not sell combat equipment. **Nothing of it is implemented, and it is not PRE-4 work.**
+The first phase that ships a bound item — Store, Daily Reward or Event — implements it first,
+behind gate GBC.1 in [`docs/PHASE_GATES.md`](docs/PHASE_GATES.md).
+
 User-supplied client assets are a PRIVATE reference and must never be committed — see the Phase
 3.7 specification's §9. The
 boundary is enforced, not merely documented: `pnpm release:check`

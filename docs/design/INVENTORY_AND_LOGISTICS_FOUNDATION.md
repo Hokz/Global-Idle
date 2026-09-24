@@ -117,6 +117,7 @@ Stellar. Do not create a second enum.
 |---|---|---|
 | **Depot** | physical, individual custody | equipment instances, unique or affixed items, containers |
 | **Stash** | large fungible quantities | creature products, materials, eligible potions and runes, commodities |
+| **Store Container** (future, `ADR-021`) | a per-Character system custody — not a backpack, not a Hunt Container Slot, not equipment, not the Loot Pouch | Character-bound consumables; its capacity is open |
 
 Normal accessible movement: container ↔ container · container ↔ Depot · container ↔ Stash (when
 eligible) · Depot ↔ Stash (when eligible) · Loot Pouch → any valid accessible storage.
@@ -126,6 +127,12 @@ never moved to the Depot, the Stash or another Character, never sold, listed or 
 destroyed with the Character — see
 [`ADR-020`](../architecture/decisions/ADR-020-character-deletion-grace-and-purge.md) §5.2. **Not
 implemented**: the PRE-4 gate adds the server-side refusal.
+
+**Except a Character-bound consumable** (`LOCKED`, `ADR-021`): its only storage movement is between
+its bound Character's Store Container and the Depot, and the Depot does not make it the Account's —
+it stays its Character's, and no other Character may withdraw it. It never goes to a Hunt
+container, a Character container, the Loot Pouch, the Stash, equipment, another Character, a
+market, a trade or an NPC sale. **Not implemented**: owned by the first phase that ships one.
 
 Desktop affordances: drag and drop, context actions, stack splitting.
 Touch affordances: long press or context action, **Move**, amount selection.
@@ -139,7 +146,8 @@ Server authoritative, both.
 
 Each Character container may declare category routing (Potions, Runes, Rings, Amulets, Utility…).
 An NPC purchase or a Depot withdrawal routes into the preferred destination, obeying stack size,
-space and Capacity, with a deterministic fallback.
+space and Capacity, with a deterministic fallback. A Character-bound consumable is never routed
+into a container: it goes back to its own Character's Store Container, or stays in the Depot.
 
 **Items never disappear.** A routing rule that cannot be satisfied is a refusal or a fallback, not
 a deletion.

@@ -49,18 +49,23 @@ The client sends **intents**, never outcomes. `startHunt(huntId, partyConfig)` i
 | `startActivity(activityDefinitionId)` | ownership, prerequisites, unlocks, party validity, no existing **account** activity claim, and — in the same transaction — **atomic acquisition of the occupancy claim for every participating Character**; fails if any participant already holds one (`ADR-013`) |
 | `stopActivity` | ownership of the running activity; releases every participant's occupancy claim in the same transaction as the lifecycle transition |
 | `equipItem(characterId, itemInstanceId, slot)` | custody, ownership, equip requirements, **character not participating in a running activity** (`DOMAIN_MODEL.md` §5.12) |
-| `sellItem` / `listItem` / `buyListing` | custody, ownership, funds, escrow, fees; never a Bootstrap Kit item (`ADR-020` §5.2) |
-| `forgeAttempt(target, sacrificeA, sacrificeB)` | custody of all three, classification and rarity match, costs; none of them a Bootstrap Kit item |
-| `startSkillTraining(characterId, exerciseItemId)` | custody, charges remaining, and — in the same transaction — **atomic acquisition of that Character's occupancy claim**; fails if the Character is hunting, in a dungeon, or already training (`ADR-013`) |
+| `sellItem` / `listItem` / `buyListing` | custody, ownership, funds, escrow, fees; never a Bootstrap Kit item (`ADR-020` §5.2) or a Character-bound consumable (`ADR-021`) |
+| `forgeAttempt(target, sacrificeA, sacrificeB)` | custody of all three, classification and rarity match, costs; none of them a Bootstrap Kit item or a Character-bound consumable |
+| `moveBoundConsumable(itemInstanceId, to)` | Account ownership; `to` is the bound Character's Store Container or the Account's Depot, and nothing else; the bound Character is `ACTIVE`; the binding is unchanged (`ADR-021` §4) |
+| `useBoundConsumable(characterId, itemInstanceId)` | Account ownership; `characterId` is the item's bound Character, `ACTIVE` and eligible; the item's own use rule; no output convertible into transferable value (`ADR-021` §5) |
+| `startSkillTraining(characterId, exerciseItemId)` | custody, charges remaining — for a Character-bound Exercise Weapon, only its bound Character, spending charges where it is stored (`ADR-021` §5) — and — in the same transaction — **atomic acquisition of that Character's occupancy claim**; fails if the Character is hunting, in a dungeon, or already training (`ADR-013`) |
 | `claimSkillTraining(characterId)` | ownership; server computes elapsed time |
 
 The two deletion commands are illustrative names; the PRE-4 implementation specification fixes them.
 **A Bootstrap Kit item is refused by every command that would move it to the Depot, the Stash or
 another Character, or sell, list, trade or convert it** — checked on the instance, in the domain,
-whatever the client shows (`ADR-020` §5.2, `DOMAIN_MODEL.md` I20). The **purge** that follows a
-deletion's deadline is **not a command**: the client can neither trigger it, bring it forward nor
-undo it, and every command that names a `PENDING_DELETION` Character — other than restore — is
-refused (`ADR-020` §4, §7).
+whatever the client shows (`ADR-020` §5.2, `DOMAIN_MODEL.md` I20). **A Character-bound consumable is
+refused by every command except a move between its bound Character's Store Container and the Depot,
+and a use by that Character** (`ADR-021`, `DOMAIN_MODEL.md` I23). The two bound-consumable commands
+above are illustrative names; the phase that ships the first bound item fixes them. The **purge**
+that follows a deletion's deadline is **not a command**: the client can neither trigger it, bring it
+forward nor undo it, and every command that names a `PENDING_DELETION` Character — other than
+restore — is refused (`ADR-020` §4, §7).
 
 **Every command is authorized against the Account.** A command naming a character the account
 does not own is rejected before any domain logic runs — not filtered afterwards.

@@ -73,10 +73,12 @@ These are each exactly one transaction, all-or-nothing:
 | **Roster slot unlock** | Gold debit, ledger, capacity increment |
 | **Character deletion request** | lifecycle `ACTIVE` → `PENDING_DELETION` and its two timestamps, after the quiescence check — no occupancy claim, no Active Party membership, no live obligation (`ADR-020` §3) |
 | **Character restore** | lifecycle back to `ACTIVE`, timestamps cleared — decided against the deadline after the Character's lock is held (`ADR-020` §2, §7) |
-| **Character purge** | the Character's whole closure — its items, POUCH ledger entries and balance, Stamina, slots, policies, activity history, derived settlement and idempotency records — **then** the Character row. One transaction, under the purge capability; nothing Account-owned changes (`ADR-020` §6–§7) |
+| **Character purge** | the Character's whole closure — its items (and, once `ADR-021` ships, its Store Container and every item bound to it wherever it is stored, the Depot included), POUCH ledger entries and balance, Stamina, slots, policies, activity history, derived settlement and idempotency records — **then** the Character row. One transaction, under the purge capability; nothing Account-owned changes (`ADR-020` §6–§7) |
 | **Activity start** | activity row, account activity claim, **one occupancy claim per participating Character** |
 | **Activity end / retirement of claims** | activity state, **release of every occupancy claim**, in the same transaction as the lifecycle transition |
 | **Skill training claim** | charges, skill progression, activity state |
+| **Bound item move** (future, `ADR-021`) | a Character-bound consumable between its Store Container and the Depot, binding unchanged — locks the Account, then the bound Character, then the item, and checks the Character is `ACTIVE` |
+| **Bound consumable use** (future, `ADR-021`) | the item or its charges, and the effect it grants — only for its bound Character |
 
 A partially applied settlement is not a state the system can be in. Loot materializing without
 its XP, or a purchase debiting without transferring, must be impossible rather than rare.
@@ -151,9 +153,10 @@ Thirty days after a deletion request, the purge removes the Character and everyt
 its POUCH ledger entries included, and no record of it survives. The exception is narrow by
 construction:
 
-- it applies **only** to rows whose sole owner or subject is the purged Character. BANK entries
-  name no Character and are never deleted, so the Account's ledger, its reconciliation and its
-  balances are unchanged by any purge;
+- it applies **only** to rows whose sole owner or subject is the purged Character — ownership
+  following the binding as well as custody, so an item bound to it is its own even in the Depot
+  (`ADR-021`). BANK entries name no Character and are never deleted, so the Account's ledger, its
+  reconciliation and its balances are unchanged by any purge;
 - it is performed **only** by the purge capability. The application role still has no `UPDATE`
   or `DELETE` on the ledger;
 - a record that is Account-owned or shared survives with the Character's identity removed rather

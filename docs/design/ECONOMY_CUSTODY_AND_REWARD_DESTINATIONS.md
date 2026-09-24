@@ -52,7 +52,8 @@ nothing.
 - both are kept, in full.
 
 **Always safe from this rule**, blessed or not: equipped items · the five Hunt containers and
-their supplies · the Depot · the Stash · the Reward Chest.
+their supplies · the Depot · the Stash · the Reward Chest · and, once it exists, a Character's
+Store Container (`ADR-021`): a Character-bound consumable is never at risk on death.
 
 **Carried-reward protection is BINARY.** Partial blessings reduce the experience and skill loss
 exactly as the baseline says, and protect nothing carried. Six blessings lose the Pouch; seven

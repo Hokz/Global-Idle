@@ -140,7 +140,9 @@ Exact order:
 
 - one BaseItem definition;
 - rarity/affixes live on ItemInstance;
-- do not make six static copies of every item.
+- do not make six static copies of every item;
+- **custody and binding are separate axes**: where an item is stored never decides, on its own,
+  whose it is — see *Character-bound consumables and the Store Container*, below.
 
 ## Forge
 
@@ -261,7 +263,9 @@ ACTIVE
   **without** the Character's identity;
 - **Account-owned state is never deleted because a Character is**: the Account, its Bank, its
   entitlements, its roster capacity and other account-wide state remain. (Roster capacity is
-  also never refunded — a Phase 0A decision, `DOMAIN_MODEL.md` §5.4.);
+  also never refunded — a Phase 0A decision, `DOMAIN_MODEL.md` §5.4.) A Character-bound
+  consumable is not Account state, even in the Depot: it is purged with its Character — see
+  *Character-bound consumables and the Store Container*, below;
 - ordinary append-only and audit guarantees stay in force during play. The purge is a deliberate,
   explicitly designed destructive boundary.
 
@@ -467,14 +471,89 @@ wall-clock time.
 - Premium must not create a fifth simultaneous Active Party member;
 - Party-related Premium benefits are OPEN and require separate product design;
 - Premium emphasis = automation/convenience/capacity;
-- Free must remain competitive.
+- Free must remain competitive;
+- the Store does **not** sell combat equipment for real-money or premium-currency value. Its
+  Character-bound items are consumables — see below.
 
 ## Economy
 
 - Gold Market;
 - Premium Currency Market;
 - economy integrity is critical;
-- Market must be transactional and use escrow.
+- Market must be transactional and use escrow;
+- a Character-bound consumable is never listed on either Market — see below.
+
+## Character-bound consumables and the Store Container
+
+`LOCKED` by the Product Owner, 2026-09-24. Architecture:
+[`architecture/decisions/ADR-021-character-bound-consumables-and-store-container.md`](architecture/decisions/ADR-021-character-bound-consumables-and-store-container.md).
+**Not implemented** — owned by the first phase that introduces one (`PHASE_GATES.md` § *GBC.1*).
+
+The Product Owner may call them *"Unique Items"*; the technical term is **Character-bound
+consumable**, because every `ItemInstance` is already unique by identity. A Character-bound
+consumable is a consumable permanently bound to one Character — for example XP Boosts, Exercise
+Weapons bought with Store Coin or premium currency, Daily Reward consumables, Event consumables,
+and other consumables explicitly configured the same way.
+
+**Scope.**
+
+- the Character-bound Store system is for **consumables**, not combat equipment. Combat equipment
+  is **not** sold through the Store for real-money or premium-currency value;
+- an Exercise Weapon belongs here because it is a charge-based training consumable, not because it
+  is combat equipment;
+- **outfits and mounts are outside this model.** They get their own cosmetic unlock or
+  entitlement design;
+- acquisition source and binding are separate: a Store, Daily Reward or Event source makes an item
+  bound only when its item or reward definition says so.
+
+**Binding.**
+
+- a bound item has one immutable bound Character. Where it is stored is not whose it is: moving it
+  to the Account's Depot neither removes nor changes the binding;
+- no other Character — the same Account's included — can withdraw, use, receive, trade, consume or
+  otherwise take control of it;
+- the binding can never be removed, reassigned, sold, gifted or converted.
+
+**The Store Container.** Every Character may have one: a system custody, not a physical backpack,
+not one of the five Hunt Container Slots — it consumes none of them — not equipment and not the
+Loot Pouch. Its capacity is not decided.
+
+**Custody.** The only ordinary storage movement of a Character-bound consumable is between its
+bound Character's Store Container and the Account's Depot. In the Depot it is still the
+Character's. It never moves to a Hunt Container, a Character container, the Loot Pouch, the Stash,
+another Character, Market escrow, any trade, mail, gift or social-transfer custody, a Forge input,
+or an equipment slot.
+
+**Use.** Only its bound Character may use it, by the item's own use rule. Using it consumes it or
+spends its charges; that is not a custody transfer. Every use checks, on the server, that the caller
+owns the Account, that the target Character is the bound Character and is `ACTIVE` and eligible,
+and that no output becomes transferable Account value.
+
+**Never:** listed on either Market; sold to or bought from another player; traded, gifted, mailed or
+moved through any social or exchange interaction; sold to an NPC or counter; converted into Gold,
+premium currency or any other transferable value; used as a Forge input; moved to the Stash;
+transferred to another Character. These rules are server-authoritative — hiding an action in the
+UI is never the boundary.
+
+**Death.** Stored only in the Store Container or the Depot, it is outside the Loot Pouch's
+death-at-risk path: ordinary death neither destroys nor drops it.
+
+**Character deletion.** While the Character is `PENDING_DELETION`, its Store Container and its bound
+items stay intact and restorable: no Store Container ↔ Depot movement, no use, and no new bound
+grant to it; a restore returns them exactly. At the final purge the Store Container is deleted, and
+so is every item bound to the Character — **including bound items stored in the Depot**. None of
+them transfers, becomes unbound, stays behind in the Depot, moves to the Stash, refunds Store Coin
+or premium currency, or converts into any value.
+
+```text
+ordinary, unbound Depot item    ->  KEEP at a purge     (the Account's)
+Character-bound Depot item      ->  DELETE at a purge   (its bound Character's)
+```
+
+Open, and not decided here: the Store Container's capacity, sorting or subcontainers; Store Coin
+pricing; which Daily Rewards and Events grant bound items; XP Boost numbers and durations; Exercise
+Weapon Store pricing and charges; the use UI; and the outfit and mount unlock model — see
+[`OPEN_QUESTIONS.md`](OPEN_QUESTIONS.md) § *Character-bound consumables*.
 
 ## Engineering process
 
