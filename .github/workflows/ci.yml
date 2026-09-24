@@ -190,6 +190,11 @@ jobs:
         # that a developer happens to have nothing locally. Fail-closed:
         # a forbidden path, a marker, a reference, an ungated or unroutable
         # loader, or an opt-in flag each fail the build (Phase 3.7 §9.3).
+        #
+        # It also gates the ARTEFACT itself: every image, font or media file in
+        # `.next` must hash-match a provenance record, because an imported
+        # asset is emitted to `.next/static/media/` without ever passing
+        # through `public/` — so the static allowlist alone would not see it.
         run: pnpm release:check
 
       # ─────────────────────────────────────────── the matrices are countable

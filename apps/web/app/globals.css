@@ -426,11 +426,20 @@ input {
    ───────────────────────────────────────────────────────────────────────── */
 
 .atlas-stack {
+  /* A flex item's default `min-width: auto` lets its widest unbreakable
+     child push the whole column past the viewport. Measured: the
+     three-level breadcrumb made this 405px wide inside a 390px phone,
+     putting zoom-in off-screen and unclickable while it LOOKED fine. */
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 .atlas-stack__crumbs {
+  /* Four levels of names do not fit on one phone line. Wrapping keeps the
+     trail complete instead of overflowing the surface it belongs to. */
+  flex-wrap: wrap;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -447,6 +456,11 @@ input {
 }
 
 .atlas-surface {
+  /* A flex item's default `min-width: auto` lets its widest unbreakable
+     child push the whole column past the viewport. Measured: the
+     three-level breadcrumb made this 405px wide inside a 390px phone,
+     putting zoom-in off-screen and unclickable while it LOOKED fine. */
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -456,21 +470,35 @@ input {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  /* At 390 wide the title and the controls do not both fit on one line.
+     Wrapping is what keeps the controls usable instead of crushed. */
+  flex-wrap: wrap;
 }
 .atlas-surface__head h2 {
   margin: 0;
   font-size: 1rem;
+  /* Allows the title to shrink so the controls never have to. */
+  min-width: 0;
 }
 .atlas-surface__zoom {
   display: flex;
   align-items: center;
   gap: 6px;
+  /* NEVER shrink. Measured: as a shrinkable flex item the buttons collapsed
+     under the zoom readout at 390 wide and the label intercepted the pointer,
+     so zoom-in was unclickable on a phone while looking perfectly fine. */
+  flex: none;
 }
 .atlas-surface__zoom button {
   width: 30px;
   height: 30px;
+  flex: none;
   font: inherit;
   line-height: 1;
+}
+.atlas-surface__zoom span {
+  min-width: 2.5em;
+  text-align: center;
 }
 
 /* The viewport. `overflow: hidden` is load-bearing: the raster is magnified
@@ -687,4 +715,38 @@ input {
   .hud-column > * {
     flex: 1 1 150px;
   }
+}
+
+/* ── Atlas: locked destinations and the four-level breadcrumb ─────────────── */
+.atlas-pin--locked {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+.atlas-pin--locked .atlas-pin__dot {
+  filter: grayscale(1);
+}
+.atlas-pin__locked {
+  margin-left: 4px;
+  font-style: normal;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #9aa7b4;
+}
+.atlas-stack__crumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.atlas-stack__crumb-current {
+  margin-left: 8px;
+  color: #9aa7b4;
+  font-size: 12px;
+}
+.atlas-stack__back {
+  align-self: flex-start;
+}
+.atlas-stack__blocked {
+  margin: 0;
+  color: #e8c37a;
 }

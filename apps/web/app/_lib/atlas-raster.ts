@@ -240,3 +240,74 @@ export function paintCityRaster(size = CITY_RASTER_SIZE): Uint8ClampedArray {
   }
   return pixels;
 }
+
+/** The regional placeholder's own size — between the macro world and the town. */
+export const REGION_RASTER_SIZE = 384;
+
+/**
+ * The PUBLIC Rookgaard REGION placeholder.
+ *
+ * The middle of the four navigation surfaces (spec §4, and
+ * `docs/design/world/ATLAS_NAVIGATION_AND_REGION_BOUNDARIES.md`): one region at
+ * readable detail, showing where its places sit relative to each other —
+ * coastline, the road spine, the town's footprint, and terrain around it.
+ *
+ * It is DELIBERATELY a different picture from the world overview, not the same
+ * art enlarged. Two levels that draw the same thing are one level with two
+ * names, and a player cannot tell which one they are on.
+ *
+ * This is this project's own procedural art from a fixed seed. It is NOT a
+ * survey of anything: no coastline or road here corresponds to real geography,
+ * which is why every pin placed on it renders `demo`.
+ */
+export function paintRegionRaster(size = REGION_RASTER_SIZE): Uint8ClampedArray {
+  const pixels = new Uint8ClampedArray(size * size * 4);
+  const put = (index: number, rgb: readonly number[]) => {
+    pixels[index] = rgb[0]!;
+    pixels[index + 1] = rgb[1]!;
+    pixels[index + 2] = rgb[2]!;
+    pixels[index + 3] = 255;
+  };
+
+  const centre = size / 2;
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const index = (y * size + x) * 4;
+      // A coast: distance from centre, warped by noise so the edge is ragged.
+      const dx = (x - centre) / centre;
+      const dy = (y - centre) / centre;
+      const radius = Math.sqrt(dx * dx + dy * dy) + (smoothNoise(x, y, 11, 3) - 0.5) * 0.28;
+      if (radius > 0.94) {
+        put(index, PALETTE.deep);
+      } else if (radius > 0.86) {
+        put(index, PALETTE.shallow);
+      } else if (radius > 0.82) {
+        put(index, PALETTE.sand);
+      } else {
+        const texture = smoothNoise(x, y, 17, 9);
+        // Higher ground inland, so the region reads as terrain rather than felt.
+        put(index, radius < 0.34 && texture > 0.58 ? PALETTE.rock : PALETTE.grass);
+        if (texture < 0.34) put(index, PALETTE.grassDark);
+      }
+    }
+  }
+
+  // The road spine, running from the landing on the west to the town centre.
+  for (let x = Math.round(size * 0.18); x < Math.round(size * 0.56); x += 1) {
+    const y = Math.round(centre + Math.sin(x / 26) * 12);
+    for (let w = -2; w <= 2; w += 1) {
+      const py = y + w;
+      if (py >= 0 && py < size) put((py * size + x) * 4, PALETTE.road);
+    }
+  }
+
+  // The town's footprint — a cluster, not a building plan. That detail belongs
+  // to the LOCAL surface below this one, which is the point of having both.
+  for (let y = Math.round(centre - 26); y < Math.round(centre + 26); y += 1) {
+    for (let x = Math.round(centre - 30); x < Math.round(centre + 30); x += 1) {
+      if (x < 0 || y < 0 || x >= size || y >= size) continue;
+      if (smoothNoise(x, y, 7, 13) > 0.52) put((y * size + x) * 4, PALETTE.roof);
+    }
+  }
+  return pixels;
+}
