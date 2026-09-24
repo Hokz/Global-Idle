@@ -577,10 +577,12 @@ Full text: [`PHASE_GATES.md`](PHASE_GATES.md) § *Pre-Phase-4*.
 - **the Character deletion lifecycle** (`ADR-020`, which supersedes `ADR-007`'s retirement) — a
   30-day reversible grace, then an atomic, idempotent, race-safe hard purge of the Character and
   everything it owns, proven by a schema-derived closure inventory and a post-purge scan, and
-  replacing `retiredAt`. The Gold Pouch question is **resolved**: kept during the grace, destroyed
-  at the purge, never moved to the Bank. Still **open** for the Product Owner: what a pending
-  Character keeps holding — its vocation, the Origin slot, its roster place — and the tutorial and
-  starting-grant rule after a purge;
+  replacing `retiredAt`. Its three product questions are **resolved** by the Product Owner: the
+  Gold Pouch is kept during the grace and destroyed at the purge, never moved to the Bank (G4.1a);
+  a pending Character keeps its vocation, the Origin slot and its roster place until the purge, so
+  a restore never conflicts with a replacement (G4.1b); tutorial completion belongs to the Account
+  and survives the purge, and no one-time grant is awarded twice (G4.1c). **None of it is
+  implemented**, and the gate has not passed;
 - **enforce the `baseXp` → `baseLevel` projection** — `baseXp` is already the durable truth and
   `baseLevel` its stored projection (schema + `progression.ts`). The gate proves and enforces that
   contract on every write path, migration and rollback; it does not choose again;

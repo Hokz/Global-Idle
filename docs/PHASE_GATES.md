@@ -73,6 +73,32 @@ proven by a test:
 - name reuse is tested **only after** a successful purge: a same-name creation is refused before
   it and accepted immediately after it.
 
+**What a pending Character holds — G4.1b, `LOCKED`**
+
+- `PENDING_DELETION` Characters are counted for roster capacity (I2);
+- they reserve their vocation (I1);
+- a pending Origin Character reserves the Origin slot (I1b);
+- creating a replacement is **rejected** while those resources are held — tested for each of the
+  three, including an account at roster capacity 1;
+- the final purge releases all three **atomically with the Character's deletion**, in the same
+  commit that releases the name: a creation that needs one of them is refused before the purge
+  commits and accepted immediately after it;
+- a restore before `purgeAt` succeeds with no uniqueness or capacity conflict, after every refused
+  replacement attempt.
+
+**Tutorial completion and one-time grants — G4.1c, `LOCKED`**
+
+- the Account's tutorial completion survives the purge of its Origin Character, and of any other
+  Character;
+- once the account has completed Rookgaard, a Character created after a purge takes the
+  later-character path — Base Level 8, no Rookgaard, the post-Rookgaard state — never the
+  first-character tutorial;
+- one-time tutorial and account grants — today the Rookgaard tutorial grant — are **not** reissued
+  after a purge and a recreation. Character-specific starting state of the normal Level-8 flow is
+  not a one-time grant, and the tests keep the two apart (`ADR-020` §5.1, C7);
+- repeated *delete → purge → recreate* cycles cannot farm any one-time grant: however many cycles
+  run, no one-time grant is awarded to the account more than once.
+
 **The purge**
 
 - a **purge dependency graph** — a referential-closure inventory of **every** foreign key and
@@ -108,8 +134,9 @@ proven by a test:
 
 **Migration**
 
-- `retiredAt`, and every partial-uniqueness assumption derived from it — I1, I1b, the name and
-  capacity checks, the `retiredAt: null` access filters — removed or redesigned;
+- `retiredAt`, and every partial-uniqueness assumption derived from it, removed: I1, I1b and the
+  name and capacity checks rebuilt over every existing Character, `PENDING_DELETION` included
+  (G4.1b), and the `retiredAt: null` access filters made lifecycle-aware;
 - a migration strategy from the implemented retirement schema: forward-only and additive first,
   with any row that has `retiredAt` set counted, reported and converted as `ADR-020` §9 describes;
 - the VERIFIED tests that encode retirement — Phase 0B `D5` and `D6`, Phase 1 `D22`'s retirement
@@ -117,7 +144,11 @@ proven by a test:
   `tests/integration/characters.test.ts` — superseded through explicit matrix amendments, never
   deleted quietly.
 
-**Owner:** Phase 4 builder, before Party formation work — and only once G4.1b is answered.
+**Owner:** Phase 4 builder, before Party formation work. The product questions this gate names —
+G4.1a to G4.1c, below — are all decided. What still awaits Product Owner confirmation is listed in
+[`OPEN_QUESTIONS.md`](OPEN_QUESTIONS.md) § *Character deletion*. One item there — an Origin
+Character purged before the account completes Rookgaard, the only case today's code can reach
+(`ADR-020` §5.1) — the builder confirms before implementing creation after a purge.
 **Acceptance:** invariant, race and closure tests, not a manual audit.
 
 #### G4.1a — the Gold Pouch at deletion — **RESOLVED** by the Product Owner, 2026-09-24
@@ -136,37 +167,54 @@ the old requirement is its integrity half: the destruction happens inside the at
 duplicates value into the Bank, and is proven under retry and rollback. Every BANK entry is
 untouched; `ADR-020` §6.3 covers the operations that had both a BANK and a POUCH leg.
 
-#### G4.1b — what a pending Character still holds — **OPEN**, Product Owner
+#### G4.1b — what a pending Character still holds — **RESOLVED** by the Product Owner, 2026-09-24
 
-The name is `LOCKED`: reserved until the purge. Still undecided — during the 30 days, does a
-`PENDING_DELETION` Character:
+**No longer open.** A `PENDING_DELETION` Character keeps every uniqueness and capacity resource
+its guaranteed restoration needs until the final purge successfully commits:
 
-- count against `rosterCapacity`;
-- keep its vocation reserved;
-- keep the Origin slot (I1b), if it is the Origin Character;
+- it continues to count against `rosterCapacity`;
+- its vocation remains reserved;
+- if it is the Origin Character, the Origin slot (I1b) remains reserved;
+- the player cannot create a replacement that would consume any of those held resources;
+- they are released **only** by the successful final purge;
+- a restore before the deadline therefore never depends on freeing or reclaiming a resource, and
+  cannot fail because the player created a replacement;
+- the name stays as already locked: released only by the successful final purge.
 
-and therefore, may the player create a replacement before the purge?
+An account at roster capacity 1 that deletes its only Character therefore cannot create another
+during the grace, and can restore the pending one. Roster capacity itself stays Account-owned and
+is neither reduced nor refunded. Recorded in `ADR-020` §5 and `DECISIONS.md` § *Character
+deletion*; **implementation pending** — proven by the tests under *What a pending Character
+holds*, above.
 
-Exact restoration constrains the answer. Releasing any of the three early lets a replacement make
-the promised restore violate I1, I1b or I2, so the restore would have to be refused — which the
-locked rule forbids. **Recommended minimal safe invariant:** all three stay held until the purge.
-The consequence to weigh: an account at capacity 1 that deletes its only Character cannot create
-another for 30 days, although it can restore it. Detail: `ADR-020` §5 and
+#### G4.1c — tutorial completion and one-time grants after a purge — **RESOLVED** by the Product Owner, 2026-09-24
+
+**No longer open.** Tutorial completion belongs to the **Account**, not to the lifetime of the
+Origin Character:
+
+- completing the initial Rookgaard tutorial journey marks the account as having completed it, and
+  deleting or purging the Origin Character does not reset that;
+- once the account has completed Rookgaard, a Character created after a purge does not restart the
+  first-character tutorial automatically. It follows the normal later-character flow: Base Level
+  8, no Rookgaard, the post-Rookgaard game state;
+- one-time account or tutorial starting grants are not awarded again because the Origin Character
+  was deleted or purged and another was created, so *delete → purge → recreate* cannot farm
+  starting items, Gold, containers, entitlements, tutorial rewards or any other one-time grant;
+- Character-specific starting state of the normal Level-8 flow may still be granted by that flow;
+- after its purge no Origin Character record remains. The account-level tutorial-completion fact
+  is the only thing that survives for this purpose.
+
+Recorded in `ADR-020` §5.1 and `DECISIONS.md` § *Character deletion*; **implementation pending** —
+proven by the tests under *Tutorial completion and one-time grants*, above. Nothing of it exists
+yet: the Account has no tutorial-completion fact, and today's code gives the Rookgaard tutorial
+grant to every Character it creates. The creation routing ships **with** the purge, never after
+it.
+
+The one case these rules do not state — an Origin Character purged **before** the account
+completes Rookgaard — is read in `ADR-020` §5.1 and listed for confirmation in
 [`OPEN_QUESTIONS.md`](OPEN_QUESTIONS.md) § *Character deletion*.
 
-No implementation may release any of these early, and G4.1's implementation does not start, until
-this is answered.
-
-#### G4.1c — tutorial replay and the starting grant after a purge — **OPEN**, Product Owner
-
-Purging an Origin Character frees the Origin slot, so the account can create a new Level-1 Origin
-Character. Tutorial completion stays Account-level and is never inferred from counting Characters
-(`TUTORIAL_ROOKGAARD_ROADMAP.md` §2), but whether the tutorial is then replayed, offered with a
-SKIP, or refused — and whether the starting grant is given again — is undecided. Without a rule,
-*delete → purge → recreate* farms the starting grant into the Depot. Carried forward from the
-Phase 1 specification's open item and from `design/FUTURE_DIRECTIONS.md`.
-
-**Owner:** Product Owner decision; the Phase 4 builder implements it.
+**Owner:** Phase 4 builder, as part of G4.1.
 
 ### G4.2 — enforce the `baseXp` → `baseLevel` projection everywhere
 

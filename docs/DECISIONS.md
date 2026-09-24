@@ -192,12 +192,12 @@ Two distinct build systems:
   may place five Characters in one Activity — one per account, five accounts — which is not this
   rule and does not relax it);
 - at most **one roster Character per vocation** per account;
-- while a Knight exists on the account, Knight is unavailable as a new vocation choice. Once that
-  Knight is **permanently purged** (*Character deletion*, below), Knight becomes available again.
-  Whether a Knight that is **pending deletion** still holds Knight during its 30-day grace is
-  `OPEN` — see *Character deletion*;
+- while a Knight exists on the account — `ACTIVE` or `PENDING_DELETION` — Knight is unavailable as
+  a new vocation choice. Only once that Knight is **permanently purged** (*Character deletion*,
+  below) does Knight become available again;
 - there is no retired or historical Character. A Character either exists — `ACTIVE`, or
-  `PENDING_DELETION` during its grace — or has been purged and does not exist at all;
+  `PENDING_DELETION` during its grace — or has been purged and does not exist at all. A Character
+  that exists counts against the roster in either state;
 - additional roster slots are unlocked with in-game Gold; exact costs remain OPEN;
 - later unlocked characters start at Base Level 8, skip Rookgaard, and receive no catch-up
   levels;
@@ -267,12 +267,56 @@ ACTIVE
 
 Nothing further is inferred from how any other game handles deletion.
 
-**`OPEN` — what a pending Character still holds.** The name is locked above. Whether a
-`PENDING_DELETION` Character keeps its **vocation**, the **Origin slot** and its **roster place**
-during the grace — and therefore whether a replacement can be created before the purge — is a
-Product Owner decision. Releasing any of them early can make the promised restore impossible,
-which is why the architecture recommends keeping all three until the purge. See
-[`OPEN_QUESTIONS.md`](OPEN_QUESTIONS.md) § *Character deletion*.
+### What a pending Character still holds — G4.1b
+
+`LOCKED` by the Product Owner, 2026-09-24. A `PENDING_DELETION` Character keeps every uniqueness
+and capacity resource its guaranteed restoration needs, until the final purge:
+
+- it continues to count against `rosterCapacity`;
+- its **vocation** remains reserved;
+- if it is the Origin Character, the **Origin slot** remains reserved;
+- the player cannot create a replacement Character that would consume any of those held
+  resources;
+- those resources are released **only** by the successful final purge, in the same atomic commit
+  that deletes the Character and releases its name;
+- a restore before the deadline therefore never depends on freeing or reclaiming a resource, and
+  never fails because the player created a replacement;
+- the name follows the rule above, unchanged.
+
+Consequences, all intended: an account at roster capacity 1 that deletes its only Character cannot
+create another during the 30-day grace, and can restore the pending one at any time before the
+deadline; no same-vocation replacement — and, when the pending Character is the Origin Character,
+no second Origin Character — can be created before the purge.
+Roster capacity stays Account-owned, and is neither reduced nor refunded by a deletion or a purge.
+
+### Tutorial completion and one-time grants after a purge — G4.1c
+
+`LOCKED` by the Product Owner, 2026-09-24. Tutorial completion belongs to the **Account**, not to
+the lifetime of the Origin Character:
+
+- completing the initial Rookgaard tutorial journey marks the account as having completed it;
+- deleting or permanently purging the Origin Character does **not** reset that account-level
+  state;
+- once the account has completed Rookgaard, a Character created after a purge does **not** restart
+  the first-character tutorial automatically. It follows the normal later-character flow above:
+  Base Level 8, no Rookgaard, the post-Rookgaard game state;
+- one-time account or tutorial starting grants are **not** awarded again merely because the Origin
+  Character was deleted or purged and another Character was created. *Delete → purge → recreate*
+  cannot farm starting items, Gold, containers, entitlements, tutorial rewards or any other
+  one-time account grant;
+- Character-specific starting state that is legitimately part of the normal Level-8
+  later-character flow may still be granted by that flow. It is not a one-time grant, and the two
+  are never conflated;
+- the Origin Character is historical only as a role while it exists. After its purge there is no
+  residual Character record; the account-level tutorial-completion fact is the only thing that
+  survives for this purpose.
+
+**Not implemented.** The Account has no tutorial-completion fact yet, and the code gives the
+Rookgaard tutorial grant to every Character it creates. Both change in the PRE-4 gate
+([`PHASE_GATES.md`](PHASE_GATES.md) § *G4.1*), with the purge and never after it. An Origin
+Character purged **before** the account completes Rookgaard is a case these rules do not state;
+the builder's reading is listed for confirmation in [`OPEN_QUESTIONS.md`](OPEN_QUESTIONS.md)
+§ *Character deletion*.
 
 ## Character activity occupancy
 

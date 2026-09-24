@@ -198,14 +198,14 @@ touching the ownership model.
 | Transaction / audit | required for currency, entitlement and roster-capacity changes |
 
 **Invariants.**
-- `count(roster characters) ≤ rosterCapacity ≤ 5` — `LOCKED BY PRODUCT`. A purged Character is
-  not counted; whether a `PENDING_DELETION` Character is counted during its grace is `OPEN`
-  (`ADR-020` §5)
-- the vocations of the account's Characters are **distinct** — `LOCKED BY PRODUCT`. A purged
-  Character holds no vocation; whether a `PENDING_DELETION` one still holds its vocation is
-  `OPEN` (`ADR-020` §5)
+- `count(roster characters) ≤ rosterCapacity ≤ 5` — `LOCKED BY PRODUCT`. Every existing
+  Character counts, a `PENDING_DELETION` one included, until its purge (G4.1b, `ADR-020` §5)
+- the vocations of the account's Characters are **distinct** — `LOCKED BY PRODUCT`. A
+  `PENDING_DELETION` Character still holds its vocation; only its purge frees it (G4.1b,
+  `ADR-020` §5)
 - tutorial completion is tracked at account level, not inferred from character count —
-  `LOCKED BY PRODUCT` (`TUTORIAL_ROOKGAARD_ROADMAP.md` §2)
+  `LOCKED BY PRODUCT` (`TUTORIAL_ROOKGAARD_ROADMAP.md` §2). No deletion or purge resets it, the
+  Origin Character's included (G4.1c, `ADR-020` §5.1)
 
 Roster capacity is stored against the Account row but is **owned by the Character context** —
 see §5.4. Physical location does not determine the bounded context.
@@ -311,13 +311,18 @@ hard purge.** See `ADR-020`, which supersedes the Phase 0A decision (`ADR-007`, 
 - No record of the purged Character survives, and no surviving shared or Account-owned record
   keeps its identity. Account-owned state — the Bank, entitlements, roster capacity, Depot and
   Stash — is untouched, and capacity is not refunded.
-- The name stays reserved until the purge. Whether the vocation, the Origin slot and the roster
-  place also stay held during the grace is `OPEN` (`ADR-020` §5).
+- The name stays reserved until the purge, and so do its vocation, its roster place and — for the
+  Origin Character — the Origin slot. Only the successful purge releases them, in the commit that
+  deletes the Character, so no replacement can take one and a restore never conflicts (G4.1b,
+  `ADR-020` §5).
 - **Playable** now means `ACTIVE`. A `PENDING_DELETION` Character is not playable. It is still an
-  existing Character for the name rule, and possibly for the others.
+  existing Character for the name, vocation, Origin-slot and capacity rules.
 - The Origin Character may be deleted like any other; tutorial completion stays Account-level and
-  is never inferred from counting Characters (`TUTORIAL_ROOKGAARD_ROADMAP.md` §2). What a purged
-  Origin Character means for tutorial replay and the starting grant is `OPEN`.
+  is never inferred from counting Characters (`TUTORIAL_ROOKGAARD_ROADMAP.md` §2). Purging it
+  never resets that completion: once Rookgaard is complete, a Character created after the purge
+  starts at Base Level 8 and skips Rookgaard, and no one-time grant is awarded again (G4.1c,
+  `ADR-020` §5.1). An Origin Character purged **before** Rookgaard is complete is a case with a
+  reading awaiting confirmation (`docs/OPEN_QUESTIONS.md` § *Character deletion*).
 
 The code still implements retirement (`retiredAt`) until the PRE-PHASE-4 gate replaces it
 (`PHASE_GATES.md` § *G4.1*).
@@ -332,7 +337,7 @@ The code still implements retirement (`retiredAt`) until the PRE-PHASE-4 gate re
 
 | Aspect | What it actually is |
 |---|---|
-| The *membership* | a **derived collection** — every Character that exists for this Account. A purged Character does not exist; whether a `PENDING_DELETION` one is a member during its grace is `OPEN` (`ADR-020` §5). Nothing to store. |
+| The *membership* | a **derived collection** — every Character that exists for this Account, a `PENDING_DELETION` one included until its purge (G4.1b, `ADR-020` §5). A purged Character does not exist. Nothing to store. |
 | The *capacity* | **durable state owned by the Character context** — an integer, because it is bought with Gold and must be auditable |
 
 Modelling the roster as its own entity would create a second place where membership could
@@ -359,11 +364,11 @@ single-owner rule of `ADR-001`; that split is removed.
 **Invariants.**
 - `1 ≤ rosterCapacity ≤ 5` — `LOCKED BY PRODUCT`
 - capacity is **monotonic** — `DECIDED IN PHASE 0A`. Deleting a character never reduces or
-  refunds purchased capacity. Its roster place is free once it is purged at the latest; whether
-  it is free earlier, during the grace, is `OPEN` (`ADR-020` §5).
+  refunds purchased capacity. Its roster place stays held through the grace and is freed only by
+  its purge (G4.1b, `ADR-020` §5).
 - a vocation held by an existing Character is not offered as an unlock choice — `LOCKED BY
-  PRODUCT`. It is free again once that Character is purged at the latest; whether a
-  `PENDING_DELETION` Character still holds it during the grace is `OPEN` (`ADR-020` §5)
+  PRODUCT`. A `PENDING_DELETION` Character still holds it; it is free again only once that
+  Character is purged (G4.1b, `ADR-020` §5)
 
 ---
 
@@ -905,8 +910,8 @@ application-only check loses a race.
 
 | # | Invariant | Enforced by |
 |---|---|---|
-| I1 | One roster Character per vocation per account | unique constraint over existing Characters; whether a `PENDING_DELETION` one counts is `OPEN` (`ADR-020` §5). **Today** still `ADR-007`'s partial index over non-retired rows, until the PRE-4 gate replaces it |
-| I2 | `count(roster characters) ≤ rosterCapacity ≤ 5` | persistence constraint + transaction; grace-state counting `OPEN` as for I1 |
+| I1 | One roster Character per vocation per account | unique constraint over every existing Character, `PENDING_DELETION` included (G4.1b, `ADR-020` §5). **Today** still `ADR-007`'s partial index over non-retired rows, until the PRE-4 gate replaces it |
+| I2 | `count(roster characters) ≤ rosterCapacity ≤ 5` | persistence constraint + transaction, counting every existing Character, `PENDING_DELETION` included, as for I1 |
 | I3 | Active Party size 1–4, entries distinct, all **playable** and owned by the account | transaction |
 | I4 | An ItemInstance is in exactly one custody scope | persistence constraint |
 | I5 | Balance projection reconciles to the ledger | transaction + reconciliation job |

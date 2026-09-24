@@ -60,6 +60,18 @@ Player completes tutorial
 
 The account should still know that the tutorial was previously completed.
 
+> **`LOCKED` — G4.1c, Product Owner, 2026-09-24.** This edge case is decided. Tutorial completion
+> belongs to the Account, and deleting or purging the Origin Character does not reset it. A
+> Character created after that purge does not restart the first-character tutorial automatically:
+> it follows the later-character flow — Base Level 8, no Rookgaard, the post-Rookgaard state — and
+> no one-time tutorial or account grant is awarded again. See
+> [`DECISIONS.md`](../../DECISIONS.md) § *Character deletion* and
+> [`ADR-020`](../../architecture/decisions/ADR-020-character-deletion-grace-and-purge.md) §5.1.
+> The optional PLAY / SKIP offer below and the replay questions of §43 stay open, within that
+> rule. An Origin Character purged **before** the tutorial is complete is a case G4.1c does not
+> state; its reading awaits confirmation in [`OPEN_QUESTIONS.md`](../../OPEN_QUESTIONS.md)
+> § *Character deletion*.
+
 ## First character / tutorial never completed
 
 The Level 1–8 tutorial is mandatory.

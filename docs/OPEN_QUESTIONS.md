@@ -54,8 +54,9 @@ only approved offline progression. Only that training's limits and rates remain 
 ## Party and roster
 
 Roster maximum (5), Active Party maximum (4) and the one-character-per-vocation rule are
-locked in `docs/DECISIONS.md` and are **not** open. How a Character that is **pending deletion**
-counts against them is open — see *Character deletion*, below.
+locked in `docs/DECISIONS.md` and are **not** open. Neither is how a Character **pending deletion**
+counts against them: until its purge it keeps its roster place, its vocation and, if it is the
+Origin Character, the Origin slot (G4.1b, `LOCKED`).
 
 - exact Gold price for Roster Slots 2-5;
 - whether unlock costs scale linearly, exponentially or by milestones;
@@ -75,39 +76,7 @@ and everything it owns, with nothing moved to the Bank or to a recovery custody 
 `docs/DECISIONS.md` § *Character deletion*, architecture in `ADR-020`, work in the PRE-4 gate
 (`PHASE_GATES.md` § *G4.1*). These are open around it.
 
-**1. What a pending Character still holds — Product Owner (gate item G4.1b).** The name is locked:
-reserved until the purge. Undecided — during its 30 days, does a `PENDING_DELETION` Character
-count against `rosterCapacity`, keep its vocation reserved, and keep the Origin slot if it is the
-Origin Character? And so, may the player create a replacement before the purge?
-
-This is not a free choice, because restoration is locked. Releasing a resource early lets a
-replacement take it, and then the promised restore would break an invariant:
-
-| Released early | A replacement can take it | The restore would then violate |
-|---|---|---|
-| the vocation | a new Character of the same vocation | I1 — one Character per vocation per account |
-| the Origin slot | a new Origin Character | I1b — at most one Origin Character |
-| the roster place | any new Character, at full capacity | I2 — `count ≤ rosterCapacity` |
-
-The restore would have to be refused, which the locked rule forbids.
-
-- **Recommended minimal safe invariant:** a `PENDING_DELETION` Character keeps all three until the
-  purge releases them. A same-vocation replacement, or any replacement beyond spare capacity,
-  waits for the purge.
-- **Consequence to weigh:** an account at capacity 1 that deletes its only Character cannot create
-  another for 30 days. It can restore the deleted one at any time in that window.
-- **Alternatives, and what they cost:** release early and let a restore fail when a replacement
-  took the resource (breaks the locked restore promise); or release early and let a restore
-  exceed capacity or duplicate a vocation (breaks a locked roster rule).
-
-**2. Tutorial replay and the starting grant after a purge — Product Owner (gate item G4.1c).**
-Purging an Origin Character frees the Origin slot, so a new Level-1 Origin Character can be
-created. Tutorial completion stays Account-level (`TUTORIAL_ROOKGAARD_ROADMAP.md` §2), but whether
-the tutorial is replayed, offered with a SKIP, or refused — and whether the starting grant is given
-again — is undecided. Without a rule, *delete → purge → recreate* farms the starting grant into the
-Depot. Carried forward from the Phase 1 specification's open item.
-
-**3. Two readings of the locked rule, for confirmation.** The builder had to choose these to write
+**1. Two readings of the locked rule, for confirmation.** The builder had to choose these to write
 `ADR-020`; either can be corrected without touching anything else:
 
 - *"exactly 30 days"* is read as **720 hours** on the server's clock, from the instant the request
@@ -116,7 +85,29 @@ Depot. Carried forward from the Phase 1 specification's open item.
   rules **derive from time** instead of storing — today Stamina recovery (`ADR-014`) — keeps
   running during the grace, exactly as it would for any idle Character (`ADR-020` §4).
 
-**4. A non-identifying record of what a purge destroyed.** The purge destroys the Pouch balance and
+**2. An Origin Character purged before the account completes Rookgaard — a reading of G4.1c,
+for confirmation.** G4.1c is `LOCKED` (`ADR-020` §5.1, rules C1–C8). C3 and C4 say what a Character
+created after a purge does once the account **has** completed Rookgaard; they do not say what
+happens when the Origin Character is purged **before** that. Today that is the only case the code
+can reach: every Character the API creates is a Level-1 Origin Character, and no path completes the
+tutorial yet. The builder's reading:
+
+- the next Character is a new Level-1 Origin Character, because the tutorial is mandatory while it
+  has never been completed (`TUTORIAL_ROOKGAARD_ROADMAP.md` §2);
+- it does **not** receive the Rookgaard tutorial grant, or any other one-time grant, a second time
+  (C5, C6);
+- the account keeps a durable record of the one-time grants it has received, naming no Character.
+  C8 names tutorial completion as the only fact that survives for the Origin role's purpose; this
+  record would survive for C5 and C6's purpose instead.
+
+Consequence to weigh: that new Origin Character starts without the grant's armour, dagger,
+backpack and potions — unless the player moved them to the Depot before the request, since Account
+custody survives the purge. The grant exists because a Character with no container cannot carry
+loot and one with no weapon measurably loses to a Rat
+(`packages/domain/src/contexts/items/grant.ts`). Product Owner. Confirming or correcting this
+reading changes only this case; C1–C8 stand.
+
+**3. A non-identifying record of what a purge destroyed.** The purge destroys the Pouch balance and
 every item the Character owned, and deletes the Pouch's ledger history with them. The rule forbids
 keeping the Character; it does not forbid an account-level fact. Should the purge leave one — for
 example the amount of each currency destroyed, with no Character id or name — for support and for
@@ -124,7 +115,7 @@ economy sink reporting? Separately, `ADR-020` §6.3 recommends recording which A
 lost their POUCH leg to a purge, so that a genuinely missing ledger leg is still detectable.
 Product Owner and architecture.
 
-**5. Purge lateness, backups, logs and restores — operations (PRE-LAUNCH gate).**
+**4. Purge lateness, backups, logs and restores — operations (PRE-LAUNCH gate).**
 
 - The **purge lateness target**: how long after `purgeAt` a due purge may take before it counts as
   a breach. The contract is fixed — at `purgeAt` the Character is due for immediate final purge,
@@ -145,7 +136,15 @@ Product Owner and architecture.
 - what happens to a deleted Character's **Gold Pouch** — decided by the Product Owner (gate item
   G4.1a, `RESOLVED`): intact during the grace, **destroyed** at the purge, never moved to the Bank
   or to a recovery custody;
-- whether deletion is reversible — for exactly 30 days, then never.
+- whether deletion is reversible — for exactly 30 days, then never;
+- what a pending Character still holds — decided by the Product Owner (gate item G4.1b,
+  `RESOLVED`): its roster place, its vocation and, if it is the Origin Character, the Origin slot,
+  all released only by the successful final purge. No replacement may consume them, so a restore
+  never fails;
+- tutorial completion and one-time grants after a purge — decided by the Product Owner (gate item
+  G4.1c, `RESOLVED`): completion belongs to the Account and survives the purge; once Rookgaard is
+  complete, a later Character starts at Base Level 8 and skips Rookgaard; no one-time grant is
+  awarded again. Only the pre-completion case above awaits confirmation of its reading.
 
 **Unchanged by this decision:** Character names are unique **per account**, as Phase 1
 implemented. `ADR-020` changes *when* a name is released, not *where* it must be unique; making
@@ -240,9 +239,8 @@ Owned by Phase 5B unless a gate is named. Direction:
 
 Stated in full in [`PHASE_GATES.md`](PHASE_GATES.md). Open where the answer is not yet written:
 
-- what a Character **pending deletion** still holds — its vocation, the Origin slot, its roster
-  place — and the tutorial and starting-grant rule after a purge (**PRE-4 gate**, G4.1b and
-  G4.1c). Both are detailed under *Character deletion*, above;
+- how G4.1c applies to an Origin Character purged **before** the account completes Rookgaard — a
+  reading awaiting confirmation (**PRE-4 gate**), detailed under *Character deletion*, above;
 - the shape of the Actor/Participant combat contract, and which compatibility adapters keep the
   verified Hunt fixtures intact (**PRE-4 gate**);
 - `ItemDefinition` version semantics for live `ItemInstance` rows (**PRE-MARKET gate**).
@@ -252,8 +250,9 @@ Stated in full in [`PHASE_GATES.md`](PHASE_GATES.md). Open where the answer is n
 `packages/domain/prisma/schema.prisma` and `contexts/hunt/progression.ts`. The PRE-4 gate enforces
 that contract across every write path; it does not revisit it.
 
-**No longer open:** the fate of a deleted Character's Gold Pouch (G4.1a). The Product Owner decided
-it with the deletion lifecycle — see *Character deletion*, above.
+**No longer open:** the fate of a deleted Character's Gold Pouch (G4.1a), what a pending
+Character still holds (G4.1b), and tutorial completion and one-time grants after a purge (G4.1c).
+The Product Owner decided all three — see *Character deletion*, above.
 
 ## IP / launch
 

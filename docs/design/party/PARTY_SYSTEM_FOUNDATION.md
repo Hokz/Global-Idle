@@ -93,11 +93,10 @@ Duplicate vocations are prohibited.
 > **Character deletion — `ADR-020`, `LOCKED` 2026-09-24.** This replaces the earlier Phase 0A
 > refinement (`ADR-007`, now `SUPERSEDED`), under which a *retired* Character stayed in persistence
 > and freed its vocation at once. There is no retired Character any more. A deleted Character is
-> `PENDING_DELETION` for 30 days and restorable, then **permanently purged**, and after the purge
-> at the latest its vocation is free for a new Character. Whether a Character that is pending
-> deletion still holds its vocation during those 30 days is `OPEN` for the Product Owner; the
-> architecture recommends that it does, because otherwise a replacement could make the promised
-> restore impossible.
+> `PENDING_DELETION` for 30 days and restorable, then **permanently purged**. During those 30 days
+> it still holds its vocation, its roster place and, as the Origin Character, the Origin slot, so
+> no replacement can make the promised restore impossible; only the purge frees them (G4.1b,
+> `LOCKED` by the Product Owner).
 > See `docs/DECISIONS.md` § *Character deletion*.
 
 Examples:
@@ -145,9 +144,9 @@ Monk
 ```
 
 A vocation already held by a Character on the account cannot be purchased or unlocked again, even
-if roster slots are free. The **final purge** of that Character releases the vocation, and it
-becomes selectable once more (`ADR-020`). During the Character's 30-day deletion grace this is
-`OPEN`, as above.
+if roster slots are free. A Character pending deletion still holds it throughout its 30-day
+grace; only the **final purge** of that Character releases the vocation, and it becomes selectable
+once more (`ADR-020` §5, G4.1b).
 
 This uniqueness rule spans the whole **roster**, not merely the Active Party.
 
@@ -977,7 +976,7 @@ The following are LOCKED unless the Product Owner explicitly changes them.
 - maximum roster = 5 characters;
 - the roster supports the five vocations: Knight, Druid, Sorcerer, Paladin, Monk;
 - maximum one character per vocation per account;
-- duplicate vocation characters are prohibited. A deleted Character is restorable for 30 days and then permanently purged; its vocation is free after the purge at the latest, and whether it still holds the vocation during the 30 days is `OPEN` (`ADR-020`, which supersedes `ADR-007`'s retirement);
+- duplicate vocation characters are prohibited. A deleted Character is restorable for 30 days and then permanently purged; it holds its vocation and its roster place until the purge, and only the purge frees them (`ADR-020` §5, G4.1b — which supersedes `ADR-007`'s retirement);
 - additional character slots/unlocks use in-game Gold;
 - exact unlock costs remain OPEN.
 

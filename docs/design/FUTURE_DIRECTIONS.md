@@ -79,12 +79,15 @@ forgotten OPEN notes.
   frozen and restorable; then a hard purge removes it and everything it owns — items, the Gold
   Pouch and its ledger history, progression — with nothing moved to the Bank or to a recovery
   custody, and no record of the Character left behind. The work is the purge's closure inventory
-  and its atomic, idempotent, race-safe execution, the replacement of `retiredAt`, and a rule that
-  stops *delete → purge → recreate* from farming the tutorial starting grant. Phase 3's `RET1` and
-  `RET2` were a retirement filter, not a flow, and are superseded rather than extended. The Gold
-  Pouch question (G4.1a) is **resolved**; what a pending Character still holds (G4.1b) and the
-  tutorial rule (G4.1c) are open Product Owner decisions — see
-  [`../PHASE_GATES.md`](../PHASE_GATES.md) § *G4.1*.
+  and its atomic, idempotent, race-safe execution, the replacement of `retiredAt`, and the
+  Account-level tutorial completion that stops *delete → purge → recreate* from farming the
+  tutorial starting grant or any other one-time grant. Phase 3's `RET1` and `RET2` were a
+  retirement filter, not a flow, and are superseded rather than extended. All three product
+  questions are **resolved** by the Product Owner: the Gold Pouch is destroyed at the purge
+  (G4.1a); a pending Character keeps its vocation, the Origin slot and its roster place until the
+  purge (G4.1b); tutorial completion belongs to the Account and survives the purge, and no
+  one-time grant is awarded twice (G4.1c) — see [`../PHASE_GATES.md`](../PHASE_GATES.md)
+  § *G4.1*.
 - **Enforce the `baseXp` → `baseLevel` projection.** Not a question of which is authoritative:
   `baseXp` is the durable truth and `baseLevel` its stored projection, already decided and
   implemented (`schema.prisma`, `contexts/hunt/progression.ts`). What is missing is enforcement on

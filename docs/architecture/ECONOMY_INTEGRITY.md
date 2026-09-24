@@ -165,10 +165,10 @@ audit trail decorative.
 | Market self-dealing / wash trading | buyer ≠ seller enforced; fees make round-trips lossy; price history retained for analysis |
 | Listing spam | listing fees, rate limits |
 | Enumeration of accounts or items | ownership-scoped queries and rate limiting are the control; non-sequential UUIDv7 ids raise the cost but are **not** the security boundary (`DATA_ARCHITECTURE.md` §2) |
-| Race on roster vocation uniqueness | persistence-level constraint over existing Characters; whether a `PENDING_DELETION` Character counts is `OPEN` (`ADR-020` §5) |
+| Race on roster vocation uniqueness | persistence-level constraint over every existing Character, `PENDING_DELETION` included (`ADR-020` §5, G4.1b) |
 | Deletion used to bank carried value | impossible by rule: nothing Character-owned moves to the Bank or to any recovery custody at purge — it is destroyed (`ADR-020`, L7–L8) |
 | Restore/purge race at the deadline | both lock the Character and decide against the authoritative clock after the lock; exactly one wins (`ADR-020` §7) |
-| Starting-grant farming through delete → purge → recreate | `OPEN` — the tutorial-replay and starting-grant rule after a purge is a Product Owner decision (PRE-4 gate, `PHASE_GATES.md` § *G4.1c*) |
+| Starting-grant farming through delete → purge → recreate | forbidden by rule (G4.1c, `LOCKED`): tutorial completion belongs to the Account and survives the purge, and no one-time grant is awarded twice. **Not implemented** — today every creation applies the Rookgaard tutorial grant; the PRE-4 gate replaces that before any purge exists (`ADR-020` §5.1, `PHASE_GATES.md` § *G4.1*) |
 
 `DEFERRED PARAMETER` — fee percentages, listing limits, rate-limit thresholds. They are tuning
 values; the mechanisms are architectural.

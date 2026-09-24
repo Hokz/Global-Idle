@@ -99,9 +99,10 @@ One player account controls every character. There is no multi-human party.
 - maximum **one Character per vocation** per account;
 - **deleting a Character** (`LOCKED`, `ADR-020`): it stays intact and restorable for **30 days**,
   then is **permanently purged** with everything it owns — items, Gold Pouch, progression.
-  Nothing moves to the Bank. Its name stays reserved until the purge. Its vocation and its roster
-  place are free after the purge at the latest; whether they are already free during the 30 days
-  is `OPEN` — `docs/DECISIONS.md` § *Character deletion*;
+  Nothing moves to the Bank. Until the purge it keeps its name, its vocation, its roster place
+  and, as the Origin Character, the Origin slot, so no replacement can take them and a restore
+  always succeeds. Deleting the Origin Character never resets the account's tutorial completion
+  and never earns a one-time grant twice — `docs/DECISIONS.md` § *Character deletion*;
 - an owned vocation is removed from future unlock choices;
 - additional roster slots are unlocked with in-game Gold (costs OPEN);
 - later unlocked characters start at Base Level 8, skip Rookgaard, get no catch-up levels.
