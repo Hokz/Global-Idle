@@ -32,7 +32,7 @@
 | [004](decisions/ADR-004-item-single-custody.md) | An ItemInstance has exactly one custody scope | `ACCEPTED` |
 | [005](decisions/ADR-005-active-party-as-configuration.md) | Active Party is ordered configuration, not an entity | `ACCEPTED` |
 | [006](decisions/ADR-006-participant-profile-refresh.md) | Composition frozen for a run; power refreshes at checkpoints | `ACCEPTED` |
-| [007](decisions/ADR-007-character-retirement.md) | Character deletion is retirement, not erasure | `ACCEPTED` |
+| [007](decisions/ADR-007-character-retirement.md) | Character deletion is retirement, not erasure | `SUPERSEDED` by 020 |
 | [008](decisions/ADR-008-newest-connection-wins.md) | The newest authenticated connection evicts the previous | `ACCEPTED` |
 | [009](decisions/ADR-009-postgres-sole-durable-truth.md) | PostgreSQL is the sole durable truth | `ACCEPTED` |
 | [010](decisions/ADR-010-pure-engine-injected-clock-and-rng.md) | Pure engine, injected clock and RNG | `ACCEPTED` |
@@ -44,6 +44,8 @@
 | [016](decisions/ADR-016-content-bundle-retention.md) | Content bundles retained while referenced, never GC'd | `ACCEPTED` |
 | [017](decisions/ADR-017-idempotency-key-contract.md) | Idempotency keys are account-scoped and fingerprinted | `ACCEPTED` |
 | [018](decisions/ADR-018-domain-package-source-layout.md) | Bounded contexts live in `packages/domain` — amends `ADR-012`'s source layout | `ACCEPTED` |
+| [019](decisions/ADR-019-currency-custody-scopes.md) | Currency lives in custody scopes (`BANK`, `POUCH`), and the ledger says which — amends `ADR-003` | `ACCEPTED`; one row amended by 020 |
+| [020](decisions/ADR-020-character-deletion-grace-and-purge.md) | Character deletion is a 30-day reversible grace, then a hard purge — supersedes `ADR-007` | `ACCEPTED` — product rule `LOCKED`; architecture pending independent review; **not implemented** (PRE-4 gate) |
 
 ---
 

@@ -25,47 +25,136 @@ specification.
 
 ## PRE-PHASE-4 GATE — before Party and vocations
 
-### G4.1 — Character retirement integrity
+### G4.1 — Character deletion lifecycle (`ADR-020`)
 
-Retirement is `ACCEPTED` in `ADR-007` and partially enforced: Phase 3's correction pass found one
-player-facing loader that did not filter retired Characters, and normalised it (`RET1`). The
-**product flow** was deliberately not built.
+The rule is `LOCKED` by the Product Owner (2026-09-24) and recorded in
+[`architecture/decisions/ADR-020-character-deletion-grace-and-purge.md`](architecture/decisions/ADR-020-character-deletion-grace-and-purge.md),
+which **supersedes** `ADR-007`'s retirement. A deletion request starts a 30-day reversible grace;
+when it expires, a hard purge removes the Character and everything it owned, and nothing moves to
+the Bank or to a recovery custody.
 
-Before Phase 4 multiplies the number of Characters in play:
+**Nothing of it is implemented.** The code still carries retirement: `retiredAt`, unique indexes
+partial over non-retired rows, name and capacity checks over `retiredAt IS NULL`,
+`retireCharacter` (reachable from no route), `ON DELETE RESTRICT` from every Character-owned
+table, and a ledger the application role cannot delete from. Phase 3's `RET1`–`RET2` filter is
+retirement-specific; it is replaced here, not extended.
 
-- every read path that can surface a Character filters retirement consistently, and a test proves
-  it for each one rather than for a sample;
-- a retired Character does not count against roster size, does not reserve its vocation, and
-  cannot enter an Active Party — each stated as an invariant test;
-- **items** held at retirement reach the account-level recovery custody scope, with no path that
-  destroys or duplicates them. That is `ADR-007`'s rule verbatim, and it is about items:
-  *"hands its items to an account-level recovery custody scope rather than destroying them."*
+Before Phase 4 multiplies the number of Characters in play, all of the following hold, each
+proven by a test:
 
-#### G4.1a — the retired Character's Gold Pouch is an OPEN product decision
+**The lifecycle**
 
-`ADR-007` settles items. It says nothing about currency, and `ADR-019` makes the Pouch a
-**Character**-scoped, ledger-derived custody — so a retired Character's Pouch has no stated fate
-and none may be assumed. Extending the item rule to currency would be a new economy rule invented
-in passing.
+- the 30-day reversible lifecycle — `ACTIVE` → `PENDING_DELETION` → restored or purged — with the
+  deadline fixed when the request is accepted, on the server's clock. No command shortens the
+  grace, and a repeated request neither extends nor restarts it;
+- a request enters the grace only from a quiescent Character — refused while it holds an occupancy
+  claim or is in a non-terminal Activity, and, as each system arrives, while it is in the Active
+  Party, a lobby or any live escrow or obligation (`ADR-020` §3);
+- a `PENDING_DELETION` Character cannot take part in gameplay: every command that would start an
+  Activity with it, or move, equip, use, sell or buy its items, touch its Pouch, unlock its slots
+  or change its policies, is refused — tested **per command**, not by sample.
 
-Before Phase 4, decide and record it deliberately. The candidates, none of them chosen here:
+**Restoration**
 
-- **transfer to `BANK`** with paired ledger entries, so the value moves visibly and the account
-  keeps it;
-- **retain an audited, restricted `POUCH`** that survives retirement and can be inspected;
-- another authorised custody shape.
+- restoration **before** the deadline returns every Character-owned row exactly as it was —
+  progression, Stamina, items and container trees, slots, loot policy, POUCH entries and balance
+  — shown by comparing the whole closure before the request and after the restore;
+- restoration **at or after** the deadline is refused, whether or not the purge has run, and
+  restoration after the purge finds nothing to restore;
+- **race tests at the deadline**: restore and purge run concurrently around `purgeAt`, exactly one
+  wins, and the result is either the whole Character restored or the whole Character purged.
 
-Whatever is chosen must **preserve historical ledger entries**, and must never silently destroy,
-duplicate or auto-move currency without a documented rule. `ADR-019` already forbids a balance
-that is not ledger-derived, so the decision has to be expressed as entries, not as a column edit.
-It must be validated under transaction retry and rollback.
+**The name**
 
-**This docs PR does not make that choice.** It is listed in
-[`OPEN_QUESTIONS.md`](OPEN_QUESTIONS.md) as a PRE-4 product/architecture decision for the Product
-Owner.
+- the name stays reserved throughout `PENDING_DELETION`, including after the deadline until the
+  purge completes;
+- name reuse is tested **only after** a successful purge: a same-name creation is refused before
+  it and accepted after it.
 
-**Owner:** Phase 4 builder, before Party formation work.
-**Acceptance:** invariant tests, not a manual audit.
+**The purge**
+
+- a **purge dependency graph** — a referential-closure inventory of **every** foreign key and
+  **every** table that references `Character`, derived from the schema by a test that fails on any
+  reference without a declared action (`ADR-020` §6). String-keyed records that embed a Character
+  or its Activities' ids — settlement operation ids, idempotency records — are in the same
+  inventory;
+- an explicit policy for each current `ON DELETE RESTRICT` relation: kept as the guard against
+  every path but the purge, which deletes in dependency order, or redesigned. `CASCADE` only
+  where everything it can reach is Character-owned;
+- **idempotent**: a retry after a crash completes the purge or does nothing. It never destroys
+  twice, and never touches another Character or Account;
+- **crash-safe**: interrupted at any point, it leaves either the whole Character or none of it —
+  never a half-purged Character;
+- **no duplication**: nothing Character-owned reaches the Bank, the Depot, the Stash or another
+  Character;
+- **no collateral deletion**: the Bank balance and every BANK entry, the Depot, the Stash,
+  entitlements, roster capacity and every other Character are identical before and after;
+- **post-purge proof**: a scan of product persistence — PostgreSQL and Redis — finds the
+  Character's id and name in no row, JSON and text columns included;
+- the purge runs under its own capability. The application role keeps no `UPDATE` or `DELETE` on
+  the ledger.
+
+**Migration**
+
+- `retiredAt`, and every partial-uniqueness assumption derived from it — I1, I1b, the name and
+  capacity checks, the `retiredAt: null` access filters — removed or redesigned;
+- a migration strategy from the implemented retirement schema: forward-only and additive first,
+  with any row that has `retiredAt` set counted, reported and converted as `ADR-020` §9 describes;
+- the VERIFIED tests that encode retirement — Phase 0B `D5` and `D6`, Phase 1 `D22`'s retirement
+  step and `D24`'s filter, Phase 3 `RET1`–`RET2`, and the `retiredAt` assertion in
+  `tests/integration/characters.test.ts` — superseded through explicit matrix amendments, never
+  deleted quietly.
+
+**Owner:** Phase 4 builder, before Party formation work — and only once G4.1b is answered.
+**Acceptance:** invariant, race and closure tests, not a manual audit.
+
+#### G4.1a — the Gold Pouch at deletion — **RESOLVED** by the Product Owner, 2026-09-24
+
+**No longer open.** The Product Owner decided it as part of the lifecycle:
+
+- during the 30-day grace, the Pouch — its POUCH entries and its balance — stays with the
+  Character, intact, so a restore returns it exactly;
+- at the final purge, the Character-scoped POUCH value and state are **destroyed** with the
+  Character;
+- it is **not** transferred to the Bank, and **not** placed in any recovery custody.
+
+The candidates this gate used to list — a transfer to `BANK` with paired entries, an audited
+restricted `POUCH`, another custody shape — are all rejected by that decision. What survives of
+the old requirement is its integrity half: the destruction happens inside the atomic purge, never
+duplicates value into the Bank, and is proven under retry and rollback. Every BANK entry is
+untouched; `ADR-020` §6.3 covers the operations that had both a BANK and a POUCH leg.
+
+#### G4.1b — what a pending Character still holds — **OPEN**, Product Owner
+
+The name is `LOCKED`: reserved until the purge. Still undecided — during the 30 days, does a
+`PENDING_DELETION` Character:
+
+- count against `rosterCapacity`;
+- keep its vocation reserved;
+- keep the Origin slot (I1b), if it is the Origin Character;
+
+and therefore, may the player create a replacement before the purge?
+
+Exact restoration constrains the answer. Releasing any of the three early lets a replacement make
+the promised restore violate I1, I1b or I2, so the restore would have to be refused — which the
+locked rule forbids. **Recommended minimal safe invariant:** all three stay held until the purge.
+The consequence to weigh: an account at capacity 1 that deletes its only Character cannot create
+another for 30 days, although it can restore it. Detail: `ADR-020` §5 and
+[`OPEN_QUESTIONS.md`](OPEN_QUESTIONS.md) § *Character deletion*.
+
+No implementation may release any of these early, and G4.1's implementation does not start, until
+this is answered.
+
+#### G4.1c — tutorial replay and the starting grant after a purge — **OPEN**, Product Owner
+
+Purging an Origin Character frees the Origin slot, so the account can create a new Level-1 Origin
+Character. Tutorial completion stays Account-level and is never inferred from counting Characters
+(`TUTORIAL_ROOKGAARD_ROADMAP.md` §2), but whether the tutorial is then replayed, offered with a
+SKIP, or refused — and whether the starting grant is given again — is undecided. Without a rule,
+*delete → purge → recreate* farms the starting grant into the Depot. Carried forward from the
+Phase 1 specification's open item and from `design/FUTURE_DIRECTIONS.md`.
+
+**Owner:** Product Owner decision; the Phase 4 builder implements it.
 
 ### G4.2 — enforce the `baseXp` → `baseLevel` projection everywhere
 
@@ -85,7 +174,8 @@ to choose again:
 
 - every write path that touches `baseXp` also writes `baseLevel = levelForXp(baseXp)` — reward
   settlement, death loss, any future XP source, and any migration or backfill;
-- retirement and the account-level recovery path preserve the pair where they touch it at all;
+- the deletion lifecycle (G4.1) writes neither number: a restore returns both exactly as stored,
+  and the purge removes both with the Character;
 - a settlement that rolls back rolls back **both**, so no partial write can leave them disagreeing;
 - the projection holds across the curve including its boundaries, in both directions.
 
@@ -130,7 +220,10 @@ the invariants are the gate.
 
 - per-Character occupancy still holds when the Activity spans accounts;
 - one shared run identity, and membership that cannot silently fork;
-- liveness rules stated per participant.
+- liveness rules stated per participant;
+- Character deletion across accounts (`ADR-020` §6.2): a Character in a lobby or a frozen plan
+  cannot be put up for deletion, and when a participant is later purged, the other accounts keep
+  their own results while no shared record names the purged Character.
 
 ### G5B.2 — Cross-account disconnect, decided separately
 
@@ -173,6 +266,13 @@ traded or forged item outlives one Activity.
 Impossible rarity/affix identities must be rejected at the boundary. Today an affix array is JSON
 the domain writes and trusts; a market lets someone else's row reach your inventory.
 
+### G6.4 — Deletion meets escrow
+
+Every Market, Forge and Imbuement table that references a Character declares its purge action
+before it ships (`ADR-020` §6.2): a live listing, escrow, trade or forge input **refuses** a
+deletion request, and completed trades keep the counterparty's facts — price, item definition,
+time, its own side — without naming the purged Character.
+
 **Owner:** Phase 6, before any market, forge or imbuement surface exists.
 
 ---
@@ -192,6 +292,13 @@ compaction, anti-abuse at real traffic, and support tooling.
 Carried from [`design/FUTURE_DIRECTIONS.md`](design/FUTURE_DIRECTIONS.md) § *Before beta /
 scale*: `IdempotencyRecord` retention, `SettlementOperation` retention with a compaction proof,
 content bundle archival, an object-storage provider, production rate limiting and auth hardening.
+
+Character deletion (`ADR-020`) adds two `OPEN` operational questions here, tracked in
+[`OPEN_QUESTIONS.md`](OPEN_QUESTIONS.md) § *Character deletion*: how long **backups and logs** may
+keep a purged Character, and what the purge job does after a **restore from backup** — which brings
+back Characters purged after the backup point and loses deletion requests and restores made after
+it. The purge's own obligations — idempotency and settlement records that name the Character
+included — are **not** deferred to this gate: they belong to G4.1.
 
 ---
 

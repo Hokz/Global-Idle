@@ -84,17 +84,21 @@ If all five vocation characters are unlocked, at least one character must remain
 
 ---
 
-# 3. One Playable Character Per Vocation — LOCKED
+# 3. One Character Per Vocation — LOCKED
 
-An account may own **at most one playable (non-retired) roster Character of each vocation**.
+An account may own **at most one roster Character of each vocation**.
 
-Duplicate **playable** vocations are prohibited.
+Duplicate vocations are prohibited.
 
-> **Refined by Phase 0A architecture (`ADR-007`).** Uniqueness applies to *playable*
-> (non-retired) roster Characters. A retired Character is historical and audit state: it is not a
-> roster member, does not count against roster size, and does not reserve its vocation. Retiring
-> a Knight frees Knight for a new one, and the retired Knight remains in persistence.
-> See `docs/DECISIONS.md`.
+> **Character deletion — `ADR-020`, `LOCKED` 2026-09-24.** This replaces the earlier Phase 0A
+> refinement (`ADR-007`, now `SUPERSEDED`), under which a *retired* Character stayed in persistence
+> and freed its vocation at once. There is no retired Character any more. A deleted Character is
+> `PENDING_DELETION` for 30 days and restorable, then **permanently purged**, and after the purge
+> at the latest its vocation is free for a new Character. Whether a Character that is pending
+> deletion still holds its vocation during those 30 days is `OPEN` for the Product Owner; the
+> architecture recommends that it does, because otherwise a replacement could make the promised
+> restore impossible.
+> See `docs/DECISIONS.md` § *Character deletion*.
 
 Examples:
 
@@ -140,11 +144,12 @@ Paladin
 Monk
 ```
 
-A vocation already held by a **playable** Character cannot be purchased or unlocked again, even
-if roster slots are free. Retiring that Character releases the vocation, and it becomes
-selectable once more (`ADR-007`).
+A vocation already held by a Character on the account cannot be purchased or unlocked again, even
+if roster slots are free. The **final purge** of that Character releases the vocation, and it
+becomes selectable once more (`ADR-020`). During the Character's 30-day deletion grace this is
+`OPEN`, as above.
 
-This uniqueness rule spans the whole **playable roster**, not merely the Active Party.
+This uniqueness rule spans the whole **roster**, not merely the Active Party.
 
 ---
 
@@ -971,8 +976,8 @@ The following are LOCKED unless the Product Owner explicitly changes them.
 - one player controls the entire Party;
 - maximum roster = 5 characters;
 - the roster supports the five vocations: Knight, Druid, Sorcerer, Paladin, Monk;
-- maximum one **playable (non-retired)** character per vocation per account (`ADR-007`);
-- duplicate **playable** vocation characters are prohibited; a retired Character is history and does not reserve its vocation (`ADR-007`);
+- maximum one character per vocation per account;
+- duplicate vocation characters are prohibited. A deleted Character is restorable for 30 days and then permanently purged; its vocation is free after the purge at the latest, and whether it still holds the vocation during the 30 days is `OPEN` (`ADR-020`, which supersedes `ADR-007`'s retirement);
 - additional character slots/unlocks use in-game Gold;
 - exact unlock costs remain OPEN.
 

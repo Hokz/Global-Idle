@@ -96,9 +96,12 @@ One player account controls every character. There is no multi-human party.
 
 - all vocation characters the account has unlocked;
 - maximum **5**;
-- maximum **one playable (non-retired) Character per vocation** per account. Retiring a
-  Character frees its vocation for a new one; the retired Character remains as history and does
-  not count against the roster;
+- maximum **one Character per vocation** per account;
+- **deleting a Character** (`LOCKED`, `ADR-020`): it stays intact and restorable for **30 days**,
+  then is **permanently purged** with everything it owns — items, Gold Pouch, progression.
+  Nothing moves to the Bank. Its name stays reserved until the purge. Its vocation and its roster
+  place are free after the purge at the latest; whether they are already free during the 30 days
+  is `OPEN` — `docs/DECISIONS.md` § *Character deletion*;
 - an owned vocation is removed from future unlock choices;
 - additional roster slots are unlocked with in-game Gold (costs OPEN);
 - later unlocked characters start at Base Level 8, skip Rookgaard, get no catch-up levels.

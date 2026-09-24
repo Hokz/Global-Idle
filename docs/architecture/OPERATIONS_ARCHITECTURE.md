@@ -226,6 +226,14 @@ absence of one, because it produces false confidence.
 `DEFERRED` — RPO/RTO targets and backup cadence. They are commercial and operational choices,
 not architectural ones.
 
+`OPEN` — **restores and Character deletion** (`ADR-020`). A restore brings back Characters purged
+after the target point and loses deletion requests and restores made after it; a pending Character
+whose deadline has passed would then be purged again at once, even one its owner restored inside
+the lost window. Recommended until decided: the purge job stays paused after a restore until the
+lifecycle transitions lost in the window are reconciled, as a step alongside 2 and 3 above. How
+long backups and logs may keep a purged Character is open as well.
+See [`../OPEN_QUESTIONS.md`](../OPEN_QUESTIONS.md) § *Character deletion*.
+
 ---
 
 ## 10. Operations checklist

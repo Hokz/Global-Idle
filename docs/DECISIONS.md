@@ -191,12 +191,13 @@ Two distinct build systems:
 - five simultaneous active characters **of one account** do not exist. (A future Expedition Group
   may place five Characters in one Activity — one per account, five accounts — which is not this
   rule and does not relax it);
-- at most **one playable (non-retired) roster Character per vocation** per account;
-- while a playable Knight exists, Knight is unavailable as a new vocation choice. If that Knight
-  is **retired**, Knight becomes available again;
-- a **retired** Character is historical and audit state, not a roster member: it does not count
-  against roster size, does not reserve its vocation, and therefore does not violate playable
-  vocation uniqueness. A retired Knight and a new playable Knight may coexist in persistence;
+- at most **one roster Character per vocation** per account;
+- while a Knight exists on the account, Knight is unavailable as a new vocation choice. Once that
+  Knight is **permanently purged** (*Character deletion*, below), Knight becomes available again.
+  Whether a Knight that is **pending deletion** still holds Knight during its 30-day grace is
+  `OPEN` — see *Character deletion*;
+- there is no retired or historical Character. A Character either exists — `ACTIVE`, or
+  `PENDING_DELETION` during its grace — or has been purged and does not exist at all;
 - additional roster slots are unlocked with in-game Gold; exact costs remain OPEN;
 - later unlocked characters start at Base Level 8, skip Rookgaard, and receive no catch-up
   levels;
@@ -225,6 +226,53 @@ level-eligible when   lowestLevel >= minimumShareLevel
   distribution table, but the exact adopted values must be verified and documented before
   implementation, never invented;
 - how XP is allocated when a multi-character formation is *not* Shared-XP eligible is OPEN.
+
+## Character deletion
+
+`LOCKED` by the Product Owner, 2026-09-24. **Supersedes retirement** (`ADR-007`, now
+`SUPERSEDED`). Architecture:
+[`architecture/decisions/ADR-020-character-deletion-grace-and-purge.md`](architecture/decisions/ADR-020-character-deletion-grace-and-purge.md).
+Owning gate: PRE-PHASE-4, [`PHASE_GATES.md`](PHASE_GATES.md) § *G4.1*. **Not implemented** — the
+code still carries the retirement model until that gate's implementation replaces it.
+
+```text
+ACTIVE
+  -> PENDING_DELETION for 30 days
+       -> restored, if the player reverses the decision inside the 30 days
+       -> PERMANENTLY PURGED, once the 30 days expire
+```
+
+- a player-requested deletion is **not** immediately destructive;
+- for exactly 30 days after the request, the Character and everything needed to restore it
+  remain intact, and the player may reverse the deletion and recover the Character;
+- the Character's **name stays reserved** throughout the 30 days;
+- when the 30 days expire, deletion is **final and irreversible**;
+- the final purge removes the Character row and **all** Character-owned state, value and data:
+  progression, skills, Stamina, equipment, inventory, Hunt containers and their contents, the Loot
+  Pouch, the **Gold Pouch** balance and its Character-scoped ledger history, Character policies
+  and configuration, Character-specific activity and run history, and every other row whose sole
+  owner or subject is that Character;
+- nothing Character-owned moves to a recovery custody or to the Account Bank. Character-owned
+  value that still exists at purge time is **destroyed** with the Character;
+- after the purge, the name is available for creation again;
+- no Character record survives to keep the deleted Character as history or audit state, and no
+  surviving account-wide or shared record keeps its identity, name or id for convenience. Where
+  account integrity needs a transaction or aggregate to survive, the account-level fact survives
+  **without** the Character's identity;
+- **Account-owned state is never deleted because a Character is**: the Account, its Bank, its
+  entitlements, its roster capacity and other account-wide state remain. (Roster capacity is
+  also never refunded — a Phase 0A decision, `DOMAIN_MODEL.md` §5.4.);
+- ordinary append-only and audit guarantees stay in force during play. The purge is a deliberate,
+  explicitly designed destructive boundary.
+
+Nothing further is inferred from how any other game handles deletion.
+
+**`OPEN` — what a pending Character still holds.** The name is locked above. Whether a
+`PENDING_DELETION` Character keeps its **vocation**, the **Origin slot** and its **roster place**
+during the grace — and therefore whether a replacement can be created before the purge — is a
+Product Owner decision. Releasing any of them early can make the promised restore impossible,
+which is why the architecture recommends keeping all three until the purge. See
+[`OPEN_QUESTIONS.md`](OPEN_QUESTIONS.md) § *Character deletion*.
 
 ## Character activity occupancy
 

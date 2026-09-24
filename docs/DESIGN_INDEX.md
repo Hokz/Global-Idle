@@ -142,7 +142,7 @@ everything under `docs/design/`:
 | `docs/GAME_SYSTEMS.md` | System-by-system overview |
 | `docs/DECISIONS.md` | Locked decisions that must not be silently reversed |
 | `docs/OPEN_QUESTIONS.md` | Project-level unresolved design questions |
-| `docs/architecture/ARCHITECTURE_OVERVIEW.md` | **Technical architecture — entry point.** The Phase 0A package (`ARCHITECTURE_APPROVED`): domain model, boundaries, persistence, lifecycle, engine, content, economy integrity, operations, and all 18 `ACCEPTED` ADRs (`ADR-001`–`ADR-017` from Phase 0A, `ADR-018` from the Phase 0B specification) |
+| `docs/architecture/ARCHITECTURE_OVERVIEW.md` | **Technical architecture — entry point.** The Phase 0A package (`ARCHITECTURE_APPROVED`): domain model, boundaries, persistence, lifecycle, engine, content, economy integrity, operations, and the full ADR index — `ADR-001`–`ADR-017` from Phase 0A, `ADR-018` from the Phase 0B specification, `ADR-019` and `ADR-020` later. `ADR-007` is `SUPERSEDED` by `ADR-020` |
 | `docs/specs/phase-0b/PHASE_0B_TECHNICAL_FOUNDATION_SPEC.md` | **Phase 0B implementation specification** — tooling, workspace boundaries, primitive contracts, test matrix and Definition of Done (**`VERIFIED`**) |
 | `docs/specs/phase-0b/PHASE_0B_FOUNDATION_REVIEW.md` | **Phase 0B evidence** — the 92-case matrix, an ADR-by-ADR trace, §16 line by line, and every autonomous implementation decision (**`VERIFIED`**, accepted 2026-09-21) |
 | `docs/specs/phase-1/PHASE_1_WORLD_CHARACTER_VERTICAL_SLICE_SPEC.md` | **Phase 1 implementation specification** — the first visible vertical slice: account/session, character, World Atlas shell, Rookgaard, one Hunt entry (**`IMPLEMENTATION_SPEC_READY`**) |
@@ -150,7 +150,8 @@ everything under `docs/design/`:
 | `docs/MVP_SCOPE.md` | First playable vertical slice |
 | `docs/ECONOMY.md` | Economy principles, sinks and transaction rules |
 | `docs/REFERENCES.md` | Research source hierarchy — and the **1x Tibia/Canary baseline lock**: the source's numbers are the numbers unless a divergence is recorded with its reason and its fixture |
-| `docs/architecture/decisions/ADR-019-currency-custody-scopes.md` | **Currency custody** — value lives in scopes (`BANK`, `POUCH`) and the one append-only ledger says which; extends ADR-003 and contradicts none of it |
+| `docs/architecture/decisions/ADR-019-currency-custody-scopes.md` | **Currency custody** — value lives in scopes (`BANK`, `POUCH`) and the one append-only ledger says which; extends ADR-003 and contradicts none of it. One guarantee row amended by ADR-020 |
+| `docs/architecture/decisions/ADR-020-character-deletion-grace-and-purge.md` | **Character deletion** — a 30-day reversible grace, then a hard purge of the Character and everything it owns; nothing moves to the Bank or to a recovery custody. `LOCKED` product rule, **supersedes ADR-007's retirement**; the purge policy for every reference to a Character; the open grace-period questions. **Not implemented** — PRE-PHASE-4 gate, `PHASE_GATES.md` § *G4.1* |
 | `docs/specs/phase-2/PHASE_2_HUNT_SIMULATOR_SPEC.md` | **Phase 2 implementation specification** — the Hunt simulator, rooms, Stamina, XP, Gold custody, supplies, death and the first Game Window (**`VERIFIED`**, accepted 2026-09-22 at `03058b5`) |
 | `docs/specs/phase-2/PHASE_2_CANARY_SOURCE_MAP.md` | **Phase 2 evidence** — every formula and datum imported or adapted from `Hokz/canary`, with the machine-checked import record beside it (**`VERIFIED`**) |
 | `docs/specs/phase-3/PHASE_3_ITEMIZATION_INVENTORY_LOGISTICS_SPEC.md` | **Phase 3 implementation specification** — real items, equipment, the five Hunt container slots, stacking, Capacity, the Loot Pouch, Loot Policy, Depot, Stash, movement, routing, the counter and the System UI |

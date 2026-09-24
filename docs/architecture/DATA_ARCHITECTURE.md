@@ -71,7 +71,9 @@ These are each exactly one transaction, all-or-nothing:
 | **Market listing** | item custody → escrow, listing row, fee, ledger |
 | **Forge attempt** | cost debit, ledger, two sacrifices → consumed, target tier on success |
 | **Roster slot unlock** | Gold debit, ledger, capacity increment |
-| **Character retirement** | character status, item custody → recovery, party config, occupancy claim check |
+| **Character deletion request** | lifecycle `ACTIVE` → `PENDING_DELETION` and its two timestamps, after the quiescence check — no occupancy claim, no Active Party membership, no live obligation (`ADR-020` §3) |
+| **Character restore** | lifecycle back to `ACTIVE`, timestamps cleared — decided against the deadline after the Character's lock is held (`ADR-020` §2, §7) |
+| **Character purge** | the Character's whole closure — its items, POUCH ledger entries and balance, Stamina, slots, policies, activity history, derived settlement and idempotency records — **then** the Character row. One transaction, under the purge capability; nothing Account-owned changes (`ADR-020` §6–§7) |
 | **Activity start** | activity row, account activity claim, **one occupancy claim per participating Character** |
 | **Activity end / retirement of claims** | activity state, **release of every occupancy claim**, in the same transaction as the lifecycle transition |
 | **Skill training claim** | charges, skill progression, activity state |
@@ -144,6 +146,22 @@ response cannot double-apply.
 - A reconciliation job verifies ledger sums against balance projections. A discrepancy is a P1
   incident (`ECONOMY_INTEGRITY.md`).
 
+**The one designed exception — a Character's final purge** (`ADR-020`, `LOCKED BY PRODUCT`).
+Thirty days after a deletion request, the purge removes the Character and everything it owned,
+its POUCH ledger entries included, and no record of it survives. The exception is narrow by
+construction:
+
+- it applies **only** to rows whose sole owner or subject is the purged Character. BANK entries
+  name no Character and are never deleted, so the Account's ledger, its reconciliation and its
+  balances are unchanged by any purge;
+- it is performed **only** by the purge capability. The application role still has no `UPDATE`
+  or `DELETE` on the ledger;
+- a record that is Account-owned or shared survives with the Character's identity removed rather
+  than being deleted (`ADR-020` §6).
+
+Everything above holds for ordinary play. After a purge, *"which Character earned this Gold?"* is
+no longer answerable; *"what did the Account's Bank receive, when and why?"* still is.
+
 ---
 
 ## 7. Activity state persistence
@@ -207,6 +225,15 @@ cleanup of genuinely **un**referenced versions.
 
 `DECIDED IN PHASE 0A` — after any restore, **reconciliation runs before the economy reopens**.
 Serving a balance that disagrees with the ledger is worse than a few minutes of downtime.
+
+**`OPEN` — restores and Character deletion** (`ADR-020`, operational gate). A restore from backup
+brings back every Character that was purged after the backup point, and loses every deletion
+request or restore made after it. A `PENDING_DELETION` Character whose deadline has passed would
+be purged again at once — including one whose owner restored it inside the lost window.
+Recommended until decided: after any restore the purge job stays **paused** until operators have
+reconciled the lifecycle transitions lost in the restore window. How long backups and logs may
+keep a purged Character is also open. Both are tracked in
+[`../OPEN_QUESTIONS.md`](../OPEN_QUESTIONS.md) § *Character deletion*.
 
 ---
 

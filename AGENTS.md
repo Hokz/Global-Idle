@@ -207,9 +207,13 @@ and its 69 matrix cases pass.
 
 It remains the active phase only because **nothing after it has started. Phase 4 has NOT
 started.** Phase 4 is gated by the PRE-PHASE-4 gate in [`docs/PHASE_GATES.md`](docs/PHASE_GATES.md),
-which has **not** been passed, and that gate's G4.1a — what happens to a retired Character's Gold
-Pouch — is an open Product Owner decision. Do not begin Phase 4 work or mark the gate passed until
-the Product Owner says so.
+which has **not** been passed. Its first item, G4.1, is now the **Character deletion lifecycle**
+(`ADR-020`, `LOCKED` by the Product Owner on 2026-09-24, superseding `ADR-007`'s retirement): a
+30-day reversible grace, then a hard purge of the Character and everything it owns. It is **not
+implemented** — the code still carries `retiredAt`. Its Gold Pouch question, G4.1a, is resolved;
+G4.1b — what a pending Character still holds — and G4.1c — the tutorial and starting-grant rule
+after a purge — are open Product Owner decisions. Do not begin Phase 4 work, implement the
+deletion lifecycle, or mark the gate passed until the Product Owner says so.
 
 User-supplied client assets are a PRIVATE reference and must never be committed — see the Phase
 3.7 specification's §9. The

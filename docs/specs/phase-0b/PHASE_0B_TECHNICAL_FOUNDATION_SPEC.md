@@ -9,6 +9,17 @@
 `ACCEPTED` with this specification
 **Entry point for the architecture it implements:** [`../../architecture/ARCHITECTURE_OVERVIEW.md`](../../architecture/ARCHITECTURE_OVERVIEW.md)
 
+> **Superseded in part — 2026-09-24.** This specification implemented `ADR-007`'s retirement
+> model: `retiredAt`, I1 as a unique index partial over non-retired rows, invariant I12 *"a
+> Character is never hard-deleted"*, `retireCharacter` with no delete counterpart, and the tests
+> `D5` and `D6`. The Product Owner has since replaced retirement with a 30-day reversible grace
+> followed by a hard purge —
+> [`ADR-020`](../../architecture/decisions/ADR-020-character-deletion-grace-and-purge.md), which
+> supersedes `ADR-007`. Nothing below is rewritten: it remains the accurate record of what Phase 0B
+> built and verified, and that code stays in place until the PRE-PHASE-4 gate replaces it
+> ([`PHASE_GATES.md`](../../PHASE_GATES.md) § *G4.1*). Where the text below states the retirement
+> rule, read it as history, not as the current rule.
+
 > This document is a **specification**. It contains no implementation. Its job is to make the
 > implementing phase unambiguous: exact tooling, exact boundaries, exact contracts, exact tests,
 > and an objective Definition of Done.

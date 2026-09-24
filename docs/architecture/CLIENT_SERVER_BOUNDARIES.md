@@ -41,10 +41,11 @@ The client sends **intents**, never outcomes. `startHunt(huntId, partyConfig)` i
 | Command | Server validates |
 |---|---|
 | `authenticate` | credentials, rate limits, account status |
-| `setActiveParty(orderedCharacterIds)` | ownership, size 1–4, distinct, all active, **no running activity** (`ADR-005`) |
+| `setActiveParty(orderedCharacterIds)` | ownership, size 1–4, distinct, all `ACTIVE` — none pending deletion — **no running activity** (`ADR-005`, `ADR-020`) |
 | `unlockRosterSlot` | capacity < 5, sufficient Gold, transactional spend |
-| `createCharacter(vocation)` | slot available, vocation not owned, level rules |
-| `retireCharacter(characterId)` | ownership, no occupancy claim held (`ADR-007`, `ADR-013`) |
+| `createCharacter(vocation)` | slot available, vocation not owned, name not reserved by any existing Character on the account, level rules. How a `PENDING_DELETION` Character counts for the slot and the vocation is `OPEN` (`ADR-020` §5) |
+| `requestCharacterDeletion(characterId)` | ownership; `ACTIVE`; no occupancy claim or non-terminal Activity, not in the Active Party, no live obligation (`ADR-020` §3, `ADR-013`). A repeat while pending returns the existing deadline |
+| `restoreCharacter(characterId)` | ownership; `PENDING_DELETION`; server time strictly before `purgeAt` (`ADR-020` §2) |
 | `startActivity(activityDefinitionId)` | ownership, prerequisites, unlocks, party validity, no existing **account** activity claim, and — in the same transaction — **atomic acquisition of the occupancy claim for every participating Character**; fails if any participant already holds one (`ADR-013`) |
 | `stopActivity` | ownership of the running activity; releases every participant's occupancy claim in the same transaction as the lifecycle transition |
 | `equipItem(characterId, itemInstanceId, slot)` | custody, ownership, equip requirements, **character not participating in a running activity** (`DOMAIN_MODEL.md` §5.12) |
@@ -52,6 +53,11 @@ The client sends **intents**, never outcomes. `startHunt(huntId, partyConfig)` i
 | `forgeAttempt(target, sacrificeA, sacrificeB)` | custody of all three, classification and rarity match, costs |
 | `startSkillTraining(characterId, exerciseItemId)` | custody, charges remaining, and — in the same transaction — **atomic acquisition of that Character's occupancy claim**; fails if the Character is hunting, in a dungeon, or already training (`ADR-013`) |
 | `claimSkillTraining(characterId)` | ownership; server computes elapsed time |
+
+The two deletion commands are illustrative names; the PRE-4 implementation specification fixes
+them. The **purge** that follows a deletion's deadline is **not a command**: the client can
+neither trigger it, bring it forward nor undo it, and every command that names a
+`PENDING_DELETION` Character — other than restore — is refused (`ADR-020` §4, §7).
 
 **Every command is authorized against the Account.** A command naming a character the account
 does not own is rejected before any domain logic runs — not filtered afterwards.

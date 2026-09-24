@@ -5,6 +5,8 @@
 **Date:** 2026-09-22
 **Amends:** [ADR-003](./ADR-003-ledger-derived-currency-balances.md) — extends it, and contradicts
 none of it.
+**Amended by:** [ADR-020](./ADR-020-character-deletion-grace-and-purge.md) (2026-09-24) — one
+guarantee row below; see the note under the table.
 
 ## Context
 
@@ -69,6 +71,13 @@ explicit `characterId`, and:
 | that carrier is a **real Character** | `FOREIGN KEY ("characterId","accountId") REFERENCES "Character"("id","accountId")` |
 | that Character belongs to **the Account on the row** | the same foreign key — it is the pair that is checked, not the id alone |
 | a Character that has carried Gold is never hard-deleted | `ON DELETE RESTRICT` (ADR-007/I12, now a database fact rather than a convention) |
+
+> **Amended by [ADR-020](./ADR-020-character-deletion-grace-and-purge.md), 2026-09-24.** The last
+> row no longer states a product rule: a Character is now hard-deleted by its final purge, 30 days
+> after a deletion request, and its POUCH entries and balance are deleted with it rather than moved
+> to the Bank. The foreign key may still refuse every other deletion path; how the purge removes
+> the rows it guards is ADR-020 §7's to define. Every other guarantee in this table stands — in
+> particular, a BANK row still names no Character, which is why the purge never has to touch one.
 
 Three details make this work rather than merely look right:
 

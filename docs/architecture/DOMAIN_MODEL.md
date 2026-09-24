@@ -198,8 +198,12 @@ touching the ownership model.
 | Transaction / audit | required for currency, entitlement and roster-capacity changes |
 
 **Invariants.**
-- `count(playable characters) ≤ rosterCapacity ≤ 5` — `LOCKED BY PRODUCT`
-- **playable (non-retired)** Character vocations are **distinct** within the account — `LOCKED BY PRODUCT`
+- `count(roster characters) ≤ rosterCapacity ≤ 5` — `LOCKED BY PRODUCT`. A purged Character is
+  not counted; whether a `PENDING_DELETION` Character is counted during its grace is `OPEN`
+  (`ADR-020` §5)
+- the vocations of the account's Characters are **distinct** — `LOCKED BY PRODUCT`. A purged
+  Character holds no vocation; whether a `PENDING_DELETION` one still holds its vocation is
+  `OPEN` (`ADR-020` §5)
 - tutorial completion is tracked at account level, not inferred from character count —
   `LOCKED BY PRODUCT` (`TUTORIAL_ROOKGAARD_ROADMAP.md` §2)
 
@@ -265,7 +269,7 @@ character, not a temporary combat companion."*
 | Owner | Character context |
 | Authoritative system | API/application layer; mutated by Activity settlement |
 | State | durable |
-| Lifecycle | created → (origin: Rookgaard L1→8 \| unlocked: starts at L8) → progresses indefinitely |
+| Lifecycle | created → (origin: Rookgaard L1→8 \| unlocked: starts at L8) → progresses indefinitely. Deletion: `ACTIVE` → `PENDING_DELETION` for 30 days → restored to `ACTIVE`, or **purged** (`ADR-020`) |
 | Mutable during an Activity | **progression only, and only through settlement.** Vocation, identity and roster membership are frozen. |
 | Transaction / audit | settlement is transactional and carries an operation id |
 
@@ -277,7 +281,7 @@ character, not a temporary combat companion."*
   prohibition. Architecture needs an answer now because vocation determines skill aptitude,
   roster uniqueness and every combat profile, so it is decided here: vocation does not change
   through ordinary play. Should a respec ever be designed, it is an explicit, audited
-  operation — never a field update — and it must re-validate playable roster vocation uniqueness.
+  operation — never a field update — and it must re-validate roster vocation uniqueness.
 - an unlocked (non-origin) character starts at Base Level 8, never enters Rookgaard, and
   receives no catch-up levels — `LOCKED BY PRODUCT`
 - `DECIDED IN PHASE 0A` — the uniqueness of vocation per account must be enforced by a
@@ -294,13 +298,29 @@ primary action at a time, and **Stamina is per-Character durable state** with a 
 Both are specified in
 [`ACTIVITY_OCCUPANCY_AND_TIMERS.md`](ACTIVITY_OCCUPANCY_AND_TIMERS.md) (`ADR-013`, `ADR-014`).
 
-`DECIDED IN PHASE 0A` — **character deletion is retirement, not erasure.** See `ADR-007`.
-A retired character is excluded from the roster, frees its vocation for a future unlock, and
-keeps its identity so ledger and market history stay referentially intact. Roster capacity is
-**not** refunded. Items held by a retired character move to an account-level recovery custody
-scope rather than being destroyed. The Origin Character may be retired; the account's tutorial
-completion flag is unaffected, which is exactly the edge case
-`TUTORIAL_ROOKGAARD_ROADMAP.md` §2 describes.
+`LOCKED BY PRODUCT` (2026-09-24) — **character deletion is a 30-day reversible grace, then a
+hard purge.** See `ADR-020`, which supersedes the Phase 0A decision (`ADR-007`, retirement).
+
+- A deletion request moves an `ACTIVE` Character to `PENDING_DELETION`. For exactly 30 days it
+  stays intact and **frozen** — no gameplay, no change to anything it owns — and its owner may
+  restore it.
+- When the 30 days expire, the purge deletes the Character row and **everything it owns**:
+  progression, Stamina, items, containers, policies, its Gold Pouch and the Pouch's ledger
+  history, and its activity history. Nothing moves to the Bank or to any recovery custody; the
+  value is destroyed.
+- No record of the purged Character survives, and no surviving shared or Account-owned record
+  keeps its identity. Account-owned state — the Bank, entitlements, roster capacity, Depot and
+  Stash — is untouched, and capacity is not refunded.
+- The name stays reserved until the purge. Whether the vocation, the Origin slot and the roster
+  place also stay held during the grace is `OPEN` (`ADR-020` §5).
+- **Playable** now means `ACTIVE`. A `PENDING_DELETION` Character is not playable. It is still an
+  existing Character for the name rule, and possibly for the others.
+- The Origin Character may be deleted like any other; tutorial completion stays Account-level and
+  is never inferred from counting Characters (`TUTORIAL_ROOKGAARD_ROADMAP.md` §2). What a purged
+  Origin Character means for tutorial replay and the starting grant is `OPEN`.
+
+The code still implements retirement (`retiredAt`) until the PRE-PHASE-4 gate replaces it
+(`PHASE_GATES.md` § *G4.1*).
 
 ---
 
@@ -312,7 +332,7 @@ completion flag is unaffected, which is exactly the edge case
 
 | Aspect | What it actually is |
 |---|---|
-| The *membership* | a **derived collection** — every playable (non-retired) Character whose owner is this Account. Nothing to store. |
+| The *membership* | a **derived collection** — every Character that exists for this Account. A purged Character does not exist; whether a `PENDING_DELETION` one is a member during its grace is `OPEN` (`ADR-020` §5). Nothing to store. |
 | The *capacity* | **durable state owned by the Character context** — an integer, because it is bought with Gold and must be auditable |
 
 Modelling the roster as its own entity would create a second place where membership could
@@ -322,7 +342,7 @@ disagree with reality. Deriving membership makes divergence impossible.
 The capacity value physically lives on the Account row, but storage location does not decide
 ownership. Capacity is a constraint on how many Characters may exist; it is bought with Gold
 through ordinary gameplay progression, and every invariant it participates in
-(`count(playable characters) ≤ rosterCapacity`) is a Character-context invariant. Identity &
+(`count(roster characters) ≤ rosterCapacity`) is a Character-context invariant. Identity &
 Access owns authentication, authorization and entitlements — none of which capacity is. An
 earlier draft split membership and capacity across two contexts, which violated the
 single-owner rule of `ADR-001`; that split is removed.
@@ -338,10 +358,12 @@ single-owner rule of `ADR-001`; that split is removed.
 
 **Invariants.**
 - `1 ≤ rosterCapacity ≤ 5` — `LOCKED BY PRODUCT`
-- capacity is **monotonic** — `DECIDED IN PHASE 0A`. Retiring a character frees its vocation
-  and a roster place, but never reduces or refunds purchased capacity.
-- a vocation held by a **playable** Character is not offered as an unlock choice — `LOCKED BY
-  PRODUCT`. Retiring that Character frees the vocation again (`ADR-007`)
+- capacity is **monotonic** — `DECIDED IN PHASE 0A`. Deleting a character never reduces or
+  refunds purchased capacity. Its roster place is free once it is purged at the latest; whether
+  it is free earlier, during the grace, is `OPEN` (`ADR-020` §5).
+- a vocation held by an existing Character is not offered as an unlock choice — `LOCKED BY
+  PRODUCT`. It is free again once that Character is purged at the latest; whether a
+  `PENDING_DELETION` Character still holds it during the grace is `OPEN` (`ADR-020` §5)
 
 ---
 
@@ -373,7 +395,9 @@ already says, and the two could disagree.
 - every entry is a Character of the same Account — `LOCKED BY PRODUCT`
 - no entry appears twice; order is significant — `DECIDED IN PHASE 0A`
 - five simultaneous active characters cannot be represented — `LOCKED BY PRODUCT`
-- every entry references a **playable** (non-retired) Character — `DECIDED IN PHASE 0A`
+- every entry references a **playable** Character — `DECIDED IN PHASE 0A`. Since `ADR-020`,
+  playable means `ACTIVE`: a Character in the Active Party cannot be put up for deletion, and a
+  `PENDING_DELETION` Character cannot join
 
 `DECIDED IN PHASE 0A` — **formation editing is rejected while an Activity is running.** An
 earlier draft allowed the configuration to be edited with the running Activity simply ignoring
@@ -725,13 +749,15 @@ my gold go" answerable and "there are two of this sword" detectable.
 |---|---|
 | Identity | opaque surrogate per entry; every entry also carries an **operation id** |
 | Owner | Economy context |
-| State | durable, **append-only, never updated, never deleted** |
-| Lifecycle | written once, retained indefinitely |
+| State | durable, **append-only, never updated**. Deleted only by a Character's final purge, and then only that Character's POUCH entries (`ADR-020`) |
+| Lifecycle | written once. BANK entries are retained indefinitely; POUCH entries until their Character is purged |
 | Mutable during an Activity | appended by settlement |
 | Transaction / audit | it *is* the audit |
 
 **Invariants.**
 - entries are immutable — `DECIDED IN PHASE 0A`
+- nothing but the purge deletes an entry, and the purge never deletes a BANK entry — `ADR-020`.
+  A BANK entry names no Character, so the Account's own ledger survives every purge unchanged
 - every entry carries the operation id that caused it, making replays detectable and
   settlement idempotent
 - the sum of a subject's entries reconciles to its balance projection; a reconciliation
@@ -879,22 +905,28 @@ application-only check loses a race.
 
 | # | Invariant | Enforced by |
 |---|---|---|
-| I1 | One **playable (non-retired)** roster Character per vocation per account | partial unique constraint over non-retired rows (`ADR-007`) |
-| I2 | `count(playable characters) ≤ rosterCapacity ≤ 5` | persistence constraint + transaction |
+| I1 | One roster Character per vocation per account | unique constraint over existing Characters; whether a `PENDING_DELETION` one counts is `OPEN` (`ADR-020` §5). **Today** still `ADR-007`'s partial index over non-retired rows, until the PRE-4 gate replaces it |
+| I2 | `count(roster characters) ≤ rosterCapacity ≤ 5` | persistence constraint + transaction; grace-state counting `OPEN` as for I1 |
 | I3 | Active Party size 1–4, entries distinct, all **playable** and owned by the account | transaction |
 | I4 | An ItemInstance is in exactly one custody scope | persistence constraint |
 | I5 | Balance projection reconciles to the ledger | transaction + reconciliation job |
-| I6 | Ledger entries are append-only | persistence permission |
+| I6 | Ledger entries are append-only — never updated; deleted only by a Character's final purge, and then only its POUCH entries | persistence permission: the application role has no `UPDATE` or `DELETE`; only the purge capability may delete (`ADR-020` §7) |
 | I7 | Settlement is idempotent under its operation id | uniqueness constraint on operation id |
 | I8 | A paused Activity cannot advance | Activity state machine — no tick path exists from the paused state |
 | I9 | At most one Session holds an account's Activity claim | Activity ownership + atomic claim |
 | I10 | Skill Training cannot write Base XP | interface capability, not runtime check |
 | I11 | Formation and equipment cannot change for a running activity's participants | command rejected at the application layer |
-| I12 | A Character is never hard-deleted | no delete path exists (`ADR-007`) |
+| I12 | A Character is hard-deleted **only** by its final purge — at or after its 30-day deadline, atomically, never partially | one privileged purge path, and no other delete path (`ADR-020` §7). **Superseded:** *"a Character is never hard-deleted"* (`ADR-007`), which the code still enforces until the PRE-4 gate |
 | I13 | At most one occupancy claim per Character | persistence constraint (`ADR-013`) |
 | I14 | An exhausted Character receives no Hunt reward by any path, including Shared XP | reward distribution filters recipients after computing the pool (`ADR-014`) |
 | I15 | Active-use duration is never consumed outside a qualifying state | timers settle from `qualifyingSince`, which only a state transition writes (`ADR-015`) |
 | I16 | A referenced content bundle is never deleted | no automatic GC exists (`ADR-016`) |
+| I17 | A `PENDING_DELETION` Character is frozen: no command changes anything it owns or makes it a participant, except restore and purge | lifecycle state checked in every command's transaction (`ADR-020` §4) |
+| I18 | A Character's name stays reserved while its row exists, in either lifecycle state | uniqueness over every existing row; a persistence constraint is recommended (`ADR-020` §5) |
+| I19 | After a purge, no product-persistence row names the purged Character, and every Account-owned row and balance is unchanged apart from documented scrubs | schema-derived closure test + post-purge scan (`ADR-020` §7) |
+
+I17–I19 are **not implemented**: they are requirements of the PRE-PHASE-4 gate
+(`PHASE_GATES.md` § *G4.1*).
 
 I8 and I10 are stated as *structural* rather than *validated*. A check that can be forgotten is
 weaker than a path that does not exist.
@@ -925,7 +957,7 @@ this section is the index, with the reasoning compressed.
 
 | # | Question | Decision | Where |
 |---|---|---|---|
-| 9.1 | Character deletion | **Retirement, not erasure.** Vocation freed, capacity not refunded, identity kept so ledger history stays intact, items moved to an account recovery scope. | §5.3, `ADR-007` |
+| 9.1 | Character deletion | **Superseded 2026-09-24 by the Product Owner:** a 30-day reversible grace, then a hard purge of the Character and everything it owns; nothing moves to the Bank or to a recovery custody, and capacity is not refunded. The Phase 0A decision — retirement, identity kept, items to an account recovery scope — is kept as history in `ADR-007`. | §5.3, `ADR-020` |
 | 9.2 | Shared XP eligibility timing | **Re-evaluated at each settlement checkpoint**, on the same cadence as the participant profile. | §5.5, `ADR-006` |
 | 9.3 | Concurrent session policy | **Newest connection wins and evicts the previous.** The activity claim transfers atomically. | §5.2, `ADR-008` |
 | 9.4 | Loot Capacity scope in a party | **Pooled for the activity**, as the sum of participating characters' capacities. | §5.7 |
@@ -986,7 +1018,7 @@ All other questions previously deferred from 0A.1 are answered in the completed 
 | [ADR-004](decisions/ADR-004-item-single-custody.md) | ItemInstance has exactly one custody scope | `ACCEPTED` |
 | [ADR-005](decisions/ADR-005-active-party-as-configuration.md) | Active Party is ordered configuration, not an entity | `ACCEPTED` |
 | [ADR-006](decisions/ADR-006-participant-profile-refresh.md) | Composition is frozen for a run; power refreshes at settlement checkpoints | `ACCEPTED` |
-| [ADR-007](decisions/ADR-007-character-retirement.md) | Character deletion is retirement, not erasure | `ACCEPTED` |
+| [ADR-007](decisions/ADR-007-character-retirement.md) | Character deletion is retirement, not erasure | `SUPERSEDED` by `ADR-020` |
 | [ADR-008](decisions/ADR-008-newest-connection-wins.md) | The newest authenticated connection evicts the previous one | `ACCEPTED` |
 | [ADR-009](decisions/ADR-009-postgres-sole-durable-truth.md) | PostgreSQL is the sole durable truth; Redis holds nothing that cannot be rebuilt | `ACCEPTED` |
 | [ADR-010](decisions/ADR-010-pure-engine-injected-clock-and-rng.md) | The engine is a pure function over explicit inputs, with injected clock and RNG | `ACCEPTED` |
@@ -998,6 +1030,11 @@ All other questions previously deferred from 0A.1 are answered in the completed 
 | [ADR-016](decisions/ADR-016-content-bundle-retention.md) | Content bundles retained while referenced | `ACCEPTED` |
 | [ADR-017](decisions/ADR-017-idempotency-key-contract.md) | Idempotency keys account-scoped and fingerprinted | `ACCEPTED` |
 | [ADR-018](decisions/ADR-018-domain-package-source-layout.md) | Bounded contexts in `packages/domain` — amends `ADR-012`'s layout | `ACCEPTED` |
+
+Recorded later, outside this package: `ADR-019` (currency custody scopes, Phase 2) and
+[`ADR-020`](decisions/ADR-020-character-deletion-grace-and-purge.md) (Character deletion: a 30-day
+reversible grace, then a hard purge — supersedes `ADR-007`). `ARCHITECTURE_OVERVIEW.md` is the
+full index.
 
 ---
 

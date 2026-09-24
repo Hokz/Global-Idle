@@ -25,7 +25,6 @@ uniqueness constraint cannot.
 | `character_equipment` | equipped, in a specific slot |
 | `market_escrow` | committed to a listing, under server control |
 | `forge_input` | committed to a forge attempt |
-| `account_recovery` | held after a character retirement (`ADR-007`) |
 | `consumed` | terminal — sacrificed, sold, destroyed |
 
 Exactly one, always. An item in escrow is *not* in the seller's inventory, so listing it twice,
@@ -33,11 +32,23 @@ equipping it, or forging with it are not states the system can reach.
 
 `consumed` is terminal. Instance ids are never reused.
 
+**There is no `account_recovery` scope.** Phase 0A listed one here, to hold a retired Character's
+items (`ADR-007`). It was never built, and `ADR-020` removes it: a Character pending deletion keeps
+its items where they are for 30 days, and its final purge **destroys** every item it still owns.
+Nothing moves to the Account at purge. Items the player moved into Account custody — the Depot or
+the Stash — before requesting deletion are the Account's, and the purge does not touch them.
+
 ---
 
 ## 3. Ledger model
 
 Append-only. No updates, no deletes — enforced by **database permissions**, not convention.
+
+**One designed exception** (`ADR-020`): a Character's final purge deletes that Character's POUCH
+entries and POUCH balance, 30 days after a deletion request, and nothing else. The value still in
+the Pouch is destroyed with them — it is **not** moved to the Bank. The purge never deletes or
+changes a BANK entry, so every Account's ledger, balances and reconciliation are untouched by it.
+The purge runs under its own capability; the application role still cannot delete an entry.
 
 Each entry records: subject account, currency type, signed amount, reason code, operation id,
 counterparty where applicable, timestamp, resulting balance.
@@ -130,8 +141,9 @@ one.
 | Client → API | no outcome, amount, timestamp or success flag is ever accepted (`CLIENT_SERVER_BOUNDARIES.md` §6) |
 | API → Engine | the engine resolves rolls but **cannot create or move an item or currency** |
 | Engine → Persistence | none. The engine has no I/O (`ADR-010`) |
-| Application → Ledger | append only; no path updates or deletes an entry |
-| Admin tooling | subject to the same transactional and audit rules as gameplay |
+| Application → Ledger | append only; no application path updates or deletes an entry |
+| Purge capability → Ledger | deletes **only** the POUCH entries of a Character whose purge it has itself verified — `PENDING_DELETION`, deadline passed — in the same transaction; never a BANK entry, never an update (`ADR-020` §7) |
+| Admin tooling | subject to the same transactional and audit rules as gameplay; it cannot purge early or restore after a purge |
 
 `DECIDED IN PHASE 0A` — **admin and support tooling is not a privileged bypass.** A grant, a
 refund or a correction is an ordinary ledgered operation with an operation id and an actor
@@ -153,7 +165,10 @@ audit trail decorative.
 | Market self-dealing / wash trading | buyer ≠ seller enforced; fees make round-trips lossy; price history retained for analysis |
 | Listing spam | listing fees, rate limits |
 | Enumeration of accounts or items | ownership-scoped queries and rate limiting are the control; non-sequential UUIDv7 ids raise the cost but are **not** the security boundary (`DATA_ARCHITECTURE.md` §2) |
-| Race on roster vocation uniqueness | persistence-level constraint over **playable (non-retired)** Characters (`ADR-007`) |
+| Race on roster vocation uniqueness | persistence-level constraint over existing Characters; whether a `PENDING_DELETION` Character counts is `OPEN` (`ADR-020` §5) |
+| Deletion used to bank carried value | impossible by rule: nothing Character-owned moves to the Bank or to any recovery custody at purge — it is destroyed (`ADR-020`, L7–L8) |
+| Restore/purge race at the deadline | both lock the Character and decide against the authoritative clock after the lock; exactly one wins (`ADR-020` §7) |
+| Starting-grant farming through delete → purge → recreate | `OPEN` — the tutorial-replay and starting-grant rule after a purge is a Product Owner decision (PRE-4 gate, `PHASE_GATES.md` § *G4.1c*) |
 
 `DEFERRED PARAMETER` — fee percentages, listing limits, rate-limit thresholds. They are tuning
 values; the mechanisms are architectural.

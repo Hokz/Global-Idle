@@ -74,11 +74,17 @@ forgotten OPEN notes.
 
 ### Before Phase 4 (roster)
 
-- **Character retirement, properly.** Retirement must settle occupancy, move **item** custody
-  safely (`ADR-007`), prevent a repeated tutorial starting-grant, and preserve history. Phase 3
-  only stopped a retired Character from being treated as playable by the inventory surface
-  (`RET1`, `RET2`); that is a filter, not a flow. The retired Character's **Gold Pouch** has no
-  stated fate — see [`../PHASE_GATES.md`](../PHASE_GATES.md) § *G4.1a*, an open decision.
+- **Character deletion lifecycle** (`LOCKED`, `ADR-020` — it supersedes the retirement this item
+  used to describe). A deletion request starts a 30-day reversible grace in which the Character is
+  frozen and restorable; then a hard purge removes it and everything it owns — items, the Gold
+  Pouch and its ledger history, progression — with nothing moved to the Bank or to a recovery
+  custody, and no record of the Character left behind. The work is the purge's closure inventory
+  and its atomic, idempotent, race-safe execution, the replacement of `retiredAt`, and a rule that
+  stops *delete → purge → recreate* from farming the tutorial starting grant. Phase 3's `RET1` and
+  `RET2` were a retirement filter, not a flow, and are superseded rather than extended. The Gold
+  Pouch question (G4.1a) is **resolved**; what a pending Character still holds (G4.1b) and the
+  tutorial rule (G4.1c) are open Product Owner decisions — see
+  [`../PHASE_GATES.md`](../PHASE_GATES.md) § *G4.1*.
 - **Enforce the `baseXp` → `baseLevel` projection.** Not a question of which is authoritative:
   `baseXp` is the durable truth and `baseLevel` its stored projection, already decided and
   implemented (`schema.prisma`, `contexts/hunt/progression.ts`). What is missing is enforcement on
