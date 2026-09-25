@@ -4,6 +4,17 @@
 **Scope:** Base Level, Skills, skill training, vocation aptitudes, baseline combat power, and how later systems modify combat.  
 **Purpose:** Establish a clean technical model before exact formulas are implemented.
 
+> **Amended 2026-09-25 — non-formula decisions only.** The Product Owner locked the classic Skill
+> set (Magic Level, Sword, Axe, Club, Shielding, Distance and Fist; no Fishing), the build
+> philosophy, damage origin versus damage type, resistances instead of absolute immunities,
+> vocation-specific Skill Trees with a no-refund respec, and equipment rules without hidden
+> per-vocation multipliers — [`DECISIONS.md`](../../DECISIONS.md). **The combat formula revision
+> discussed after PR #13 head `86a7681` is not decided:** attack coefficients, the minimum and
+> maximum auto-attack formulas, whether Canary's coefficient is adopted, the starting Skill value,
+> the Defense score and its roll, the Armor roll, the rounding stages, skill scaling and balance
+> targets stay open (§45). Nothing here changes a formula that Phases 2–3.6 implemented and
+> verified.
+
 ---
 
 # 1. Core Principle
@@ -67,13 +78,15 @@ Examples:
 - Club;
 - Distance;
 - Shielding;
-- Magic Level.
+- Magic Level;
+- Fist.
 
-Additional skills can be defined later.
+*2026-09-25:* the classic set is locked — Magic Level, Sword, Axe, Club, Shielding, Distance and
+Fist — and there is no Fishing skill.
 
 ## Skill Tree
 
-Advanced vocation development system.
+Advanced vocation development system — one tree per vocation (2026-09-25, §27).
 
 Not the same as Skills.
 
@@ -120,6 +133,11 @@ Baseline Combat Power
 ```
 
 Later systems modify this baseline.
+
+*2026-09-25:* **Level is not the sole power source.** Level mainly provides base progression — HP,
+Mana, Capacity — plus access and unlocks. Power and build also come from the Skills, the
+vocation's Skill Tree, the Wheel, equipment, affixes, the Forge, Imbuements and Charms, and Hunts
+reward matching a build to the Hunt rather than level alone.
 
 ---
 
@@ -670,6 +688,11 @@ Equipment may affect combat through:
 
 Equipment should modify the baseline rather than replace the Skill system.
 
+*2026-09-25 (`DECISIONS.md` § *Equipment*):* vocations are told apart by equipment eligibility,
+weapon and off-hand options, spells, Skill Trees and the Wheel — never by a hidden per-vocation
+Armor or Defense multiplier. Armour slots stay Tibia-like, and any vocation may use a shield where
+the item and the rules allow.
+
 ---
 
 # 23. Rarity / Affix Interaction
@@ -795,6 +818,14 @@ Exori Mastery
 
 Exact nodes are future design.
 
+*2026-09-25 (`DECISIONS.md` § *Vocation Skill Trees and respec*):* there is no universal Skill
+Tree — **each vocation has its own**, and its number of paths is that vocation's design, not a
+fixed three. Further paths are gated by Level or other progression, and crossing into them is
+intended long term. Nodes are bought with Gold, a major sink, and trees are deep enough that a
+later path does not imply the first is complete. A respec removes chosen nodes, refunds no Gold,
+and never leaves a tree structurally invalid. Open: whether an extreme endgame can buy every node,
+and the Monk's branch identity.
+
 ---
 
 # 28. Skills vs Skill Tree vs Spells
@@ -803,11 +834,11 @@ This distinction must be maintained in code and UI.
 
 ```text
 SKILLS
-Sword / Axe / Club / Distance / Shielding / Magic Level
+Magic Level / Sword / Axe / Club / Shielding / Distance / Fist
 → numeric proficiency
 
 SKILL TREE
-class progression / passive or active upgrades
+one per vocation — class progression / passive or active upgrades
 
 WHEEL OF DESTINY
 specialization and build shaping
@@ -934,6 +965,9 @@ Later systems can modify:
 
 Canary should be studied before the exact Global Idle model is locked.
 
+*2026-09-25:* whatever the model, it holds no hidden per-vocation Armor or Defense multiplier. The
+Defense score, its roll and the Armor roll belong to the open formula revision (§45).
+
 ---
 
 # 34. Resistances
@@ -952,6 +986,12 @@ Damage should eventually account for:
 Exact resistance ordering, rounding and interaction with armor/defense must be deliberately specified.
 
 Do not assume Canary ordering without review.
+
+*2026-09-25:* **damage origin** — a spell, a weapon, a rune — and **damage type** — physical,
+fire, ice and the rest — are separate, and the defences that apply follow the type: a spell may
+deal physical damage. Ordinary Hunt design avoids absolute 100% creature immunities. Creatures
+use resistances, sensitivities and weaknesses instead, so a mismatched build is less efficient,
+not blocked.
 
 ---
 
@@ -1282,7 +1322,12 @@ The following are established product directions:
 - off-class Skill progression should remain possible but inefficient;
 - Canary is the baseline technical reference for Tibia-style combat formulas;
 - Wheel and Skill Tree modify the character on top of baseline Skills;
-- Rookgaard introduces advanced systems but does not fully use them.
+- Rookgaard introduces advanced systems but does not fully use them;
+- *2026-09-25:* the classic Skills are Magic Level, Sword, Axe, Club, Shielding, Distance and
+  Fist, with no Fishing; Level is not the sole power source; damage origin and damage type are
+  separate; ordinary Hunts use resistances, not absolute immunities; each vocation has its own
+  Skill Tree, with a respec that refunds nothing; no hidden per-vocation Armor or Defense
+  multiplier.
 
 ---
 
@@ -1290,6 +1335,10 @@ The following are established product directions:
 
 Must still be designed explicitly:
 
+- **the combat formula revision discussed after PR #13 head `86a7681`** — attack coefficients, the
+  minimum and maximum auto-attack formulas, whether Canary's coefficient is adopted, the starting
+  Skill value, the Defense score and its roll, the Armor roll, the rounding stages, skill scaling
+  and balance targets. It is handled separately, and nothing is decided by this document;
 - exact Skill Point award trigger;
 - exact starting Skill values;
 - exact Base Level XP curve;
@@ -1320,7 +1369,8 @@ Must still be designed explicitly:
 - party behavior;
 - death penalties;
 - blessing interactions;
-- Skill Tree nodes;
+- each vocation's Skill Tree paths and nodes; whether an extreme endgame can buy every node; the
+  Monk's branch identity;
 - Wheel nodes;
 - modifier stacking/rounding order.
 

@@ -11,7 +11,9 @@ scope. Both are explicitly temporary.
 
 ## 1. Five Hunt container slots per Character
 
-Every Character owns exactly **five** top-level Hunt container slots.
+Every Character owns exactly **five** top-level Hunt container slots. *Since 2026-09-25 that
+Character is the Game Account's Main; whether a companion has slots of its own or shares the
+Main's is open (`ADR-022` GA-O3).*
 
 | Slot | How it is obtained |
 |---|---|
@@ -126,13 +128,16 @@ eligible) · Depot ↔ Stash (when eligible) · Loot Pouch → any valid accessi
 never moved to the Depot, the Stash or another Character, never sold, listed or traded, and it is
 destroyed with the Character — see
 [`ADR-020`](../architecture/decisions/ADR-020-character-deletion-grace-and-purge.md) §5.2. **Not
-implemented**: the PRE-4 gate adds the server-side refusal.
+implemented**: the PRE-4 gate adds the server-side refusal. *Since 2026-09-25 the kit's potions
+follow the Character-bound consumable rule below instead (`ADR-021` S6), and how its gear is
+represented is open (`ADR-020` DEL-O4).*
 
 **Except a Character-bound consumable** (`LOCKED`, `ADR-021`): its only storage movement is between
 its bound Character's Store Container and the Depot, and the Depot does not make it the Account's —
 it stays its Character's, and no other Character may withdraw it. It never goes to a Hunt
 container, a Character container, the Loot Pouch, the Stash, equipment, another Character, a
-market, a trade or an NPC sale. **Not implemented**: owned by the first phase that ships one.
+market, a trade or an NPC sale. **Not implemented**: owned by the first phase that ships one —
+since 2026-09-25 possibly the tutorial, whose Health and Mana potions are bound (`ADR-020` DEL-O5).
 
 Desktop affordances: drag and drop, context actions, stack splitting.
 Touch affordances: long press or context action, **Move**, amount selection.

@@ -192,7 +192,9 @@ started ──► accruing (independent of session) ──► claimed / exhauste
 An account may have a Skill Training activity and a Hunt running at the same time **only on
 different Characters**. The same Character can never do both: it holds at most one occupancy
 claim (`ADR-013`, invariant I13). A Knight hunting while a Druid trains is the intended shape of
-roster play; a Knight hunting *and* training is refused at the command boundary.
+roster play; a Knight hunting *and* training is refused at the command boundary. *Under `ADR-022`
+(2026-09-25) one of the two is the Main and the other a companion, and whether a companion trains
+on its own while the Main hunts is open (GA-O5).*
 
 ---
 

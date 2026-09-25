@@ -15,14 +15,14 @@ Create a healthy player economy where:
 
 Candidates:
 - Forge;
-- Skill Tree;
+- vocation Skill Trees — Gold-funded nodes, and a respec that refunds nothing;
 - services;
 - supplies;
 - travel;
 - Market fees;
 - respecs;
 - progression unlocks;
-- additional character/roster slot unlocks;
+- companion unlocks (`ADR-022`);
 - repair/maintenance only if it adds meaningful strategy.
 
 ## Item sinks

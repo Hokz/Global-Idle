@@ -26,6 +26,17 @@ was the only remaining review finding.
 
 Neither correction changes a contract, a boundary, or the 87-case total.
 
+> **Superseded in part — 2026-09-25.** The roster model this specification sits inside — additional
+> Characters as Level-8 vocation unlocks of the same kind as the Origin Character, up to five per
+> Account — has since been replaced by the Product Owner: a Game Account has exactly one Main
+> Character, which is the Origin Character before Rookgaard, and further vocations are companions,
+> not account-lifecycle Characters of its kind
+> ([`ADR-022`](../../architecture/decisions/ADR-022-game-account-main-character-and-companions.md)).
+> The retirement it relies on is superseded by
+> [`ADR-020`](../../architecture/decisions/ADR-020-character-deletion-grace-and-purge.md) as well.
+> Nothing below is rewritten: it remains the record of what Phase 1 specified and built, and its
+> creation endpoint still creates the Origin Character only.
+
 > This document is a **specification**. It contains no implementation. Its job is to make the
 > implementing phase mechanical: exact contracts, exact boundaries, exact tests, an objective
 > Definition of Done — and, where two approved documents disagree, an explicit decision with its

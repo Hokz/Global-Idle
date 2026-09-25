@@ -3,6 +3,8 @@
 **Status:** `ACCEPTED`
 **Phase:** 0A
 **Date:** 2026-09-20
+**Amended by:** [ADR-022](./ADR-022-game-account-main-character-and-companions.md) (2026-09-25) —
+the roster is one Main Character plus companions; see the note under *Decision*.
 
 ## Context
 
@@ -43,6 +45,13 @@ Two claims now exist at two scopes, and both are load-bearing:
 | Occupancy claim (this ADR) | Character | one Character doing two things |
 
 **Invariant I13** — at most one occupancy claim per Character, enforced by constraint.
+
+> **Amended by [ADR-022](./ADR-022-game-account-main-character-and-companions.md), 2026-09-25.** The
+> *"five-character roster"* this record assumes is now one Main Character per Game Account plus up
+> to four companions. One claim per acting Character stands for the Main. Whether each companion
+> holds its own claim, and whether a companion outside the Active Party may act while the Main
+> hunts — the concurrency this record calls the point of the roster — is open (`ADR-022` GA-O5),
+> for Phase 4.
 
 ## Consequences
 

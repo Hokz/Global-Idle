@@ -16,6 +16,7 @@ documents exist, what each one covers and how far each one has been approved.
   - path: `docs/design/tutorial/TUTORIAL_ROOKGAARD_ROADMAP.md`
   - status: `DESIGN BASELINE`
   - scope: Level 1–8 onboarding, Rookgaard, first Hunt, first Dungeon, Atlas, Level 8 vocation transition.
+  - amended 2026-09-25: the first character is the Game Account's Main and companions never enter Rookgaard (`ADR-022`); the tutorial's potions are Character-bound (`ADR-021` S6); the Doublet is an ordinary item and the Doublet Quest's final chest is claimed once per Game Account (`ADR-023`).
 
 ### Combat / Progression
 
@@ -23,6 +24,7 @@ documents exist, what each one covers and how far each one has been approved.
   - path: `docs/design/combat/COMBAT_LEVEL_SKILLS_FOUNDATION.md`
   - status: `DESIGN BASELINE / PARTIALLY OPEN`
   - scope: Base Level, Skills, Exercise Weapons, Training Dummies, vocation aptitude, Canary formula research and layered Combat System architecture.
+  - amended 2026-09-25, non-formula decisions only: the classic Skills with Fist and no Fishing, the build philosophy, damage origin vs type, resistances instead of absolute immunities, vocation-specific Skill Trees. The combat formula revision is **open**.
 
 ### Party / Roster
 
@@ -30,6 +32,7 @@ documents exist, what each one covers and how far each one has been approved.
   - path: `docs/design/party/PARTY_SYSTEM_FOUNDATION.md`
   - status: `DESIGN BASELINE / PARTIALLY OPEN`
   - scope: unique-vocation roster, Gold unlocks, 1–4 Active Party formation, Frontline, Shared XP eligibility, reconnect behavior.
+  - amended 2026-09-25 by `ADR-022`: one Main Character per Game Account plus up to four companions; the Main always in the personal Active Party. Its superseded sections carry notes.
 
 ### Economy / Custody
 
@@ -64,6 +67,7 @@ documents exist, what each one covers and how far each one has been approved.
   - path: `docs/design/multiplayer/COOPERATIVE_QUEST_STRATEGY.md`
   - status: `APPROVED DIRECTION` for the model · `OPEN` for §9 · `FUTURE / NOT IMPLEMENTED`
   - scope: the co-op lobby's encounter checklist and role slots, the player-authored **conditional** strategy, readiness → validated → frozen plan → one authoritative run, the death/spectator rule, and per-account settlement.
+  - amended 2026-09-25: one selected actor per Game Account (`ADR-022`), and a replayable quest whose final chest is claimed once per Game Account (`ADR-023`).
   - owners: generic quest engine -> Phase 5 · infrastructure -> Phase 5B slice 1 · first cooperative quest -> slice 2 · Warzones -> slice 3.
 
 ### Future directions
@@ -142,7 +146,7 @@ everything under `docs/design/`:
 | `docs/GAME_SYSTEMS.md` | System-by-system overview |
 | `docs/DECISIONS.md` | Locked decisions that must not be silently reversed |
 | `docs/OPEN_QUESTIONS.md` | Project-level unresolved design questions |
-| `docs/architecture/ARCHITECTURE_OVERVIEW.md` | **Technical architecture — entry point.** The Phase 0A package (`ARCHITECTURE_APPROVED`): domain model, boundaries, persistence, lifecycle, engine, content, economy integrity, operations, and the full ADR index — `ADR-001`–`ADR-017` from Phase 0A, `ADR-018` from the Phase 0B specification, `ADR-019` and `ADR-020` later. `ADR-007` is `SUPERSEDED` by `ADR-020` |
+| `docs/architecture/ARCHITECTURE_OVERVIEW.md` | **Technical architecture — entry point.** The Phase 0A package (`ARCHITECTURE_APPROVED`): domain model, boundaries, persistence, lifecycle, engine, content, economy integrity, operations, and the full ADR index — `ADR-001`–`ADR-017` from Phase 0A, `ADR-018` from the Phase 0B specification, `ADR-019` to `ADR-023` later. `ADR-007` is `SUPERSEDED` by `ADR-020` |
 | `docs/specs/phase-0b/PHASE_0B_TECHNICAL_FOUNDATION_SPEC.md` | **Phase 0B implementation specification** — tooling, workspace boundaries, primitive contracts, test matrix and Definition of Done (**`VERIFIED`**) |
 | `docs/specs/phase-0b/PHASE_0B_FOUNDATION_REVIEW.md` | **Phase 0B evidence** — the 92-case matrix, an ADR-by-ADR trace, §16 line by line, and every autonomous implementation decision (**`VERIFIED`**, accepted 2026-09-21) |
 | `docs/specs/phase-1/PHASE_1_WORLD_CHARACTER_VERTICAL_SLICE_SPEC.md` | **Phase 1 implementation specification** — the first visible vertical slice: account/session, character, World Atlas shell, Rookgaard, one Hunt entry (**`IMPLEMENTATION_SPEC_READY`**) |
@@ -151,8 +155,10 @@ everything under `docs/design/`:
 | `docs/ECONOMY.md` | Economy principles, sinks and transaction rules |
 | `docs/REFERENCES.md` | Research source hierarchy — and the **1x Tibia/Canary baseline lock**: the source's numbers are the numbers unless a divergence is recorded with its reason and its fixture |
 | `docs/architecture/decisions/ADR-019-currency-custody-scopes.md` | **Currency custody** — value lives in scopes (`BANK`, `POUCH`) and the one append-only ledger says which; extends ADR-003 and contradicts none of it. One guarantee row amended by ADR-020 |
-| `docs/architecture/decisions/ADR-020-character-deletion-grace-and-purge.md` | **Character deletion** — a 30-day reversible grace, then a hard purge of the Character and everything it owns; nothing moves to the Bank or to a recovery custody. `LOCKED` product rule, **supersedes ADR-007's retirement**; the purge policy for every reference to a Character; what a pending Character holds (G4.1b) and what survives a purge for tutorial completion and one-time grants (G4.1c), both `LOCKED`, with G4.1c's pre-completion case: the Bootstrap Kit, kept distinct from Tutorial Rewards, and the current starting grant classified. **Not implemented** — PRE-PHASE-4 gate, `PHASE_GATES.md` § *G4.1* |
-| `docs/architecture/decisions/ADR-021-character-bound-consumables-and-store-container.md` | **Character-bound consumables** — XP Boosts, Store-bought Exercise Weapons, Daily Reward and Event consumables bound permanently to one Character: binding separate from custody, a per-Character Store Container, only Store Container ↔ Depot, never sold, traded, listed, stashed, forged or converted, and purged with the Character even from the Depot. `LOCKED` product rule. **Not implemented** — gate GBC.1, owned by the first phase that ships one |
+| `docs/architecture/decisions/ADR-020-character-deletion-grace-and-purge.md` | **Character deletion** — a 30-day reversible grace, then a hard purge of the Character and everything it owns; nothing moves to the Bank or to a recovery custody. `LOCKED` product rule, **supersedes ADR-007's retirement**; the purge policy for every reference to a Character; what a pending Character holds (G4.1b) and what survives a purge for tutorial completion and one-time grants (G4.1c), both `LOCKED`, with G4.1c's pre-completion case: the Bootstrap Kit, kept distinct from Tutorial Rewards, and the current starting grant classified. **Amended 2026-09-25**, pending independent review: exactly 720 elapsed hours, a full freeze with no catch-up, an immutable historical deletion record and a public Deleted List, and the Main Character model's open items (DEL-O1–DEL-O6). **Not implemented** — PRE-PHASE-4 gate, `PHASE_GATES.md` § *G4.1* |
+| `docs/architecture/decisions/ADR-021-character-bound-consumables-and-store-container.md` | **Character-bound consumables** — XP Boosts, Store-bought Exercise Weapons, Daily Reward and Event consumables bound permanently to one Character: binding separate from custody, a per-Character Store Container, only Store Container ↔ Depot, never sold, traded, listed, stashed, forged or converted, and purged with the Character even from the Depot. `LOCKED` product rule. Since 2026-09-25 the tutorial's Health and Mana potions are bound consumables too (S6), pending independent review. **Not implemented** — gate GBC.1, owned by the first phase that ships one |
+| `docs/architecture/decisions/ADR-022-game-account-main-character-and-companions.md` | **Game Account, Main Character and companions** — one Main Character per Game Account, its campaign identity; further vocations as companions; the personal Active Party is the Main plus up to three companions; human multiplayer takes one selected actor per Game Account; login identity above Game Accounts as semantics, not a schema. Supersedes the roster of five equivalent Characters. `LOCKED` 2026-09-25, pending independent review. **Not implemented** — Phase 4 |
+| `docs/architecture/decisions/ADR-023-quest-replay-and-one-time-reward-claims.md` | **Quest replay and one-time reward claims** — content stays replayable; a quest's final or primary reward chest is claimed once per Game Account, whichever actor opens it; a typed, exactly-once claim; quest reward items are ordinary unless bound. `LOCKED` 2026-09-25, pending independent review. **Not implemented** — Phase 5 |
 | `docs/specs/phase-2/PHASE_2_HUNT_SIMULATOR_SPEC.md` | **Phase 2 implementation specification** — the Hunt simulator, rooms, Stamina, XP, Gold custody, supplies, death and the first Game Window (**`VERIFIED`**, accepted 2026-09-22 at `03058b5`) |
 | `docs/specs/phase-2/PHASE_2_CANARY_SOURCE_MAP.md` | **Phase 2 evidence** — every formula and datum imported or adapted from `Hokz/canary`, with the machine-checked import record beside it (**`VERIFIED`**) |
 | `docs/specs/phase-3/PHASE_3_ITEMIZATION_INVENTORY_LOGISTICS_SPEC.md` | **Phase 3 implementation specification** — real items, equipment, the five Hunt container slots, stacking, Capacity, the Loot Pouch, Loot Policy, Depot, Stash, movement, routing, the counter and the System UI |

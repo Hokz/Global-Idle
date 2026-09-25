@@ -155,6 +155,15 @@ The ones that would actually reveal a problem:
 | Job queue depth and age | worker starvation |
 | Content version in use | whether a deployment actually rolled out |
 | Overdue Character purges — how many are due and not yet purged, and how late the oldest is past `purgeAt` | the deletion lifecycle degrading. A due purge that has not committed is a **failure condition**, never a normal state; it alerts against a lateness target chosen before production (`ADR-020` §7, pre-launch gate). **PRE-4 — not implemented** |
+| Historical deletion records written vs purges committed | **must match** — a purge without its record, or a record without its purge, is an integrity alarm (`ADR-020` §7, DH1–DH3). **PRE-4 — not implemented** |
+
+### Product analytics — direction (2026-09-25)
+
+XP production, hunt efficiency, loot and drop generation, item creation and destruction, deleted
+Characters and balance analysis are preserved or collected (`ADR-020` DH6). What is collected,
+where it lives and how it is produced are not decided here: the purge's own facts are the PRE-4
+specification's (DH3), and retention is the pre-launch gate's. Analytics may keep identifying
+fields internally (DH4); they never become live ownership, custody or a uniqueness input (DH5).
 
 ### Tracing
 
@@ -192,7 +201,7 @@ Shared codebase, separate entry point (`ADR-012`).
 | Ledger reconciliation | scheduled; halts economy writes for a mismatched subject |
 | Listing expiry | returns escrowed items to inventory, transactionally |
 | Skill training settlement | on claim, or swept for long-idle accounts |
-| Character purge (**PRE-4 — not implemented**) | attempts every Character whose `purgeAt` has arrived **promptly**, one atomic transaction each; a purge that cannot commit is retried automatically and alerts while overdue. It never purges early and never defers a due purge (`ADR-020` §7) |
+| Character purge (**PRE-4 — not implemented**) | attempts every Character whose `purgeAt` has arrived **promptly**, one atomic transaction each, writing the historical deletion record in the same boundary; a purge that cannot commit is retried automatically and alerts while overdue. It never purges early and never defers a due purge (`ADR-020` §7) |
 
 `DECIDED IN PHASE 0A` — **every job is idempotent and safe to run twice.** Job systems deliver
 at-least-once under failure; designing for exactly-once is designing for a guarantee that does
@@ -235,7 +244,8 @@ the lost window. Recommended until decided: the purge job stays paused after a r
 lifecycle transitions lost in the window are reconciled, as a step alongside 2 and 3 above. That
 pause is part of disaster recovery, not a way to defer purges: every Character that falls due
 while it lasts is an **overdue purge**, visible and alerting like any other (`ADR-020` §7). How
-long backups and logs may keep a purged Character is open as well.
+long backups and logs may keep a purged Character is open as well, and so is how long historical
+deletion records, purge manifests and deletion analytics are retained.
 See [`../OPEN_QUESTIONS.md`](../OPEN_QUESTIONS.md) § *Character deletion*.
 
 ---

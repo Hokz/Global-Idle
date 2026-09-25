@@ -22,7 +22,9 @@ doing determines what it burns.**
 The restriction is on **Character action occupancy**, not on the player. The account may freely
 navigate hubs, inspect the Market, Atlas, inventory and skills, use menus, and manage other
 characters. Account-level concurrency across *different* characters is expected and supported —
-it is how a five-character roster is meant to be played.
+it is how a five-character roster is meant to be played. *Under `ADR-022` (2026-09-25) the roster
+is one Main Character plus companions, and whether a companion outside the Active Party may act on
+its own while the Main hunts is open (GA-O5).*
 
 ### Enforcement
 
@@ -51,7 +53,8 @@ Note the two claims are different scopes and both are needed:
 
 ## 2. Stamina — LOCKED
 
-Stamina belongs to **each Character independently**. There is no shared account pool.
+Stamina belongs to **each Character independently**. There is no shared account pool. *Under
+`ADR-022` that is the Main's; whether a companion has Stamina of its own is open (GA-O4).*
 
 ```text
 maximum: 42:00 hours, per Character
@@ -168,6 +171,10 @@ Worked example:
 If the Druid later joins the Hunt, only the Druid switches to consuming; the other three keep
 recovering.
 
+*Read under `ADR-022` (2026-09-25):* this example assumes five Characters acting independently.
+With one Main and its companions, whether companions train on their own while the Main hunts, and
+whether they have Stamina of their own, are open (GA-O4–GA-O5).
+
 ### 3.1 Rates
 
 | Account | Eligible non-consuming time | Stamina gained |
@@ -187,6 +194,11 @@ Any state in which the Character is **not reserved in a Stamina-consuming Hunt l
 - Dummy / Exercise Weapon Skill Training;
 - menus, hubs, Market, Atlas while the Character is not hunting;
 - any future activity explicitly configured as non-consuming.
+
+**Never a Character pending deletion** (`ADR-020`, 2026-09-25). The deletion grace is a full
+freeze: a `PENDING_DELETION` Character neither consumes nor recovers, offline or not. Its Stamina
+is settled up to the accepted request, no read settles it while it is pending, and a restore
+credits nothing for the pending time — recovery resumes from the restore instant (FZ2–FZ3).
 
 The qualifier matters. **"Offline recovers" does not extend to reconnect grace.** A Hunt paused
 in the 5-minute grace is a *reserved* Hunt state — the activity still exists and the Character's
@@ -220,12 +232,17 @@ CHARACTER STAMINA MODE (exactly one, derived from authoritative state)
   RECOVERING   everything else
 ```
 
+*Since 2026-09-25 a `PENDING_DELETION` Character is in none of the three: it is frozen, and nothing
+accrues (§3.2, `ADR-020` §4).*
+
 ---
 
 ## 4. Premium entitlement — LOCKED
 
 **Premium belongs to the Account, not to a Character.** Every Character on the account receives
-applicable benefits: the 42→39 XP band and 1:1 recovery.
+applicable benefits: the 42→39 XP band and 1:1 recovery. *Under `ADR-022` the account is the Game
+Account and its actors are the Main and its companions; whether Premium attaches to the login
+identity instead is open (GA-O8).*
 
 A Premium transition is authoritative server state. `DECIDED IN PHASE 0A`:
 
@@ -363,6 +380,10 @@ Recorded here and in the roadmaps so the implementing phase cannot quietly skip 
 | 22 | A Premium transition mid-interval applies correctly segmented rates |
 | 23 | The boundary at exactly 39:00 is deterministic |
 | 24 | The boundary at exactly 0:00 is deterministic |
+
+*Since 2026-09-25 the PRE-4 gate adds one more for Stamina: a `PENDING_DELETION` Character recovers
+nothing, and a restore credits nothing for the grace (`PHASE_GATES.md` § *G4.1*, the full freeze
+and no catch-up).*
 
 ### Active-use timers
 

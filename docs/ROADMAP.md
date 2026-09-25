@@ -40,18 +40,20 @@ Detail for every entry is in the master roadmap; nothing below adds to it.
 3.6 Movement fidelity
 3.7 First real asset visual slice
     ── PRE-PHASE-4 GATE ──
-4   Party / vocations
+4   Party / vocations                   (Skills; the Main + companions; personal Active Party)
 5   Quest / dungeon / boss framework    (generic engine; solo + one-account Party)
     ── PRE-5B GATE ──
-5B  Multiplayer activities              slice 1 infrastructure
+5B  Multiplayer activities              (one selected actor per Game Account)
+                                        slice 1 infrastructure
                                         slice 2 first cooperative quest
                                         slice 3 Warzones
 6   Economy                             (minimum cross-account settlement lands EARLIER)
-7   Forge / Imbuement / Wheel / Skill Tree
+7   Forge / Imbuement / Wheel / vocation Skill Trees
 7A  Advanced progression                (Bestiary, Charms, outfits, achievements)
 8   Premium / automation
 9   Content expansion
 10  Scale / hardening                   (but risk is hardened where it is introduced)
+    later: PvP arena, matchmaking, ranking — after the combat foundations
 ```
 
 ---

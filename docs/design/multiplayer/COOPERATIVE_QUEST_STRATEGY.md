@@ -11,14 +11,20 @@ first cooperative quest · Phase 5B slice 3 owns Warzones.
 · [`../party/PARTY_SYSTEM_FOUNDATION.md`](../party/PARTY_SYSTEM_FOUNDATION.md)
 · [`docs/PHASE_GATES.md`](../../PHASE_GATES.md)
 · [`docs/MASTER_DEVELOPMENT_ROADMAP.md`](../../MASTER_DEVELOPMENT_ROADMAP.md) §20
+· [`ADR-022`](../../architecture/decisions/ADR-022-game-account-main-character-and-companions.md)
+(one selected actor per Game Account)
+· [`ADR-023`](../../architecture/decisions/ADR-023-quest-replay-and-one-time-reward-claims.md)
+(replay and one-time reward claims)
 
 ---
 
 ## 1. Three group concepts that are not each other — `APPROVED DIRECTION`
 
 ```text
-ACTIVE PARTY        1-4 Characters, ONE account                       Phase 4
-EXPEDITION GROUP    up to 5 humans, ONE Character per account         Phase 5B slice 2
+ACTIVE PARTY        1-4 actors, ONE Game Account: the Main            Phase 4
+                    + up to 3 companions
+EXPEDITION GROUP    up to 5 humans, ONE selected actor per Game       Phase 5B slice 2
+                    Account: its Main or any unlocked companion
 WARZONE             ~25-50 entrants, TENTATIVE and to be benchmarked  Phase 5B slice 3
 ```
 
@@ -28,7 +34,10 @@ They differ in kind, not in size:
   already per Character, which is what makes it possible without any networking;
 - an **Expedition Group** is several *accounts* in one Activity. That brings invitations,
   lobbies, fairness, disconnect policy, cross-account settlement and spectating — none of which
-  a one-account Party needs;
+  a one-account Party needs. *Since 2026-09-25 each Game Account selects exactly one actor — its
+  Main or any unlocked companion; the Main is not mandatory, the personal party never enters as a
+  block, and changing the actor creates no new account, reward entitlement or completion identity
+  (`ADR-022` MP1–MP5);*
 - a **Warzone** is the same multi-account infrastructure at a scale that has to be measured
   before it is promised.
 
@@ -121,11 +130,26 @@ revival mechanic exists. Do not invent either. See §9.
 
 ## 6. Multi-account settlement — `APPROVED DIRECTION`
 
-Rewards and penalties in a shared run settle **per account**. The minimum settlement safety
-needed for this — a reward ledger that cannot double-pay or lose a payout across accounts — must
-exist and be proven **before the first shared quest**, not deferred to the full Market.
+Rewards and penalties in a shared run settle **per account** — per Game Account. The minimum
+settlement safety needed for this — a reward ledger that cannot double-pay or lose a payout across
+accounts — must exist and be proven **before the first shared quest**, not deferred to the full
+Market.
 
 See [`docs/PHASE_GATES.md`](../../PHASE_GATES.md) § *Pre-5B* and § *Pre-market*.
+
+### Replay and one-time reward claims — `LOCKED` (2026-09-25)
+
+A cooperative quest is **not** one-time content (`ADR-023`):
+
+- it may be run again — its boss rooms repeated, its hunt areas reused, other groups helped, and a
+  different actor selected by the same Game Account on a later run;
+- its final or primary reward chest is claimed **once per Game Account**, whichever actor that
+  Game Account selected. Replay never re-enables it, and choosing the Main or a companion never
+  resets it;
+- the claim is Game Account state, kept apart from completion and progression, and a retried or
+  concurrent claim grants at most once (`PHASE_GATES.md` § *G5B.3*);
+- what a replay yields once the chest is claimed, and whether a helper gains anything, are open
+  (§9).
 
 ## 7. What Phase 5 must deliver for this to be possible — `APPROVED DIRECTION`
 
@@ -165,6 +189,8 @@ Tracked in [`docs/OPEN_QUESTIONS.md`](../../OPEN_QUESTIONS.md) under *Cooperativ
   is separately approved;
 - how contribution is measured, and whether it affects reward;
 - how loot is distributed across accounts, and whether the Reward Chest is the vehicle;
+- what a replay yields once the final chest is claimed, and whether helping another group yields
+  anything to the helper (`ADR-023` §4);
 - the plan authoring surface's expressive limits — how much conditional logic is too much;
 - what happens when a frozen plan becomes unsatisfiable mid-run;
 - scheduling and matchmaking for Warzone entry;

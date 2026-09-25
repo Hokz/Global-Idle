@@ -118,9 +118,37 @@ the `DOM` cases.
 - translated into dungeons rather than full tile-by-tile recreation;
 - long term should include meaningful interactive mechanics.
 
+### Replay and one-time reward claims
+
+`LOCKED` by the Product Owner, 2026-09-25. Architecture:
+[`architecture/decisions/ADR-023-quest-replay-and-one-time-reward-claims.md`](architecture/decisions/ADR-023-quest-replay-and-one-time-reward-claims.md).
+**Not implemented** — no quest, dungeon or chest exists yet (Phase 5).
+
+**Content access and replay** and **one-time reward claims** are separate. A quest is never
+*"one-time"* in the sense of being inaccessible after completion:
+
+- a quest — a multiplayer quest included — may be run again. Its boss rooms may be repeated, its
+  hunt areas stay usable under the content's access rules, a player may help other groups again,
+  and a Game Account may select a different actor — its Main or a companion — on a later run;
+- none of that re-enables a one-time reward. A quest's **final or primary reward chest is one-time
+  per Game Account** (campaign);
+- not yet claimed: opening the eligible chest grants the reward exactly once, and the
+  authoritative claim state becomes `CLAIMED`. Already claimed: opening it grants nothing a second
+  time, and the UI may show the chest as empty;
+- the claim state belongs to the **Game Account**, never to the selected actor, so choosing the
+  Main or a companion never resets it;
+- quest completion and progression state and reward-claim state are never conflated, because
+  content is replayable;
+- the claim is a typed reward-claim concept, settled exactly once under retry and concurrency —
+  never scattered, untyped storage flags. Its physical representation is the implementing phase's;
+- an ordinary quest reward item — the Doublet included — is a normal item unless its definition
+  says otherwise: movable, sellable, tradeable and discardable under the normal item rules. Coming
+  from a quest never makes equipment Character-bound.
+
 ## Bosses
 
-- one-time unlock dungeon where applicable;
+- one-time unlock dungeon where applicable — the unlock is *access*; one-time *rewards* follow the
+  claim rules above;
 - repeatable after unlock;
 - auto-rotation supported;
 - default design target: up to 3 completions/day per boss.
@@ -144,6 +172,20 @@ Exact order:
 - **custody and binding are separate axes**: where an item is stored never decides, on its own,
   whose it is — see *Character-bound consumables and the Store Container*, below.
 
+### Affixes
+
+`LOCKED` by the Product Owner, 2026-09-25. Not implemented beyond Phase 3's rolled affixes.
+
+- affix pools are **slot-specific**: what an item can roll depends on its equipment slot and item
+  type;
+- a reroll targets **one** existing affix — one status slot — that the player chooses. Only that
+  slot rerolls;
+- the result is random from the legal pool for that item type. It may stay the same attribute at a
+  different value, or become another legal attribute;
+- every other affix on the item stays exactly as it was.
+
+Pools, values, reroll costs and limits are open.
+
 ## Forge
 
 - target explicitly selected;
@@ -154,6 +196,17 @@ Exact order:
 - same Rarity;
 - eligible items can reach Tier 10;
 - difficulty/cost scales with Classification + Rarity + Tier.
+
+`LOCKED` by the Product Owner, 2026-09-25:
+
+- **rarity and affixes are one axis, the Forge Tier another.** Affix quality is never called a
+  Forge Tier, and forging never changes rarity or affixes;
+- the intended recursive sacrifice concept: a target base item plus **two matching sacrifice items
+  of the required prior tier** attempt the next Forge Tier, and each higher tier repeats that with
+  sacrifices of its own prior tier;
+- the Forge has a success and a failure chance.
+
+Exact success rates, and any failure consequence beyond those locked above, are open.
 
 ## Imbuements
 
@@ -167,6 +220,63 @@ Two distinct build systems:
 - Wheel;
 - vocation Skill Tree.
 
+### Classic Skills and the build philosophy
+
+`LOCKED` by the Product Owner, 2026-09-25. **Non-formula rules only**: no combat coefficient,
+formula, rounding stage or balance number is decided here (*Combat formulas*, below).
+
+- the classic Skills are retained: **Magic Level, Sword, Axe, Club, Shielding, Distance and
+  Fist**. There is **no Fishing** skill;
+- they are real progression variables, and later feed the combat formulas;
+- **Level is not the sole power source.** Level mainly provides base progression — HP, Mana,
+  Capacity — plus access and unlocks. Power and build also come from the classic Skills, the
+  vocation's Skill Tree, the Wheel, equipment, affixes, the Forge, Imbuements, Charms and later
+  systems;
+- Hunts should reward **matching a build to the Hunt**, not level alone.
+
+### Damage origin and damage type
+
+`LOCKED` by the Product Owner, 2026-09-25.
+
+- **damage origin** — a spell, a weapon, a rune — and **damage type** — physical, fire, ice and so
+  on — are two different things. A spell may deal **physical** damage;
+- which defences apply is decided by the damage **type**, never by whether the source was a spell
+  or a weapon.
+
+### Creature elemental design
+
+`LOCKED` by the Product Owner, 2026-09-25.
+
+- ordinary Hunt design avoids absolute 100% creature immunities;
+- creatures use **resistances, sensitivities and weaknesses** instead;
+- a resistant Hunt is **less efficient** for a mismatched build, not generically impossible.
+
+### Vocation Skill Trees and respec
+
+`LOCKED` by the Product Owner, 2026-09-25.
+
+- there is **no universal, shared Skill Tree**. Each vocation has its **own** Skill Tree;
+- the number of paths is **not** fixed at three: it depends on each vocation's design;
+- further paths can be gated by Character Level or other progression. Earlier examples such as
+  Level 1000 or 2000 are illustrations, not locked thresholds;
+- crossing over into further paths, long term, is intended;
+- **Gold** is an intended major progression sink: nodes are bought with it;
+- trees are deep enough that unlocking a later path does not imply the first one is complete;
+- **respec:** the player may remove chosen nodes and rebuild. Gold already spent is **not**
+  refunded. A tree can never be left structurally invalid — a removed node's dependent descendants
+  are handled consistently, in a way the final implementation defines.
+
+Open: whether an extreme endgame can eventually buy every node or keeps an exclusive
+specialization, and the Monk's branch identity.
+
+### Combat formulas — OPEN
+
+The combat formula revision discussed after PR #13 head `86a7681` is **not** decided: attack
+coefficients, the minimum and maximum auto-attack formulas, whether Canary's coefficient is
+adopted, the starting Skill value, the Defense score and its roll, the Armor roll, the rounding
+stages of the combat pipeline, skill scaling, and any balance target derived from them. It is
+handled separately. The formulas Phases 2–3.6 implemented and verified are unchanged.
+
 ## Vocation identity
 
 - Knight = Tank
@@ -175,46 +285,124 @@ Two distinct build systems:
 - Paladin = Ranged Physical/Holy DPS
 - Monk = Debuff/Hybrid Support
 
-## Party and character roster
+## Equipment
 
-> **Scope of this section: the PERSONAL Active Party — the Characters of ONE account.**
-> Every rule below is about that. None of them is a statement about several *humans* sharing an
-> Activity: a cross-account **Expedition Group** is explicitly supported future direction, owned
-> by Phase 5B. See
-> [`design/MULTIPLAYER_ACTIVITIES_FOUNDATION.md`](design/MULTIPLAYER_ACTIVITIES_FOUNDATION.md) §1
-> and [`design/multiplayer/COOPERATIVE_QUEST_STRATEGY.md`](design/multiplayer/COOPERATIVE_QUEST_STRATEGY.md).
->
-> This note adds the scope the wording always implied; it reverses nothing.
+`LOCKED` by the Product Owner, 2026-09-25. **Non-formula rules only** — no slot arithmetic is
+decided here.
 
-- one player/account controls the entire personal Party; **there is no multi-human PERSONAL
-  Party**. A shared cross-account Activity is a different system, not a larger Party;
-- the account **Character Roster** holds at most **5** characters;
-- the **Active Party** holds at most **4** characters, minimum 1;
-- five simultaneous active characters **of one account** do not exist. (A future Expedition Group
-  may place five Characters in one Activity — one per account, five accounts — which is not this
-  rule and does not relax it);
-- at most **one roster Character per vocation** per account;
-- while a Knight exists on the account — `ACTIVE` or `PENDING_DELETION` — Knight is unavailable as
-  a new vocation choice. Only once that Knight is **permanently purged** (*Character deletion*,
-  below) does Knight become available again;
-- there is no retired or historical Character. A Character either exists — `ACTIVE`, or
-  `PENDING_DELETION` during its grace — or has been purged and does not exist at all. A Character
-  that exists counts against the roster in either state;
-- additional roster slots are unlocked with in-game Gold; exact costs remain OPEN;
-- later unlocked characters start at Base Level 8, skip Rookgaard, and receive no catch-up
-  levels;
-- unlocking a character never forces it into the Active Party; the player may deliberately run
-  solo, duo, trio or four characters;
-- roster characters outside the Active Party do not fight and do not receive Shared XP;
-- Active Party Slot 1 is the **Frontline**; the Origin Character is not required to hold Slot 1,
-  nor to be in the Active Party at all;
-- one account/session owns the whole Active Party, so the 5-minute reconnect grace pauses the
-  entire Party activity.
+- the ordinary armour slots stay Tibia-like;
+- vocations are told apart mainly by **equipment eligibility**, weapon and off-hand options,
+  spells, Skill Trees, the Wheel and similar systems — **never** by a hidden per-vocation Armor or
+  Defense multiplier;
+- an item's requirements may restrict it by vocation or class, and by level;
+- any vocation may use a **shield** where the item and the rules allow it;
+- **Knight:** a one-handed weapon with a shield, or a two-handed weapon;
+- **Monk:** primarily two-handed. Its final equipment identity is open;
+- **Paladin:** shield-compatible throwing and spear-style options, and two-handed bows and
+  crossbows;
+- **mages:** a wand or rod with a shield, with a **spellbook** as the preferred and typical
+  off-hand where content allows.
+
+## Bestiary
+
+`LOCKED` direction, Product Owner, 2026-09-25. **Not implemented** (Phase 7A).
+
+- the **Tibia Global Bestiary** is the baseline for structure, creature characterization and
+  categories, and kill-count thresholds;
+- when the Bestiary phase is built, it **verifies** the then-current Tibia Global values from
+  reliable sources and records the exact values it adopts. No threshold is frozen from memory
+  before then;
+- the Bestiary reveals useful creature knowledge — resistances and weaknesses among it — through
+  progression, and supports build planning;
+- the exact reveal UX and any deliberate divergence belong to the owning phase.
+
+## Game Account, Main Character and companions
+
+`LOCKED` by the Product Owner, 2026-09-25. **Supersedes** the roster of up to five equivalent
+Characters per account that this section described until 2026-09-24. Architecture:
+[`architecture/decisions/ADR-022-game-account-main-character-and-companions.md`](architecture/decisions/ADR-022-game-account-main-character-and-companions.md).
+**Not implemented** — every Character in code today is a Main before Rookgaard; companions,
+unlocks and the Active Party are Phase 4.
+
+```text
+LOGIN / AUTH IDENTITY
+  └─ one or more GAME ACCOUNTS (campaigns)
+       ├─ exactly one MAIN CHARACTER each
+       └─ a COMPANION ROSTER
+```
+
+- a Game Account has exactly **one Main Character** — the player's primary created character and
+  the Game Account's campaign identity. *Origin Character* in older documents and in code is the
+  Main before it completes Rookgaard;
+- further vocation actors are unlocked as **companions**, members of the Game Account's roster. A
+  companion is **not** an account-lifecycle Character equivalent to the Main: it does not replace
+  the Main, and it does not carry the Main's deletion or tutorial semantics;
+- the five vocation identities remain Knight, Druid, Sorcerer, Paladin and Monk;
+- a player who wants a different Main vocation may use **another Game Account** under the same
+  login identity, subject to later account-management design;
+- wherever a document says *Account*, it means the **Game Account** — its Bank, Depot, Stash,
+  tutorial completion, reward-claim state and roster. The login identity is a separate level above
+  it, and how it is stored is the owning phase's choice.
+
+**Carried over, unchanged** — each was locked before and nothing above contradicts it:
+
+- at most **one roster member per vocation**: the Main and every companion hold distinct
+  vocations, so a Game Account has at most four companions. A vocation the Main or a companion
+  holds is not offered as an unlock;
+- companions are unlocked with in-game **Gold**, not with Premium. An unlock is permanent and never
+  refunded; exact costs and any other prerequisite remain OPEN;
+- a newly unlocked companion starts at Base Level 8, never enters Rookgaard, receives no catch-up
+  levels, and has its own vocation, Base Level, Base XP and Skills.
+
+**OPEN, because this decision makes them ambiguous** (`ADR-022` §4,
+[`OPEN_QUESTIONS.md`](OPEN_QUESTIONS.md)): a companion's own lifecycle; what happens to the
+companions and to the Game Account when the Main is deleted or purged; companion custody, Stamina,
+occupancy and names; how a low-level companion levels when the Main is always present; and whether
+entitlements and sessions belong to the login identity or to each Game Account. Where an older rule
+below says *Character* about any roster member — occupancy, Stamina, Shared XP, per-Character
+custody — it now applies to the Main, and to a companion only once Phase 4 specifies it.
+
+## Personal Active Party
+
+> **Scope: the PERSONAL Active Party — the actors of ONE Game Account.** None of these rules is a
+> statement about several humans sharing an Activity (*Human multiplayer*, below).
+
+`LOCKED` by the Product Owner, 2026-09-25:
+
+- a personal or solo Hunt belongs to one Game Account;
+- the **Main Character is always present**. Up to **three companions** may join it: at most
+  **four** combat actors, minimum one — the Main alone;
+- the player may reorder the formation. Slot 1 is the **Frontline**, and the Main need not hold
+  it;
+- one player controls the whole personal party; **there is no multi-human personal party**;
+- five simultaneous active actors of one Game Account do not exist, and Premium never creates a
+  fifth;
+- roster companions outside the Active Party do not fight and do not receive Shared XP;
+- unlocking a companion never forces it into the Active Party;
+- one Game Account's session owns the whole Active Party, so the 5-minute reconnect grace pauses
+  the entire party activity.
+
+## Human multiplayer — one selected actor per Game Account
+
+`LOCKED` by the Product Owner, 2026-09-25:
+
+- in human multiplayer or co-op, several human Game Accounts share **one** multiplayer Activity;
+- each participating Game Account selects **exactly one** eligible combat actor from its unlocked
+  roster — its **Main or any unlocked companion**. The Main is **not** mandatory in multiplayer;
+- the personal four-actor Active Party **never** enters multiplayer as a block;
+- changing the selected actor never creates another account, another reward entitlement or another
+  completion identity.
+
+Unchanged: the first cooperative quest takes **up to five humans, one selected actor per Game
+Account**; the Warzone scale stays tentative and benchmark-driven; the lobby strategy and
+frozen-plan architecture remain in force
+([`design/multiplayer/COOPERATIVE_QUEST_STRATEGY.md`](design/multiplayer/COOPERATIVE_QUEST_STRATEGY.md),
+[`design/MULTIPLAYER_ACTIVITIES_FOUNDATION.md`](design/MULTIPLAYER_ACTIVITIES_FOUNDATION.md)).
 
 ### Shared XP eligibility
 
-Evaluated across the **entire** Active Party, using only the highest and lowest active Base
-Levels:
+Evaluated across the **entire** Active Party — the Main and its active companions — using only the
+highest and lowest active Base Levels:
 
 ```text
 minimumShareLevel = ceil(highestLevel × 2 / 3)
@@ -223,30 +411,40 @@ level-eligible when   lowestLevel >= minimumShareLevel
 ```
 
 - one out-of-range active member makes the whole formation fail eligibility;
-- newly unlocked Level 8 characters receive **no** exception;
+- a newly unlocked Level-8 companion receives **no** exception;
 - Tibia Global's Shared Experience metrics are the reference direction for the bonus and
   distribution table, but the exact adopted values must be verified and documented before
   implementation, never invented;
-- how XP is allocated when a multi-character formation is *not* Shared-XP eligible is OPEN.
+- how XP is allocated when a multi-actor formation is *not* Shared-XP eligible is OPEN — and matters
+  more now that the Main is always present (`ADR-022` GA-O6).
 
 ## Character deletion
 
-`LOCKED` by the Product Owner, 2026-09-24. **Supersedes retirement** (`ADR-007`, now
-`SUPERSEDED`). Architecture:
+`LOCKED` by the Product Owner, 2026-09-24, and **amended 2026-09-25** (720 hours, the full freeze,
+the historical record and the public Deleted List, below). **Supersedes retirement** (`ADR-007`,
+now `SUPERSEDED`). Architecture:
 [`architecture/decisions/ADR-020-character-deletion-grace-and-purge.md`](architecture/decisions/ADR-020-character-deletion-grace-and-purge.md).
 Owning gate: PRE-PHASE-4, [`PHASE_GATES.md`](PHASE_GATES.md) § *G4.1*. **Not implemented** — the
 code still carries the retirement model until that gate's implementation replaces it.
 
+Since 2026-09-25 the Character these rules delete is the **Main Character** (`ADR-022`).
+Companions are not account-lifecycle Characters of its kind, and how deletion reaches them — and
+what becomes of the Game Account when its only Main is purged — is **OPEN** for the PRE-4
+specification (`ADR-020` §5.3).
+
 ```text
 ACTIVE
-  -> PENDING_DELETION for 30 days
-       -> restored, if the player reverses the decision inside the 30 days
-       -> PERMANENTLY PURGED, once the 30 days expire
+  -> PENDING_DELETION for 30 days = exactly 720 elapsed hours, fully frozen
+       -> restored, if the player reverses the decision before purgeAt
+       -> PERMANENTLY PURGED at purgeAt; an immutable historical record remains
 ```
 
 - a player-requested deletion is **not** immediately destructive;
 - for exactly 30 days after the request, the Character and everything needed to restore it
   remain intact, and the player may reverse the deletion and recover the Character;
+- **30 days is exactly 720 elapsed hours** from the accepted request, on the authoritative server
+  clock. `purgeAt` is stored and fixed; there are no time-zone or calendar-day semantics
+  (2026-09-25);
 - the Character's **name stays reserved** throughout the 30 days;
 - when the 30 days expire, deletion is **final and irreversible**;
 - the final purge removes the Character row and **all** Character-owned state, value and data:
@@ -257,10 +455,9 @@ ACTIVE
 - nothing Character-owned moves to a recovery custody or to the Account Bank. Character-owned
   value that still exists at purge time is **destroyed** with the Character;
 - after the purge, the name is available for creation again;
-- no Character record survives to keep the deleted Character as history or audit state, and no
-  surviving account-wide or shared record keeps its identity, name or id for convenience. Where
-  account integrity needs a transaction or aggregate to survive, the account-level fact survives
-  **without** the Character's identity;
+- ~~no Character record survives to keep the deleted Character as history or audit state, and no
+  surviving account-wide or shared record keeps its identity, name or id for convenience~~ —
+  **superseded 2026-09-25** by the historical record and the public Deleted List, below;
 - **Account-owned state is never deleted because a Character is**: the Account, its Bank, its
   entitlements, its roster capacity and other account-wide state remain. (Roster capacity is
   also never refunded — a Phase 0A decision, `DOMAIN_MODEL.md` §5.4.) A Character-bound
@@ -270,6 +467,45 @@ ACTIVE
   explicitly designed destructive boundary.
 
 Nothing further is inferred from how any other game handles deletion.
+
+### The grace is a full freeze — 2026-09-25
+
+The Product Owner delegated the safety architecture and approved this direction:
+
+- a deletion **copies nothing**. The same authoritative gameplay Character stays persisted and is
+  marked `PENDING_DELETION`; there is no second, restorable copy;
+- while pending it is **fully frozen**: no Hunt, no Training, no XP, no Skill progression, **no
+  Stamina recovery**, no other elapsed-time gameplay recovery, no item move or use, no currency
+  mutation, no quest mutation, no reward grant and no bound-item grant;
+- restore works only while `now < purgeAt`. It reactivates the same persisted state and returns it
+  **exactly as it was when the deletion was accepted** — no reconstruction from a copied snapshot,
+  no catch-up and no offline recovery for the pending time;
+- at `now ≥ purgeAt` restore is forbidden and the purge is immediately due. A failed purge is a
+  degraded, frozen condition, never an extension: the name stays reserved until the purge
+  succeeds, retry is automatic, and the condition is visible and alerting;
+- the purge is idempotent: a retry cannot double-settle, double-delete value, re-grant, refund or
+  duplicate anything. After a successful purge the gameplay state cannot be restored;
+- the name is released only by the successful final purge and may then be reused. A historical
+  deletion record never reserves it.
+
+### Deletion history, the public Deleted List and analytics — 2026-09-25
+
+The rules that required a purge to leave no identity behind are **superseded**:
+
+- a successful purge removes the **live, restorable** gameplay Character, and an **immutable
+  historical deletion record** survives for audit, moderation and analytics. It can never restore
+  gameplay;
+- a **public Deleted List** shows the former Character's name, vocation, level at the
+  deletion/purge snapshot, the deletion/purge date, and a broad reason category that tells a
+  voluntary deletion from a rules or moderation deletion. Detailed internal moderation reasons are
+  not automatically public;
+- the internal deletion audit keeps enough immutable history to answer what was deleted and to
+  support anti-duplication, operations and balance analytics — preferably a purge manifest
+  (deletion snapshot) plus analytics facts, never old live gameplay rows left restorable;
+- historical records may keep identifying fields internally: the Product Owner asked for named
+  history. They never take part in live ownership or custody, or in any gameplay uniqueness rule;
+- analytics are preserved or collected for XP production, hunt efficiency, loot and drop
+  generation, item creation and destruction, deleted Characters, and balance analysis.
 
 ### What a pending Character still holds — G4.1b
 
@@ -293,6 +529,11 @@ deadline; no same-vocation replacement — and, when the pending Character is th
 no second Origin Character — can be created before the purge.
 Roster capacity stays Account-owned, and is neither reduced nor refunded by a deletion or a purge.
 
+*Read under `ADR-022` (2026-09-25):* the pending Character is the Game Account's Main. It stays the
+Main through the grace — its name, its vocation and its Main slot (the *Origin slot*) stay reserved
+and nothing can replace it — so these rules hold unchanged for it. Whether anything may take them
+after the purge, and what happens to its companions meanwhile, is OPEN (`ADR-020` §5.3).
+
 ### Tutorial completion and one-time grants after a purge — G4.1c
 
 `LOCKED` by the Product Owner, 2026-09-24. Tutorial completion belongs to the **Account**, not to
@@ -314,7 +555,13 @@ the lifetime of the Origin Character:
   are never conflated;
 - the Origin Character is historical only as a role while it exists. After its purge there is no
   residual Character record; the account-level tutorial-completion fact is the only thing that
-  survives for this purpose.
+  survives for this purpose. *(Since 2026-09-25 that means no live record: the immutable historical
+  deletion record is history, not a Character, and plays no part in tutorial routing.)*
+
+*Read under `ADR-022` (2026-09-25):* tutorial completion and one-time reward state belong to the
+**Game Account**, and every rule above about them stands. The rules about *"a Character created
+after a purge"* describe a **replacement Main**, and whether a Game Account may create one after
+its Main is purged is OPEN (`ADR-020` §5.3). If it may, they say how it starts.
 
 ### Before Rookgaard is complete — the Bootstrap Kit (G4.1c)
 
@@ -362,16 +609,32 @@ is destroyed with that Character, so repeated cycles accumulate nothing.
 a kit: the code gives every Character the same starting grant, whose items can be moved to the
 Depot, and whose potions can be stowed in the Stash. The PRE-4 gate
 ([`PHASE_GATES.md`](PHASE_GATES.md) § *G4.1*) changes that, with the purge and never after it. The
-current grant is classified item by item in `ADR-020` §5.2. Two points are flagged there, not
-decided: its 20 small health potions, and whether the kit's binding ends with the tutorial — see
-[`OPEN_QUESTIONS.md`](OPEN_QUESTIONS.md) § *Character deletion*.
+current grant is classified item by item in `ADR-020` §5.2.
+
+**The tutorial's items — 2026-09-25.**
+
+- tutorial utility consumables — its Health and Mana potions — are **Character-bound** and use the
+  **Store Container** model (*Character-bound consumables*, below). They are not a Tutorial Reward,
+  and their binding never ends. Like every bound consumable they may rest in the Depot, still
+  bound, so the kit rule above that keeps kit items out of the Depot now concerns the gear. The
+  current direction is **20 Health and 20 Mana potions**; neither quantity is final while combat
+  balance is calibrated. The content still grants 20 small health potions in the backpack and no
+  mana potion;
+- the tutorial's **starter combat gear** — armour, dagger, backpack — must be equipped and used in
+  Rookgaard. The Store Container model is for consumables and never reaches an equipment slot, so it
+  cannot hold that gear, and the Product Owner has not chosen how the gear is represented. It is
+  **not** forced into that model: it is **OPEN** for the PRE-4 specification (`ADR-020` DEL-O4);
+- a quest reward is never bound because it came from a quest: the tutorial's **Doublet is an
+  ordinary item** (*Quests*, above). The Doublet Quest's final chest is one-time per Game Account.
 
 ## Character activity occupancy
 
 - a Character may perform only **one** primary gameplay/progression action at a time;
 - the same Character cannot Hunt and Skill Train simultaneously, and cannot be in two
   activities;
-- **different** Characters on the same account may act concurrently;
+- **different** Characters on the same account may act concurrently. *Under `ADR-022` the Main is
+  the only such Character; whether a companion outside the Active Party may act on its own while
+  the Main hunts is OPEN (GA-O5);*
 - the restriction is on Character action occupancy, not on UI navigation - the player may browse
   hubs, Market, Atlas, inventory and skills freely.
 
@@ -435,7 +698,11 @@ The distinction is *participating in a Stamina-consuming activity* vs *not parti
 - **Premium: 1 minute of eligible time = +1 minute** (1:1);
 - **Free: 2 minutes of eligible time = +1 minute** (1:2);
 - capped at 42:00; there is no mandatory waiting period;
-- every activity type must declare whether it consumes Stamina.
+- every activity type must declare whether it consumes Stamina;
+- a **`PENDING_DELETION` Character recovers nothing**: the deletion grace is a full freeze, and a
+  restore credits nothing for the pending time (*Character deletion*, 2026-09-25);
+- Stamina per Character applies to the Main; whether each companion has its own Stamina is OPEN
+  (`ADR-022` GA-O4).
 
 ## Active-use timers
 
@@ -463,11 +730,13 @@ wall-clock time.
 
 ## Free/Premium
 
-- **Premium is an Account-wide entitlement**, not a Character one. Every Character on the account
-  receives applicable benefits;
+- **Premium is an Account-wide entitlement**, not a Character one. Every actor of the account — the
+  Main and its companions — receives applicable benefits. *Account* here is the Game Account, as
+  implemented; whether Premium should instead attach to the login identity and cover all its Game
+  Accounts is OPEN (`ADR-022` GA-O8);
 - a Premium transition splits an unsettled interval at the transition boundary; already-settled
   time is never retroactively rewritten;
-- additional roster characters are unlocked with in-game **Gold**, not with Premium;
+- companions are unlocked with in-game **Gold**, not with Premium;
 - Premium must not create a fifth simultaneous Active Party member;
 - Party-related Premium benefits are OPEN and require separate product design;
 - Premium emphasis = automation/convenience/capacity;
@@ -488,12 +757,15 @@ wall-clock time.
 `LOCKED` by the Product Owner, 2026-09-24. Architecture:
 [`architecture/decisions/ADR-021-character-bound-consumables-and-store-container.md`](architecture/decisions/ADR-021-character-bound-consumables-and-store-container.md).
 **Not implemented** — owned by the first phase that introduces one (`PHASE_GATES.md` § *GBC.1*).
+Since 2026-09-25 that may be the tutorial's own consumables; whether PRE-4 builds this foundation
+for them is **OPEN** (`ADR-020` DEL-O5).
 
 The Product Owner may call them *"Unique Items"*; the technical term is **Character-bound
 consumable**, because every `ItemInstance` is already unique by identity. A Character-bound
 consumable is a consumable permanently bound to one Character — for example XP Boosts, Exercise
 Weapons bought with Store Coin or premium currency, Daily Reward consumables, Event consumables,
-and other consumables explicitly configured the same way.
+the **tutorial's utility consumables** (2026-09-25), and other consumables explicitly configured
+the same way.
 
 **Scope.**
 
@@ -543,7 +815,8 @@ items stay intact and restorable: no Store Container ↔ Depot movement, no use,
 grant to it; a restore returns them exactly. At the final purge the Store Container is deleted, and
 so is every item bound to the Character — **including bound items stored in the Depot**. None of
 them transfers, becomes unbound, stays behind in the Depot, moves to the Stash, refunds Store Coin
-or premium currency, or converts into any value.
+or premium currency, or converts into any value. The historical deletion record may list them; it
+owns and binds nothing.
 
 ```text
 ordinary, unbound Depot item    ->  KEEP at a purge     (the Account's)
@@ -552,7 +825,8 @@ Character-bound Depot item      ->  DELETE at a purge   (its bound Character's)
 
 Open, and not decided here: the Store Container's capacity, sorting or subcontainers; Store Coin
 pricing; which Daily Rewards and Events grant bound items; XP Boost numbers and durations; Exercise
-Weapon Store pricing and charges; the use UI; and the outfit and mount unlock model — see
+Weapon Store pricing and charges; the use UI; the outfit and mount unlock model; how a Hunt uses a
+bound tutorial potion held in the Store Container; and the final tutorial potion quantities — see
 [`OPEN_QUESTIONS.md`](OPEN_QUESTIONS.md) § *Character-bound consumables*.
 
 ## Engineering process

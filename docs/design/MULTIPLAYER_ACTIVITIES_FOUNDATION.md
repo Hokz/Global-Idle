@@ -16,8 +16,9 @@ networking-free. See [`../MASTER_DEVELOPMENT_ROADMAP.md`](../MASTER_DEVELOPMENT_
 ## 1. Three different kinds of "together"
 
 ```text
-ACTIVE PARTY        1-4 Characters owned by ONE Account            Phase 4
-EXPEDITION GROUP    up to 5 ACCOUNTS, one Character each           Phase 5B slice 2
+ACTIVE PARTY        1-4 actors of ONE Game Account:                Phase 4
+                    the Main + up to 3 companions
+EXPEDITION GROUP    up to 5 GAME ACCOUNTS, one selected actor each Phase 5B slice 2
 WARZONE             a large public activity on the same rails      Phase 5B slice 3
 ```
 
@@ -27,6 +28,12 @@ possible. An Expedition Group is several players, which brings lobbies, invitati
 disconnect policy and loot distribution — every one of which is a product decision nobody has made
 yet. A Warzone is that same multi-account machinery at a scale that must be measured before it is
 promised.
+
+*Since 2026-09-25 (`ADR-022`):* the Active Party always contains its Game Account's Main. An
+Expedition Group or a Warzone takes **exactly one selected actor per Game Account** — its Main or
+any unlocked companion; the Main is not mandatory. The personal party never enters as a block, and
+changing the selected actor creates no new account, reward entitlement or completion identity
+(MP1–MP5).
 
 **A personal Party is never re-labelled as a large Party.** Raising the Active Party cap is not
 how cooperative play arrives; the Expedition Group is.
@@ -45,13 +52,15 @@ Direction only:
 - automated area and room progression, as Hunts already work;
 - a final boss;
 - rewards based on the current Tibia/Canary Warzone content — Warzones 1–9 are the recognisable
-  candidates.
+  candidates;
+- the content stays replayable, and each Game Account claims a one-time final reward once,
+  whichever actor it selected (`ADR-023`, 2026-09-25).
 
 ### Participant scale — `TENTATIVE`
 
 | Activity | Target | Status |
 |---|---|---|
-| Expedition Group (first cooperative quest) | **5 humans, one Character per account** | approved shape, Phase 5B slice 2 |
+| Expedition Group (first cooperative quest) | **5 humans, one selected actor per Game Account** — its Main or a companion | approved shape, Phase 5B slice 2 |
 | Warzone | **~25 minimum to ~50 maximum entrants** | **TENTATIVE — tunable, to be benchmarked** |
 
 The earlier illustrative "10? 20?" is **superseded** by that Warzone target. Neither number is a

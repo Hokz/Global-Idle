@@ -41,20 +41,21 @@ The client sends **intents**, never outcomes. `startHunt(huntId, partyConfig)` i
 | Command | Server validates |
 |---|---|
 | `authenticate` | credentials, rate limits, account status |
-| `setActiveParty(orderedCharacterIds)` | ownership, size 1–4, distinct, all `ACTIVE` — none pending deletion — **no running activity** (`ADR-005`, `ADR-020`) |
-| `unlockRosterSlot` | capacity < 5, sufficient Gold, transactional spend |
-| `createCharacter(vocation)` | slot available, vocation not owned, Origin slot free, name not reserved — each counted over every existing Character on the account, `PENDING_DELETION` included (`ADR-020` §5, G4.1b); the creation path from the Account's tutorial completion, never from a Character count — before completion a new Level-1 Origin with a fresh Bootstrap Kit, after it the later-character path — and no one-time reward awarded twice (`ADR-020` §5.1–§5.2, G4.1c); level rules |
-| `requestCharacterDeletion(characterId)` | ownership; `ACTIVE`; no occupancy claim or non-terminal Activity, not in the Active Party, no live obligation (`ADR-020` §3, `ADR-013`). A repeat while pending returns the existing deadline |
-| `restoreCharacter(characterId)` | ownership; `PENDING_DELETION`; server time strictly before `purgeAt` (`ADR-020` §2) |
+| `setActiveParty(orderedCharacterIds)` | ownership, size 1–4, distinct, the Game Account's Main present (`ADR-022` PP2), all `ACTIVE` — none pending deletion — **no running activity** (`ADR-005`, `ADR-020`) |
+| `unlockRosterSlot` | capacity < 5, sufficient Gold, transactional spend. Under `ADR-022` this is a companion unlock; its shape is Phase 4's |
+| `createCharacter(vocation)` | slot available, vocation not owned, Origin slot free, name not reserved — each counted over every existing Character on the account, `PENDING_DELETION` included (`ADR-020` §5, G4.1b); the creation path from the Account's tutorial completion, never from a Character count — before completion a new Level-1 Origin with a fresh Bootstrap Kit, after it the later-character path — and no one-time reward awarded twice (`ADR-020` §5.1–§5.2, G4.1c); level rules. Under `ADR-022` it creates the Game Account's Main — a companion is unlocked, not created this way — and whether a replacement Main may be created after a purge is `ADR-020` DEL-O1 |
+| `requestCharacterDeletion(characterId)` | ownership; `ACTIVE`; no occupancy claim or non-terminal Activity, not in the Active Party — which the Main always is, so the PRE-4 specification restates this for it (`ADR-020` §3, DEL-O1) — no live obligation (`ADR-020` §3, `ADR-013`). A repeat while pending returns the existing deadline |
+| `restoreCharacter(characterId)` | ownership; `PENDING_DELETION`; server time strictly before `purgeAt` (`ADR-020` §2). The Character returns exactly as it was, and nothing is credited for the pending time (FZ3) |
 | `startActivity(activityDefinitionId)` | ownership, prerequisites, unlocks, party validity, no existing **account** activity claim, and — in the same transaction — **atomic acquisition of the occupancy claim for every participating Character**; fails if any participant already holds one (`ADR-013`) |
 | `stopActivity` | ownership of the running activity; releases every participant's occupancy claim in the same transaction as the lifecycle transition |
 | `equipItem(characterId, itemInstanceId, slot)` | custody, ownership, equip requirements, **character not participating in a running activity** (`DOMAIN_MODEL.md` §5.12) |
 | `sellItem` / `listItem` / `buyListing` | custody, ownership, funds, escrow, fees; never a Bootstrap Kit item (`ADR-020` §5.2) or a Character-bound consumable (`ADR-021`) |
-| `forgeAttempt(target, sacrificeA, sacrificeB)` | custody of all three, classification and rarity match, costs; none of them a Bootstrap Kit item or a Character-bound consumable |
+| `forgeAttempt(target, sacrificeA, sacrificeB)` | custody of all three, classification and rarity match, the sacrifices at the required prior tier (2026-09-25), costs; none of them a Bootstrap Kit item or a Character-bound consumable |
 | `moveBoundConsumable(itemInstanceId, to)` | Account ownership; `to` is the bound Character's Store Container or the Account's Depot, and nothing else; the bound Character is `ACTIVE`; the binding is unchanged (`ADR-021` §4) |
 | `useBoundConsumable(characterId, itemInstanceId)` | Account ownership; `characterId` is the item's bound Character, `ACTIVE` and eligible; the item's own use rule; no output convertible into transferable value (`ADR-021` §5) |
 | `startSkillTraining(characterId, exerciseItemId)` | custody, charges remaining — for a Character-bound Exercise Weapon, only its bound Character, spending charges where it is stored (`ADR-021` §5) — and — in the same transaction — **atomic acquisition of that Character's occupancy claim**; fails if the Character is hunting, in a dungeon, or already training (`ADR-013`) |
 | `claimSkillTraining(characterId)` | ownership; server computes elapsed time |
+| `claimQuestReward(rewardId)` (future, Phase 5) | Game Account ownership and eligibility, decided on the server; a claim already recorded for this Game Account and reward grants nothing, and a new claim commits with its grant exactly once, whichever actor the Game Account used (`ADR-023` §2) |
 
 The two deletion commands are illustrative names; the PRE-4 implementation specification fixes them.
 **A Bootstrap Kit item is refused by every command that would move it to the Depot, the Stash or

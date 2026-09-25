@@ -18,7 +18,7 @@ The project depends on:
 - Forge;
 - Imbuements;
 - Wheel-style progression;
-- class skill trees;
+- vocation-specific skill trees;
 - quests as dungeons;
 - boss unlocks;
 - market/economy;
@@ -208,9 +208,11 @@ and its 69 matrix cases pass.
 It remains the active phase only because **nothing after it has started. Phase 4 has NOT started.**
 Phase 4 is gated by the PRE-PHASE-4 gate in [`docs/PHASE_GATES.md`](docs/PHASE_GATES.md), which has
 **not** been passed. Its first item, G4.1, is now the **Character deletion lifecycle** (`ADR-020`,
-`LOCKED` by the Product Owner on 2026-09-24, superseding `ADR-007`'s retirement): a 30-day
-reversible grace, then a hard purge of the Character and everything it owns. It is **not
-implemented** — the code still carries `retiredAt`. Its three product questions are resolved by the
+`LOCKED` by the Product Owner on 2026-09-24, superseding `ADR-007`'s retirement, and amended on
+2026-09-25): a 30-day reversible grace — exactly 720 elapsed hours, fully frozen — then a hard
+purge of the live Character and everything it owns, leaving an immutable historical deletion record
+and a public Deleted List entry. It is **not implemented** — the code still carries `retiredAt`.
+Its three product questions are resolved by the
 Product Owner: G4.1a, the Gold Pouch is destroyed at the purge; G4.1b, a pending Character keeps its
 vocation, the Origin slot and its roster place until the purge; G4.1c, tutorial completion belongs
 to the Account and survives the purge, no one-time Tutorial Reward is awarded twice, and an Origin
@@ -218,14 +220,25 @@ Character purged before Rookgaard is complete is replaced by a new Level-1 Origi
 Character-bound Bootstrap Kit. Resolved is not implemented. Do not begin Phase 4 work, implement the
 deletion lifecycle, or mark the gate passed until the Product Owner says so.
 
+Since 2026-09-25 a Game Account has exactly **one Main Character**, and further vocations are
+**companions**; the personal Active Party is the Main plus up to three companions, and human
+multiplayer takes one selected actor per Game Account (`ADR-022`). Quest replay is separate from
+one-time reward claims, which belong to the Game Account (`ADR-023`). The Character that G4.1
+deletes is the Main, and what that means for its companions and its Game Account — with the other
+items of `ADR-020` §5.3, DEL-O1 to DEL-O6 — is settled by the PRE-4 specification. These decisions
+are recorded and pending independent review. **The PRE-4 specification has not started.**
+
 **Character-bound consumables** (`ADR-021`, `LOCKED` by the Product Owner on 2026-09-24) are
 consumables bound permanently to one Character — XP Boosts, Store-bought Exercise Weapons, Daily
 Reward and Event consumables. The binding is separate from custody. They move only between the
 Character's Store Container and the Account's Depot, are never sold, traded, listed, stashed,
 forged or converted, and are purged with the Character even when they are stored in the Depot. The
-Store does not sell combat equipment. **Nothing of it is implemented, and it is not PRE-4 work.**
-The first phase that ships a bound item — Store, Daily Reward or Event — implements it first,
-behind gate GBC.1 in [`docs/PHASE_GATES.md`](docs/PHASE_GATES.md).
+Store does not sell combat equipment. **Nothing of it is implemented.** Since 2026-09-25 the
+tutorial's Health and Mana potions are Character-bound consumables too (S6), and whether PRE-4
+builds this foundation for them is open (`ADR-020` DEL-O5); the tutorial's starter gear is not in
+this model, and its representation is open (DEL-O4). The first phase that ships a bound item —
+Store, Daily Reward, Event or tutorial — implements it first, behind gate GBC.1 in
+[`docs/PHASE_GATES.md`](docs/PHASE_GATES.md).
 
 User-supplied client assets are a PRIVATE reference and must never be committed — see the Phase
 3.7 specification's §9. The

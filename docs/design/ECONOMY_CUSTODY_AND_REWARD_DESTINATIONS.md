@@ -19,6 +19,11 @@ REWARD CHEST   boss rewards                    stored     SAFE from death     Ph
 A destination is decided by what produced the reward, not by what the player would prefer. Nothing
 routes a boss reward into the Loot Pouch, and nothing routes a Rat's coins into the Reward Chest.
 
+*Not to be confused (2026-09-25):* the **Reward Chest** is a custody where rewards are stored. A
+quest's **final reward chest** is content that grants a reward, and it is claimed once per Game
+Account, whichever actor opens it (`ADR-023` §3). The two have similar names and nothing else in
+common.
+
 ## 2. Gold Pouch vs Bank
 
 | | Gold Pouch | Bank |
@@ -78,7 +83,8 @@ and never did; what matters is that every movement is explainable.
 
 Direction only, not a specification:
 
-- account-wide across the roster, unless a concrete conflict disproves it;
+- account-wide across the roster — the Main and its companions (`ADR-022`) — unless a concrete
+  conflict disproves it;
 - deposit, withdraw, balance and history;
 - player-to-player transfer later;
 - the Market's escrow later;

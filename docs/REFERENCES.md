@@ -39,6 +39,18 @@ immunities · ordinary loot identity and baseline chance · vocation baseline pa
 weight · spells, runes and cooldowns · combat formulas, their ORDER and their rounding · the
 experience curve · the death-loss formula · blessing protection · Promotion protection.
 
+**Documented override, 2026-09-25 — immunities.** Ordinary Hunt design avoids absolute 100%
+creature immunities and uses resistances, sensitivities and weaknesses instead (`DECISIONS.md`
+§ *Creature elemental design*). A baseline immunity is reference data; ordinary Hunt content does
+not copy it as an absolute rule, and the resistance values used instead are content design, still
+open.
+
+**Not decided here — combat formulas.** A combat formula revision was discussed after PR #13 head
+`86a7681` — attack coefficients, the auto-attack range, whether Canary's coefficient is adopted,
+the starting Skill value, Defense and Armor rolls, rounding stages and skill scaling. It is
+**open**, and handled separately; this page neither adopts nor rejects any of it. The formulas
+Phases 2–3.6 implemented and verified stand until a decision replaces them.
+
 **Do not globally scale HP, XP, damage or loot chance because this is an idle game.** An idle game
 changes how often a fight happens and who presses the buttons. It does not change what a Rat is.
 A server that multiplied everything by two would not be a faithful baseline with a knob on it; it

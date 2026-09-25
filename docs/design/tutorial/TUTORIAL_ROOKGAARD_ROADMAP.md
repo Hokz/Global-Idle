@@ -39,6 +39,15 @@ The tutorial should teach mechanics **when the player needs to use them**, rathe
 
 # 2. First Character vs Additional Characters
 
+> **Read under
+> [`ADR-022`](../../architecture/decisions/ADR-022-game-account-main-character-and-companions.md)
+> (2026-09-25).** The first character is the Game Account's **Main Character**. Additional
+> vocations are **companions**: they never enter Rookgaard and start at Base Level 8. A different
+> Main vocation means another Game Account under the same login, and whether that Game Account's
+> Main plays Rookgaard is open (GA-O9). The deletion edge case below now concerns the Main, and
+> whether a replacement Main may exist after its purge is open for the PRE-4 specification
+> (`ADR-020` DEL-O1).
+
 The account must track whether the onboarding has already been completed.
 
 Recommended account-level state:
@@ -85,6 +94,11 @@ The Level 1–8 tutorial is mandatory.
 > Origin Character was purged. See
 > [`ADR-020`](../../architecture/decisions/ADR-020-character-deletion-grace-and-purge.md) §5.2,
 > which also classifies today's starting grant.
+>
+> *Since 2026-09-25:* the kit's potions are Character-bound tutorial consumables under `ADR-021` —
+> they may rest in the Depot, still bound — and how the starter gear is represented is open
+> (`ADR-020` DEL-O4). The Doublet Quest's final chest is claimed once per Game Account, and the
+> Doublet it holds is an ordinary item, never part of the kit (`ADR-023`, §19).
 
 ## Additional character after tutorial completion
 
@@ -96,6 +110,10 @@ SKIP TUTORIAL
 ```
 
 The exact skip flow is a later design item.
+
+*Under `ADR-022` (2026-09-25) an additional vocation is a companion, which never enters Rookgaard.
+This offer can only concern a replacement Main or a second Game Account's Main, and both are open
+(DEL-O1, GA-O9).*
 
 ---
 
@@ -126,6 +144,10 @@ Vocation: not yet chosen
 ```
 
 The character's vocation is chosen only at Level 8.
+
+*Read under `ADR-022` (2026-09-25):* a Game Account has one Main, so *character selection* becomes
+choosing a Game Account once a login holds several, and that UX is open (GA-O10). Every new Main
+starts as above; a companion never does.
 
 ---
 
@@ -585,6 +607,11 @@ Dungeon Complete
 
 The Doublet also creates a natural opportunity to introduce equipment as a reward system.
 
+`LOCKED` 2026-09-25 (`ADR-023`): the Doublet Quest can be run again like any quest, but its
+guaranteed final chest is claimed **once per Game Account**, and a replay never re-enables it. The
+**Doublet is an ordinary item** — movable, sellable, tradeable and discardable under the normal
+item rules — never Character-bound for coming from a quest.
+
 ---
 
 # 20. Dungeon Completion
@@ -865,6 +892,11 @@ but the risk of death is higher.
 The game informs.
 
 The player decides.
+
+*2026-09-25:* the tutorial's own Health and Mana potions are **Character-bound tutorial
+consumables** in the Store Container model (`ADR-021` S6). The direction is 20 Health and 20 Mana
+potions, neither final while combat balance is calibrated. How a Hunt uses a bound potion held in
+the Store Container is open (`ADR-020` DEL-O5). Potions bought at a counter stay ordinary items.
 
 ---
 
@@ -1285,12 +1317,17 @@ Not yet locked:
 - exact Rookgaard XP pacing;
 - exact Atlas icon set;
 - exact Level 2 UI copy;
-- tutorial skip behavior for later characters;
+- tutorial skip behavior — since 2026-09-25 only a replacement Main or a second Game Account's
+  Main could concern it, because companions never enter Rookgaard (`ADR-022` GA-O9, `ADR-020`
+  DEL-O1);
 - exact visual effects/highlights;
 - exact Mainland destination flow after vocation selection;
 - whether all Rookgaard systems are replayable after tutorial completion;
-- exact tutorial reward tables besides the guaranteed Doublet, and which tutorial rewards —
-  the guaranteed Doublet included — are one-time per account (G4.1c): a one-time Tutorial Reward
-  is never replayed for a replacement Origin Character.
+- exact tutorial reward tables besides the guaranteed Doublet, and which *other* tutorial
+  rewards are one-time per account (G4.1c): a one-time Tutorial Reward is never replayed for a
+  replacement Origin Character. The Doublet Quest's final chest is decided — one-time per Game
+  Account (`ADR-023`, 2026-09-25);
+- the final tutorial Health and Mana potion quantities, and how the starter gear is represented
+  (`ADR-020` DEL-O4).
 
 These must be discussed before implementation if they materially affect behavior.

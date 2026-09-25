@@ -48,7 +48,12 @@ for its own sake.
 **Owner: Phase 7 / 7A — Advanced Progression.** Not Phase 9: the content that feeds a kill counter
 is a consumer of this system, not its owner.
 
-Tibia identity is the baseline (`REFERENCES.md`).
+Tibia identity is the baseline (`REFERENCES.md`). *`LOCKED` direction, 2026-09-25
+(`DECISIONS.md` § *Bestiary*): the Tibia Global Bestiary is the baseline for structure, creature
+characterization, categories and kill thresholds; the phase that builds it verifies the
+then-current values from reliable sources and records what it adopts, and nothing is frozen from
+memory before then. It reveals resistances and weaknesses through progression, for build
+planning.*
 
 - creature **kill counters** unlock Bestiary entries and their information;
 - Bestiary progress awards **Charm Points**;
@@ -77,10 +82,12 @@ forgotten OPEN notes.
 ### Before Phase 4 (roster)
 
 - **Character deletion lifecycle** (`LOCKED`, `ADR-020` — it supersedes the retirement this item
-  used to describe). A deletion request starts a 30-day reversible grace in which the Character is
-  frozen and restorable; then a hard purge removes it and everything it owns — items, the Gold
-  Pouch and its ledger history, progression — with nothing moved to the Bank or to a recovery
-  custody, and no record of the Character left behind. The work is the purge's closure inventory
+  used to describe; amended 2026-09-25). A deletion request starts a 30-day reversible grace —
+  exactly 720 elapsed hours — in which the Character is fully frozen and restorable; then a hard
+  purge removes the live Character and everything it owns — items, the Gold Pouch, progression —
+  with nothing moved to the Bank or to a recovery custody. ~~No record of the Character left
+  behind~~ — **superseded 2026-09-25**: an immutable historical deletion record and a public
+  Deleted List entry remain, never live state. The work is the purge's closure inventory
   and its atomic, idempotent, race-safe execution, the replacement of `retiredAt`, and what stops
   *delete → purge → recreate* from accumulating Account value: Account-level tutorial completion
   and one-time reward state, and a Bootstrap Kit bound to its Character. Phase 3's `RET1` and
@@ -90,7 +97,9 @@ forgotten OPEN notes.
   until the purge (G4.1b); tutorial completion belongs to the Account and survives the purge, no
   one-time Tutorial Reward is awarded twice, and an Origin Character purged before Rookgaard is
   complete is replaced by a new Level-1 Origin with a fresh, Character-bound Bootstrap Kit
-  (G4.1c) — see [`../PHASE_GATES.md`](../PHASE_GATES.md) § *G4.1*.
+  (G4.1c) — see [`../PHASE_GATES.md`](../PHASE_GATES.md) § *G4.1*. Since 2026-09-25 the deleted
+  Character is the Game Account's Main (`ADR-022`), and the PRE-4 specification settles what that
+  means for its companions and its Game Account, with the other items of `ADR-020` §5.3.
 - **Enforce the `baseXp` → `baseLevel` projection.** Not a question of which is authoritative:
   `baseXp` is the durable truth and `baseLevel` its stored projection, already decided and
   implemented (`schema.prisma`, `contexts/hunt/progression.ts`). What is missing is enforcement on
@@ -105,7 +114,7 @@ forgotten OPEN notes.
 - **Validate impossible rarity/affix identities.** Today an affix array is JSON the domain writes
   and trusts. A market lets someone else's row reach your inventory.
 
-### Before the first Character-bound consumable (Store, Daily Reward or Event)
+### Before the first Character-bound consumable (Store, Daily Reward, Event or tutorial)
 
 - **Binding separate from custody, and the Store Container** (`LOCKED`, `ADR-021`). A consumable
   bound permanently to one Character — an XP Boost, a Store-bought Exercise Weapon, a Daily Reward
@@ -114,7 +123,8 @@ forgotten OPEN notes.
   converted, and is purged with the Character wherever it is stored. It belongs to no fixed phase:
   Phase 8 is the obvious consumer, but whichever phase ships the first bound item builds this first
   — [`../PHASE_GATES.md`](../PHASE_GATES.md) § *GBC.1*. The Store sells consumables, never combat
-  equipment.
+  equipment. Since 2026-09-25 the tutorial's Health and Mana potions are bound consumables too,
+  and whether PRE-4 builds this foundation for them is open (`ADR-020` DEL-O5).
 
 ### Before Phase 5B (multiplayer)
 
@@ -203,6 +213,8 @@ needs more than one of these shapes at once.
 
 Current Tibia identity as the baseline: kill counters, Bestiary progress, Charm Points, Charm
 Runes, developed in stages. A **separate progression axis** from Gold and Base Level, deliberately.
+The Tibia Global values are verified when the phase is built, never frozen from memory, and the
+Bestiary reveals resistances and weaknesses (2026-09-25, §3 above).
 
 ## Imbuements, outfits, achievements — FUTURE, NOT IMPLEMENTED
 

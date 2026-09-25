@@ -6,6 +6,9 @@ Global Idle is a **100% browser-based idle strategy RPG**.
 
 The player manages characters, parties, equipment, resources and progression while navigating an interactive world map.
 
+Each Game Account has one **Main Character**, its campaign identity, and unlocks further vocations
+as **companions** that join the Main in a personal party of up to four (`ADR-022`, 2026-09-25).
+
 Combat is automated and simulated by the server.
 
 The game should feel like managing an RPG world, not selecting anonymous numbered stages.
@@ -104,6 +107,14 @@ Preferred direction:
 
 Final model still requires design validation.
 
+The classic Skills are retained — Magic Level, Sword, Axe, Club, Shielding, Distance and Fist — and
+there is no Fishing. Level is not the sole power source: power and build also come from the
+Skills, the vocation's Skill Tree, the Wheel, equipment, affixes, the Forge, Imbuements and
+Charms, and Hunts reward matching a build to the Hunt (`DECISIONS.md`, 2026-09-25). Damage origin
+and damage type are separate, and ordinary Hunts use resistances rather than absolute immunities.
+The combat formula revision discussed after PR #13 head `86a7681` is **open** and handled
+separately; nothing here decides a formula or a number.
+
 ## 6. Vocation roles
 
 ### Knight
@@ -162,10 +173,14 @@ Secondary: Mid-tier DPS / healing
 - socketable gems;
 - important currency sink.
 
-### Class Skill Tree
+### Vocation Skill Trees
 - separate from the Wheel;
-- gold-funded upgrades;
+- **one tree per vocation** — there is no universal Skill Tree, and the number of paths is each
+  vocation's own, not a fixed three (`DECISIONS.md`, 2026-09-25);
+- further paths gated by Level or other progression, with long-term crossover;
+- Gold-funded nodes — a major Gold sink;
 - nodes can have multiple ranks;
+- respec removes chosen nodes, refunds no Gold, and never leaves a tree invalid;
 - strengthens vocation identity;
 - must not erase core class weaknesses.
 
@@ -193,9 +208,16 @@ Quest completion can unlock:
 - travel;
 - other systems.
 
+**Replay and one-time rewards are separate** (`ADR-023`, 2026-09-25). A quest — a multiplayer quest
+included — can be run again: its boss rooms repeated, its areas reused, other groups helped, a
+different actor selected. Its final or primary reward chest is claimed **once per Game Account**,
+whichever actor opens it, and replay never re-enables it. A quest reward item is ordinary unless
+its definition binds it.
+
 ## 9. Bosses
 
-Bosses can require a one-time unlock dungeon.
+Bosses can require a one-time unlock dungeon. The unlock is **access**; one-time *rewards* follow
+the claim rules of §8.
 
 Example flow:
 
@@ -226,6 +248,11 @@ The player should repeatedly decide whether an item should be:
 - kept for another character;
 - used as Forge material.
 
+Vocations are told apart by equipment eligibility, weapon and off-hand options, spells, Skill
+Trees and the Wheel — never by a hidden per-vocation Armor or Defense multiplier. Armour slots stay
+Tibia-like, and any vocation may use a shield where the item and the rules allow
+(`DECISIONS.md` § *Equipment*).
+
 ## 11. Rarity
 
 Locked rarity ladder:
@@ -240,6 +267,9 @@ Locked rarity ladder:
 Use one base item definition plus generated item instances.
 
 Do **not** create six static versions of every base item.
+
+Affix pools are slot-specific, and a reroll changes one chosen affix slot, leaving the others
+exactly as they were (`DECISIONS.md` § *Affixes*).
 
 ### Example
 
@@ -292,6 +322,9 @@ Locked structural direction:
   - item Classification;
   - item Rarity;
 - all eligible items can progress to Tier 10;
+- Forge Tier is a separate axis from rarity and affixes. Each next tier takes the target plus
+  **two matching sacrifices of the required prior tier**, recursively, and an attempt has a success
+  and a failure chance (2026-09-25);
 - higher Classification, Rarity and Tier should become harder/more expensive;
 - costs can include:
   - gold;
@@ -299,7 +332,7 @@ Locked structural direction:
   - exaltation cores;
   - other approved resources.
 
-Exact formulas are open.
+Exact rates, costs and any further failure consequence are open.
 
 ## 14. Imbuements
 
@@ -359,15 +392,15 @@ Premium should be highly valuable without making Free non-competitive.
 
 Direction:
 
-Party capacity is **not** a Premium lever. The account Character Roster holds up to five
-unique-vocation characters, the Active Party holds at most four of them, and every roster slot
-past the first is unlocked with in-game Gold by Free and Premium players alike. A fifth
-simultaneous Active Party member does not exist. See
+Party capacity is **not** a Premium lever. A Game Account has one Main Character and unlocks up
+to four companions — one per remaining vocation — with in-game Gold, by Free and Premium players
+alike. The personal Active Party is the Main plus up to three companions; a fifth simultaneous
+member does not exist (`ADR-022`). See
 [`docs/design/party/PARTY_SYSTEM_FOUNDATION.md`](design/party/PARTY_SYSTEM_FOUNDATION.md).
 
 ### Free
-- starts with the Origin Character;
-- unlocks further roster characters with Gold (costs OPEN);
+- starts with its Main Character — the Origin Character, before Rookgaard;
+- unlocks companions with Gold (costs OPEN);
 - navigates to services/NPCs;
 - standard storage;
 - standard automation.
@@ -578,29 +611,40 @@ speed, so the importer adds visual identity without the movement engine changing
 Full text: [`PHASE_GATES.md`](PHASE_GATES.md) § *Pre-Phase-4*.
 
 - **the Character deletion lifecycle** (`ADR-020`, which supersedes `ADR-007`'s retirement) — a
-  30-day reversible grace, then an atomic, idempotent, race-safe hard purge of the Character and
-  everything it owns, proven by a schema-derived closure inventory and a post-purge scan, and
-  replacing `retiredAt`. Its three product questions are **resolved** by the Product Owner: the
+  30-day reversible grace of exactly 720 elapsed hours, during which the Character is fully frozen
+  and after which a restore returns it exactly with nothing credited; then an atomic, idempotent,
+  race-safe hard purge of the live Character and everything it owns, proven by a schema-derived
+  closure inventory and a post-purge scan, leaving an immutable historical deletion record and a
+  public Deleted List entry, and replacing `retiredAt`. Its three product questions are
+  **resolved** by the Product Owner: the
   Gold Pouch is kept during the grace and destroyed at the purge, never moved to the Bank (G4.1a);
   a pending Character keeps its vocation, the Origin slot and its roster place until the purge, so
   a restore never conflicts with a replacement (G4.1b); tutorial completion belongs to the Account
   and survives the purge, no one-time Tutorial Reward is awarded twice, and an Origin Character
   purged before Rookgaard is complete is replaced by a new Level-1 Origin with a fresh Bootstrap
-  Kit that can never leave it or become Account value (G4.1c). **None of it is implemented**, and
-  the gate has not passed;
+  Kit that can never leave it or become Account value (G4.1c). Since 2026-09-25 the Character it
+  deletes is the Game Account's Main (`ADR-022`), and the PRE-4 specification settles DEL-O1 to
+  DEL-O6 — the sole Main and its companions, companion lifecycle, moderation deletion, the starter
+  gear, the tutorial consumables' sequencing and the Deleted List's presentation — before the
+  purge is built. **None of it is implemented**, and the gate has not passed;
 - **enforce the `baseXp` → `baseLevel` projection** — `baseXp` is already the durable truth and
   `baseLevel` its stored projection (schema + `progression.ts`). The gate proves and enforces that
   contract on every write path, migration and rollback; it does not choose again;
-- **an Actor/Participant combat contract** that supports up to 4 same-account actors now and
-  participants from several accounts later. Compatibility adapters keep previously VERIFIED Hunt
-  behaviour and fixtures intact. **Do not implement a generic multiplayer platform yet.**
+- **an Actor/Participant combat contract** that supports the Main and up to three companions now
+  and, later, one selected actor per Game Account from several accounts. Compatibility adapters
+  keep previously VERIFIED Hunt behaviour and fixtures intact. **Do not implement a generic
+  multiplayer platform yet.**
 
 ### Phase 4 — Party / vocations
 
-- base Skills, training, and death loss;
+- base Skills — the classic set, with no Fishing — training, and death loss;
 - all five vocations and their identities;
 - occupancy integration with dedicated Skill Training, and Stamina recovery while training;
-- character roster (5) and Gold-based unlocks; **Active Party formation (1-4)** and Frontline;
+- **companions** (`ADR-022`): the Main Character plus up to four Gold-unlocked companions, one per
+  vocation. The companion questions `ADR-022` §4 leaves open — lifecycle, custody, Stamina,
+  occupancy, levelling, names — are settled by this phase's specification;
+- the **personal Active Party**: the Main plus up to three companions, 1–4 actors, reorderable,
+  with the Frontline in Slot 1;
 - Shared XP eligibility;
 - **tactical policy primitives** — target selection, healing, supply use, risk/retreat, role.
   These are the player's *strategy*, not their reflexes, and they are baseline gameplay;
@@ -622,6 +666,9 @@ The **generic** engine. Solo and one-account Party only; no networking, no lobby
 - the same definitions must work solo and with a one-account Party;
 - **no boss implemented as bespoke code**, and **no lobby in Phase 5**;
 - the Requirement / Cost / Reward primitive, built when the first content slice needs it;
+- **reward claims** (`ADR-023`): content stays replayable, and each one-time reward — a quest's
+  final chest — is a typed, exactly-once claim per Game Account, kept apart from completion and
+  progression state;
 - Reward Chest — persistent and safe from Hunt death — and blessing acquisition, where this is
   the natural owning slice;
 - travel and access foundations; unlock framework; first-completion rules; boss daily limits and
@@ -634,8 +681,9 @@ The cooperative layer that later drives this engine:
 
 Full text: [`PHASE_GATES.md`](PHASE_GATES.md) § *Pre-5B*.
 
-Multi-account membership invariants; **cross-account disconnect decided and tested separately**
-from one-account Party behaviour; reward ledger safety across accounts.
+Multi-account membership invariants, with exactly one selected actor per Game Account;
+**cross-account disconnect decided and tested separately** from one-account Party behaviour;
+reward ledger safety across accounts, one-time reward claims per Game Account included.
 
 ### Phase 5B — Multiplayer activities
 
@@ -646,6 +694,8 @@ Three slices, in order. Recorded in
 #### Slice 1 — social and multi-account infrastructure
 
 - friends and invitations; chat; lobby; readiness; membership;
+- **one selected actor per Game Account** — its Main or any unlocked companion; the Main is not
+  mandatory, and a personal Active Party never enters as a block (`ADR-022` MP1–MP5);
 - per-character occupancy across accounts; one shared run identity; liveness rules;
 - reward ledger safety; spectator-only reads;
 - **do not re-label a personal Party as a large Party**; cross-account disconnect behaviour is
@@ -654,7 +704,9 @@ Three slices, in order. Recorded in
 
 #### Slice 2 — the first cooperative complex quest
 
-Up to **five human players, one selected Character per account**.
+Up to **five human players, one selected actor per Game Account** — its Main or any unlocked
+companion. The quest stays replayable, and its final reward chest is claimed once per Game Account
+(`ADR-023`).
 
 - a pre-room lobby exposing the encounter mechanic checklist and role slots;
 - players collectively author a **conditional strategy** — when to change targets, who collects
@@ -667,7 +719,7 @@ Up to **five human players, one selected Character per account**.
 
 #### Slice 3 — Warzones
 
-- large public activities on the same multi-account infrastructure;
+- large public activities on the same multi-account infrastructure, one actor per Game Account;
 - tentative target **~25 minimum to ~50 maximum entrants — TUNABLE and TO BE BENCHMARKED**, not a
   locked balance parameter;
 - shared objectives with sectors or subgroups, not fifty independent agents in one small arena;
@@ -690,10 +742,12 @@ Recorded in full: [`design/ECONOMY_CUSTODY_AND_REWARD_DESTINATIONS.md`](design/E
 
 ### Phase 7 — Forge / Imbuement / Wheel / Skill Tree
 
-- Forge target and sacrifices, Tier 0-10, classification and rarity validation;
+- Forge target and sacrifices of the required prior tier, recursively; Tier 0-10; success and
+  failure; classification and rarity validation;
 - Imbuements: **Powerful only**, 12h **active-use** duration on the item, boss-progression unlock
   gate, transaction-safe apply/remove/consume;
-- quest unlocks; Wheel; gems; vocation Skill Tree; item sinks.
+- quest unlocks; Wheel; gems; **vocation Skill Trees** — one per vocation, Gold-funded, with a
+  respec that refunds nothing; item sinks.
 
 Combat must accept **stable modifier interfaces** before these subsystems are implemented, so a
 new modifier source is configuration rather than a combat rewrite.
@@ -702,7 +756,9 @@ new modifier source is configuration rather than a combat rewrite.
 
 - **Bestiary and Charms** — kill counters, Bestiary entries, Charm Points, Charm Runes and the
   multi-stage Charm progression. Owned here, not by Phase 9: it is a progression system with its
-  own counters and unlocks, and content that feeds it is a consumer rather than its owner;
+  own counters and unlocks, and content that feeds it is a consumer rather than its owner. The
+  Tibia Global Bestiary is the baseline: its then-current values are verified and recorded when
+  this phase is built, and it reveals resistances and weaknesses (`DECISIONS.md` § *Bestiary*);
 - outfits and achievements.
 
 Recorded in full: [`design/FUTURE_DIRECTIONS.md`](design/FUTURE_DIRECTIONS.md) §3.
@@ -710,7 +766,8 @@ Recorded in full: [`design/FUTURE_DIRECTIONS.md`](design/FUTURE_DIRECTIONS.md) �
 ### Phase 8 — Premium / automation
 
 - Premium purchase, renewal, expiry and entitlement transitions, splitting any unsettled interval
-  at the transition;
+  at the transition. Premium is per Game Account as implemented; whether it attaches to the login
+  identity instead is open (`ADR-022` GA-O8);
 - the Stamina benefits Phase 2 already consumes; future boost products use `ActiveUseTimer`,
   never wall-clock countdowns;
 - advanced Auto-Sell with item / category / rarity / default rules and protected-state overrides;
@@ -720,8 +777,9 @@ Recorded in full: [`design/FUTURE_DIRECTIONS.md`](design/FUTURE_DIRECTIONS.md) �
   — in each Character's Store Container (`ADR-021`). Phase 8 is the obvious first consumer, not the
   owner by right: a Daily Reward or an Event may ship a bound consumable earlier, and **whichever
   phase ships the first one implements the binding and the Store Container first**, behind the
-  BOUND-CONSUMABLE gate ([`PHASE_GATES.md`](PHASE_GATES.md) § *GBC.1*). No Store, Daily Reward or
-  Event bound item ships before it passes.
+  BOUND-CONSUMABLE gate ([`PHASE_GATES.md`](PHASE_GATES.md) § *GBC.1*). No bound item ships
+  before it passes. Since 2026-09-25 the tutorial's Health and Mana potions are bound consumables
+  too, and whether PRE-4 builds the foundation for them is open (`ADR-020` DEL-O5).
 
 **Not paywalled:** foundational tactical strategy (Phase 4) and the quest mechanic checklist and
 plan authoring (Phases 5 / 5B) are **baseline gameplay**.
@@ -786,7 +844,7 @@ Current detailed design documents:
 
 - [`docs/design/tutorial/TUTORIAL_ROOKGAARD_ROADMAP.md`](design/tutorial/TUTORIAL_ROOKGAARD_ROADMAP.md) — Level 1–8 Rookgaard onboarding through vocation selection.
 - [`docs/design/combat/COMBAT_LEVEL_SKILLS_FOUNDATION.md`](design/combat/COMBAT_LEVEL_SKILLS_FOUNDATION.md) — Base Level, Skills, training systems and the layered Combat System architecture.
-- [`docs/design/party/PARTY_SYSTEM_FOUNDATION.md`](design/party/PARTY_SYSTEM_FOUNDATION.md) — character roster, unique vocations, Gold unlocks, the 1-4 Active Party, Frontline and Shared XP eligibility.
+- [`docs/design/party/PARTY_SYSTEM_FOUNDATION.md`](design/party/PARTY_SYSTEM_FOUNDATION.md) — the Main Character and its companions (`ADR-022`), unique vocations, Gold unlocks, the personal 1–4 Active Party, Frontline and Shared XP eligibility.
 - [`docs/design/world/ATLAS_NAVIGATION_AND_REGION_BOUNDARIES.md`](design/world/ATLAS_NAVIGATION_AND_REGION_BOUNDARIES.md) — the four navigation surfaces, region boundaries as data rather than pixels, calibration honesty and the deferred gold region highlight.
 - [`docs/design/multiplayer/COOPERATIVE_QUEST_STRATEGY.md`](design/multiplayer/COOPERATIVE_QUEST_STRATEGY.md) — the co-op lobby checklist as a player-authored conditional strategy, the frozen plan, spectators, and the Party / Expedition / Warzone distinction.
 

@@ -1,9 +1,13 @@
 # ADR-021 — Character-bound consumables and the Store Container
 
 **Status:** `ACCEPTED` — the product rule is `LOCKED` by the Product Owner (2026-09-24). Reviewed
-independently at PR #13 head `5ed5b26` and returned for two narrow corrections, both applied here:
-the Store Container's representation (§3) and the binding's representation (§6, §7) are no longer
-fixed. Not yet accepted.
+independently at PR #13 head `5ed5b26` and returned for two narrow corrections: the Store
+Container's representation (§3) and the binding's representation (§6, §7) are no longer fixed.
+Validated with those corrections at PR #13 head `86a7681`.
+**Amended 2026-09-25** by Product Owner decisions made after `86a7681`: tutorial utility
+consumables are Character-bound consumables under this record (S6), which opens a conflict with
+the tutorial's starter gear and a sequencing question against PRE-4 (§5, §7, §9). **The amendment
+is pending independent review.**
 **Extends:** [ADR-004](./ADR-004-item-single-custody.md) — one new custody scope, and a binding
 that is independent of custody; ADR-004 itself is unchanged.
 [ADR-020](./ADR-020-character-deletion-grace-and-purge.md) — the purge reaches a bound item
@@ -52,6 +56,7 @@ binding is such a reference.
 | S3 | An Exercise Weapon belongs to this system because it is a charge-based training consumable, not because it is combat equipment. |
 | S4 | Outfits and mounts are **outside** this model. They get their own cosmetic unlock or entitlement design and are never forced into Store Container semantics. |
 | S5 | Acquisition source and binding are separate dimensions. A Store, Daily Reward or Event source makes an item bound only when its item or reward definition says so. |
+| S6 | *2026-09-25.* **Tutorial utility consumables** — the tutorial's Health and Mana potions, for example — are Character-bound, and they use this record's Store Container model. The current tutorial direction is 20 Health and 20 Mana potions; neither quantity is final while combat balance is calibrated. |
 
 **Binding**
 
@@ -191,6 +196,11 @@ sites (F8).
   not wall-clock time (`DECISIONS.md` § *Active-use timers*, `ADR-015`). A `PENDING_DELETION`
   Character is never in a qualifying state, so the grace consumes none of an active effect, and a
   restore returns it exactly (X3).
+- **Tutorial potions (S6) — open.** A Hunt drinks potions automatically, and Phase 3 draws them
+  from what the Character carries in its Hunt containers (`broughtSupplies`). G3 keeps a bound item
+  out of every Hunt container, so how a Hunt uses a Character-bound potion held in the Store
+  Container is not decided. It is U4 for a concrete item, recorded as `ADR-020` DEL-O5 and settled
+  before the tutorial's bound potions ship.
 - **No hidden conversion.** No use, and no by-product of a use, yields Gold, premium currency, a
   transferable item, or any other transferable value (U3).
 
@@ -215,16 +225,17 @@ a Store purchase, a Daily Reward, an Event grant — is refused (X2).
   ```
 
 - Nothing is refunded (X6). The ledger entry that paid for a bound item belongs to the Account and
-  stays. It must not keep the Character's identity (`ADR-020` L12): the simplest way is the rule
-  BANK entries already follow — name no Character in any column, the operation id included
-  (`ADR-020` §6.3).
+  stays. It names no Character, in any column, the operation id included — the rule BANK entries
+  already follow (`ADR-020` §6.3). That rule outlives `ADR-020` L12, superseded on 2026-09-25,
+  because the BANK ledger is live persistence and the post-purge proof covers it.
 - **Found by the closure test.** The binding is a relation to `Character`, so `ADR-020`'s closure
   test and reference inventory must enumerate it and act on it — every binding, a bound item
   stored in the Depot included — and it declares DELETE-OWNED. Referential integrity is mandatory:
   a binding can never name a Character that does not exist. Which physical mechanism provides it
   is the implementing phase's choice (§7).
 - **Nothing left behind.** `ADR-020` §7's post-purge scan finds the purged Character's id in no
-  row, so no orphaned binding can survive.
+  live row, so no orphaned binding can survive. The historical deletion record (`ADR-020` DH1) may
+  name the purged Character and what it held, but binds nothing and owns nothing.
 - **Only its own.** The purge selects exactly the rows bound to the Character being purged, so a
   retry after a crash, or a repeated purge, can never delete another Character's items
   (`ADR-020` §7, idempotence).
@@ -257,9 +268,9 @@ reference inventory, immutable, and impossible to orphan**:
   bound Characters, or with an unbound instance, and a split or merge preserves the binding. No
   further stack behaviour is invented here.
 
-**The Bootstrap Kit is a different binding** (`ADR-020` §5.2). If both are represented on
+**The Bootstrap Kit was a different binding** (`ADR-020` §5.2). If both are represented on
 `ItemInstance`, the representation distinguishes them, so that neither's custody rules leak into
-the other:
+the other. As validated at `86a7681`:
 
 | | Bootstrap Kit | Character-bound consumable |
 |---|---|---|
@@ -267,6 +278,15 @@ the other:
 | where it may be | its Character's own gameplay custody — **never** the Depot | its Character's Store Container, or the Depot — **never** gameplay custody |
 | used | in play — worn, carried, consumed | only by its bound Character, by the item's use rule |
 | at the purge | destroyed with its Character | destroyed with its Character, wherever it is stored |
+
+**Since 2026-09-25 (S6)** the kit's utility consumables — its potions — are Character-bound
+consumables under this record: Store Container or Depot, never gameplay custody. That leaves an
+**unresolved conflict** for the rest of the kit. The starter gear — armour, dagger, backpack — must
+be equipped and used in Rookgaard, and this record's custody (consumables only, Store Container ↔
+Depot only, never an equipment slot — G3) cannot express that. The gear is **not** forced into this
+model, and no path is chosen here: it is open, as `ADR-020` DEL-O4, for the PRE-4 specification
+with Product Owner confirmation. A quest reward is never bound merely because it came from a quest
+(`ADR-023` QR8): the Doublet is an ordinary item.
 
 ### 8. Relation to other records
 
@@ -284,14 +304,21 @@ the other:
 
 ### 9. Who implements it, and what it must prove
 
-**Not PRE-4.** PRE-4 implements the deletion lifecycle, and all it owes this record is
-compatibility: its purge closure must stay extensible to a binding that is independent of
-custody. Nothing in the PRE-4 design may assume that Character-owned `ItemInstance` rows are found
-by `characterId` alone (`PHASE_GATES.md` § *G4.1*).
+**As validated at `86a7681`: not PRE-4.** PRE-4 implements the deletion lifecycle, and all it owes
+this record is compatibility: its purge closure must stay extensible to a binding that is
+independent of custody. Nothing in the PRE-4 design may assume that Character-owned `ItemInstance`
+rows are found by `characterId` alone (`PHASE_GATES.md` § *G4.1*).
+
+**Since 2026-09-25 that is an open question.** The tutorial's utility consumables are
+Character-bound (S6), and G4.1c ships the Bootstrap Kit with the purge. Either PRE-4 builds this
+record's foundation — and passes GBC.1 — for the tutorial consumables, or the starting grant
+changes shape until the phase that does. Which one is `ADR-020` DEL-O5, decided in the PRE-4
+specification with Product Owner confirmation. Until then this record does not claim PRE-4, and
+PRE-4 does not ship a bound item without GBC.1.
 
 **The first phase that introduces a Character-bound consumable** implements this foundation first.
-Phase 8 (Premium) is the obvious consumer. A Daily Reward or an Event may need it earlier, and
-whichever ships first owns it. **No Store, Daily Reward or Event bound item ships before the
+Phase 8 (Premium) is the obvious consumer. A Daily Reward, an Event — or, now, the tutorial — may
+need it earlier, and whichever ships first owns it. **No bound item ships before the
 BOUND-CONSUMABLE gate passes** (`PHASE_GATES.md` § *GBC.1*). That implementation must prove:
 
 - the binding survives `STORE_CONTAINER` → `DEPOT` → `STORE_CONTAINER`;
@@ -323,7 +350,11 @@ BOUND-CONSUMABLE gate passes** (`PHASE_GATES.md` § *GBC.1*). That implementatio
 - exact XP Boost numbers and durations;
 - Exercise Weapon Store pricing and charge counts;
 - the use UI, and whether a use starts from the Store Container, the Depot or a dedicated panel;
-- the outfit and mount storage and unlock model.
+- the outfit and mount storage and unlock model;
+- *2026-09-25:* how a Hunt uses a bound tutorial potion held in the Store Container, and whether
+  PRE-4 or a later phase builds this foundation for the tutorial consumables (`ADR-020` DEL-O5);
+- *2026-09-25:* how the tutorial's starter gear is represented (`ADR-020` DEL-O4);
+- *2026-09-25:* the final tutorial Health and Mana potion quantities.
 
 Left to the implementing phase, within §1 and §6–§7: how the Store Container is represented,
 whether any weight or space rule applies to it, and the physical representation of the binding.
@@ -379,11 +410,12 @@ turn premium-currency purchases into Gold.
 
 ## Product constraints requiring this architecture
 
-- The rules of §1 — Product Owner, 2026-09-24.
+- The rules of §1 — Product Owner, 2026-09-24; S6 — Product Owner, 2026-09-25.
 - *"no item duplication"* — `docs/ARCHITECTURE.md`, security baseline.
 - *"Premium should primarily improve: automation; time efficiency; storage/capacity; management
   convenience."* — `docs/ECONOMY.md`
 - *"Avoid exclusive endgame combat power as the main Premium value."* —
   `MASTER_DEVELOPMENT_ROADMAP.md` §16
-- The purge removes all Character-owned state, value and data, and no surviving record keeps the
-  Character's identity — `ADR-020` L6, L8, L10, L12.
+- The purge removes all Character-owned state, value and data from live persistence — `ADR-020`
+  L6, L8. (L10 and L12, which also required that no surviving record keep the Character's
+  identity, are superseded by `ADR-020` DH1–DH5 since 2026-09-25.)

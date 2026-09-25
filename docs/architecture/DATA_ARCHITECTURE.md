@@ -70,15 +70,16 @@ These are each exactly one transaction, all-or-nothing:
 | **Market purchase** | buyer balance, seller balance, fee, item custody, ledger ×N, listing state |
 | **Market listing** | item custody → escrow, listing row, fee, ledger |
 | **Forge attempt** | cost debit, ledger, two sacrifices → consumed, target tier on success |
-| **Roster slot unlock** | Gold debit, ledger, capacity increment |
-| **Character deletion request** | lifecycle `ACTIVE` → `PENDING_DELETION` and its two timestamps, after the quiescence check — no occupancy claim, no Active Party membership, no live obligation (`ADR-020` §3) |
-| **Character restore** | lifecycle back to `ACTIVE`, timestamps cleared — decided against the deadline after the Character's lock is held (`ADR-020` §2, §7) |
-| **Character purge** | the Character's whole closure — its items (and, once `ADR-021` ships, its Store Container and every item bound to it wherever it is stored, the Depot included), POUCH ledger entries and balance, Stamina, slots, policies, activity history, derived settlement and idempotency records — **then** the Character row. One transaction, under the purge capability; nothing Account-owned changes (`ADR-020` §6–§7) |
+| **Roster slot unlock** — a companion unlock, `ADR-022` | Gold debit, ledger, capacity increment |
+| **Character deletion request** | lifecycle `ACTIVE` → `PENDING_DELETION` and its two timestamps, after the quiescence check — no occupancy claim, no Active Party membership (restated for the Main by the PRE-4 specification, DEL-O1), no live obligation (`ADR-020` §3). Stamina and every other time-derived value are settled up to the accepted request, and nothing accrues after it (FZ2) |
+| **Character restore** | lifecycle back to `ACTIVE`, timestamps cleared — decided against the deadline after the Character's lock is held (`ADR-020` §2, §7). Time-derived state resumes from the restore instant; nothing is credited for the grace (FZ3) |
+| **Character purge** | the Character's whole closure — its items (and, once `ADR-021` ships, its Store Container and every item bound to it wherever it is stored, the Depot included), POUCH ledger entries and balance, Stamina, slots, policies, activity history, derived settlement and idempotency records — **then** the Character row. One transaction, under the purge capability; nothing Account-owned changes (`ADR-020` §6–§7). The same boundary writes the immutable historical deletion record — the purge manifest, its analytics facts and the Deleted List entry (DH1–DH6) |
 | **Activity start** | activity row, account activity claim, **one occupancy claim per participating Character** |
 | **Activity end / retirement of claims** | activity state, **release of every occupancy claim**, in the same transaction as the lifecycle transition |
 | **Skill training claim** | charges, skill progression, activity state |
 | **Bound item move** (future, `ADR-021`) | a Character-bound consumable between its Store Container and the Depot, binding unchanged — locks the Account, then the bound Character, then the item, and checks the Character is `ACTIVE` |
 | **Bound consumable use** (future, `ADR-021`) | the item or its charges, and the effect it grants — only for its bound Character |
+| **One-time reward claim** (future, Phase 5, `ADR-023`) | the claim and the grant it authorises, together. A uniqueness guarantee over the Game Account and the reward makes a retried or concurrent claim grant at most once |
 
 A partially applied settlement is not a state the system can be in. Loot materializing without
 its XP, or a purchase debiting without transferring, must be impossible rather than rare.
@@ -149,9 +150,12 @@ response cannot double-apply.
   incident (`ECONOMY_INTEGRITY.md`).
 
 **The one designed exception — a Character's final purge** (`ADR-020`, `LOCKED BY PRODUCT`).
-Thirty days after a deletion request, the purge removes the Character and everything it owned,
-its POUCH ledger entries included, and no record of it survives. The exception is narrow by
-construction:
+Thirty days — exactly 720 elapsed hours — after a deletion request, the purge removes the live
+Character and everything it owned, its POUCH ledger entries included unless the PRE-4
+specification keeps them as immutable history outside live custody (`ADR-020` §6.1). ~~No record
+of it survives~~ — **superseded 2026-09-25**: an immutable historical deletion record survives,
+outside live persistence, and never takes part in ownership, custody or uniqueness (DH1–DH5). The
+exception is narrow by construction:
 
 - it applies **only** to rows whose sole owner or subject is the purged Character — ownership
   following the binding as well as custody, so an item bound to it is its own even in the Depot
@@ -159,11 +163,13 @@ construction:
   reconciliation and its balances are unchanged by any purge;
 - it is performed **only** by the purge capability. The application role still has no `UPDATE`
   or `DELETE` on the ledger;
-- a record that is Account-owned or shared survives with the Character's identity removed rather
-  than being deleted (`ADR-020` §6).
+- a record that is Account-owned or shared survives rather than being deleted. Since 2026-09-25
+  the owning phase either removes the Character's identity from it or keeps it as immutable
+  history within DH5 (`ADR-020` §6).
 
 Everything above holds for ordinary play. After a purge, *"which Character earned this Gold?"* is
-no longer answerable; *"what did the Account's Bank receive, when and why?"* still is.
+no longer answerable from the live ledger — the historical deletion record may answer it for audit
+(DH3–DH4); *"what did the Account's Bank receive, when and why?"* still is.
 
 ---
 
@@ -237,7 +243,8 @@ Recommended until decided: after any restore the purge job stays **paused** unti
 reconciled the lifecycle transitions lost in the restore window. The pause is disaster recovery,
 not a deferral: every Character that falls due during it is an overdue purge — the monitored,
 degraded condition of `ADR-020` §7. How long backups and logs may keep a purged Character is also
-open. Both are tracked in
+open, and so is how long historical deletion records, purge manifests and deletion analytics are
+kept, and who may read them. All are tracked in
 [`../OPEN_QUESTIONS.md`](../OPEN_QUESTIONS.md) § *Character deletion*.
 
 ---
