@@ -8,8 +8,9 @@ with `ADR-021` (§4, §6) was validated with PR #13 head `86a7681`.
 governance synchronization that follows it: the grace is locked at exactly 720 elapsed hours
 (§1a, §2); it is a full freeze with no elapsed-time recovery (§1a, §4); L10 and L12 are superseded
 by an immutable historical deletion record and a public Deleted List (§1b, §6, §7); and the Main
-Character model (`ADR-022`) leaves named items open (§5.3). **Those amendments are pending
-independent review.**
+Character model (`ADR-022`) leaves named items open (§5.3). The independent review of `e2d0e04`
+returned DH6 for a scope correction: game-wide telemetry is not a deletion deliverable (§1b, §7).
+**Those amendments are pending independent review.**
 **Supersedes:** [ADR-007](./ADR-007-character-retirement.md), in full.
 **Amends:** [ADR-019](./ADR-019-currency-custody-scopes.md) — one guarantee row (§8); the rest of
 it stands.
@@ -114,7 +115,7 @@ L10 and L12 required the purge to leave no identity behind. The Product Owner su
 | DH3 | The internal deletion audit keeps enough immutable history to answer *what was deleted*, and to support anti-duplication, operations and balance analytics — preferably a **purge manifest** (a deletion snapshot) plus analytics facts, never old live gameplay rows left restorable. |
 | DH4 | Historical records **may keep identifying fields** internally: the Product Owner asked for named history. |
 | DH5 | Historical records **never** take part in live ownership or custody, or in any gameplay uniqueness constraint. |
-| DH6 | Analytics are preserved or collected for XP production, hunt efficiency, loot and drop generation, item creation and destruction, deleted Characters, and balance analysis. |
+| DH6 | Analytics are preserved or collected for XP production, hunt efficiency, loot and drop generation, item creation and destruction, deleted Characters, and balance analysis. *Scope, clarified after the independent review of `e2d0e04`:* this is a **game-wide direction**, not a deletion deliverable. Each gameplay or economy phase records the telemetry it introduces, and later balance and analytics work consumes it. The deletion lifecycle owns only its own facts — the historical record, the purge manifest and the Deleted List (DH1–DH3) — and a purge must not corrupt durable audit or analytics data that already exists (§6, §7). |
 
 Because the grace is a full freeze (FZ2), a Character's level cannot change between the deletion
 request and the purge, so the Deleted List's *level at the deletion/purge snapshot* is one number.
@@ -424,11 +425,11 @@ represented at all is open (§5.3). Both are settled before the kit is implement
 (`PHASE_GATES.md` § *G4.1*).
 
 **No Tutorial Reward exists in code.** The tutorial's rewards — the guaranteed tutorial Treasure
-Chest and its Doublet (`TUTORIAL_ROOKGAARD_ROADMAP.md` §18–§19) — are design only. The chest is
-the Doublet Quest's final reward chest, which `ADR-023` makes one-time per Game Account; the
-Doublet itself is an ordinary item, never Character-bound (`ADR-023` QR8). Which *other* tutorial
-rewards are one-time Tutorial Rewards, never replayed for a replacement Origin Character, is
-decided with their reward tables (§43 of that document).
+Chest and its Doublet (`TUTORIAL_ROOKGAARD_ROADMAP.md` §18–§19) — are design only. The Doublet
+itself is an ordinary item, never Character-bound (`ADR-023` QR8). Which tutorial rewards — the
+chest included — are one-time Tutorial Rewards, never replayed for a replacement Origin
+Character, is decided with their reward tables (§43 of that document). Whichever is one-time is
+claimed once per Game Account (`ADR-023` §2).
 
 **Kit items that already exist.** No `ItemInstance` records where it came from. A kit backpack is
 indistinguishable from one bought at the counter, and kit potions merge with bought ones. The PRE-4
@@ -478,11 +479,13 @@ is built:**
 
 **Since 2026-09-25 (DH1–DH5).** The actions below say what leaves **live** product persistence. What
 leaves it is not forgotten: the purge also records the immutable historical deletion record — a
-purge manifest (deletion snapshot) and analytics facts (DH3) — and the PRE-4 specification defines
-its shape. Recording it atomically with the purge is recommended, so that no purge commits without
-its record and no record exists for a purge that did not commit. SCRUB is no longer mandatory: L12
-is superseded, so a phase may keep a purged Character's identity in shared history, provided
-nothing in it takes part in live ownership, custody or uniqueness (DH5).
+purge manifest (deletion snapshot) and its deletion-specific facts (DH3) — and the PRE-4
+specification defines its shape. It is not a general telemetry platform: the game-wide balance
+telemetry of DH6 belongs to the phases that introduce what it measures. Recording the record
+atomically with the purge is recommended, so that no purge commits without its record and no
+record exists for a purge that did not commit. SCRUB is no longer mandatory: L12 is superseded, so
+a phase may keep a purged Character's identity in shared history, provided nothing in it takes
+part in live ownership, custody or uniqueness (DH5).
 
 Every reference to a Character takes exactly one of four actions:
 
@@ -601,9 +604,14 @@ the BANK legs, which are the Account's own record that it paid or received value
   historical deletion record (DH1–DH5) is the scan's one declared exception: it is immutable, it
   holds no foreign key that live state depends on, and it takes part in no ownership, custody or
   uniqueness rule.
-- **Recorded.** The purge writes the historical deletion record — the purge manifest and analytics
-  facts (DH3), and the Deleted List entry (DH2) — as part of the same boundary. Its shape is the
-  PRE-4 specification's; that it matches exactly what was purged is a test.
+- **Recorded.** The purge writes the historical deletion record — the purge manifest and its
+  deletion-specific facts (DH3), and the Deleted List entry (DH2) — as part of the same boundary.
+  Its shape is the PRE-4 specification's; that it matches exactly what was purged is a test. The
+  manifest may reference durable facts that earlier phases already keep, and the purge builds no
+  telemetry beyond its own deletion facts (DH6).
+- **No damage to existing audit or analytics data.** The purge changes no durable audit or
+  analytics record that it does not own. What it removes from live history (§6) stays answerable
+  through the manifest (DH3).
 - **Due at the deadline — never early, never deferred.** `purgeAt` is the instant the Character
   becomes **due for immediate final purge**. The purge job attempts it promptly at or after that
   instant; a schedule that routinely leaves due Characters waiting is a defect, not a policy. No

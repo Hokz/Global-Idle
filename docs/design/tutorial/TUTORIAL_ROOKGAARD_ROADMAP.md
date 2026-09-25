@@ -97,8 +97,8 @@ The Level 1–8 tutorial is mandatory.
 >
 > *Since 2026-09-25:* the kit's potions are Character-bound tutorial consumables under `ADR-021` —
 > they may rest in the Depot, still bound — and how the starter gear is represented is open
-> (`ADR-020` DEL-O4). The Doublet Quest's final chest is claimed once per Game Account, and the
-> Doublet it holds is an ordinary item, never part of the kit (`ADR-023`, §19).
+> (`ADR-020` DEL-O4). The Doublet is an ordinary item, never part of the kit (`ADR-023` QR8, §19);
+> whether the Doublet Quest's chest is a one-time Tutorial Reward is open (§43).
 
 ## Additional character after tutorial completion
 
@@ -607,10 +607,14 @@ Dungeon Complete
 
 The Doublet also creates a natural opportunity to introduce equipment as a reward system.
 
-`LOCKED` 2026-09-25 (`ADR-023`): the Doublet Quest can be run again like any quest, but its
-guaranteed final chest is claimed **once per Game Account**, and a replay never re-enables it. The
-**Doublet is an ordinary item** — movable, sellable, tradeable and discardable under the normal
-item rules — never Character-bound for coming from a quest.
+`LOCKED` 2026-09-25 (`ADR-023` QR8): the **Doublet is an ordinary item** — movable, sellable,
+tradeable and discardable under the normal item rules — never Character-bound for coming from a
+quest.
+
+**Open (§43):** whether the Doublet Quest can be replayed, and whether its chest is a one-time
+Tutorial Reward. The Product Owner's replay rule covers human multiplayer / co-op quests, not the
+tutorial. If the chest is one-time, it is claimed once per Game Account, whichever actor opens it,
+and neither a replay nor a replacement Origin Character re-enables it (`ADR-023` §2, G4.1c).
 
 ---
 
@@ -1323,10 +1327,12 @@ Not yet locked:
 - exact visual effects/highlights;
 - exact Mainland destination flow after vocation selection;
 - whether all Rookgaard systems are replayable after tutorial completion;
-- exact tutorial reward tables besides the guaranteed Doublet, and which *other* tutorial
-  rewards are one-time per account (G4.1c): a one-time Tutorial Reward is never replayed for a
-  replacement Origin Character. The Doublet Quest's final chest is decided — one-time per Game
-  Account (`ADR-023`, 2026-09-25);
+- exact tutorial reward tables besides the guaranteed Doublet, and which tutorial rewards — the
+  Doublet Quest's chest included — are one-time per account (G4.1c): a one-time Tutorial Reward is
+  never replayed for a replacement Origin Character, and its claim is `ADR-023`'s per-Game-Account
+  primitive;
+- whether the Doublet Quest, or any other tutorial quest, can be replayed at all. The replay rule
+  of `ADR-023` covers human multiplayer / co-op quests only;
 - the final tutorial Health and Mana potion quantities, and how the starter gear is represented
   (`ADR-020` DEL-O4).
 

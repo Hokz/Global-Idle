@@ -157,12 +157,16 @@ The ones that would actually reveal a problem:
 | Overdue Character purges — how many are due and not yet purged, and how late the oldest is past `purgeAt` | the deletion lifecycle degrading. A due purge that has not committed is a **failure condition**, never a normal state; it alerts against a lateness target chosen before production (`ADR-020` §7, pre-launch gate). **PRE-4 — not implemented** |
 | Historical deletion records written vs purges committed | **must match** — a purge without its record, or a record without its purge, is an integrity alarm (`ADR-020` §7, DH1–DH3). **PRE-4 — not implemented** |
 
-### Product analytics — direction (2026-09-25)
+### Balance telemetry — a game-wide direction (2026-09-25)
 
-XP production, hunt efficiency, loot and drop generation, item creation and destruction, deleted
-Characters and balance analysis are preserved or collected (`ADR-020` DH6). What is collected,
-where it lives and how it is produced are not decided here: the purge's own facts are the PRE-4
-specification's (DH3), and retention is the pre-launch gate's. Analytics may keep identifying
+XP production, hunt efficiency, loot and drop generation, item creation and destruction, deletion
+history and balance analysis are preserved or collected (`ADR-020` DH6). This is a **cross-phase
+direction, not one phase's deliverable**. Each gameplay or economy phase records the telemetry it
+introduces, and later balance and analytics work consumes it. PRE-4 records only the
+deletion-specific facts — the historical record, the purge manifest and the Deleted List
+(DH1–DH3) — and must not corrupt durable audit or analytics data that already exists; it builds no
+general telemetry platform. What each phase collects, where it lives and how it is produced are
+that phase's decisions, and retention is the pre-launch gate's. Analytics may keep identifying
 fields internally (DH4); they never become live ownership, custody or a uniqueness input (DH5).
 
 ### Tracing

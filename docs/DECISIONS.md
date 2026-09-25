@@ -120,27 +120,33 @@ the `DOM` cases.
 
 ### Replay and one-time reward claims
 
-`LOCKED` by the Product Owner, 2026-09-25. Architecture:
+`LOCKED` by the Product Owner, 2026-09-25. The replay rule is for **human multiplayer / co-op**
+quests. Architecture:
 [`architecture/decisions/ADR-023-quest-replay-and-one-time-reward-claims.md`](architecture/decisions/ADR-023-quest-replay-and-one-time-reward-claims.md).
 **Not implemented** — no quest, dungeon or chest exists yet (Phase 5).
 
-**Content access and replay** and **one-time reward claims** are separate. A quest is never
-*"one-time"* in the sense of being inaccessible after completion:
+**Content replayability** and **one-time reward claims** are separate:
 
-- a quest — a multiplayer quest included — may be run again. Its boss rooms may be repeated, its
-  hunt areas stay usable under the content's access rules, a player may help other groups again,
-  and a Game Account may select a different actor — its Main or a companion — on a later run;
-- none of that re-enables a one-time reward. A quest's **final or primary reward chest is one-time
-  per Game Account** (campaign);
+- **replayability is defined by the content.** A human multiplayer / co-op quest may be run again:
+  its shared quest, boss and content may be repeated, its hunt areas stay usable under the
+  content's access rules, a player may help other groups again, and a Game Account may select a
+  different actor — its Main or a companion — on a later run. A co-op quest is never *"one-time"*
+  in the sense of being inaccessible after completion;
+- whether solo, tutorial, story or dungeon quest content can be replayed is **content-specific and
+  OPEN** unless separately decided. No rule makes every quest replayable;
+- **a one-time reward claim is separate state.** A reward is one-time where its definition says
+  so, and a co-op quest's **final or primary reward chest is one-time per Game Account**
+  (campaign). Replay never re-enables a one-time reward;
 - not yet claimed: opening the eligible chest grants the reward exactly once, and the
   authoritative claim state becomes `CLAIMED`. Already claimed: opening it grants nothing a second
   time, and the UI may show the chest as empty;
 - the claim state belongs to the **Game Account**, never to the selected actor, so choosing the
   Main or a companion never resets it;
-- quest completion and progression state and reward-claim state are never conflated, because
-  content is replayable;
-- the claim is a typed reward-claim concept, settled exactly once under retry and concurrency —
-  never scattered, untyped storage flags. Its physical representation is the implementing phase's;
+- wherever content is replayable, quest completion and progression state and reward-claim state
+  are never conflated;
+- the claim is a typed, reusable reward-claim concept, settled exactly once under retry and
+  concurrency — never scattered, untyped storage flags. Its physical representation is the
+  implementing phase's;
 - an ordinary quest reward item — the Doublet included — is a normal item unless its definition
   says otherwise: movable, sellable, tradeable and discardable under the normal item rules. Coming
   from a quest never makes equipment Character-bound.
@@ -505,7 +511,11 @@ The rules that required a purge to leave no identity behind are **superseded**:
 - historical records may keep identifying fields internally: the Product Owner asked for named
   history. They never take part in live ownership or custody, or in any gameplay uniqueness rule;
 - analytics are preserved or collected for XP production, hunt efficiency, loot and drop
-  generation, item creation and destruction, deleted Characters, and balance analysis.
+  generation, item creation and destruction, deleted Characters, and balance analysis. This is a
+  **game-wide direction**: each gameplay or economy phase records the telemetry it introduces. The
+  deletion lifecycle records only its own facts — the historical record, the purge manifest and
+  the Deleted List — and a purge must not corrupt durable audit or analytics data that already
+  exists.
 
 ### What a pending Character still holds — G4.1b
 
@@ -625,7 +635,9 @@ current grant is classified item by item in `ADR-020` §5.2.
   cannot hold that gear, and the Product Owner has not chosen how the gear is represented. It is
   **not** forced into that model: it is **OPEN** for the PRE-4 specification (`ADR-020` DEL-O4);
 - a quest reward is never bound because it came from a quest: the tutorial's **Doublet is an
-  ordinary item** (*Quests*, above). The Doublet Quest's final chest is one-time per Game Account.
+  ordinary item** (*Quests*, above). Whether the Doublet Quest can be replayed, and whether its
+  chest is a one-time Tutorial Reward, are **OPEN** (`TUTORIAL_ROOKGAARD_ROADMAP.md` §43). If the
+  chest is one-time, it is claimed once per Game Account.
 
 ## Character activity occupancy
 

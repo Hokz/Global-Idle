@@ -53,8 +53,9 @@ Direction only:
 - a final boss;
 - rewards based on the current Tibia/Canary Warzone content — Warzones 1–9 are the recognisable
   candidates;
-- the content stays replayable, and each Game Account claims a one-time final reward once,
-  whichever actor it selected (`ADR-023`, 2026-09-25).
+- co-op content stays replayable, and each Game Account claims its one-time final reward once,
+  whichever actor it selected (`ADR-023`, 2026-09-25). This replay rule is for human multiplayer
+  and co-op content; other content defines its own.
 
 ### Participant scale — `TENTATIVE`
 

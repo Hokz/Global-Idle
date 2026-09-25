@@ -210,8 +210,9 @@ Translated into dungeons:
 - minibosses;
 - puzzles;
 - unlock rewards;
-- **replayable**: completion never locks the content, and the final or primary reward chest is
-  claimed once per Game Account, whichever actor opens it (`ADR-023`).
+- **human multiplayer / co-op quests are replayable**: completion never locks them, and their
+  final or primary reward chest is claimed once per Game Account, whichever actor opens it.
+  Whether other quest content can be replayed is decided per content (`ADR-023`).
 
 Long term:
 - first completion should require meaningful interaction.

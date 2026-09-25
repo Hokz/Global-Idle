@@ -142,8 +142,9 @@ around it.
   and the reason categories' wording.
 
 The same specification defines the historical deletion record's shape — the purge manifest and
-its analytics facts (DH3, DH6) — and whether a purged Character's POUCH ledger entries leave the
-ledger or stay as immutable history outside live custody (`ADR-020` §6.1).
+its deletion-specific facts (DH3) — and whether a purged Character's POUCH ledger entries leave the
+ledger or stay as immutable history outside live custody (`ADR-020` §6.1). It builds no general
+telemetry: see *Balance telemetry*, below.
 
 **2. The final tutorial potion quantities.** The direction is 20 Health and 20 Mana potions
 (`ADR-021` S6); neither number is final while combat balance is calibrated.
@@ -208,6 +209,17 @@ names unique across all accounts would be a separate Product Owner decision. *Si
 public Deleted List shows former Characters' names from every account, and one login may hold
 several Game Accounts, so that decision is open: per Game Account, per login, or across all. A
 historical record never takes part in any uniqueness rule (DH5).*
+
+## Balance telemetry
+
+**Not open:** the direction — XP production, hunt efficiency, loot and drop generation, item
+creation and destruction, deletion history and balance analysis are preserved or collected
+(`ADR-020` DH6, 2026-09-25). It is game-wide: each gameplay or economy phase records the telemetry
+it introduces, and PRE-4 records only the deletion-specific facts. Open:
+
+- what each phase records, and in what form;
+- where analytics live, and how later balance work reads them;
+- how long they are kept, and who may read them — they may keep identifying fields (DH4).
 
 ## Vocation balance
 
@@ -299,18 +311,23 @@ open (`ADR-020` DEL-O4). Open around it:
 
 ## Quests and reward claims
 
-The separation is **not** open: content access and replay are separate from one-time reward
-claims; a quest's final or primary reward chest is claimed once per Game Account, whichever actor
-opens it; and a quest reward item is ordinary unless its definition binds it — `LOCKED` in
+**Not open:** content replayability and one-time reward claims are separate; a human multiplayer
+/ co-op quest can be replayed, and its final or primary reward chest is claimed once per Game
+Account, whichever actor opens it; a one-time claim belongs to the Game Account, never to the
+actor; and a quest reward item is ordinary unless its definition binds it — `LOCKED` in
 `docs/DECISIONS.md` § *Replay and one-time reward claims*, architecture in `ADR-023`. Open around
 it (Phase 5 unless named):
 
-- which rewards, per quest and per boss, are one-time and which repeat;
+- whether solo, tutorial, story and dungeon quest content can be replayed — each content's own
+  decision; no rule makes every quest replayable;
+- which rewards, per quest and per boss, are one-time and which repeat, beyond the co-op final
+  chest;
 - what a replay yields when the final chest is already claimed — ordinary loot, nothing, or a
   lesser table;
 - the empty-chest presentation;
 - whether helping another group yields anything to the helper;
-- the tutorial reward tables besides the Doublet (`TUTORIAL_ROOKGAARD_ROADMAP.md` §43).
+- the tutorial reward tables, including whether the Doublet Quest's chest is one-time, and
+  whether the Doublet Quest can be replayed (`TUTORIAL_ROOKGAARD_ROADMAP.md` §43).
 
 ## Equipment
 

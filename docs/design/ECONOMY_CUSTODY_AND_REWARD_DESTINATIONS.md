@@ -20,9 +20,9 @@ A destination is decided by what produced the reward, not by what the player wou
 routes a boss reward into the Loot Pouch, and nothing routes a Rat's coins into the Reward Chest.
 
 *Not to be confused (2026-09-25):* the **Reward Chest** is a custody where rewards are stored. A
-quest's **final reward chest** is content that grants a reward, and it is claimed once per Game
-Account, whichever actor opens it (`ADR-023` §3). The two have similar names and nothing else in
-common.
+quest's **final reward chest** is content that grants a reward; where it is one-time — a co-op
+quest's is — it is claimed once per Game Account, whichever actor opens it (`ADR-023` §3). The two
+have similar names and nothing else in common.
 
 ## 2. Gold Pouch vs Bank
 

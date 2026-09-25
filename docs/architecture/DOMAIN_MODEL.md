@@ -227,9 +227,10 @@ attach to the login identity instead is open (`ADR-022` GA-O8).
 - a one-time Tutorial Reward is Account-governed: recorded in Account-owned reward state wherever
   a reward is defined as one-time, and never reissued because a Character was deleted or purged —
   `LOCKED BY PRODUCT` (G4.1c, `ADR-020` §5.1). The Bootstrap Kit is not such a reward (§5.13)
-- every one-time reward claim — a quest's final reward chest included — is Game Account state,
-  claimed at most once whichever actor opens it and however often the content is replayed —
-  `LOCKED BY PRODUCT` (2026-09-25, `ADR-023`, I25)
+- every one-time reward claim is Game Account state, claimed at most once whichever actor claims
+  it and however often replayable content is run — `LOCKED BY PRODUCT` (2026-09-25, `ADR-023`,
+  I25). A co-op quest's final chest is such a reward; any other reward is one-time only where its
+  definition says so
 
 Roster capacity is stored against the Account row but is **owned by the Character context** —
 see §5.4. Physical location does not determine the bounded context.
@@ -353,11 +354,11 @@ reversible grace, then a hard purge.** See `ADR-020`, which supersedes the Phase
 - ~~No record of the purged Character survives, and no surviving shared or Account-owned record
   keeps its identity.~~ **Superseded 2026-09-25:** no *live* record survives — nothing that could
   restore it, own or hold anything, or take part in a uniqueness rule — but an **immutable
-  historical deletion record** does, with a public Deleted List entry and internal audit and
-  analytics facts that may keep identifying fields (`ADR-020` DH1–DH6). Account-owned state — the
-  Bank, entitlements, roster capacity, and the unbound items in the Depot and the Stash — is
-  untouched, and capacity is not refunded. A Character-bound consumable is the Character's even
-  in the Depot, and the purge deletes it (`ADR-021`).
+  historical deletion record** does, with a public Deleted List entry and internal audit facts that
+  may keep identifying fields (`ADR-020` DH1–DH5). Account-owned state — the Bank, entitlements,
+  roster capacity, and the unbound items in the Depot and the Stash — is untouched, and capacity
+  is not refunded. A Character-bound consumable is the Character's even in the Depot, and the
+  purge deletes it (`ADR-021`).
 - The name stays reserved until the purge, and so do its vocation, its roster place and — for the
   Origin Character — the Origin slot. Only the successful purge releases them, in the commit that
   deletes the Character, so no replacement can take one and a restore never conflicts (G4.1b,
@@ -632,9 +633,12 @@ domain model:
 - the first tutorial dungeon has a guaranteed chest as a **tutorial-scoped exception**, not a
   universal floor-10 rule — `LOCKED BY PRODUCT`
 - **replay and one-time reward claims are separate** — `LOCKED BY PRODUCT` (2026-09-25,
-  `ADR-023`). Content may be run again. A quest's final or primary reward chest is claimed at most
-  once per **Game Account**, whichever actor opens it, and replay never re-enables it. Claim state
-  is a typed, exactly-once concept, kept apart from completion and progression state (I25)
+  `ADR-023`). Whether content can be replayed is defined by the content: a human multiplayer /
+  co-op quest can be, and for solo, tutorial, story and dungeon content it is content-specific and
+  open. A reward is one-time where its definition says so — a co-op quest's final or primary chest
+  is — and it is claimed at most once per **Game Account**, whichever actor opens it; replay never
+  re-enables it. Claim state is a typed, exactly-once concept, kept apart from completion and
+  progression state (I25)
 
 `DEFERRED` to 0A.6 — where unlock state lives (a per-account unlock set vs. flags) and how
 puzzle/lever interaction state is represented. *Since 2026-09-25 a one-time reward claim is never

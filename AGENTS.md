@@ -222,11 +222,13 @@ deletion lifecycle, or mark the gate passed until the Product Owner says so.
 
 Since 2026-09-25 a Game Account has exactly **one Main Character**, and further vocations are
 **companions**; the personal Active Party is the Main plus up to three companions, and human
-multiplayer takes one selected actor per Game Account (`ADR-022`). Quest replay is separate from
-one-time reward claims, which belong to the Game Account (`ADR-023`). The Character that G4.1
-deletes is the Main, and what that means for its companions and its Game Account — with the other
-items of `ADR-020` §5.3, DEL-O1 to DEL-O6 — is settled by the PRE-4 specification. These decisions
-are recorded and pending independent review. **The PRE-4 specification has not started.**
+multiplayer takes one selected actor per Game Account (`ADR-022`). Replaying a human multiplayer
+or co-op quest is separate from its one-time reward claim, which belongs to the Game Account;
+whether other content can be replayed is that content's own decision (`ADR-023`). The Character
+that G4.1 deletes is the Main, and what that means for its companions and its Game Account — with
+the other items of `ADR-020` §5.3, DEL-O1 to DEL-O6 — is settled by the PRE-4 specification. These
+decisions are recorded and pending independent review. **The PRE-4 specification has not
+started.**
 
 **Character-bound consumables** (`ADR-021`, `LOCKED` by the Product Owner on 2026-09-24) are
 consumables bound permanently to one Character — XP Boosts, Store-bought Exercise Weapons, Daily

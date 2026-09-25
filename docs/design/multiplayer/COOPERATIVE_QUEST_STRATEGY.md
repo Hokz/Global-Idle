@@ -151,6 +151,9 @@ A cooperative quest is **not** one-time content (`ADR-023`):
 - what a replay yields once the chest is claimed, and whether a helper gains anything, are open
   (§9).
 
+This replay rule is the Product Owner's for cooperative quests. Whether other content — solo,
+tutorial, story or dungeon — can be replayed is that content's own decision.
+
 ## 7. What Phase 5 must deliver for this to be possible — `APPROVED DIRECTION`
 
 Phase 5 builds the quest engine **without any networking**, and it must already be the engine

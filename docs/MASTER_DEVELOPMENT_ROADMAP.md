@@ -208,11 +208,12 @@ Quest completion can unlock:
 - travel;
 - other systems.
 
-**Replay and one-time rewards are separate** (`ADR-023`, 2026-09-25). A quest — a multiplayer quest
-included — can be run again: its boss rooms repeated, its areas reused, other groups helped, a
+**Replay and one-time rewards are separate** (`ADR-023`, 2026-09-25). A **human multiplayer /
+co-op** quest can be run again: its boss rooms repeated, its areas reused, other groups helped, a
 different actor selected. Its final or primary reward chest is claimed **once per Game Account**,
-whichever actor opens it, and replay never re-enables it. A quest reward item is ordinary unless
-its definition binds it.
+whichever actor opens it, and replay never re-enables it. Whether solo, tutorial, story or dungeon
+content can be replayed is decided per content. A quest reward item is ordinary unless its
+definition binds it.
 
 ## 9. Bosses
 
@@ -615,8 +616,8 @@ Full text: [`PHASE_GATES.md`](PHASE_GATES.md) § *Pre-Phase-4*.
   and after which a restore returns it exactly with nothing credited; then an atomic, idempotent,
   race-safe hard purge of the live Character and everything it owns, proven by a schema-derived
   closure inventory and a post-purge scan, leaving an immutable historical deletion record and a
-  public Deleted List entry, and replacing `retiredAt`. Its three product questions are
-  **resolved** by the Product Owner: the
+  public Deleted List entry — deletion-specific facts only, never a general telemetry platform —
+  and replacing `retiredAt`. Its three product questions are **resolved** by the Product Owner: the
   Gold Pouch is kept during the grace and destroyed at the purge, never moved to the Bank (G4.1a);
   a pending Character keeps its vocation, the Origin slot and its roster place until the purge, so
   a restore never conflicts with a replacement (G4.1b); tutorial completion belongs to the Account
@@ -666,9 +667,9 @@ The **generic** engine. Solo and one-account Party only; no networking, no lobby
 - the same definitions must work solo and with a one-account Party;
 - **no boss implemented as bespoke code**, and **no lobby in Phase 5**;
 - the Requirement / Cost / Reward primitive, built when the first content slice needs it;
-- **reward claims** (`ADR-023`): content stays replayable, and each one-time reward — a quest's
-  final chest — is a typed, exactly-once claim per Game Account, kept apart from completion and
-  progression state;
+- **the reward-claim primitive** (`ADR-023`): each one-time reward is a typed, exactly-once claim
+  per Game Account, kept apart from completion and progression state. Which content can be
+  replayed is each content's own definition; co-op quests (Phase 5B) can be;
 - Reward Chest — persistent and safe from Hunt death — and blessing acquisition, where this is
   the natural owning slice;
 - travel and access foundations; unlock framework; first-completion rules; boss daily limits and
@@ -807,6 +808,14 @@ Recorded in full: [`design/FUTURE_DIRECTIONS.md`](design/FUTURE_DIRECTIONS.md) �
 > **Security, retry/idempotency, economy correctness and realistic load tests MUST occur at the
 > phase that introduces their risk — never all postponed to Phase 10.**
 > [`PHASE_GATES.md`](PHASE_GATES.md) § *Pre-launch*.
+
+### Cross-phase — balance telemetry
+
+XP production, hunt efficiency, loot and drop generation, item creation and destruction, deletion
+history and balance analysis are preserved or collected (`ADR-020` DH6, 2026-09-25). No single
+phase owns it: each gameplay or economy phase records the telemetry it introduces, and later
+balance and analytics work — Phase 9's economy rebalance among it — consumes it. PRE-4 records only
+the deletion-specific facts.
 
 ### Operational gate
 

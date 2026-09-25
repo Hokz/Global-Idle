@@ -171,18 +171,23 @@ Proven by tests:
   record is the one declared exception: the scan knows where it is, and proves that nothing else
   names the Character (DH1–DH5);
 - **the historical deletion record** (DH1–DH4): the purge writes an immutable record — the purge
-  manifest (a deletion snapshot) and its analytics facts — within the same final boundary, so that
-  no purge commits without its record and no record exists for a purge that did not commit. Tests
-  show that it matches exactly what was purged, is written once under retry, cannot be updated or
-  deleted by the application role, restores nothing, and holds no ownership, custody or uniqueness
-  (DH5);
+  manifest (a deletion snapshot) and its deletion-specific facts — within the same final boundary,
+  so that no purge commits without its record and no record exists for a purge that did not
+  commit. Tests show that it matches exactly what was purged, is written once under retry, cannot
+  be updated or deleted by the application role, restores nothing, and holds no ownership, custody
+  or uniqueness (DH5);
 - **the public Deleted List** (DH2): an entry shows the former Character's name, vocation, level at
   the deletion snapshot, the date and a broad reason category — tested for exactly those fields —
   and no internal moderation detail reaches it. Which date it shows and the categories' wording are
   DEL-O6;
-- **analytics** (DH6): the PRE-4 specification names the facts the purge keeps or emits — XP
-  production, hunt efficiency, loot and drops, items created and destroyed, deleted Characters —
-  and a test shows they survive the purge without being live state;
+- **deletion-specific facts only** (DH3): the manifest records what the purge removed — the
+  Character, and the value and items it destroyed — enough to answer *what was deleted* and to
+  serve as anti-duplication evidence, and a test shows it matches the purge exactly. It may
+  reference durable facts that Phases 2–3 already keep. **PRE-4 builds no general telemetry**: XP,
+  Hunt, loot and item-flow analytics are a game-wide direction that each gameplay or economy phase
+  records for what it introduces (DH6);
+- **no damage to existing audit or analytics data**: a purge changes no durable audit or analytics
+  record that it does not own — tested beside *no collateral deletion*, above;
 - **a closure that can follow a binding**: nothing in the purge assumes that Character-owned
   `ItemInstance` rows are found by `characterId` alone. A future binding that is independent of
   custody — `ADR-021`'s Character-bound consumables, stored in the Depot with `characterId` null —
