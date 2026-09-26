@@ -15,14 +15,14 @@ Create a healthy player economy where:
 
 Candidates:
 - Forge;
-- Skill Tree;
+- vocation Skill Trees — Gold-funded nodes, and a respec that refunds nothing;
 - services;
 - supplies;
 - travel;
 - Market fees;
 - respecs;
 - progression unlocks;
-- additional character/roster slot unlocks;
+- companion unlocks (`ADR-022`);
 - repair/maintenance only if it adds meaningful strategy.
 
 ## Item sinks
@@ -47,6 +47,10 @@ Item listings priced in gold.
 Item listings priced in premium currency.
 
 The same item should not be simultaneously committed to two listings.
+
+A Character-bound consumable — an XP Boost or a Store-bought Exercise Weapon, for example — is
+never listed on either market, traded or sold
+([`architecture/decisions/ADR-021-character-bound-consumables-and-store-container.md`](architecture/decisions/ADR-021-character-bound-consumables-and-store-container.md)).
 
 ## Transaction rules
 

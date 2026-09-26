@@ -15,7 +15,9 @@ Phase 2 at all, beyond a tiny primitive Phase 2 genuinely cannot avoid.
 **Owner: Phase 9 — Content Expansion** (the primitive it leans on is Phase 5's Requirement /
 Cost / Reward).
 
-Rookgaard is the **first mandatory progression area**. Everything after it branches.
+Rookgaard is the **first mandatory progression area**. Everything after it branches. *Since
+2026-09-25 it is also a permanent, single-player region where a player may stay indefinitely
+([`../DECISIONS.md`](../DECISIONS.md) § *Rookgaard*).*
 
 - on reaching Mainland/Thais, regional objectives and tasks award **progression points**;
 - points are spent to unlock **player-chosen** cities and routes;
@@ -48,7 +50,12 @@ for its own sake.
 **Owner: Phase 7 / 7A — Advanced Progression.** Not Phase 9: the content that feeds a kill counter
 is a consumer of this system, not its owner.
 
-Tibia identity is the baseline (`REFERENCES.md`).
+Tibia identity is the baseline (`REFERENCES.md`). *`LOCKED` direction, 2026-09-25
+(`DECISIONS.md` § *Bestiary*): the Tibia Global Bestiary is the baseline for structure, creature
+characterization, categories and kill thresholds; the phase that builds it verifies the
+then-current values from reliable sources and records what it adopts, and nothing is frozen from
+memory before then. It reveals resistances and weaknesses through progression, for build
+planning.*
 
 - creature **kill counters** unlock Bestiary entries and their information;
 - Bestiary progress awards **Charm Points**;
@@ -61,7 +68,9 @@ neither levelled nor earned still has something advancing.
 ## 4. Imbuement materials, outfits, achievements
 
 - creature materials feed future **Powerful Imbuements** (one tier only — `ACTIVITY_OCCUPANCY_AND_TIMERS.md` §6);
-- **outfits, addons and auras** are earned through quests, materials or the store, as configured;
+- **outfits, addons and auras** are earned through quests, materials or the store, as configured.
+  They are cosmetic unlocks, outside `ADR-021`'s Character-bound item model, and never Store
+  Container items — their own unlock model is still open;
 - **achievements** track meaningful progression milestones.
 
 ---
@@ -74,12 +83,28 @@ forgotten OPEN notes.
 
 ### Before Phase 4 (roster)
 
-- **Character retirement, properly.** Retirement must settle occupancy, move item custody safely,
-  prevent a repeated tutorial starting-grant, and preserve history. Phase 3 only stopped a retired
-  Character from being treated as playable by the inventory surface (`RET1`, `RET2`); that is a
-  filter, not a flow.
-- **`baseLevel` projection vs `baseXp` truth.** Two representations of the same fact. Reconcile
-  which is authoritative and make the other derived, before a second system reads the wrong one.
+- **Game Account deletion lifecycle** (`LOCKED`, `ADR-024`, reusing `ADR-020`'s mechanics;
+  `ADR-020` superseded the retirement this item used to describe). A deletion request puts the
+  **whole Game Account** into a reversible grace of exactly 720 elapsed hours, fully frozen; then
+  a hard purge removes all live Game Account state — the Main, every companion, items, Pouches,
+  Bank, Depot, Stash, progression and claims. Nothing transfers to another Game Account or the
+  Login, which survives, and nothing creates a replacement Main. One lifecycle serves every
+  deletion source, moderation included, and an internal history record for support remains — no
+  public Deleted List. The work is the purge's closure inventory and its atomic, idempotent,
+  race-safe execution, the replacement of `retiredAt`, and a Login represented apart from its Game
+  Accounts. Phase 3's `RET1` and `RET2` were a retirement filter, not a flow, and are superseded
+  rather than extended. The Character-scoped rules of 2026-09-24 — G4.1b's holds, G4.1c's tutorial
+  survival and the Bootstrap Kit — are superseded; G4.1a's destroyed Gold Pouch stands — see
+  [`../PHASE_GATES.md`](../PHASE_GATES.md) § *G4.1*.
+- **Globally unique Character names**, enforced at persistence level, with a pending Game
+  Account's names reserved until its purge — [`../PHASE_GATES.md`](../PHASE_GATES.md) § *G4.4*.
+- **One authoritative tunable configuration surface** (`ADR-025`) before Phase 4 adds its tunable
+  values — [`../PHASE_GATES.md`](../PHASE_GATES.md) § *G4.5*.
+- **Enforce the `baseXp` → `baseLevel` projection.** Not a question of which is authoritative:
+  `baseXp` is the durable truth and `baseLevel` its stored projection, already decided and
+  implemented (`schema.prisma`, `contexts/hunt/progression.ts`). What is missing is enforcement on
+  every write path, migration and rollback, so the pair cannot drift —
+  [`../PHASE_GATES.md`](../PHASE_GATES.md) § *G4.2*.
 
 ### Before Market / Forge / Imbuement
 
@@ -89,11 +114,30 @@ forgotten OPEN notes.
 - **Validate impossible rarity/affix identities.** Today an affix array is JSON the domain writes
   and trusts. A market lets someone else's row reach your inventory.
 
+### Before the first Character-bound consumable (Store, Daily Reward, Event or tutorial)
+
+- **Binding separate from custody, and the Store Container** (`LOCKED`, `ADR-021`). A consumable
+  bound permanently to one Character — an XP Boost, a Store-bought Exercise Weapon, a Daily Reward
+  or Event consumable — moves only between that Character's Store Container and the Account's
+  Depot, is used only by that Character, is never sold, traded, listed, stashed, forged or
+  converted, and is purged with its Game Account wherever it is stored. It belongs to no fixed
+  phase: Phase 8 is the obvious consumer, but whichever phase ships the first bound item builds
+  this first — [`../PHASE_GATES.md`](../PHASE_GATES.md) § *GBC.1*. The Store sells consumables,
+  never combat equipment. Since 2026-09-25 the tutorial's Health and Mana potions are bound
+  consumables too, used straight from the Store Container through the action slots. Which phase
+  first issues them bound is open (`ADR-024` DEL-O5).
+
 ### Before Phase 5B (multiplayer)
 
+> These, and the Phase 4 and market gates, are now stated in full in
+> [`../PHASE_GATES.md`](../PHASE_GATES.md). This list is the origin; that document is the
+> canonical statement.
+
 - **Multi-account Activity membership**, the Character→membership invariant, and competitive
-  liveness semantics. `MULTIPLAYER_ACTIVITIES_FOUNDATION.md` has the design; the invariants are
-  the part that must exist before two accounts share one Activity.
+  liveness semantics. `MULTIPLAYER_ACTIVITIES_FOUNDATION.md` has the design,
+  [`multiplayer/COOPERATIVE_QUEST_STRATEGY.md`](multiplayer/COOPERATIVE_QUEST_STRATEGY.md) has
+  the player-facing model, and the invariants are the part that must exist before two accounts
+  share one Activity.
 
 ### Before beta / scale
 
@@ -112,6 +156,7 @@ Each shapes Phase 4+ design. None expands Phase 3.5.
 | **Tactical Automation Profiles** | target priorities, movement policy, supply thresholds, risk/retreat behaviour — the player's *strategy* rather than their *reflexes* | Phase 4 |
 | **Hunt Route Strategy** | Safe / Balanced / Aggressive / Loot-oriented route policy over a real map | after Phase 3.5 gives routes a map |
 | **Spatial Party Formation** | frontline, range, support radius, vocation positioning | Phase 5B |
+| **Tactical policy primitives** | target selection, healing, supply use, risk/retreat, role — baseline gameplay, never paywalled | Phase 4 |
 | **Run Analyzer** | XP/h, Gold/h, loot, supply burn, movement vs combat time, damage/healing, capacity utilisation | Phase 4 |
 | **Balance Simulation Laboratory** | a headless bulk-run tool for balancing, over the deterministic simulator that already exists | Phase 4 |
 | **Deterministic Run Replay / Debug Inspector** | reproduce one Activity from seed + content + state | Phase 4 |
@@ -169,6 +214,8 @@ needs more than one of these shapes at once.
 
 Current Tibia identity as the baseline: kill counters, Bestiary progress, Charm Points, Charm
 Runes, developed in stages. A **separate progression axis** from Gold and Base Level, deliberately.
+The Tibia Global values are verified when the phase is built, never frozen from memory, and the
+Bestiary reveals resistances and weaknesses (2026-09-25, §3 above).
 
 ## Imbuements, outfits, achievements — FUTURE, NOT IMPLEMENTED
 

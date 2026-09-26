@@ -70,11 +70,16 @@ These are each exactly one transaction, all-or-nothing:
 | **Market purchase** | buyer balance, seller balance, fee, item custody, ledger ×N, listing state |
 | **Market listing** | item custody → escrow, listing row, fee, ledger |
 | **Forge attempt** | cost debit, ledger, two sacrifices → consumed, target tier on success |
-| **Roster slot unlock** | Gold debit, ledger, capacity increment |
-| **Character retirement** | character status, item custody → recovery, party config, occupancy claim check |
+| **Roster slot unlock** — a companion unlock, `ADR-022` | Gold debit, ledger, capacity increment |
+| **Game Account deletion request** | the Game Account's lifecycle `ACTIVE` → `PENDING_DELETION` and its two timestamps, after the quiescence check — no occupancy claim or non-terminal Activity for any of its actors, no live obligation; configured Active Party membership does not block (`ADR-024` §2). Stamina and every other time-derived value of every Character are settled up to the accepted request, and nothing accrues after it (FZ2) |
+| **Game Account restore** | lifecycle back to `ACTIVE`, timestamps cleared — decided against the deadline after the Game Account's lock is held (`ADR-020` §2, §7; `ADR-024` §2). Time-derived state resumes from the restore instant; nothing is credited for the grace (FZ3) |
+| **Game Account purge** | the Game Account's whole closure — every Character and everything each owns, its items in every custody (Store Containers and bound items included), its Bank, Depot and Stash, its ledger entries and balances, entitlements, activity history, derived settlement and idempotency records — **then** the Game Account row, releasing its Characters' names in the same commit. One transaction, under the purge capability; the Login and every other Game Account are unchanged (`ADR-024` §3). The same boundary writes the internal history record (HR2–HR5) — no Deleted List entry, no destroyed-value inventory — and builds no general telemetry (DH6) |
 | **Activity start** | activity row, account activity claim, **one occupancy claim per participating Character** |
 | **Activity end / retirement of claims** | activity state, **release of every occupancy claim**, in the same transaction as the lifecycle transition |
 | **Skill training claim** | charges, skill progression, activity state |
+| **Bound item move** (future, `ADR-021`) | a Character-bound consumable between its Store Container and the Depot, binding unchanged — locks the Account, then the bound Character, then the item, and checks the Character is `ACTIVE` |
+| **Bound consumable use** (future, `ADR-021`) | the item or its charges, and the effect it grants — only for its bound Character |
+| **One-time reward claim** (future, Phase 5, `ADR-023`) | the claim and the grant it authorises, together. A uniqueness guarantee over the Game Account and the reward makes a retried or concurrent claim grant at most once |
 
 A partially applied settlement is not a state the system can be in. Loot materializing without
 its XP, or a purchase debiting without transferring, must be impossible rather than rare.
@@ -144,6 +149,29 @@ response cannot double-apply.
 - A reconciliation job verifies ledger sums against balance projections. A discrepancy is a P1
   incident (`ECONOMY_INTEGRITY.md`).
 
+**The one designed exception — a Game Account's final purge** (`ADR-024`, reusing `ADR-020`;
+`LOCKED BY PRODUCT`). Exactly 720 elapsed hours after a deletion request, the purge removes the
+whole Game Account and everything it owned — its ledger entries, BANK and POUCH, included, unless
+the PRE-4 specification keeps them as immutable history outside live state (`ADR-024` §3). An
+internal history record for support survives, outside live persistence, and never takes part in
+ownership, custody, claims or uniqueness (HR2–HR5). The exception is narrow by construction:
+
+- it applies **only** to rows that belong to the purged Game Account or to one of its Characters.
+  The Login and every other Game Account — of the same Login included — are unchanged, and every
+  surviving custody scope still reconciles;
+- it is performed **only** by the purge capability. The application role still has no `UPDATE`
+  or `DELETE` on the ledger;
+- a record shared with another Game Account — a completed co-op run, a completed trade — survives
+  for the other side. The owning phase either removes the purged Game Account's identity from it
+  or keeps it as immutable history within HR5 (`ADR-024` §3).
+
+*Until the final synchronization* the purge took one Character, and the Account's BANK entries
+survived it (`ADR-020` §6.1). Since `ADR-024` the Bank goes with its Game Account.
+
+Everything above holds for ordinary play. After a purge, nothing about the purged Game Account's
+economy is answerable from the live ledger. The internal history record keeps what support needs
+(HR3); it is not an economy record (HR4).
+
 ---
 
 ## 7. Activity state persistence
@@ -207,6 +235,18 @@ cleanup of genuinely **un**referenced versions.
 
 `DECIDED IN PHASE 0A` — after any restore, **reconciliation runs before the economy reopens**.
 Serving a balance that disagrees with the ledger is worse than a few minutes of downtime.
+
+**`OPEN` — restores and Game Account deletion** (`ADR-024`, operational gate). A restore from
+backup brings back every Game Account that was purged after the backup point, and loses every
+deletion request or restore made after it. A `PENDING_DELETION` Game Account whose deadline has
+passed would be purged again at once — including one whose owner restored it inside the lost
+window. Recommended until decided: after any restore the purge job stays **paused** until
+operators have reconciled the lifecycle transitions lost in the restore window. The pause is
+disaster recovery, not a deferral: every Game Account that falls due during it is an overdue purge
+— the monitored, degraded condition of `ADR-020` §7. How long backups and logs may keep a purged
+Game Account is also open, and so is how long internal history records are kept, and who in
+support may read them. All are tracked in [`../OPEN_QUESTIONS.md`](../OPEN_QUESTIONS.md)
+§ *Game Account deletion*.
 
 ---
 

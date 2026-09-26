@@ -79,6 +79,7 @@ If that loop is not satisfying, do not scale content yet.
 - full quest library;
 - complex boss rotation;
 - Premium store;
-- the Character Roster, character unlocks and multi-character Active Party;
+- companions, companion unlocks and the multi-actor Active Party — the MVP has the Main Character
+  alone (`ADR-022`);
 - complete content import;
 - C++/WASM optimization.

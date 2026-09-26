@@ -4,6 +4,23 @@
 **Scope:** Base Level, Skills, skill training, vocation aptitudes, baseline combat power, and how later systems modify combat.  
 **Purpose:** Establish a clean technical model before exact formulas are implemented.
 
+> **Amended 2026-09-25 — non-formula decisions.** The Product Owner locked the classic Skill
+> set (Magic Level, Sword, Axe, Club, Shielding, Distance and Fist; no Fishing), the build
+> philosophy, damage origin versus damage type, resistances instead of absolute immunities,
+> vocation-specific Skill Trees with a no-refund respec, and equipment rules without hidden
+> per-vocation multipliers — [`DECISIONS.md`](../../DECISIONS.md).
+>
+> **Amended again 2026-09-25 — the weapon attack and defence formulas are `LOCKED`** (final
+> synchronization, after PR #13 head `fff6faf`). The exact expressions are Attack Value, Max
+> Base Damage, Defense Value at a 0.50 scale plus flat Weapon Defense and Armor Value, and Armor
+> Value. Armor and Defense decide pass or block only. Mitigation is a percentage of the damage
+> that passed. There is no hidden vocation multiplier. They are recorded in `DECISIONS.md`
+> § *Combat formulas — weapon attack and defence* and summarised in §29 and §33 below. Ranged
+> Accuracy, the damage-roll distribution and minimum damage, the rounding stages and the
+> tie/order/visual-mapping rules stay open (§45). **Not implemented:** the engine Phases 2–3.6
+> verified still follows Canary, and stays as built until the phase that implements the locked
+> formulas replaces it through explicit matrix amendments.
+
 ---
 
 # 1. Core Principle
@@ -67,13 +84,15 @@ Examples:
 - Club;
 - Distance;
 - Shielding;
-- Magic Level.
+- Magic Level;
+- Fist.
 
-Additional skills can be defined later.
+*2026-09-25:* the classic set is locked — Magic Level, Sword, Axe, Club, Shielding, Distance and
+Fist — and there is no Fishing skill.
 
 ## Skill Tree
 
-Advanced vocation development system.
+Advanced vocation development system — one tree per vocation (2026-09-25, §27).
 
 Not the same as Skills.
 
@@ -120,6 +139,11 @@ Baseline Combat Power
 ```
 
 Later systems modify this baseline.
+
+*2026-09-25:* **Level is not the sole power source.** Level mainly provides base progression — HP,
+Mana, Capacity — plus access and unlocks. Power and build also come from the Skills, the
+vocation's Skill Tree, the Wheel, equipment, affixes, the Forge, Imbuements and Charms, and Hunts
+reward matching a build to the Hunt rather than level alone.
 
 ---
 
@@ -407,6 +431,13 @@ Exercise Wand/Rod
 
 Exact item names, charges, costs and efficiency are future balance work.
 
+An Exercise Weapon bought with Store Coin or premium currency is a **Character-bound consumable**
+(`LOCKED`, [`ADR-021`](../../architecture/decisions/ADR-021-character-bound-consumables-and-store-container.md)):
+only its own Character trains with it, it is stored only in that Character's Store Container or
+the Depot, and it is never sold, traded or moved to another Character. It is a charge-based
+training consumable, not combat equipment. A Gold-bought Exercise Weapon is bound only if its
+definition says so.
+
 ---
 
 # 15. Public Training Dummy
@@ -663,6 +694,11 @@ Equipment may affect combat through:
 
 Equipment should modify the baseline rather than replace the Skill system.
 
+*2026-09-25 (`DECISIONS.md` § *Equipment*):* vocations are told apart by equipment eligibility,
+weapon and off-hand options, spells, Skill Trees and the Wheel — never by a hidden per-vocation
+Armor or Defense multiplier. Armour slots stay Tibia-like, and any vocation may use a shield where
+the item and the rules allow.
+
 ---
 
 # 23. Rarity / Affix Interaction
@@ -788,6 +824,14 @@ Exori Mastery
 
 Exact nodes are future design.
 
+*2026-09-25 (`DECISIONS.md` § *Vocation Skill Trees and respec*):* there is no universal Skill
+Tree — **each vocation has its own**, and its number of paths is that vocation's design, not a
+fixed three. Further paths are gated by Level or other progression, and crossing into them is
+intended long term. Nodes are bought with Gold, a major sink, and trees are deep enough that a
+later path does not imply the first is complete. A respec removes chosen nodes, refunds no Gold,
+and never leaves a tree structurally invalid. Open: whether an extreme endgame can buy every node,
+and the Monk's branch identity.
+
 ---
 
 # 28. Skills vs Skill Tree vs Spells
@@ -796,11 +840,11 @@ This distinction must be maintained in code and UI.
 
 ```text
 SKILLS
-Sword / Axe / Club / Distance / Shielding / Magic Level
+Magic Level / Sword / Axe / Club / Shielding / Distance / Fist
 → numeric proficiency
 
 SKILL TREE
-class progression / passive or active upgrades
+one per vocation — class progression / passive or active upgrades
 
 WHEEL OF DESTINY
 specialization and build shaping
@@ -830,6 +874,20 @@ vocation parameters
 Then apply modifier layers.
 
 Exact Canary formula is not yet imported/approved.
+
+*`LOCKED` 2026-09-25 — the weapon attack formulas* (`DECISIONS.md` § *Combat formulas — weapon
+attack and defence*, where the exact expressions are recorded):
+
+```text
+E = Skill + Level / 100
+w = (WeaponAttack - 7) / 55
+s = (E - 1.01) / 263.99
+AttackValue   = 5 + 85 * w^2 + 350 * s^1.5 + 685 * (w * s)^3     the pass/block score
+MaxBaseDamage = 0.085 * WeaponAttack * Skill + Level / 5         the maximum base damage
+```
+
+Attack Value decides pass or block, and is separate from the damage dealt. Open: the exact ranged
+Accuracy system, the damage-roll distribution and minimum damage, and the rounding stages (§45).
 
 ---
 
@@ -927,6 +985,33 @@ Later systems can modify:
 
 Canary should be studied before the exact Global Idle model is locked.
 
+*2026-09-25:* whatever the model, it holds no hidden per-vocation Armor or Defense multiplier.
+
+*`LOCKED` 2026-09-25, final synchronization — Defense Value and Armor Value* (`DECISIONS.md`
+§ *Combat formulas — weapon attack and defence*):
+
+```text
+E_def = Shielding + Level / 100
+w_def = (ShieldDefense - 7) / 55
+s_def = (E_def - 1.01) / 263.99
+DefenseCoreRaw    = 5 + 85 * w_def^2 + 350 * s_def^1.5 + 685 * (w_def * s_def)^3
+ScaledDefenseCore = DefenseCoreRaw * 0.50
+DefenseValue      = ScaledDefenseCore + WeaponDefense + ArmorValue
+
+ArmorValue = sum of Armor from all equipped armor-bearing slots, excluding weapon and shield
+```
+
+- Defense uses Attack Value's core shape and weights at a 0.50 scale, then adds flat Weapon Defense
+  and the whole ArmorValue at the end;
+- ArmorValue is also its own, independent defensive check;
+- Armor and Defense decide **pass or block** only. They never reduce damage that passes;
+- **Mitigation** is a percentage reduction of damage that passed:
+  `FinalDamage = PassedDamage * (1 - MitigationPercent)`;
+- no hidden vocation multiplier. A Knight's tankiness comes from visible build and progression
+  systems.
+
+Open: the exact tie, order and visual-mapping rules, and how the scores are compared (§45).
+
 ---
 
 # 34. Resistances
@@ -945,6 +1030,12 @@ Damage should eventually account for:
 Exact resistance ordering, rounding and interaction with armor/defense must be deliberately specified.
 
 Do not assume Canary ordering without review.
+
+*2026-09-25:* **damage origin** — a spell, a weapon, a rune — and **damage type** — physical,
+fire, ice and the rest — are separate, and the defences that apply follow the type: a spell may
+deal physical damage. Ordinary Hunt design avoids absolute 100% creature immunities. Creatures
+use resistances, sensitivities and weaknesses instead, so a mismatched build is less efficient,
+not blocked.
 
 ---
 
@@ -1024,11 +1115,20 @@ Advanced build development begins in Mainland after vocation selection.
 
 Exact timing for first Skill Point allocation is still to be finalized.
 
+*2026-09-25, final synchronization:* Rookgaard is a full, single-player region, and a player may
+stay there indefinitely, vocationless (`DECISIONS.md` § *Rookgaard*). Its constraints above hold
+for as long as the player stays.
+
 ---
 
 # 39. Vocation Selection and Skills
 
 Vocation is chosen at Base Level 8.
+
+*2026-09-25, final synchronization:* more precisely, the vocation is chosen on proceeding to the
+Mainland, which the Level 8 event offers. The **Main** chooses it — the character has been the
+Main since its creation — and the other four become the Game Account's possible Companions
+(`ADR-022` GA12, RK4). A Main that stays in Rookgaard stays vocationless.
 
 This matters because vocation influences Skill aptitude/cost.
 
@@ -1144,6 +1244,14 @@ Use:
 - reference comparisons;
 - progression simulations;
 - edge cases.
+
+*Phase 4A adds a **combat inspector** for a development / staging privileged identity
+([`PHASE_4A_PLAYABLE_BETA_SLICE.md`](../milestones/PHASE_4A_PLAYABLE_BETA_SLICE.md) §6). Where
+implemented, it shows the Attack Value and its roll, the Armor and Defense checks, the block or
+pass outcome, Max Base Damage, the damage roll, Mitigation, the final HP damage, the Skill and
+equipment contributions, and the seed and run identity. It reads the server's calculation for
+whichever combat model is implemented, and decides nothing. It is not a substitute for the tests
+above.*
 
 ---
 
@@ -1275,7 +1383,16 @@ The following are established product directions:
 - off-class Skill progression should remain possible but inefficient;
 - Canary is the baseline technical reference for Tibia-style combat formulas;
 - Wheel and Skill Tree modify the character on top of baseline Skills;
-- Rookgaard introduces advanced systems but does not fully use them.
+- Rookgaard introduces advanced systems but does not fully use them;
+- *2026-09-25:* the classic Skills are Magic Level, Sword, Axe, Club, Shielding, Distance and
+  Fist, with no Fishing; Level is not the sole power source; damage origin and damage type are
+  separate; ordinary Hunts use resistances, not absolute immunities; each vocation has its own
+  Skill Tree, with a respec that refunds nothing; no hidden per-vocation Armor or Defense
+  multiplier;
+- *2026-09-25, final synchronization:* the exact Attack Value, Max Base Damage, Defense Value and
+  Armor Value formulas (§29, §33); Armor and Defense decide pass or block and never reduce damage
+  that passes; Mitigation is a percentage of the damage that passed; `baseXp` is the truth and
+  `baseLevel` its stored projection.
 
 ---
 
@@ -1283,9 +1400,16 @@ The following are established product directions:
 
 Must still be designed explicitly:
 
+- ~~the combat formula revision discussed after PR #13 head `86a7681`~~ — **decided 2026-09-25**
+  for weapon attack and defence (§29, §33). What stays open of it: the exact ranged Accuracy
+  system; the damage-roll distribution and minimum damage; the rounding stages, where not already
+  specified; the tie, order and visual-mapping rules; and, not stated with the formulas, how the
+  scores are compared, whether Skill and Shielding are base or effective values, and ShieldDefense
+  without a shield or below the 7 offset;
 - exact Skill Point award trigger;
 - exact starting Skill values;
-- exact Base Level XP curve;
+- exact Base Level XP curve — Phase 2 implemented Canary's `getExpForLevel`, and the Product Owner
+  has not locked it as Global Idle's curve (2026-09-25). It stands until a decision replaces it;
 - exact Skill XP/progress mechanics from hunting;
 - exact Skill cost curve;
 - exact Level 1000 → Skill 100 calibration formula;
@@ -1313,7 +1437,8 @@ Must still be designed explicitly:
 - party behavior;
 - death penalties;
 - blessing interactions;
-- Skill Tree nodes;
+- each vocation's Skill Tree paths and nodes; whether an extreme endgame can buy every node; the
+  Monk's branch identity;
 - Wheel nodes;
 - modifier stacking/rounding order.
 
@@ -1366,10 +1491,9 @@ Buffs / Debuffs
              ↓
 
 TARGET DEFENSE
-Armor
-Shielding
+Defense Value · Armor Value   pass or block (2026-09-25)
 Resistances
-Mitigation
+Mitigation                    % of the damage that passed
              ↓
 
 FINAL COMBAT RESULT

@@ -14,7 +14,7 @@ Read, in order:
 6. `docs/ECONOMY.md`
 7. `docs/architecture/ARCHITECTURE_OVERVIEW.md`
 8. `docs/MVP_SCOPE.md`
-9. `docs/ROADMAP.md`
+9. `docs/PHASE_GATES.md` (`docs/ROADMAP.md` is navigation only — the phase sequence is in the master roadmap at 3)
 10. `docs/DECISIONS.md`
 11. `docs/OPEN_QUESTIONS.md`
 12. `docs/REFERENCES.md`

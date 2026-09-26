@@ -81,12 +81,29 @@ Each works until it does not, and each is expensive to undo once a phase has shi
 
 ---
 
+## Creator tooling and the combat inspector — development and staging
+
+Phase 4A adds two tools for a **development / staging privileged identity**
+([`design/milestones/PHASE_4A_PLAYABLE_BETA_SLICE.md`](../design/milestones/PHASE_4A_PLAYABLE_BETA_SLICE.md)
+§5–§6). Neither is shown to an ordinary player.
+
+- **The creator console** sends server-side commands. Its authority comes from the authenticated
+  identity, never from a *"God Character"*, and every command goes through the same domain paths
+  as play: it never bypasses a domain invariant and never writes client state as if it were
+  authority.
+- **The combat inspector** displays the server's own combat calculation. It never recomputes
+  combat in the client, and what it shows is never gameplay-state authority — the rule above for
+  Chat / Logs holds for it too.
+
+---
+
 ## Phase ownership
 
 | Phase | Surface work |
 |---|---|
 | 1 | World Navigation — the Atlas, markers, region and hunt selection |
 | 2 | **The first real Game Window** — the Rookgaard Sewers Hunt: Character, creatures, automatic combat, room and cycle, connection state, Stamina, session XP/Gold, supplies, death |
+| 4A | **The Playable Beta Slice** — Game Account selection or creation and naming; the Rookgaard Game Window; a small functional Atlas with useful labels and details; one reusable NPC / dialogue flow; the System UI its journey needs — equipment, the progressing Skill, the potion action slot; the development / staging creator console and combat inspector |
 | later | city and NPC scenes; System UI panels; Chat and Logs as real systems |
 
 Phase 2 implements the first useful Game Window and **nothing else from this document**. No city

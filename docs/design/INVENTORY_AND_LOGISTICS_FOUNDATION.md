@@ -11,7 +11,9 @@ scope. Both are explicitly temporary.
 
 ## 1. Five Hunt container slots per Character
 
-Every Character owns exactly **five** top-level Hunt container slots.
+Every Character owns exactly **five** top-level Hunt container slots. *Since 2026-09-25 that
+Character is the Game Account's Main; whether a companion has slots of its own or shares the
+Main's is open (`ADR-022` GA-O3).*
 
 | Slot | How it is obtained |
 |---|---|
@@ -117,9 +119,25 @@ Stellar. Do not create a second enum.
 |---|---|---|
 | **Depot** | physical, individual custody | equipment instances, unique or affixed items, containers |
 | **Stash** | large fungible quantities | creature products, materials, eligible potions and runes, commodities |
+| **Store Container** (future, `ADR-021`) | a per-Character system custody — not a backpack, not a Hunt Container Slot, not equipment, not the Loot Pouch | Character-bound consumables; its capacity is open |
 
 Normal accessible movement: container ↔ container · container ↔ Depot · container ↔ Stash (when
 eligible) · Depot ↔ Stash (when eligible) · Loot Pouch → any valid accessible storage.
+
+~~**Except a Bootstrap Kit item** (G4.1c, 2026-09-24): it stayed in its own Character's custody,
+never moved to the Depot, the Stash or another Character, never sold, listed or traded~~ —
+**retired 2026-09-25**. The tutorial's starter gear — armour, dagger, backpack — is ordinary,
+low-value items that move like any other, and the tutorial potions follow the Character-bound
+consumable rule below ([`DECISIONS.md`](../DECISIONS.md) § *Tutorial starting items*).
+
+**Except a Character-bound consumable** (`LOCKED`, `ADR-021`): its only storage movement is between
+its bound Character's Store Container and the Depot, and the Depot does not make it the Account's —
+it stays its Character's, and no other Character may withdraw it. It never goes to a Hunt
+container, a Character container, the Loot Pouch, the Stash, equipment, another Character, a
+market, a trade or an NPC sale. A configured action slot uses a bound potion straight from the
+Store Container, so it never needs a Hunt container (`ADR-021` U5). **Not implemented**: owned by
+the first phase that ships one — since 2026-09-25 possibly the tutorial, whose Health and Mana
+potions are bound; which phase is open (`ADR-024` DEL-O5).
 
 Desktop affordances: drag and drop, context actions, stack splitting.
 Touch affordances: long press or context action, **Move**, amount selection.
@@ -133,7 +151,8 @@ Server authoritative, both.
 
 Each Character container may declare category routing (Potions, Runes, Rings, Amulets, Utility…).
 An NPC purchase or a Depot withdrawal routes into the preferred destination, obeying stack size,
-space and Capacity, with a deterministic fallback.
+space and Capacity, with a deterministic fallback. A Character-bound consumable is never routed
+into a container: it goes back to its own Character's Store Container, or stays in the Depot.
 
 **Items never disappear.** A routing rule that cannot be satisfied is a refusal or a fallback, not
 a deletion.

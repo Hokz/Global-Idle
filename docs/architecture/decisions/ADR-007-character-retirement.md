@@ -1,8 +1,22 @@
 # ADR-007 — Character deletion is retirement, not erasure
 
-**Status:** `ACCEPTED`
+**Status:** `SUPERSEDED` by [ADR-020](./ADR-020-character-deletion-grace-and-purge.md) on
+2026-09-24. Accepted 2026-09-20.
 **Phase:** 0A
 **Date:** 2026-09-20
+
+> **Historical record — no longer the rule.** The Product Owner replaced retirement with a
+> two-stage lifecycle: a 30-day reversible grace, then a hard purge that removes the Character and
+> everything it owned, with nothing moved to the Bank or to a recovery custody.
+> [ADR-020](./ADR-020-character-deletion-grace-and-purge.md) records the new rule and lists, point
+> by point, which assumptions below no longer apply. Since 2026-09-25 the deletion unit is the
+> whole Game Account ([ADR-024](./ADR-024-game-account-deletion-grace-and-purge.md)).
+>
+> The text below is kept unchanged because it is what Phase 0B implemented and verified —
+> `retiredAt`, I1's partial unique index over non-retired rows, and `retireCharacter` with no
+> delete counterpart — and what Phase 1 extended with I1b. That code stays in place until the
+> PRE-PHASE-4 implementation replaces it ([`PHASE_GATES.md`](../../PHASE_GATES.md) § *G4.1*). Do
+> not build new work on this ADR.
 
 ## Context
 

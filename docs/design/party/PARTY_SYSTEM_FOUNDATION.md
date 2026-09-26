@@ -4,6 +4,44 @@
 **Scope:** Account character roster, vocation uniqueness, character-slot unlocks, Active Party composition, frontline positioning, Shared XP eligibility, and connection behavior.  
 **Purpose:** Define the persistent product rules for how one player builds and controls a multi-character party before exact Party XP bonuses, unlock prices, and combat-role formulas are implemented.
 
+> **Amended 2026-09-25 —
+> [`ADR-022`](../../architecture/decisions/ADR-022-game-account-main-character-and-companions.md).**
+> The Product Owner replaced the roster of up to five **equivalent** Characters with **one Main
+> Character per Game Account** plus **companions**:
+>
+> - a Game Account has exactly one Main Character, from its creation — its campaign identity,
+>   the character this document calls the *Origin Character*, vocationless in Rookgaard — and
+>   unlocks further vocations as companions, at most one per vocation, so at most four;
+> - the personal Active Party is the Main plus up to three companions — 1 to 4 actors,
+>   reorderable. The **Main is always present**, and need not hold Slot 1;
+> - in human multiplayer each Game Account selects exactly one actor — its Main or a companion —
+>   and the personal party never enters as a block.
+>
+> Superseded as written until 2026-09-24: §2's roster of five equivalent Characters, §4's Origin
+> Character leaving the party, §5's roster slots as Characters, §8's *"real persistent character,
+> not a temporary combat companion"*, the examples of §9, §11, §17 and §25 that leave the Main out
+> of the party, and the matching lines of §28. Each carries a note where it stands. **Carried over
+> unchanged:** one roster member per vocation, Gold unlocks, the Level-8 start with its own
+> progression, the 1–4 Active Party, the Frontline, Shared XP eligibility and the connection rules.
+> What the change leaves open is `ADR-022` §4. The current rules are in
+> [`DECISIONS.md`](../../DECISIONS.md) § *Game Account, Main Character and companions* and
+> § *Personal Active Party*.
+>
+> **Amended again 2026-09-25 — final synchronization.** An unlocked companion is **permanent**:
+> never deleted, dismissed, removed, replaced, rerolled, converted into the Main or unlocked
+> backward (GA11). The Main selects its vocation on proceeding to the Mainland, and the other four
+> are possible companions (GA12). The Main / companion distinction adds no hidden combat
+> multiplier (GA13). Rookgaard is single-player, with no Party and no companions (RK1–RK4).
+> Deletion takes the whole Game Account
+> ([`ADR-024`](../../architecture/decisions/ADR-024-game-account-deletion-grace-and-purge.md)).
+>
+> **Phase 4A** — the Playable Beta Slice
+> ([`PHASE_4A_PLAYABLE_BETA_SLICE.md`](../milestones/PHASE_4A_PLAYABLE_BETA_SLICE.md)) is a
+> milestone inside Phase 4 that plays in Rookgaard, so it shows the Main alone: no companion and
+> no Party (RK2). It changes nothing in this document. Which part of Phase 4 builds the companions
+> and the personal Active Party — the foundation before 4A or the remainder after it — is the
+> Phase 4 specification's to place.
+
 ---
 
 # 1. Core Identity
@@ -28,6 +66,9 @@ SERVER-SIMULATED COMBAT
 
 All characters in the Active Party are controlled by the same player.
 
+*Since 2026-09-25 the account is the **Game Account**, and its roster is one Main Character plus
+companions. A login identity above it may hold several Game Accounts (`ADR-022` §2).*
+
 There is no concept of:
 
 ```text
@@ -41,6 +82,11 @@ inside the normal Global Idle Party System.
 ---
 
 # 2. Character Roster vs Active Party
+
+> **Superseded 2026-09-25 (`ADR-022`).** The roster is the Game Account's **Main Character** plus up
+> to four **companions** — still five members at most, one per vocation — and the Active Party is
+> the Main plus up to three companions. The limits below stand; *"characters"* in them means the
+> Main and its companions.
 
 The project must distinguish two concepts.
 
@@ -84,17 +130,24 @@ If all five vocation characters are unlocked, at least one character must remain
 
 ---
 
-# 3. One Playable Character Per Vocation — LOCKED
+# 3. One Character Per Vocation — LOCKED
 
-An account may own **at most one playable (non-retired) roster Character of each vocation**.
+An account may own **at most one roster Character of each vocation**.
 
-Duplicate **playable** vocations are prohibited.
+Duplicate vocations are prohibited.
 
-> **Refined by Phase 0A architecture (`ADR-007`).** Uniqueness applies to *playable*
-> (non-retired) roster Characters. A retired Character is historical and audit state: it is not a
-> roster member, does not count against roster size, and does not reserve its vocation. Retiring
-> a Knight frees Knight for a new one, and the retired Knight remains in persistence.
-> See `docs/DECISIONS.md`.
+> **Character deletion — `ADR-020`, `LOCKED` 2026-09-24.** This replaces the earlier Phase 0A
+> refinement (`ADR-007`, now `SUPERSEDED`), under which a *retired* Character stayed in persistence
+> and freed its vocation at once. There is no retired Character any more. A deleted Character is
+> `PENDING_DELETION` for 30 days and restorable, then **permanently purged**. During those 30 days
+> it still holds its vocation, its roster place and, as the Origin Character, the Origin slot, so
+> no replacement can make the promised restore impossible; only the purge frees them (G4.1b,
+> `LOCKED` by the Product Owner).
+> See `docs/DECISIONS.md` § *Game Account deletion*. *Since 2026-09-25 the grace is exactly 720
+> elapsed hours and a full freeze. Since the final synchronization the deletion target is the
+> **whole Game Account** (`ADR-024`): the Main and every companion go together at its purge, a
+> companion is **permanent** and never deleted or dismissed on its own (`ADR-022` GA11), and no
+> replacement Main exists. The per-Character holds above are superseded.*
 
 Examples:
 
@@ -140,15 +193,22 @@ Paladin
 Monk
 ```
 
-A vocation already held by a **playable** Character cannot be purchased or unlocked again, even
-if roster slots are free. Retiring that Character releases the vocation, and it becomes
-selectable once more (`ADR-007`).
+A vocation already held by a Character on the account cannot be purchased or unlocked again, even
+if roster slots are free. *Since 2026-09-25 companions are permanent and the Main is never
+replaced, so a vocation once held stays held for the life of the Game Account; only the Game
+Account's own purge ends it (`ADR-022` GA11, `ADR-024`).*
 
-This uniqueness rule spans the whole **playable roster**, not merely the Active Party.
+This uniqueness rule spans the whole **roster**, not merely the Active Party. *Carried over by
+`ADR-022` §3: it spans the Main and every companion.*
 
 ---
 
 # 4. Initial / Origin Character
+
+> **Superseded in part 2026-09-25 (`ADR-022` PP2).** The first character is the Game Account's
+> **Main Character**, and it is **always** in the personal Active Party. The two paragraphs below
+> that let the player remove it from the party describe the superseded model. It is still not
+> required to hold Slot 1 (PP3).
 
 The first character is created through the normal onboarding flow.
 
@@ -168,6 +228,11 @@ Choose first vocation
 
 This first character is the account's initial/origin character.
 
+*Since 2026-09-25 this first character is the Game Account's **Main**, from its creation. The
+player may also stay in Rookgaard indefinitely, vocationless and alone: Rookgaard is
+single-player, with no Party (`ADR-022` RK1–RK3). On proceeding to the Mainland the same Main
+selects its vocation, and the other four become possible companions (GA12).*
+
 Example:
 
 ```text
@@ -185,6 +250,11 @@ The original character therefore represents the account's starting character, no
 ---
 
 # 5. Character / Roster Slot Unlock Progression
+
+> **Read under `ADR-022` (2026-09-25).** Slot 1 holds the Main; slots 2–5 unlock **companions**,
+> one vocation each. The capacity table stands, but the player now chooses which companions — up to
+> three — join the Main, not which four of five characters are active. Whether an integer capacity
+> stays the representation is Phase 4's choice.
 
 The player begins with:
 
@@ -250,6 +320,9 @@ The current locked limits are:
 4 characters maximum in the Active Party
 ```
 
+*Since 2026-09-25: the Main and up to four companions in the roster, and the Main plus up to three
+companions in the Active Party (`ADR-022`).*
+
 Premium must not create a fifth simultaneous combat-party member under this design.
 
 Future Premium benefits related to party management or convenience require separate product design.
@@ -257,6 +330,9 @@ Future Premium benefits related to party management or convenience require separ
 ---
 
 # 7. Unlocking a New Character
+
+> **Read under `ADR-022` (2026-09-25):** the newly unlocked character is a **companion**. Everything
+> this section says of it is carried over.
 
 A secondary character does **not** repeat the first-character tutorial.
 
@@ -290,6 +366,12 @@ No special catch-up levels are granted.
 
 # 8. Newly Unlocked Characters Are Independent Characters
 
+> **Superseded wording 2026-09-25 (`ADR-022`).** A newly unlocked vocation is now a **companion**,
+> and a companion is not an account-lifecycle Character equivalent to the Main (GA4). The sentence
+> below used *"companion"* for something temporary; the progression it protects carries over: a
+> companion has its own vocation, Base Level, Base XP and Skills, and inherits no level. Its
+> custody, Stamina, occupancy, lifecycle and name are open (`ADR-022` §4).
+
 Unlocking a vocation creates a real persistent character, not a temporary combat companion.
 
 Each character has its own progression state.
@@ -321,6 +403,10 @@ is a valid roster state.
 ---
 
 # 9. Unlock Does Not Mean Active
+
+> **Read under `ADR-022` (2026-09-25):** every formation includes the Main. The solo formation is
+> the Main alone, the examples below hold only where the Main is one of the listed characters, and
+> the fifth vocation that sits out is a companion.
 
 Unlocking a character never forces that character into the Active Party.
 
@@ -380,6 +466,8 @@ Characters outside the Active Party:
 
 Unlocking all five vocations therefore creates roster strategy rather than automatic five-character combat.
 
+*Since 2026-09-25 only companions can be outside the Active Party; the Main is always in it.*
+
 ---
 
 # 11. Party Formation Is Player-Controlled
@@ -411,6 +499,11 @@ The player may remove Knight from the Active Party and play:
 ```
 
 to progress the Druid independently.
+
+> **Superseded example 2026-09-25 (`ADR-022` PP2).** If the Knight is the Main, it cannot leave the
+> Active Party, so the Druid cannot be played alone this way. How a low-level companion progresses
+> is open (GA-O6). Human multiplayer, where any unlocked companion may be the selected actor (MP3),
+> is one path.
 
 When Druid later reaches an appropriate level range, the player may form:
 
@@ -460,7 +553,8 @@ If reordered:
 
 Druid becomes frontline.
 
-The system does not force Knight or any specific vocation into Slot 1.
+The system does not force Knight or any specific vocation into Slot 1 — nor the Main (`ADR-022`
+PP3).
 
 The player is allowed to make strategically strong or weak formations.
 
@@ -494,6 +588,9 @@ Current Frontline: Paladin
 ```
 
 Whether the final UI uses the exact label "Origin Character" is OPEN, but the underlying distinction is required.
+
+*Since 2026-09-25 the Origin Character is the Game Account's Main, from its creation. It is always
+in the Active Party, and it need not be the Frontline (`ADR-022` PP2–PP3).*
 
 ---
 
@@ -661,6 +758,10 @@ Therefore:
 
 The game must not bypass this rule to power-level newly unlocked vocation characters.
 
+> **Read under `ADR-022` (2026-09-25):** a companion cannot be played solo — the Main is always
+> present — so the first option below no longer exists for a companion, and how a low-level
+> companion levels is open (GA-O6). The rule itself, no exception, stands.
+
 If the player wants to develop the Druid, they may:
 
 - play the Druid solo;
@@ -709,6 +810,9 @@ Before implementation, define whether:
 - another explicit rule is used.
 
 Do not invent this behavior in code.
+
+*Since 2026-09-25 this matters more: the Main is always present, so a Level-250 Main with a new
+Level-8 companion is exactly this case (`ADR-022` GA-O6).*
 
 ---
 
@@ -785,7 +889,7 @@ The game should provide a dedicated Party/Roster management interface where the 
 - see locked/unavailable vocations;
 - identify each character's vocation and level;
 - choose which unlocked characters are active;
-- remove characters from the Active Party;
+- remove companions from the Active Party — never the Main (`ADR-022` PP2);
 - reorder the Active Party;
 - choose Slot 1 / Frontline;
 - see whether the current formation is Shared-XP eligible;
@@ -834,7 +938,8 @@ Exact confirmation flow and visuals are OPEN.
 
 # 24. Gold Sink
 
-Additional character/roster unlocks are an intentional Gold sink.
+Additional character/roster unlocks are an intentional Gold sink. *Since 2026-09-25 they are
+companion unlocks (`ADR-022`).*
 
 Conceptually:
 
@@ -896,6 +1001,9 @@ The system intentionally creates both:
 - character progression;
 - roster progression.
 
+*Read under `ADR-022` (2026-09-25):* the Knight is the Main, so it never leaves the party, and how
+*"develop Druid"* happens while it is present is open (GA-O6).
+
 ---
 
 # 26. Strategic Consequence of Five Vocations / Four Active Slots
@@ -942,6 +1050,8 @@ Sorcerer
 
 This makes composition choice a permanent strategy layer rather than a simple progression toward using every character at once.
 
+*Since 2026-09-25 the Main is always one of the four, so the choice is which companion sits out.*
+
 ---
 
 # 27. Party State — Conceptual
@@ -956,6 +1066,9 @@ sharedXpEnabled
 sharedXpEligibility
 ```
 
+*Since 2026-09-25 it also needs to know which member is the Main, which every formation contains
+(`ADR-022`).*
+
 This is **not** an implementation schema.
 
 Exact database fields, APIs and transport contracts belong to a later implementation specification.
@@ -964,40 +1077,54 @@ Exact database fields, APIs and transport contracts belong to a later implementa
 
 # 28. Locked Decisions Summary
 
-The following are LOCKED unless the Product Owner explicitly changes them.
+The following are LOCKED unless the Product Owner explicitly changes them. *Updated 2026-09-25 for
+`ADR-022`.*
 
 ## Ownership / Roster
 
 - one player controls the entire Party;
-- maximum roster = 5 characters;
+- a Game Account has exactly one **Main Character**; further vocations are **companions**
+  (`ADR-022`, 2026-09-25);
+- maximum roster = 5: the Main and up to four companions;
 - the roster supports the five vocations: Knight, Druid, Sorcerer, Paladin, Monk;
-- maximum one **playable (non-retired)** character per vocation per account (`ADR-007`);
-- duplicate **playable** vocation characters are prohibited; a retired Character is history and does not reserve its vocation (`ADR-007`);
-- additional character slots/unlocks use in-game Gold;
+- maximum one roster member per vocation per Game Account;
+- duplicate vocation characters are prohibited;
+- an unlocked companion is **permanent** — never deleted, dismissed, removed, replaced, rerolled,
+  converted into the Main or unlocked backward (`ADR-022` GA11);
+- deletion takes the **whole Game Account**: restorable for exactly 720 elapsed hours, fully
+  frozen, then permanently purged with the Main and every companion (`ADR-024`, which supersedes
+  `ADR-020`'s Character target; `ADR-020` superseded `ADR-007`'s retirement);
+- the Main / companion distinction adds no hidden combat multiplier (`ADR-022` GA13);
+- companions are unlocked with in-game Gold;
 - exact unlock costs remain OPEN.
 
 ## Active Party
 
-- minimum Active Party size = 1;
-- maximum Active Party size = 4;
-- an unlocked character does not have to be active;
-- the player may run solo, duo, trio or four-character Party;
+- minimum Active Party size = 1 — the Main alone;
+- maximum Active Party size = 4 — the Main and up to three companions;
+- the **Main is always present** (`ADR-022` PP2, 2026-09-25);
+- an unlocked companion does not have to be active;
+- the player may run a solo, duo, trio or four-actor Party, and every one includes the Main;
 - five active characters are not allowed;
 - the older Premium fifth-active-party-slot direction is superseded.
 
 ## New Characters
 
-- first/origin character performs Rookgaard Level 1–8;
-- later unlocked vocation characters do not perform Rookgaard;
-- later characters start at Level 8;
-- later characters receive Level 8-appropriate Skill progression according to the final Skill model;
+- the first character **is** the Main, from its creation — the *Origin Character* in older text
+  and in code. It begins in Rookgaard at Level 1, vocationless, and may stay there indefinitely
+  (`ADR-022` RK1–RK3). The guided tutorial leads to the Level 8 vocation choice, and the same Main
+  selects its vocation on proceeding to the Mainland;
+- companions do not perform Rookgaard;
+- companions start at Level 8;
+- companions receive Level 8-appropriate Skill progression according to the final Skill model;
 - no automatic catch-up level is granted.
 
 ## Formation
 
 - Active Party can be reordered;
 - Slot 1 is the current Frontline;
-- the Origin Character is not permanently required in Slot 1 or even in the Active Party.
+- the Main is not required in Slot 1. ~~Nor even in the Active Party~~ — **superseded
+  2026-09-25**: the Main is always in it (`ADR-022` PP2).
 
 ## Shared XP
 
@@ -1007,7 +1134,7 @@ The following are LOCKED unless the Product Owner explicitly changes them.
 - `minimumShareLevel = ceil(highestLevel × 2 / 3)`;
 - Shared XP level eligibility requires `lowestLevel >= minimumShareLevel`;
 - one out-of-range member invalidates Shared XP eligibility for the whole formation;
-- newly unlocked characters get no exception;
+- newly unlocked companions get no exception;
 - Tibia Global Shared Experience metrics are the reference direction for bonus/distribution;
 - exact adopted bonus table must be verified/documented before implementation.
 
@@ -1017,13 +1144,18 @@ The following are LOCKED unless the Product Owner explicitly changes them.
 - disconnect pauses the entire Active Party;
 - the global 5-minute reconnect grace applies to the entire current activity.
 
+## Human multiplayer — 2026-09-25
+
+- each participating Game Account selects exactly one actor: its Main or any unlocked companion;
+- the personal Active Party never enters multiplayer as a block (`ADR-022` MP1–MP5).
+
 ---
 
 # 29. Open Decisions
 
 The following remain OPEN and must not be silently decided by a builder:
 
-- exact Gold cost for Roster Slots 2–5;
+- exact Gold cost for Roster Slots 2–5 — the companion unlocks;
 - whether unlock costs scale linearly, exponentially or by milestones;
 - whether additional prerequisites besides Gold exist;
 - exact final name for "Origin Character";
@@ -1035,7 +1167,12 @@ The following remain OPEN and must not be silently decided by a builder:
 - (resolved in Phase 0A architecture: formation **and equipment** changes are rejected while an
   Activity is running - see `docs/architecture/DOMAIN_MODEL.md` §5.5 and §5.12)
 - final Skill Point state granted to a newly unlocked Level 8 character;
-- Premium/convenience benefits related to Party management now that there is no fifth active Party slot.
+- Premium/convenience benefits related to Party management now that there is no fifth active Party slot;
+- *since 2026-09-25* (`ADR-022` §4): companion custody, Stamina and occupancy (GA-O3–GA-O5);
+  whether a companion's name is player-chosen (GA-O7 — it is a globally unique Character name);
+  and how a low-level companion levels with the Main always present (GA-O6). A companion's
+  lifecycle (GA-O1) and what deleting the Main does to its companions (GA-O2) are **resolved**:
+  companions are permanent, and deletion takes the whole Game Account (`ADR-024`).
 
 ---
 
@@ -1064,3 +1201,8 @@ maximum 4 selected characters
 ```
 
 Existing project documents must be updated to match this rule before Party implementation begins.
+
+**2026-09-25.** This document's own roster of five equivalent Characters is superseded in turn by
+`ADR-022`: one Main Character per Game Account, up to four companions, and a personal Active Party
+that always contains the Main. The limits above still read true as numbers — five roster members,
+four active — with the Main as one of each.

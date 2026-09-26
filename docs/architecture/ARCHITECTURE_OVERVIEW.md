@@ -30,20 +30,27 @@
 | [002](decisions/ADR-002-activity-owns-in-flight-state.md) | Activity owns in-flight state; progression changes at settlement | `ACCEPTED` |
 | [003](decisions/ADR-003-ledger-derived-currency-balances.md) | Currency balances are ledger-derived projections | `ACCEPTED` |
 | [004](decisions/ADR-004-item-single-custody.md) | An ItemInstance has exactly one custody scope | `ACCEPTED` |
-| [005](decisions/ADR-005-active-party-as-configuration.md) | Active Party is ordered configuration, not an entity | `ACCEPTED` |
+| [005](decisions/ADR-005-active-party-as-configuration.md) | Active Party is ordered configuration, not an entity | `ACCEPTED`; amended by 022 — the Main is always in it |
 | [006](decisions/ADR-006-participant-profile-refresh.md) | Composition frozen for a run; power refreshes at checkpoints | `ACCEPTED` |
-| [007](decisions/ADR-007-character-retirement.md) | Character deletion is retirement, not erasure | `ACCEPTED` |
+| [007](decisions/ADR-007-character-retirement.md) | Character deletion is retirement, not erasure | `SUPERSEDED` by 020 |
 | [008](decisions/ADR-008-newest-connection-wins.md) | The newest authenticated connection evicts the previous | `ACCEPTED` |
 | [009](decisions/ADR-009-postgres-sole-durable-truth.md) | PostgreSQL is the sole durable truth | `ACCEPTED` |
 | [010](decisions/ADR-010-pure-engine-injected-clock-and-rng.md) | Pure engine, injected clock and RNG | `ACCEPTED` |
 | [011](decisions/ADR-011-content-as-versioned-artifact.md) | Content is a versioned build artifact | `ACCEPTED` |
 | [012](decisions/ADR-012-modular-monolith.md) | One deployable modular monolith for Phase 0B | `ACCEPTED` |
-| [013](decisions/ADR-013-character-activity-occupancy.md) | One primary action per Character, atomically enforced | `ACCEPTED` |
-| [014](decisions/ADR-014-per-character-stamina.md) | Stamina per Character, activated by first qualifying XP | `ACCEPTED` |
+| [013](decisions/ADR-013-character-activity-occupancy.md) | One primary action per Character, atomically enforced | `ACCEPTED`; amended by 022 — companion occupancy open |
+| [014](decisions/ADR-014-per-character-stamina.md) | Stamina per Character, activated by first qualifying XP | `ACCEPTED`; amended by 022 — companion Stamina open; a pending Character recovers nothing (020) |
 | [015](decisions/ADR-015-active-use-duration-timers.md) | Active-use timers settle at checkpoints, never by wall clock | `ACCEPTED` |
 | [016](decisions/ADR-016-content-bundle-retention.md) | Content bundles retained while referenced, never GC'd | `ACCEPTED` |
 | [017](decisions/ADR-017-idempotency-key-contract.md) | Idempotency keys are account-scoped and fingerprinted | `ACCEPTED` |
 | [018](decisions/ADR-018-domain-package-source-layout.md) | Bounded contexts live in `packages/domain` — amends `ADR-012`'s source layout | `ACCEPTED` |
+| [019](decisions/ADR-019-currency-custody-scopes.md) | Currency lives in custody scopes (`BANK`, `POUCH`), and the ledger says which — amends `ADR-003` | `ACCEPTED`; one row amended by 020 |
+| [020](decisions/ADR-020-character-deletion-grace-and-purge.md) | Character deletion is a 30-day reversible grace, then a hard purge — supersedes `ADR-007` | `ACCEPTED` — product rule `LOCKED`; reviewed and accepted at PR #13 heads `45d95f6`, `f249771` and `395b9ce`, and the `ADR-021` reconciliation validated with head `86a7681`; **amended 2026-09-25** — 720 hours, the full freeze; **superseded in part by 024** — its Character target, G4.1b, G4.1c, the Bootstrap Kit, the Deleted List, per-account names; its lifecycle mechanics reused. The amendments validated with PR #13 head `fff6faf`; the supersession accepted in the review of PR #13 head `c74b845`, which returned documentation corrections; the correcting head is **pending independent review**; **not implemented** (PRE-4 gate) |
+| [021](decisions/ADR-021-character-bound-consumables-and-store-container.md) | Character-bound consumables and the Store Container: binding separate from custody; purged with their Game Account wherever stored — extends `ADR-004` and `ADR-020` | `ACCEPTED` — product rule `LOCKED`; reviewed at PR #13 head `5ed5b26`, two corrections applied, validated at head `86a7681`; **amended 2026-09-25** — tutorial potions bound on the instance (S6–S7), used from the Store Container through the action slots (U5), no `UNIQUEID` binding (B6). The first amendment validated with PR #13 head `fff6faf`; the second accepted in the review of PR #13 head `c74b845`, which returned documentation corrections; the correcting head is **pending independent review**; **not implemented** (gate GBC.1) |
+| [022](decisions/ADR-022-game-account-main-character-and-companions.md) | A Login owns one or more Game Accounts; a Game Account has one Main Character; further vocations are permanent companions; Rookgaard is single-player and vocationless; one selected actor per Game Account in multiplayer — supersedes the roster of five equivalent Characters; amends 005, 013, 014 and 020 | `ACCEPTED` — product rules `LOCKED` 2026-09-25, validated with PR #13 head `fff6faf`; extended in the final synchronization (GA8–GA13, RK1–RK4), accepted in the review of PR #13 head `c74b845`, which returned documentation corrections — among them its Main wording: the Rookgaard character is the Main from creation; the correcting head is **pending independent review**; **not implemented** (Phase 4; PRE-4 for the Login's minimum) |
+| [023](decisions/ADR-023-quest-replay-and-one-time-reward-claims.md) | Quest replay is separate from one-time reward claims; co-op quests can be replayed, and a one-time reward is claimed once per Game Account — never per actor or per Login | `ACCEPTED` — product rules `LOCKED` 2026-09-25; corrected after the review of `e2d0e04` and validated with PR #13 head `fff6faf`; extended with QR9, accepted in the review of PR #13 head `c74b845`, which returned documentation corrections; the correcting head is **pending independent review**; **not implemented** (Phase 5) |
+| [024](decisions/ADR-024-game-account-deletion-grace-and-purge.md) | Game Account deletion: a 720-hour frozen grace, then a hard purge of the whole Game Account; the Login survives; one lifecycle for every source; global Character names; an internal history record, no public Deleted List — supersedes 020's Character target | `ACCEPTED` — product rules `LOCKED` 2026-09-25; accepted in the review of PR #13 head `c74b845`, which returned documentation corrections; the correcting head is **pending independent review**; **not implemented** (PRE-4 gate) |
+| [025](decisions/ADR-025-tunable-configuration-surface.md) | Tunable gameplay values live in one authoritative, validated, versioned server-side configuration surface; guarantees are never configuration | `ACCEPTED` — direction `LOCKED` 2026-09-25; accepted in the review of PR #13 head `c74b845`, which returned documentation corrections; the correcting head is **pending independent review**; **not implemented** (PRE-4 gate) |
 
 ---
 
@@ -244,6 +251,12 @@ One account, one session, one claim, an ordered list of at most four active char
 from a roster of at most five with unique vocations. Composition is frozen for a run; power
 refreshes at checkpoints. Shared XP eligibility is derived, never stored. Nothing in the model
 admits a second human.
+
+*Since 2026-09-25 (`ADR-022`):* the account is the Game Account, the roster is one Main Character
+plus up to four companions, and the Main is always in the personal Active Party. Human
+multiplayer does admit several humans — in a separate multi-account Activity, one selected actor
+per Game Account, never through the personal party (Phase 5B). One Login may own several Game
+Accounts, each deleted as a whole while the Login survives (`ADR-024`).
 
 ### Future systems integrate without rewriting boundaries
 

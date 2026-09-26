@@ -3,6 +3,9 @@
 **Status:** `ACCEPTED`
 **Phase:** 0A
 **Date:** 2026-09-20
+**Amended by:** [ADR-020](./ADR-020-character-deletion-grace-and-purge.md) and
+[ADR-022](./ADR-022-game-account-main-character-and-companions.md) (2026-09-25) — see the note under
+*Decision*.
 
 ## Context
 
@@ -46,6 +49,15 @@ counted twice within a settlement segment.
 
 **Recovery is not the absence of activity; it is the absence of a consuming activity.** Skill
 Training recovers. So does being offline, idling, or browsing menus.
+
+> **Amended 2026-09-25.** A `PENDING_DELETION` Character recovers **nothing**: the deletion grace is
+> a full freeze, and a restore credits nothing for the pending interval
+> ([ADR-020](./ADR-020-character-deletion-grace-and-purge.md) FZ2–FZ3). Since the final
+> synchronization the deletion unit is the Game Account, so the freeze covers every Character of a
+> pending Game Account ([ADR-024](./ADR-024-game-account-deletion-grace-and-purge.md)). Stamina per
+> Character applies to the Main Character; whether each companion carries its own Stamina or
+> shares the Main's is open ([ADR-022](./ADR-022-game-account-main-character-and-companions.md)
+> GA-O4).
 
 **Segmented settlement.** Any settlement interval that crosses a rate boundary is split at that
 boundary and each segment settles at its own rate. Two boundaries do this:

@@ -3,6 +3,8 @@
 **Status:** `ACCEPTED`
 **Phase:** 0A.1
 **Date:** 2026-09-20
+**Amended by:** [ADR-022](./ADR-022-game-account-main-character-and-companions.md) (2026-09-25) —
+the Main Character is always in the Active Party; see the note under *Decision*.
 
 ## Context
 
@@ -32,6 +34,16 @@ outlives a composition change.
 - **A running Activity holds an immutable roster snapshot**, and **formation editing is
   rejected while an Activity is running**. The command fails with a clear reason; it does not
   silently succeed-and-do-nothing.
+
+> **Amended by [ADR-022](./ADR-022-game-account-main-character-and-companions.md), 2026-09-25.** A
+> Game Account now has exactly one Main Character, and further vocations are companions. The
+> personal Active Party is the Main plus up to three companions — four actors at most — and the
+> Main is **always** in it, at whatever position the player puts it. So the first benefit below no
+> longer holds: the configuration must contain its Game Account's Main, which every formation write
+> checks. Everything else in this record stands — ordered configuration, order as position, Slot 1
+> as the Frontline, Shared XP eligibility derived rather than stored, and formation edits refused
+> while an Activity runs. *"Roster max 5"* in the constraints below is now the Main and at most four
+> companions, never five equivalent Characters.
 
 ## Consequences
 

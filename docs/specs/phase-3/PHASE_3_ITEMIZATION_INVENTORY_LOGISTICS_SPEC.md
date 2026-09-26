@@ -7,6 +7,17 @@
 **Source evidence:** [`PHASE_3_CANARY_SOURCE_MAP.md`](./PHASE_3_CANARY_SOURCE_MAP.md) — every number
 below traces to a file and a symbol in `Hokz/canary` at `f6b81a8`.
 
+> **Historical record.** This specification records what Phase 3 built, and it is not rewritten as
+> later decisions arrive. Two of them change item custody for the future:
+> [`ADR-020`](../../architecture/decisions/ADR-020-character-deletion-grace-and-purge.md)
+> (Character deletion and the purge) and
+> [`ADR-021`](../../architecture/decisions/ADR-021-character-bound-consumables-and-store-container.md)
+> (Character-bound consumables, a per-Character Store Container, and a binding separate from
+> custody — so a Depot row will no longer always be the Account's). For current rules, read those,
+> and [`ADR-024`](../../architecture/decisions/ADR-024-game-account-deletion-grace-and-purge.md):
+> since 2026-09-25 the deletion unit is the whole Game Account, whose purge takes its Depot and
+> Stash too.
+
 > This document removes implementation ambiguity. Where a value could have been invented, the
 > source map says where it came from; where Global Idle deliberately differs, it is labelled a
 > decision. Where a number is genuinely still open, it is marked **INITIAL/TUNABLE** and lives in

@@ -16,11 +16,13 @@ takes that answer from Canary rather than inventing a fresh generic-RPG one:
 - creature HP, XP, speed, attacks, defence, armour, resistances and immunities;
 - vocation baseline parameters;
 - spells, runes and cooldowns;
-- combat formulas, and the ORDER damage is reduced in (defence, then armour, then mitigation);
+- combat formulas, and the ORDER damage is reduced in (defence, then armour, then mitigation) —
+  *overridden 2026-09-25 for weapon attack and defence, below*;
 - RNG shape and rounding;
 - death conditions;
 - loot identities for later phases;
-- the experience-per-level curve.
+- the experience-per-level curve — implemented from Canary in Phase 2, and not locked as Global
+  Idle's own (2026-09-25, below).
 
 The distinction that keeps this honest:
 
@@ -38,6 +40,33 @@ creature HP · creature Base XP · creature attacks and damage · defences, armo
 immunities · ordinary loot identity and baseline chance · vocation baseline parameters · item
 weight · spells, runes and cooldowns · combat formulas, their ORDER and their rounding · the
 experience curve · the death-loss formula · blessing protection · Promotion protection.
+
+**Documented override, 2026-09-25 — immunities.** Ordinary Hunt design avoids absolute 100%
+creature immunities and uses resistances, sensitivities and weaknesses instead (`DECISIONS.md`
+§ *Creature elemental design*). A baseline immunity is reference data; ordinary Hunt content does
+not copy it as an absolute rule, and the resistance values used instead are content design, still
+open.
+
+**Documented override, 2026-09-25 — weapon attack and defence formulas.** The Product Owner
+locked Global Idle's own Attack Value, Max Base Damage, Defense Value and Armor Value
+(`DECISIONS.md` § *Combat formulas — weapon attack and defence*).
+
+| Field | Record |
+|---|---|
+| Source baseline | Canary's `Creature::blockHit`, where defence, then armour, each subtract a random amount and mitigation applies last; and its melee `Weapons::getMaxWeaponDamage`, `round(0.085 × attackFactor × attackValue × attackSkill + level / 5)` |
+| Global Idle override | an Attack Value and a Defense Value that decide pass or block, with Armor Value as its own check as well. Armor and Defense never reduce damage that passes. Mitigation is a percentage of passed damage. Max Base Damage is `0.085 × WeaponAttack × Skill + Level / 5` |
+| Reason | Product Owner decision, 2026-09-25 |
+| Fixture | none yet. The implementing phase pins it, and supersedes Phase 2's source-fidelity cases for these formulas through explicit matrix amendments |
+
+Still open: ranged Accuracy, the damage-roll distribution and minimum damage, the rounding stages
+and the tie/order/visual-mapping rules. The formulas Phases 2–3.6 implemented and verified stay as
+built until the phase that implements the override replaces them.
+
+**Not locked — the experience curve.** Phase 2 implemented Canary's `Player::getExpForLevel`,
+`(((level - 6) * level + 17) * level - 12) / 6 * 100`, as the baseline. The Product Owner recorded
+on 2026-09-25 that Global Idle need not adopt that exact curve unless it is separately locked. It
+stands as implemented until such a decision; `baseXp` stays the truth and `baseLevel` its stored
+projection either way (`DECISIONS.md` § *Base XP and Base Level*).
 
 **Do not globally scale HP, XP, damage or loot chance because this is an idle game.** An idle game
 changes how often a fight happens and who presses the buttons. It does not change what a Rat is.

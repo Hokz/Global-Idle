@@ -9,6 +9,28 @@
 `ACCEPTED` with this specification
 **Entry point for the architecture it implements:** [`../../architecture/ARCHITECTURE_OVERVIEW.md`](../../architecture/ARCHITECTURE_OVERVIEW.md)
 
+> **Superseded in part — 2026-09-24.** This specification implemented `ADR-007`'s retirement
+> model: `retiredAt`, I1 as a unique index partial over non-retired rows, invariant I12 *"a
+> Character is never hard-deleted"*, `retireCharacter` with no delete counterpart, and the tests
+> `D5` and `D6`. The Product Owner has since replaced retirement with a 30-day reversible grace
+> followed by a hard purge —
+> [`ADR-020`](../../architecture/decisions/ADR-020-character-deletion-grace-and-purge.md), which
+> supersedes `ADR-007`. Nothing below is rewritten: it remains the accurate record of what Phase 0B
+> built and verified, and that code stays in place until the PRE-PHASE-4 gate replaces it
+> ([`PHASE_GATES.md`](../../PHASE_GATES.md) § *G4.1*). Where the text below states the retirement
+> rule, read it as history, not as the current rule.
+
+> **Superseded in part — 2026-09-25.** This specification's roster rules — `rosterCapacity` 1–5,
+> and I1 and I2 over up to five equivalent Characters per Account — were written for a roster the
+> Product Owner has since replaced: a Game Account has one Main Character, and further vocations
+> are companions
+> ([`ADR-022`](../../architecture/decisions/ADR-022-game-account-main-character-and-companions.md)).
+> Nothing below is rewritten; it remains the record of what Phase 0B built and verified. Where it
+> describes the roster as equivalent Characters, read it as history; the current rules are in
+> [`DOMAIN_MODEL.md`](../../architecture/DOMAIN_MODEL.md) §5.1–§5.5 and §7. Since the final
+> synchronization of 2026-09-25 the deletion unit is the whole Game Account
+> ([`ADR-024`](../../architecture/decisions/ADR-024-game-account-deletion-grace-and-purge.md)).
+
 > This document is a **specification**. It contains no implementation. Its job is to make the
 > implementing phase unambiguous: exact tooling, exact boundaries, exact contracts, exact tests,
 > and an objective Definition of Done.

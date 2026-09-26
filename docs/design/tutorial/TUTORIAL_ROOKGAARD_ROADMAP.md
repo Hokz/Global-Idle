@@ -4,6 +4,20 @@
 **Scope:** First-character onboarding, Rookgaard progression from Level 1 to Level 8, and the transition to Mainland.  
 **Purpose:** Define what the player learns, in what order, and which systems are introduced before the real long-term progression begins.
 
+> **Amended 2026-09-25 — Rookgaard is a permanent region** (final synchronization,
+> [`DECISIONS.md`](../../DECISIONS.md) § *Rookgaard*). Rookgaard is a full playable region, and a
+> player may stay there indefinitely. It is single-player, with no vocation, no Companions, no
+> Main-game Party and no co-op. A Game Account's **Main** begins here — it is the Main from its
+> creation — vocationless, and stays so while the player remains. On proceeding to the Mainland
+> the same Main selects its vocation there, and the other four vocations become the Game
+> Account's possible Companions. The guided tutorial below still leads to Level 8 and the vocation
+> choice. Reaching Level 8 **offers** the Mainland; it does not end Rookgaard.
+>
+> **Phase 4A** — the Playable Beta Slice
+> ([`PHASE_4A_PLAYABLE_BETA_SLICE.md`](../milestones/PHASE_4A_PLAYABLE_BETA_SLICE.md)) plays a
+> small part of Rookgaard: the Main, a small Atlas, one NPC flow and the Sewers. It is **not** the
+> full tutorial, and it neither implements nor changes this document.
+
 ---
 
 # 1. Design Principle
@@ -39,6 +53,20 @@ The tutorial should teach mechanics **when the player needs to use them**, rathe
 
 # 2. First Character vs Additional Characters
 
+> **Read under
+> [`ADR-022`](../../architecture/decisions/ADR-022-game-account-main-character-and-companions.md)
+> (2026-09-25).** The first character is the Game Account's **Main Character**. Additional
+> vocations are **companions**: they never enter Rookgaard and start at Base Level 8. A different
+> Main vocation means another Game Account under the same login.
+>
+> **Since the final synchronization (2026-09-25):** every Game Account's Main begins in
+> Rookgaard, vocationless (RK3), and nothing is shared between one Login's Game Accounts (GA10).
+> Deletion takes the **whole Game Account**, and no replacement Main is ever created inside one
+> ([`ADR-024`](../../architecture/decisions/ADR-024-game-account-deletion-grace-and-purge.md)). The
+> deletion edge case below therefore no longer arises: a Game Account's tutorial completion is
+> purged with it, and a new campaign is a new Game Account that starts in Rookgaard. It is kept as
+> history.
+
 The account must track whether the onboarding has already been completed.
 
 Recommended account-level state:
@@ -60,9 +88,42 @@ Player completes tutorial
 
 The account should still know that the tutorial was previously completed.
 
+> **`LOCKED` — G4.1c, Product Owner, 2026-09-24; superseded 2026-09-25 by `ADR-024`.** This edge
+> case was decided as follows. Tutorial completion belongs to the Account, and deleting or purging
+> the Origin Character does not reset it. A Character created after that purge does not restart
+> the first-character tutorial automatically: it follows the later-character flow — Base Level 8,
+> no Rookgaard, the post-Rookgaard state — and no one-time tutorial or account reward is awarded
+> again. See [`DECISIONS.md`](../../DECISIONS.md) § *Game Account deletion* (*Superseded*) and
+> [`ADR-020`](../../architecture/decisions/ADR-020-character-deletion-grace-and-purge.md) §5.1.
+> The optional PLAY / SKIP offer below and the replay questions of §43 stay open.
+
 ## First character / tutorial never completed
 
-The Level 1–8 tutorial is mandatory.
+The guided Level 1–8 tutorial is mandatory. Staying in Rookgaard after it is the player's choice
+(RK1).
+
+> **`LOCKED` — G4.1c, pre-completion case, Product Owner, 2026-09-24; superseded 2026-09-25.**
+> *There is no replacement Origin Character (`ADR-024` GD7), and the Bootstrap Kit is retired: the
+> starter gear is ordinary items, and the tutorial potions are Character-bound consumables
+> ([`DECISIONS.md`](../../DECISIONS.md) § *Tutorial starting items*). The rule read:* If the
+> Origin Character is permanently purged before the account completes Rookgaard, the next
+> Character is a **new Origin Character** at Base Level 1, and this mandatory tutorial starts
+> again. It receives a fresh
+> **Bootstrap Kit** — enough to make the tutorial playable, bound to that Character, never
+> movable to the Depot, the Stash or another Character, never tradeable, sellable or convertible
+> into Account value, and destroyed with it. The kit is **not** a Tutorial Reward. Tutorial
+> Rewards — the tutorial's real rewards, such as the Doublet of §19 — are Account-governed:
+> one-time where defined as one-time (§43 decides which), and never replayed merely because the
+> Origin Character was purged. See
+> [`ADR-020`](../../architecture/decisions/ADR-020-character-deletion-grace-and-purge.md) §5.2,
+> which also classifies today's starting grant.
+>
+> *Since 2026-09-25:* the tutorial potions are Character-bound consumables under `ADR-021`. They
+> share the ordinary potion's definition, are bound on the instance, and are used from the Store
+> Container through the action slots. The starter gear — armour, dagger, backpack — is ordinary,
+> low-value items: it becomes obsolete, may be discarded, and a Rookstayer may keep using it. The
+> Doublet is an ordinary item (`ADR-023` QR8, §19). Whether the Doublet Quest's chest is a
+> one-time Tutorial Reward is open (§43).
 
 ## Additional character after tutorial completion
 
@@ -74,6 +135,11 @@ SKIP TUTORIAL
 ```
 
 The exact skip flow is a later design item.
+
+*Under `ADR-022` (2026-09-25) an additional vocation is a companion, which never enters Rookgaard.
+Since the final synchronization no replacement Main exists (`ADR-024`), so this offer can only
+concern a later Game Account's Main. Whether it may skip the guided tutorial is open (GA-O9,
+§43).*
 
 ---
 
@@ -104,6 +170,10 @@ Vocation: not yet chosen
 ```
 
 The character's vocation is chosen only at Level 8.
+
+*Read under `ADR-022` (2026-09-25):* a Game Account has one Main, so *character selection* becomes
+choosing a Game Account once a login holds several, and that UX is open (GA-O10). Every new Game
+Account's character starts as above — vocationless, in Rookgaard (RK3); a companion never does.
 
 ---
 
@@ -563,6 +633,15 @@ Dungeon Complete
 
 The Doublet also creates a natural opportunity to introduce equipment as a reward system.
 
+`LOCKED` 2026-09-25 (`ADR-023` QR8): the **Doublet is an ordinary item** — movable, sellable,
+tradeable and discardable under the normal item rules — never Character-bound for coming from a
+quest.
+
+**Open (§43):** whether the Doublet Quest can be replayed, and whether its chest is a one-time
+Tutorial Reward. The Product Owner's replay rule covers human multiplayer / co-op quests, not the
+tutorial. If the chest is one-time, it is claimed once per Game Account — never per Login — and no
+replay re-enables it (`ADR-023` §2, QR9). Each Game Account claims its own.
+
 ---
 
 # 20. Dungeon Completion
@@ -742,6 +821,10 @@ are **not yet defined**.
 
 The tutorial should explain the concept without overwhelming the player with monetization.
 
+A Store XP Boost is a **Character-bound consumable** (`LOCKED`,
+[`ADR-021`](../../architecture/decisions/ADR-021-character-bound-consumables-and-store-container.md)):
+bound to one Character, never traded or sold.
+
 ---
 
 # 27. Creature Loot vs Dungeon Treasure Chest
@@ -840,6 +923,14 @@ The game informs.
 
 The player decides.
 
+*2026-09-25:* the tutorial's own Health and Mana potions are **Character-bound tutorial
+consumables** in the Store Container model (`ADR-021` S6–S7). They use the ordinary potion's
+definition, bound on the instance. The direction is 20 Health and 20 Mana potions, neither final
+while combat balance is calibrated. A configured **action slot** — Health Potion or Mana Potion —
+drinks an eligible bound potion straight from the Store Container by its own threshold. It never
+has to move to a Hunt Container (`ADR-021` U5). Which phase first issues them as bound instances
+is open (`ADR-024` DEL-O5). Potions bought at a counter stay ordinary items.
+
 ---
 
 # 30. Core Hunt Management Philosophy
@@ -911,6 +1002,14 @@ The narrative direction is:
 > Your real adventure begins there.
 
 Exact dialogue remains open.
+
+*2026-09-25, final synchronization:* reaching Level 8 **offers** the vocation and the Mainland; it
+does not end Rookgaard. Rookgaard is a full playable region, and a player may decline and stay
+indefinitely — vocationless, single-player, with no Companions ([`DECISIONS.md`](../../DECISIONS.md)
+§ *Rookgaard*). *One-way* describes leaving. Three things are open (§43): whether a player who stays
+may still leave later, what Rookgaard offers beyond Level 8, and whether this event still stops a
+running Hunt and returns the character to the Temple. The dialogue direction above must not tell a
+Rookstayer that Rookgaard is over.
 
 ---
 
@@ -1054,6 +1153,12 @@ Account tutorial flag updated
 ↓
 Travel to Mainland
 ```
+
+*2026-09-25:* the **Main** chooses its vocation here — the character has been the Main since its
+creation — and the other four vocations become the Game Account's possible Companions, each
+unlocked later with Gold (`ADR-022` GA12, RK4). The tutorial flag is Game Account state, and is
+purged only with its Game Account (`ADR-024`). A player who never makes this choice stays a
+vocationless Rookstayer.
 
 Important:
 
@@ -1259,10 +1364,22 @@ Not yet locked:
 - exact Rookgaard XP pacing;
 - exact Atlas icon set;
 - exact Level 2 UI copy;
-- tutorial skip behavior for later characters;
+- tutorial skip behavior — since 2026-09-25 only a later Game Account's Main could concern it,
+  because companions never enter Rookgaard and no replacement Main exists (`ADR-022` GA-O9,
+  `ADR-024` GD7);
 - exact visual effects/highlights;
 - exact Mainland destination flow after vocation selection;
 - whether all Rookgaard systems are replayable after tutorial completion;
-- exact tutorial reward tables besides the guaranteed Doublet.
+- *2026-09-25, Rookstaying:* whether a player who stays in Rookgaard may still proceed to the
+  Mainland later; what Rookgaard offers a Rookstayer beyond Level 8; and whether the Level 8 event
+  still stops a running Hunt (§32);
+- exact tutorial reward tables besides the guaranteed Doublet, and which tutorial rewards — the
+  Doublet Quest's chest included — are one-time. A one-time Tutorial Reward is claimed once per
+  Game Account, through `ADR-023`'s primitive (QR9);
+- whether the Doublet Quest, or any other tutorial quest, can be replayed at all. The replay rule
+  of `ADR-023` covers human multiplayer / co-op quests only;
+- the final tutorial Health and Mana potion quantities, and which phase first issues the potions
+  as bound instances (`ADR-024` DEL-O5). The starter gear's representation is decided: ordinary
+  items (2026-09-25).
 
 These must be discussed before implementation if they materially affect behavior.

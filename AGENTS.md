@@ -18,7 +18,7 @@ The project depends on:
 - Forge;
 - Imbuements;
 - Wheel-style progression;
-- class skill trees;
+- vocation-specific skill trees;
 - quests as dungeons;
 - boss unlocks;
 - market/economy;
@@ -39,6 +39,10 @@ Before meaningful work, read:
 9. `docs/DECISIONS.md`
 10. `docs/OPEN_QUESTIONS.md`
 11. any task-specific design document.
+
+Read these **fresh at the start of every phase**. They are the canonical record of product
+direction; conversation history is not. A requirement that exists only in a chat is not a
+requirement — if it matters, it is in one of these documents first.
 
 ## 3. Agent workflow
 
@@ -103,6 +107,23 @@ configuration input. Defer it as a parameter and continue, rather than stopping 
 - documentation updates.
 
 Never silently override a locked product decision.
+
+### Recording a direction change
+
+An approved change of product direction is a **documentation change first**, in its own PR:
+
+1. update the **single owning document** — the one that owns that topic, not whichever is open;
+2. update `docs/DESIGN_INDEX.md` and every affected cross-reference;
+3. mark each statement `APPROVED`, `OPEN` or `TENTATIVE`, and name the owning phase or gate;
+4. open a **docs-only PR**, have it independently reviewed, and merge only with the Product
+   Owner's authorization.
+
+A direction handoff is **never** by itself authorization to implement. Implementation needs its
+own specification, tests, PR and review. A docs PR never advances `activePhase` and never marks a
+phase `VERIFIED`.
+
+Where a new direction appears to contradict a **LOCKED** rule, raise it for the Product Owner's
+decision in the PR. Do not quietly rewrite the rule.
 
 ## 5. Architectural principles
 
@@ -178,12 +199,78 @@ a phase marker copied into five documents is a phase marker that goes stale in f
 this file said *"Current phase: Phase 1"* for two entire phases.
 `scripts/check-project-state.mjs` fails CI if the two ever disagree again.
 
-Active phase: **Phase 3.7 — First real asset visual slice**
-(`IMPLEMENTATION_COMPLETE — PENDING INDEPENDENT REVIEW`). Its specification is
+Active phase: **Phase 3.7 — First real asset visual slice** — **`VERIFIED`**, independently
+reviewed and accepted 2026-09-24 at head `733503bccf262fbcc7790c78886684d7d239ad84` (PR #12, still
+open and stacked on PR #11). Its specification is
 [`docs/specs/phase-3-7/PHASE_3_7_ASSET_VISUAL_SLICE_SPEC.md`](docs/specs/phase-3-7/PHASE_3_7_ASSET_VISUAL_SLICE_SPEC.md)
-and its 69 matrix cases pass. It has been independently reviewed twice — at `06c33e7` and at
-`fb7defc` — and both sets of corrections are applied. It is back in review and **NOT VERIFIED**.
-User-supplied client assets are a PRIVATE reference and must never be committed — see its §9. The
+and its 69 matrix cases pass.
+
+It remains the active phase only because **nothing after it has started. Phase 4 has NOT started.**
+**There is no Phase 3.8.** After Phase 3.7 comes the PRE-PHASE-4 gate in
+[`docs/PHASE_GATES.md`](docs/PHASE_GATES.md), which has **not** been passed, and then Phase 4. The
+canonical sequence (`docs/MASTER_DEVELOPMENT_ROADMAP.md` §20) is:
+
+```text
+Phase 3.7 — VERIFIED → PRE-PHASE-4 specification
+  → PRE-PHASE-4 implementation + independent validation → Phase 4 foundation
+  → PHASE 4A — PLAYABLE BETA SLICE / CREATOR PREVIEW → remainder of Phase 4 → Phase 5
+```
+
+The product decisions the gate depends on were made on 2026-09-25. Its next work product is the
+**PRE-PHASE-4 specification**, and then the implementation of the decided rules and contracts:
+
+- **G4.1, Game Account deletion** (`ADR-024`, which reuses `ADR-020`'s lifecycle and supersedes
+  its Character target; `ADR-020` superseded `ADR-007`'s retirement). A request puts the **whole
+  Game Account** into a 720-hour grace, fully frozen and exactly restorable. Then a hard purge
+  removes the Main, every companion and everything the Game Account owns. The Login survives,
+  nothing transfers, no replacement Main is created, and one lifecycle serves every source,
+  moderation included. An internal history record remains, and there is no public Deleted List.
+  It is **not implemented** — the code still carries `retiredAt`;
+- **G4.2**, the `baseXp` → `baseLevel` projection on every write path, rollback and migration;
+- **G4.3**, the Actor/Participant contract — the vocationless Main alone in Rookgaard, the Main and
+  up to three companions, one actor per Game Account in co-op;
+- **G4.4**, globally unique Character names;
+- **G4.5**, the tunable configuration surface (`ADR-025`).
+
+Do not begin Phase 4 work, implement any of it, or mark the gate passed until the Product Owner
+says so.
+
+**Phase 4A — Playable Beta Slice / Creator Preview** is a mandatory playable milestone inside the
+Phase 4 program, after the Phase 4 foundation. It is not a replacement for Phase 4 and not a gate
+([`docs/design/milestones/PHASE_4A_PLAYABLE_BETA_SLICE.md`](docs/design/milestones/PHASE_4A_PLAYABLE_BETA_SLICE.md)).
+One person plays from development / staging sign-in to a restored session: a Game Account, its
+Rookgaard Main, the Atlas, an NPC, a Hunt, XP, a Skill, loot, equipment, a potion through an
+action slot, and state restored from the server. Creator tooling belongs to an authenticated
+privileged identity, never to a *"God Character"*, and never bypasses a domain invariant. It has
+**not** started.
+
+Since 2026-09-25 one **Login** may own several **Game Accounts**. Each has exactly **one Main
+Character** — the Main from creation, vocationless in Rookgaard, which selects its vocation on
+proceeding to the Mainland — up to four **permanent** companions, and its own name, claims and
+economy (`ADR-022`). The personal Active Party is the Main plus up to three companions, and human
+multiplayer takes one selected actor per Game Account. **Rookgaard** is a permanent, single-player,
+vocationless region where a player may stay (RK1–RK4). Replaying a human multiplayer or co-op quest
+is separate from its one-time reward claim, which belongs to the Game Account — never the actor or
+the Login (`ADR-023`). The weapon attack and defence formulas are **locked**, and ranged Accuracy,
+the damage roll and the rounding stages stay open (`docs/DECISIONS.md`). These decisions were
+recorded at PR #13 head `c74b845`, which was independently reviewed, its decisions accepted, and
+returned for documentation corrections only. The correcting head is **pending independent
+review**. **The PRE-4 specification has not started.**
+
+**Character-bound consumables** (`ADR-021`, `LOCKED` by the Product Owner on 2026-09-24) are
+consumables bound permanently to one Character — XP Boosts, Store-bought Exercise Weapons, Daily
+Reward and Event consumables, and since 2026-09-25 the tutorial's Health and Mana potions. The
+binding is separate from custody and lives on the instance, never in Canary's `UNIQUEID`. They move
+only between the Character's Store Container and the Account's Depot, a configured action slot may
+drink a bound potion straight from the Store Container, and they are never sold, traded, listed,
+stashed, forged or converted. They are purged with their Game Account. The Store does not sell
+combat equipment. The tutorial's starter gear is ordinary items. **Nothing of it is implemented.**
+Which phase first issues the tutorial potions bound is open (`ADR-024` DEL-O5). The first phase
+that ships a bound item implements it first, behind gate GBC.1 in
+[`docs/PHASE_GATES.md`](docs/PHASE_GATES.md).
+
+User-supplied client assets are a PRIVATE reference and must never be committed — see the Phase
+3.7 specification's §9. The
 boundary is enforced, not merely documented: `pnpm release:check`
 (`scripts/check-release-isolation.mjs`) fails the build if a private asset can reach a
 distributable artefact. `apps/web/public/assets/private/` is a forbidden path; every file under
@@ -194,16 +281,17 @@ because a bundled asset never passes through `public/`. An allowlist entry must 
 author and licence: the script can require that a claim exists and bind it to exact bytes, but only
 a human can verify the claim is true. Private files belong at `private/assets/`, which no bundler
 input covers.
-Last VERIFIED: **Phase 3.6 — Movement fidelity: Character speed and tile ground speed**, accepted
-2026-09-23 at head `f96c839d4609ecef2cf592a7f3d3c6e8a91f3ef4` (PR #10, still open and stacked on
-PR #9). Phase 3.5 remains VERIFIED at `2e67f4b` (PR #9); Phase 3 at `d46f78b` (PR #8).
+Last VERIFIED: **Phase 3.7 — First real asset visual slice**, accepted 2026-09-24 at head
+`733503bccf262fbcc7790c78886684d7d239ad84` (PR #12). Phase 3.6 remains VERIFIED at `f96c839`
+(PR #10); Phase 3.5 at `2e67f4b` (PR #9); Phase 3 at `d46f78b` (PR #8).
 
-Phase 0A (`ARCHITECTURE_APPROVED`), Phase 0B, Phase 1, Phase 2, Phase 3, Phase 3.5 and Phase 3.6
-are closed and VERIFIED. Their
+Phase 0A (`ARCHITECTURE_APPROVED`), Phase 0B, Phase 1, Phase 2, Phase 3, Phase 3.5, Phase 3.6 and
+Phase 3.7 are closed and VERIFIED. Their
 primitives — occupancy, Stamina, active-use timers, entitlements, idempotency, content bundles,
 transactions, the deterministic Hunt simulator, currency custody, the physical item model, the
-tile map with its authoritative movement timeline, cadence-invariant random streams and the
-supported movement domain every actor is proved against —
+tile map with its authoritative movement timeline, cadence-invariant random streams, the
+supported movement domain every actor is proved against, and the release-isolation boundary that
+keeps private client assets out of every distributable artefact —
 are implemented and independently reviewed. **Reuse them; do not build parallel replacements.**
 
 A phase's own specification is the thing to build against, and the one in

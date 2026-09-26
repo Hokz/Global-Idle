@@ -26,6 +26,27 @@ was the only remaining review finding.
 
 Neither correction changes a contract, a boundary, or the 87-case total.
 
+> **Superseded in part — 2026-09-25.** The roster model this specification sits inside — additional
+> Characters as Level-8 vocation unlocks of the same kind as the Origin Character, up to five per
+> Account — has since been replaced by the Product Owner: a Game Account has exactly one Main
+> Character, from its creation — the character this specification calls the Origin Character is
+> that Main, vocationless in Rookgaard — and further vocations are companions, not
+> account-lifecycle Characters of its kind
+> ([`ADR-022`](../../architecture/decisions/ADR-022-game-account-main-character-and-companions.md)).
+> The retirement it relies on is superseded by
+> [`ADR-020`](../../architecture/decisions/ADR-020-character-deletion-grace-and-purge.md) as well.
+> Nothing below is rewritten: it remains the record of what Phase 1 specified and built, and its
+> creation endpoint still creates the Origin Character only.
+>
+> **Superseded in part — 2026-09-25, final synchronization.** Two more of its rules have been
+> replaced. The `name` rule *"unique among playable characters account-wide"* — and `NAME_TAKEN`'s
+> *"on this account"* — gives way to **global** Character-name uniqueness across the whole game.
+> Deletion now takes the whole **Game Account**, and its Login survives
+> ([`ADR-024`](../../architecture/decisions/ADR-024-game-account-deletion-grace-and-purge.md)
+> NM1–NM5, GD1–GD2). The PRE-4 gate replaces the implementation (`PHASE_GATES.md` § *G4.1*,
+> § *G4.4*). Rookgaard is a permanent, single-player region where a player may stay
+> (`DECISIONS.md` § *Rookgaard*).
+
 > This document is a **specification**. It contains no implementation. Its job is to make the
 > implementing phase mechanical: exact contracts, exact boundaries, exact tests, an objective
 > Definition of Done — and, where two approved documents disagree, an explicit decision with its
