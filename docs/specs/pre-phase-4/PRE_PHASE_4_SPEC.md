@@ -1464,7 +1464,8 @@ specification's row annotated *amended by PRE-4*. Phase totals do not change.
 | — | retention and access for the history record and the ledger archive; purge lateness target; backups and restore | the pre-launch gate | no |
 | — | the combat items listed in §11 | the combat phase | no |
 
-**Resolved by this specification:** the ledger at purge (PO-1), the name comparison (PO-2), the
+**Decided by the Product Owner for this specification:** the ledger at purge (PO-1) and the name
+comparison (PO-2). **Proposed by this specification, and settled only when it is approved:** the
 history record's fields (SD-13), idempotency records at purge (SD-11), the Login minimum and how a
 Login with no Game Account starts one (SD-1 to SD-3), the conversion of `retiredAt` rows (SD-14),
 existing name collisions (SD-15), the configuration surface's first form (SD-18) and DEL-O5 (SD-19).
