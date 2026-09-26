@@ -117,9 +117,10 @@ Game Account controls every actor in its personal party. There is no multi-human
 - one **Login** (email / authentication) may own several **Game Accounts**. Each is its own
   campaign, with its own name, Main, companions, progression, quests, reward claims and economy;
   none of it is shared;
-- a Game Account has exactly **one Main Character**, its campaign identity. *Origin Character* is
-  the Main before it proceeds to the Mainland — the Game Account's vocationless Rookgaard
-  character, which takes its vocation there;
+- a Game Account has exactly **one Main Character**, its campaign identity, **from creation**. The
+  character that begins in Rookgaard **is** the Main, vocationless there, and the same Main
+  selects its vocation on proceeding to the Mainland. *Origin Character* is only the legacy and
+  code name for that Main in its vocationless Rookgaard state;
 - further vocations are unlocked as **companions** — at most one per vocation, so at most four. A
   companion is not an account-lifecycle Character equivalent to the Main;
 - a vocation the Main or a companion holds is removed from future unlock choices;
@@ -144,10 +145,10 @@ Game Account controls every actor in its personal party. There is no multi-human
 ### Rookgaard
 
 `LOCKED` 2026-09-25: Rookgaard is a full playable, **single-player** region — no vocation, no
-companions, no Main-game Party, no co-op. A Game Account's character begins there vocationless and
-may stay indefinitely. Reaching Level 8 offers the vocation and the Mainland; it does not end
-Rookgaard. On the Mainland the chosen vocation becomes the Main's, and the other four become
-possible companions — `docs/DECISIONS.md` § *Rookgaard*.
+companions, no Main-game Party, no co-op. A Game Account's Main begins there vocationless and may
+stay indefinitely. Reaching Level 8 offers the vocation and the Mainland; it does not end
+Rookgaard. On proceeding to the Mainland the same Main selects its vocation, and the other four
+become possible companions — `docs/DECISIONS.md` § *Rookgaard*.
 
 ### Active Party
 
@@ -383,3 +384,24 @@ one.
   deleted with the Game Account wherever it is stored — never refunded, unbound or transferred.
 - **Not decided:** which phase first issues the tutorial potions as bound instances (`ADR-024`
   DEL-O5).
+
+## Playable Beta Slice and creator tooling (Phase 4A)
+
+Approved by the Product Owner; **not started** —
+[`design/milestones/PHASE_4A_PLAYABLE_BETA_SLICE.md`](design/milestones/PHASE_4A_PLAYABLE_BETA_SLICE.md),
+`docs/DECISIONS.md` § *Phase 4A — Playable Beta Slice / Creator Preview*.
+
+- **What:** a mandatory playable milestone inside the Phase 4 program, after the Phase 4
+  foundation — not a replacement for Phase 4 and not a gate. One person plays from development /
+  staging sign-in, through a Game Account and its Rookgaard Main, the Atlas, an NPC, a Hunt, XP, a
+  Skill, loot, equipment and a potion through an action slot, to a session restored from the
+  server.
+- **Creator tooling:** administrative capability belongs to an authenticated development /
+  staging **privileged identity**, never to a fake ordinary *"God Character"*. Its server-side
+  commands — XP, and Level only through the XP → Level invariant, Skills, vitals, test items, test
+  Gold through the ledger, test content, test Hunts, safe progression flags — **never bypass a
+  domain invariant**.
+- **Combat inspector:** a read-only view of the server's own combat calculation, for whichever
+  combat model is implemented. It decides nothing.
+- **Values:** rough, visually incomplete and unbalanced is acceptable; `INITIAL/TUNABLE` values
+  live in the configuration surface (`ADR-025`).

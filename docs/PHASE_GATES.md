@@ -28,7 +28,12 @@ specification.
 **There is no Phase 3.8.** Phase 3.7 is the last VERIFIED phase, and this gate comes next, then
 Phase 4. Its next work product is the **PRE-PHASE-4 specification**, and the product decisions it
 depends on are made (2026-09-25). What remains is to specify and implement the decided rules and
-contracts: G4.1 to G4.5 below.
+contracts, with independent validation: G4.1 to G4.5 below.
+
+**Phase 4A — Playable Beta Slice / Creator Preview is not a gate.** It is a mandatory playable
+milestone inside the Phase 4 program, after the Phase 4 foundation
+([`design/milestones/PHASE_4A_PLAYABLE_BETA_SLICE.md`](design/milestones/PHASE_4A_PLAYABLE_BETA_SLICE.md)).
+It adds nothing to this gate, and this gate is unchanged by it.
 
 ### G4.1 — Game Account deletion lifecycle (`ADR-024`, reusing `ADR-020`)
 
@@ -289,7 +294,7 @@ both **without** building a multiplayer platform yet.
 
 | Where | Actors |
 |---|---|
-| Rookgaard | **one** vocationless, single-player actor (`ADR-022` RK2–RK3) |
+| Rookgaard | **one** actor: the Main alone, vocationless and single-player (`ADR-022` RK2–RK3) |
 | the Main game | the Main plus up to three Companions |
 | later co-op | **exactly one** actor per Game Account — its Main or any Companion |
 

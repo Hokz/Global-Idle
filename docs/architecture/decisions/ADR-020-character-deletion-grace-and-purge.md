@@ -12,7 +12,10 @@ Character model (`ADR-022`) leaves named items open (§5.3). The independent rev
 returned DH6 for a scope correction: game-wide telemetry is not a deletion deliverable (§1b, §7).
 **Superseded in part, 2026-09-25,** by
 [ADR-024](./ADR-024-game-account-deletion-grace-and-purge.md) — see the note below.
-**Those amendments are pending independent review.**
+**Review:** those amendments were independently reviewed and validated with PR #13 head `fff6faf`.
+The partial supersession was recorded at `c74b845`, which the independent review accepted and
+returned for documentation and governance corrections only; the correcting head is **pending
+independent review**.
 **Supersedes:** [ADR-007](./ADR-007-character-retirement.md), in full.
 **Amends:** [ADR-019](./ADR-019-currency-custody-scopes.md) — one guarantee row (§8); the rest of
 it stands.

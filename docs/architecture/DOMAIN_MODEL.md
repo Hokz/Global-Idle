@@ -217,9 +217,10 @@ attach to the login identity instead is open (`ADR-022` GA-O8).
   companions (`ADR-022` §3). Every existing Character counts. How a companion is represented and
   counted is Phase 4's choice
 - a Game Account has **one Main Character** — `LOCKED BY PRODUCT` (2026-09-25, `ADR-022` GA1). At
-  any instant it has at most one, and nothing may create a second (I24). The Main is the Game
-  Account's Rookgaard character, which takes its vocation on entering the Main game (RK3–RK4). No
-  replacement Main exists: a Game Account is deleted as a whole (`ADR-024` GD7)
+  any instant it has at most one, and nothing may create a second (I24). The character a Game
+  Account starts with **is** its Main, from creation: vocationless in Rookgaard, and the same Main
+  selects its vocation on proceeding to the Mainland (RK3–RK4). No replacement Main exists: a Game
+  Account is deleted as a whole (`ADR-024` GD7)
 - the vocations of the Main and its companions are **distinct** — `LOCKED BY PRODUCT`
 - an unlocked companion is **permanent**, and leaves only with its whole Game Account — `LOCKED BY
   PRODUCT` (2026-09-25, `ADR-022` GA11, I28)
@@ -301,9 +302,10 @@ transport. Explicitly **not** choosing a heartbeat interval here.
 the player's primary created character and the Game Account's campaign identity. Further
 vocations are **companions**. A companion keeps its own vocation, Base Level, Base XP and Skills,
 but it is **not** an account-lifecycle Character equivalent to the Main. This section describes
-the Main. Every Character in code today is one — an Origin Character, which is the Main before it
-proceeds to the Mainland: vocationless, in Rookgaard, where it may stay (`ADR-022` RK1–RK4). How a
-companion is represented, and which of the rules below reach it, are Phase 4's (`ADR-022` §2, §4).
+the Main. Every Character in code today is one: the Main from its creation, in its vocationless
+Rookgaard state, where it may stay (`ADR-022` RK1–RK4). *Origin Character* is only its legacy and
+code name. How a companion is represented, and which of the rules below reach it, are Phase 4's
+(`ADR-022` §2, §4).
 Until 2026-09-24 this section said a Character was *"not a companion"*, quoting the party
 document's *"real persistent character, not a temporary combat companion"*: that described the
 superseded roster of five equivalent Characters.
@@ -314,7 +316,7 @@ superseded roster of five equivalent Characters.
 | Owner | Character context |
 | Authoritative system | API/application layer; mutated by Activity settlement |
 | State | durable |
-| Lifecycle | created → (the Main: begins in Rookgaard at Level 1, vocationless, may stay there indefinitely, and takes its vocation on proceeding to the Mainland \| a companion, from Phase 4: starts at L8, permanent) → progresses indefinitely. A Character has no deletion state of its own: it is frozen while its **Game Account** is `PENDING_DELETION` — 720 elapsed hours — and purged only with it, leaving an internal history record (`ADR-024`) |
+| Lifecycle | created → (the Main, from creation: begins in Rookgaard at Level 1, vocationless, may stay there indefinitely, and selects its vocation on proceeding to the Mainland \| a companion, from Phase 4: starts at L8, permanent) → progresses indefinitely. A Character has no deletion state of its own: it is frozen while its **Game Account** is `PENDING_DELETION` — 720 elapsed hours — and purged only with it, leaving an internal history record (`ADR-024`) |
 | Mutable during an Activity | **progression only, and only through settlement.** Vocation, identity and roster membership are frozen. |
 | Transaction / audit | settlement is transactional and carries an operation id |
 
@@ -1074,7 +1076,7 @@ application-only check loses a race.
 | I21 | A one-time Tutorial Reward is awarded at most once per Game Account | Game Account-owned claim state, checked in the awarding transaction; a case of I25 |
 | I22 | A Character-bound consumable's binding is immutable and independent of its custody: a move between its Store Container and the Depot never changes it | enforced, never by convention; the binding is a referentially safe relation to one Character that the purge closure test and reference inventory can enumerate — its physical form is the implementing phase's choice (`ADR-021` §6–§7) |
 | I23 | A Character-bound consumable is only ever in its bound Character's Store Container or the Account's Depot, is used only by that Character, never reaches the Stash, another Character, a market, a trade, an NPC sale, a Forge input or any currency conversion, and is deleted by that Character's purge wherever it is stored | server-side check on every custody, use and sale path, per instance; the purge selects by binding (`ADR-021`) |
-| I24 | A Game Account has at most one Main Character at any instant, and nothing creates a second or a replacement | a persistence-level guarantee; its form is the implementing phase's (`ADR-022` GA1, `ADR-024` GD7). **Today** every Character is an Origin Character — a Main before Rookgaard — and I1b allows at most one un-vocationalized one per Account; no constraint named for I24 exists |
+| I24 | A Game Account has at most one Main Character at any instant, and nothing creates a second or a replacement | a persistence-level guarantee; its form is the implementing phase's (`ADR-022` GA1, `ADR-024` GD7). **Today** every Character is a Main in its vocationless Rookgaard state — an Origin Character, in the code's legacy name — and I1b allows at most one un-vocationalized one per Account; no constraint named for I24 exists |
 | I25 | A one-time reward is claimed at most once per Game Account — never per actor, never per Login — whichever actor claims it and however often its content is replayed, and the claim commits with its grant | a uniqueness guarantee over the Game Account and the reward, in the granting transaction (`ADR-023` §2, QR9) |
 | I26 | A historical deletion record never takes part in live ownership or custody, in restoring gameplay, in reward claims, or in any gameplay uniqueness rule, names included | written by the purge, immutable, and read by no gameplay path (`ADR-020` DH5, FZ6; `ADR-024` HR5) |
 | I27 | A Character name is unique across the **whole game** — every existing Character of every Game Account | a persistence-level uniqueness guarantee (`ADR-024` NM1, `PHASE_GATES.md` § *G4.4*). **Today** only an application check per Account, among playable rows |

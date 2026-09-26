@@ -39,8 +39,12 @@ Detail for every entry is in the master roadmap; nothing below adds to it.
 3.5 Tile / spatial Game Window
 3.6 Movement fidelity
 3.7 First real asset visual slice
-    ── PRE-PHASE-4 GATE ──
+    ── PRE-PHASE-4 GATE ──              (specification, then implementation + validation)
 4   Party / vocations                   (Skills; the Main + companions; personal Active Party)
+                                        Phase 4 foundation
+                                        4A Playable Beta Slice / Creator Preview
+                                           (a milestone inside Phase 4 — not a gate)
+                                        remainder of Phase 4
 5   Quest / dungeon / boss framework    (generic engine; solo + one-account Party)
     ── PRE-5B GATE ──
 5B  Multiplayer activities              (one selected actor per Game Account)
@@ -56,9 +60,11 @@ Detail for every entry is in the master roadmap; nothing below adds to it.
     later: PvP arena, matchmaking, ranking — after the combat foundations
 ```
 
-There is **no Phase 3.8** (2026-09-25). After Phase 3.7 comes the PRE-PHASE-4 gate, and its next
-work product is the PRE-PHASE-4 specification — the master roadmap §20 says so, and this line only
-repeats it.
+There is **no Phase 3.8** (2026-09-25). After Phase 3.7 comes the PRE-PHASE-4 gate: its
+specification — the next work product — then its implementation and independent validation. Then
+the Phase 4 foundation, **Phase 4A — Playable Beta Slice / Creator Preview**, and the remainder of
+Phase 4, before Phase 5. Phase 4A is a mandatory playable milestone inside Phase 4, not a
+replacement for it and not a gate. The master roadmap §20 says so, and these lines only repeat it.
 
 ---
 

@@ -4,7 +4,8 @@
 `FUTURE / NOT IMPLEMENTED` for region polygons, calibration and the gold region highlight.
 
 **Owning phases:** Phase 3.7 owns the hierarchy and the uncalibrated-pin rule · Phase 9 owns
-verified calibration, region polygons and the region-wide highlight.
+verified calibration, region polygons and the region-wide highlight · Phase 4A needs the minimum
+functional Atlas of §8.
 
 **Related:** [`docs/specs/phase-3-7/PHASE_3_7_ASSET_VISUAL_SLICE_SPEC.md`](../../specs/phase-3-7/PHASE_3_7_ASSET_VISUAL_SLICE_SPEC.md)
 · [`docs/MASTER_DEVELOPMENT_ROADMAP.md`](../../MASTER_DEVELOPMENT_ROADMAP.md) §20
@@ -125,3 +126,18 @@ Tracked in [`docs/OPEN_QUESTIONS.md`](../../OPEN_QUESTIONS.md) under *World, Atl
 - whether a region boundary is one polygon or a multi-polygon with holes;
 - whether the world atlas and the regional atlas share one coordinate space or two;
 - what a region highlight does at a boundary two regions share.
+
+## 8. The Phase 4A minimum — `APPROVED DIRECTION`, not implemented
+
+The Phase 4A Playable Beta Slice
+([`docs/design/milestones/PHASE_4A_PLAYABLE_BETA_SLICE.md`](../milestones/PHASE_4A_PLAYABLE_BETA_SLICE.md)
+§4) needs a small, functional Atlas:
+
+- Rookgaard available;
+- the Temple, the Sewers and at least one useful marker;
+- Thais may appear, locked and marked as future;
+- hovering, focusing or clicking an entry shows a useful label and details.
+
+It changes nothing above. §4 holds: no geographic polygon or coordinate is invented for it, and an
+unsourced position stays a visible **demo** marker. Calibration, polygons and the gold highlight
+stay Phase 9's.

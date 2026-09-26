@@ -4,10 +4,14 @@
 also delegated, and then approved, the login-identity / Game Account separation in §2. Recorded
 in the governance synchronization that follows PR #13 head `86a7681`. **Extended** in the final
 2026-09-25 synchronization, after PR #13 head `fff6faf`. The Product Owner locked one Login owning
-several Game Accounts, each with its own name (GA8–GA10). Companions are permanent, and the Main's
-vocation is the one chosen on entering the Main game (GA11–GA13). Rookgaard is a single-player,
-vocationless region where a player may stay indefinitely (RK1–RK4). Deletion targets the whole
-Game Account (`ADR-024`). **Pending independent review.**
+several Game Accounts, each with its own name (GA8–GA10). Companions are permanent, and the Main —
+the Main from its creation — selects its vocation on proceeding to the Mainland (GA11–GA13, RK4).
+Rookgaard is a single-player, vocationless region where a player may stay indefinitely (RK1–RK4).
+Deletion targets the whole Game Account (`ADR-024`). **Review:** the record was independently
+reviewed and validated with PR #13 head `fff6faf`. The extension was recorded at `c74b845`, which
+the independent review accepted and returned for documentation and governance corrections — among
+them this record's Main wording: the Rookgaard character **is** the Main, from its creation (GA1,
+RK3, §2). The correcting head is **pending independent review**.
 **Supersedes:** the roster of up to five equivalent Characters per Account —
 [`DECISIONS.md`](../../DECISIONS.md) § *Party and character roster* as it stood until 2026-09-24,
 and [`PARTY_SYSTEM_FOUNDATION.md`](../../design/party/PARTY_SYSTEM_FOUNDATION.md) §2–§8 and §28 as
@@ -62,14 +66,14 @@ What exists in code today:
 |---|---|
 | GA8 | A **Login Identity** is based on email / authentication. One Login may own **several Game Accounts**, and each Game Account is an independent campaign and session identity. |
 | GA9 | Each Game Account has its **own name and display identity**. A Game Account name is not a Character name: the two are separate namespaces (`ADR-024` NM4). |
-| GA10 | Each Game Account has its own Main — exactly one, once it enters the Main game — up to four Companions, its own campaign, progression and quest state, its own one-time reward claims, and its own gameplay and economy state. Nothing of it is shared with another Game Account of the same Login. |
+| GA10 | Each Game Account has its own Main — exactly one, from its creation — up to four Companions, its own campaign, progression and quest state, its own one-time reward claims, and its own gameplay and economy state. Nothing of it is shared with another Game Account of the same Login. |
 
 **Vocation, the Main and Companions** — `LOCKED`, final synchronization (2026-09-25)
 
 | # | Rule |
 |---|---|
 | GA11 | An unlocked Companion is **permanent**. It can never be deleted, dismissed, removed, replaced, rerolled, converted into the Main or unlocked backward. It disappears only with its whole Game Account (`ADR-024` GD8). |
-| GA12 | The vocation chosen on entering the Main game becomes the **Main's** vocation. The other four vocations are the Game Account's possible Companions. |
+| GA12 | The **Main** selects its vocation on proceeding to the Mainland: that vocation is the Main's. The other four vocations are the Game Account's possible Companions. |
 | GA13 | The Main / Companion distinction creates **no hidden combat multiplier**. |
 
 **Rookgaard** — `LOCKED`, final synchronization (2026-09-25)
@@ -78,8 +82,8 @@ What exists in code today:
 |---|---|
 | RK1 | Rookgaard is a **full playable region**, and a player may stay there indefinitely. Reaching Level 8 does not end it. |
 | RK2 | Rookgaard has no vocation, no Companions, no Main-game Party and no Main-game multiplayer or co-op. It is **single-player**. |
-| RK3 | A Game Account's character begins in Rookgaard **vocationless**, and stays vocationless, with no Companions, for as long as the player remains there. |
-| RK4 | On proceeding to the Mainland the player selects the **Main vocation** there, and the other four vocations become the Game Account's possible Companions (GA12). |
+| RK3 | A Game Account's **Main** begins in Rookgaard — it is the Main from its creation — **vocationless**, and stays vocationless, with no Companions, for as long as the player remains there. |
+| RK4 | On proceeding to the Mainland the **same Main** selects its **vocation** there, and the other four vocations become the Game Account's possible Companions (GA12). |
 
 **The personal Active Party**
 
@@ -116,8 +120,12 @@ approved this direction:
 ```text
 LOGIN / AUTH IDENTITY        who signs in — email / authentication (GA8)
   └─ GAME ACCOUNT            one campaign, with its own name; one or more per Login
-       ├─ MAIN CHARACTER     exactly one per Game Account, once it enters the Main game
-       └─ COMPANION ROSTER   up to four permanent companions, one per remaining vocation
+       ├─ MAIN CHARACTER     exactly one campaign character, from creation (GA1)
+       │    Rookgaard:            role = Main; vocation = none; companions = none (RK2–RK3)
+       │    Mainland transition:  the same Main Character; vocation = the selected vocation;
+       │                          the four other vocations become possible Companions (RK4)
+       └─ COMPANION ROSTER   up to four permanent companions, one per remaining vocation;
+                             never in Rookgaard
 ```
 
 *Final synchronization (2026-09-25):* the Login → several Game Accounts direction is `LOCKED`
@@ -134,11 +142,12 @@ must therefore be represented apart from the Game Account before the purge ships
   its own, a mapping, or another shape — is the owning phase's choice.
 - **The Main Character is today's `Character`.** Every Character that exists is an Origin
   Character, which is a Main. *Origin Character* is the name Phases 1–3, their specifications and
-  the code use (`originCharacter`, `character-baseline.origin`, `starting-grant.origin.rookgaard`);
-  it now means the Main before it completes Rookgaard. *Since the final synchronization:* it is
-  the Game Account's vocationless Rookgaard character, which becomes the Main — with its chosen
-  vocation — on entering the Main game (RK3–RK4). A player who stays in Rookgaard keeps it
-  vocationless, with no Companions.
+  the code use (`originCharacter`, `character-baseline.origin`, `starting-grant.origin.rookgaard`).
+  It is only a **legacy and code name** for the Main in its vocationless Rookgaard state. The
+  character a Game Account starts with **is** its Main from creation: vocationless in Rookgaard,
+  and on proceeding to the Mainland the same Main selects its vocation (RK3–RK4). There is no
+  moment at which it *becomes* the Main. A player who stays in Rookgaard keeps it vocationless,
+  with no Companions.
 - **A companion has no representation yet.** Whether it is a `Character` row with a role, a
   separate entity, or something else is Phase 4's choice. This record fixes the semantics, not
   the tables.
@@ -173,8 +182,8 @@ Each of these was locked before 2026-09-25, and nothing in §1 contradicts it:
 | GA-O6 | **How a low-level companion progresses.** The Main is always present, so a Level-250 Main with a new Level-8 companion fails Shared XP eligibility, and XP allocation for a non-eligible formation is already open. Being selected for multiplayer (MP3) is one path; whether there are others is not decided. | Phase 4 |
 | GA-O7 | **Companion names.** Whether companions carry player-chosen names, and under what uniqueness. *Narrowed 2026-09-25:* companions carry Character names, globally unique and reserved while their Game Account is pending (`ADR-024` NM1–NM2). Whether a companion's name is chosen by the player, and when it is set, stays open. | Phase 4 |
 | GA-O8 | **Which level owns what.** Whether Premium and other entitlements attach to the login identity or to each Game Account, and at which level sessions, the newest-connection rule (`ADR-008`) and the one activity claim sit. Today all of them are per Account, that is per Game Account. | the phase that builds multiple Game Accounts per login |
-| GA-O9 | **A second Game Account under the same login.** Whether its Main must play Rookgaard or may skip it, and whether any progress or benefit is shared across one login's Game Accounts. *Resolved in part 2026-09-25:* every Game Account's character begins in Rookgaard, vocationless (RK3), and no campaign, progression, quest, reward-claim, gameplay or economy state is shared (GA10). Still open: whether a later Game Account may skip the guided tutorial — the PLAY / SKIP offer of `TUTORIAL_ROOKGAARD_ROADMAP.md` §2. Whether entitlements are shared is GA-O8. | the tutorial and account-management design |
-| GA-O10 | **Owning phase and UX** for creating, listing and switching Game Accounts under one login. *Since 2026-09-25* PRE-4 needs a minimum of it: the Login represented apart from the Game Account, and a way for a Login whose only Game Account was purged to start a new one (`ADR-024` §5). | the PRE-PHASE-4 specification for that minimum; otherwise not assigned |
+| GA-O9 | **A second Game Account under the same login.** Whether its Main must play Rookgaard or may skip it, and whether any progress or benefit is shared across one login's Game Accounts. *Resolved in part 2026-09-25:* every Game Account's Main begins in Rookgaard, vocationless (RK3), and no campaign, progression, quest, reward-claim, gameplay or economy state is shared (GA10). Still open: whether a later Game Account may skip the guided tutorial — the PLAY / SKIP offer of `TUTORIAL_ROOKGAARD_ROADMAP.md` §2. Whether entitlements are shared is GA-O8. | the tutorial and account-management design |
+| GA-O10 | **Owning phase and UX** for creating, listing and switching Game Accounts under one login. *Since 2026-09-25* PRE-4 needs a minimum of it: the Login represented apart from the Game Account, and a way for a Login whose only Game Account was purged to start a new one (`ADR-024` §5). The Phase 4A journey selects or creates a Game Account, so a minimal select / create flow exists by then ([`PHASE_4A_PLAYABLE_BETA_SLICE.md`](../../design/milestones/PHASE_4A_PLAYABLE_BETA_SLICE.md)). | the PRE-PHASE-4 specification for that minimum; the Phase 4 specification for 4A's flow; otherwise not assigned |
 | GA-O11 | **Game Account names** (GA9). Whether they must be unique, in what scope, and whether a pending Game Account's name is reserved. They are a separate namespace from Character names (`ADR-024` NM4). | with GA-O10 |
 
 ## Consequences

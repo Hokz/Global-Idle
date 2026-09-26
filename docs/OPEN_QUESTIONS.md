@@ -115,12 +115,13 @@ Open, from `ADR-022` §4:
   NM1–NM2). Whether the player chooses them, and when, stays open;
 - **GA-O8** whether Premium and other entitlements, sessions, the newest-connection rule and the
   one activity claim attach to the login identity or to each Game Account;
-- **GA-O9** — *resolved in part*: every Game Account's character begins in Rookgaard,
-  vocationless, and nothing is shared across one Login's Game Accounts (RK3, GA10). Still open:
+- **GA-O9** — *resolved in part*: every Game Account's Main begins in Rookgaard, vocationless,
+  and nothing is shared across one Login's Game Accounts (RK3, GA10). Still open:
   whether a later Game Account may skip the guided tutorial (`TUTORIAL_ROOKGAARD_ROADMAP.md` §2);
 - **GA-O10** the owning phase and UX for creating, listing and switching Game Accounts. PRE-4
   needs a minimum: the Login apart from the Game Account, and a way for a Login whose only Game
-  Account was purged to start a new one (`ADR-024` §5);
+  Account was purged to start a new one (`ADR-024` §5). Phase 4A's journey selects or creates a
+  Game Account, so a minimal select / create flow exists by then (*Phase 4A*, below);
 - **GA-O11** Game Account names — whether they are unique, in what scope, and whether a pending
   Game Account's name is reserved. They are a separate namespace from Character names.
 
@@ -134,8 +135,10 @@ Carried from before, still open:
 - exact definition of a "qualifying Hunt XP reward" for Stamina activation;
 - the identities of the five bosses in the Powerful Imbuement unlock set (the count is locked at five);
 - combat consequences of Party ordering beyond Slot 1 being the Frontline;
-- final name for the "Origin Character" concept — since 2026-09-25, the Main before it completes
-  Rookgaard;
+- final name for the "Origin Character" concept — *settled in substance*: it is the Main itself,
+  from creation, in its vocationless Rookgaard state, and *Origin Character* survives only as a
+  legacy and code name. Whether the code identifiers are renamed is left to the phase that touches
+  them;
 - final Skill Point state granted to a newly unlocked Level 8 companion.
 
 ## Game Account deletion
@@ -306,9 +309,9 @@ that refunds nothing and never leaves a tree invalid. Open:
 ## Rookgaard
 
 **Not open** (2026-09-25, final synchronization): Rookgaard is a full playable, single-player
-region, without vocation, Companions, Main-game Party or co-op. A Game Account's character begins
-there vocationless and may stay indefinitely. The Main vocation is chosen on proceeding to the
-Mainland — `docs/DECISIONS.md` § *Rookgaard*, `ADR-022` RK1–RK4. Open
+region, without vocation, Companions, Main-game Party or co-op. A Game Account's Main — the Main
+from creation — begins there vocationless and may stay indefinitely. The same Main selects its
+vocation on proceeding to the Mainland — `docs/DECISIONS.md` § *Rookgaard*, `ADR-022` RK1–RK4. Open
 (`TUTORIAL_ROOKGAARD_ROADMAP.md` §43):
 
 - whether a player who has stayed in Rookgaard may still proceed to the Mainland later;
@@ -449,13 +452,14 @@ a cooperative quest stays replayable, and its final reward chest is claimed once
 
 Stated in full in [`PHASE_GATES.md`](PHASE_GATES.md). There is no Phase 3.8: after the VERIFIED
 Phase 3.7 comes the PRE-4 gate, and its next work product is the PRE-PHASE-4 specification. Its
-product decisions are made (2026-09-25). Open where the answer is not yet written:
+product decisions are made (2026-09-25). Phase 4A, inside Phase 4, is not a gate (*Phase 4A*,
+below). Open where the answer is not yet written:
 
 - the narrowed deletion items — DEL-O3, moderation authority, for the phase that builds
   moderation tooling, and DEL-O5, when the tutorial potions become bound — and the specification
   details listed under *Game Account deletion*, above (**PRE-4 gate**);
-- the shape of the Actor/Participant combat contract — one vocationless actor in Rookgaard, the
-  Main and up to three companions in the Main game, one actor per Game Account in later co-op —
+- the shape of the Actor/Participant combat contract — the vocationless Main alone in Rookgaard,
+  the Main and up to three companions in the Main game, one actor per Game Account in later co-op —
   and which compatibility adapters keep the verified Hunt fixtures intact (**PRE-4 gate**, G4.3);
 - the comparison global name uniqueness uses, and how names that already collide are resolved
   (**PRE-4 gate**, G4.4);
@@ -474,6 +478,30 @@ source, global names and the internal history record (`ADR-024`, 2026-09-25). Th
 Owner decided the Gold Pouch's fate (G4.1a) on 2026-09-24, and it stands. G4.1b and G4.1c were
 decided the same day and are superseded. On 2026-09-25 the grace's length, the full freeze and the
 tutorial potions' binding were decided, and so were the starter gear and how the potions are used.
+
+## Phase 4A — Playable Beta Slice
+
+**Not open** (approved by the Product Owner after the final 2026-09-25 synchronization): Phase 4A
+is a mandatory playable milestone inside the Phase 4 program, between the Phase 4 foundation and
+its remainder — not a replacement for Phase 4 and not a gate. Its acceptance journey, minimum
+Atlas, creator tooling, combat inspector and non-goals are recorded in
+[`design/milestones/PHASE_4A_PLAYABLE_BETA_SLICE.md`](design/milestones/PHASE_4A_PLAYABLE_BETA_SLICE.md)
+and `docs/DECISIONS.md`. Open, for the Phase 4 specification (milestone §9):
+
+- which Phase 4 deliverables form the foundation and which the remainder, and which of the
+  journey's missing pieces 4A builds itself;
+- what *staging* is, and how its authentication is protected;
+- how the privileged creator identity is represented and granted, and how creator commands are
+  recorded;
+- whether any creator capability ever reaches production — moderation authority is `ADR-024`
+  DEL-O3;
+- the shape of the reusable NPC / dialogue flow, and which NPC comes first;
+- which potion 4A's action slot uses — an ordinary carried one, or a Character-bound one from the
+  Store Container, which needs GBC.1 first (*Tactical action slots*, above);
+- which combat model the inspector shows at 4A — whether the locked formulas are implemented by
+  then;
+- which test content is approved for teleport, and which progression flags are safe to reset;
+- how the journey is proven — its matrix cases and its browser evidence.
 
 ## IP / launch
 

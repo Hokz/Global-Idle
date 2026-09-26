@@ -1126,9 +1126,9 @@ for as long as the player stays.
 Vocation is chosen at Base Level 8.
 
 *2026-09-25, final synchronization:* more precisely, the vocation is chosen on proceeding to the
-Mainland, which the Level 8 event offers. It becomes the Main's vocation, and the other four become
-the Game Account's possible Companions (`ADR-022` GA12, RK4). A player who stays in Rookgaard stays
-vocationless.
+Mainland, which the Level 8 event offers. The **Main** chooses it — the character has been the
+Main since its creation — and the other four become the Game Account's possible Companions
+(`ADR-022` GA12, RK4). A Main that stays in Rookgaard stays vocationless.
 
 This matters because vocation influences Skill aptitude/cost.
 
@@ -1244,6 +1244,14 @@ Use:
 - reference comparisons;
 - progression simulations;
 - edge cases.
+
+*Phase 4A adds a **combat inspector** for a development / staging privileged identity
+([`PHASE_4A_PLAYABLE_BETA_SLICE.md`](../milestones/PHASE_4A_PLAYABLE_BETA_SLICE.md) §6). Where
+implemented, it shows the Attack Value and its roll, the Armor and Defense checks, the block or
+pass outcome, Max Base Damage, the damage roll, Mitigation, the final HP damage, the Skill and
+equipment contributions, and the seed and run identity. It reads the server's calculation for
+whichever combat model is implemented, and decides nothing. It is not a substitute for the tests
+above.*
 
 ---
 

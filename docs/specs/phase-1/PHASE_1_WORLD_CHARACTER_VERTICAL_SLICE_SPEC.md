@@ -29,8 +29,9 @@ Neither correction changes a contract, a boundary, or the 87-case total.
 > **Superseded in part — 2026-09-25.** The roster model this specification sits inside — additional
 > Characters as Level-8 vocation unlocks of the same kind as the Origin Character, up to five per
 > Account — has since been replaced by the Product Owner: a Game Account has exactly one Main
-> Character, which is the Origin Character before Rookgaard, and further vocations are companions,
-> not account-lifecycle Characters of its kind
+> Character, from its creation — the character this specification calls the Origin Character is
+> that Main, vocationless in Rookgaard — and further vocations are companions, not
+> account-lifecycle Characters of its kind
 > ([`ADR-022`](../../architecture/decisions/ADR-022-game-account-main-character-and-companions.md)).
 > The retirement it relies on is superseded by
 > [`ADR-020`](../../architecture/decisions/ADR-020-character-deletion-grace-and-purge.md) as well.

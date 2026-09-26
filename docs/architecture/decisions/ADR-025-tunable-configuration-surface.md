@@ -1,8 +1,10 @@
 # ADR-025 — Tunable gameplay values live in one authoritative server-side configuration surface
 
-**Status:** `ACCEPTED` — the direction is `LOCKED` by the Product Owner (2026-09-25). Recorded in
-the final 2026-09-25 governance synchronization, which follows PR #13 head `fff6faf`. **Pending
-independent review.**
+**Status:** `ACCEPTED` — the direction is `LOCKED` by the Product Owner (2026-09-25). Recorded at
+PR #13 head `c74b845`, in the final 2026-09-25 governance synchronization that followed the
+independently validated head `fff6faf`. **Review:** the independent review of `c74b845` accepted
+it and returned documentation and governance corrections only; the correcting head is **pending
+independent review**.
 **Relates to:** [ADR-010](./ADR-010-pure-engine-injected-clock-and-rng.md) — the engine is a pure
 function of explicit inputs. [ADR-011](./ADR-011-content-as-versioned-artifact.md) — content is a
 versioned artifact that an Activity pins.

@@ -7,11 +7,16 @@
 > **Amended 2026-09-25 — Rookgaard is a permanent region** (final synchronization,
 > [`DECISIONS.md`](../../DECISIONS.md) § *Rookgaard*). Rookgaard is a full playable region, and a
 > player may stay there indefinitely. It is single-player, with no vocation, no Companions, no
-> Main-game Party and no co-op. A Game Account's character begins here vocationless and stays so
-> while the player remains. On proceeding to the Mainland the player selects the Main vocation
-> there, and the other four vocations become the Game Account's possible Companions. The guided
-> tutorial below still leads to Level 8 and the vocation choice. Reaching Level 8 **offers**
-> the Mainland; it does not end Rookgaard.
+> Main-game Party and no co-op. A Game Account's **Main** begins here — it is the Main from its
+> creation — vocationless, and stays so while the player remains. On proceeding to the Mainland
+> the same Main selects its vocation there, and the other four vocations become the Game
+> Account's possible Companions. The guided tutorial below still leads to Level 8 and the vocation
+> choice. Reaching Level 8 **offers** the Mainland; it does not end Rookgaard.
+>
+> **Phase 4A** — the Playable Beta Slice
+> ([`PHASE_4A_PLAYABLE_BETA_SLICE.md`](../milestones/PHASE_4A_PLAYABLE_BETA_SLICE.md)) plays a
+> small part of Rookgaard: the Main, a small Atlas, one NPC flow and the Sewers. It is **not** the
+> full tutorial, and it neither implements nor changes this document.
 
 ---
 
@@ -54,7 +59,7 @@ The tutorial should teach mechanics **when the player needs to use them**, rathe
 > vocations are **companions**: they never enter Rookgaard and start at Base Level 8. A different
 > Main vocation means another Game Account under the same login.
 >
-> **Since the final synchronization (2026-09-25):** every Game Account's character begins in
+> **Since the final synchronization (2026-09-25):** every Game Account's Main begins in
 > Rookgaard, vocationless (RK3), and nothing is shared between one Login's Game Accounts (GA10).
 > Deletion takes the **whole Game Account**, and no replacement Main is ever created inside one
 > ([`ADR-024`](../../architecture/decisions/ADR-024-game-account-deletion-grace-and-purge.md)). The
@@ -133,7 +138,7 @@ The exact skip flow is a later design item.
 
 *Under `ADR-022` (2026-09-25) an additional vocation is a companion, which never enters Rookgaard.
 Since the final synchronization no replacement Main exists (`ADR-024`), so this offer can only
-concern a later Game Account's character. Whether it may skip the guided tutorial is open (GA-O9,
+concern a later Game Account's Main. Whether it may skip the guided tutorial is open (GA-O9,
 §43).*
 
 ---
@@ -1149,10 +1154,11 @@ Account tutorial flag updated
 Travel to Mainland
 ```
 
-*2026-09-25:* the vocation chosen here becomes the **Main's**, and the other four become the Game
-Account's possible Companions, each unlocked later with Gold (`ADR-022` GA12, RK4). The tutorial
-flag is Game Account state, and is purged only with its Game Account (`ADR-024`). A player who
-never makes this choice stays a vocationless Rookstayer.
+*2026-09-25:* the **Main** chooses its vocation here — the character has been the Main since its
+creation — and the other four vocations become the Game Account's possible Companions, each
+unlocked later with Gold (`ADR-022` GA12, RK4). The tutorial flag is Game Account state, and is
+purged only with its Game Account (`ADR-024`). A player who never makes this choice stays a
+vocationless Rookstayer.
 
 Important:
 
@@ -1358,8 +1364,8 @@ Not yet locked:
 - exact Rookgaard XP pacing;
 - exact Atlas icon set;
 - exact Level 2 UI copy;
-- tutorial skip behavior — since 2026-09-25 only a later Game Account's character could concern
-  it, because companions never enter Rookgaard and no replacement Main exists (`ADR-022` GA-O9,
+- tutorial skip behavior — since 2026-09-25 only a later Game Account's Main could concern it,
+  because companions never enter Rookgaard and no replacement Main exists (`ADR-022` GA-O9,
   `ADR-024` GD7);
 - exact visual effects/highlights;
 - exact Mainland destination flow after vocation selection;

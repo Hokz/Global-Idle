@@ -12,8 +12,10 @@ A tutorial potion shares the ordinary potion's definition and is bound on its in
 configured action slot uses it straight from the Store Container (U5), which resolves U4 for
 potions. Canary's UNIQUEID and ACTIONID are not a binding (B6). The starter gear is ordinary items,
 so the conflict of §7 is gone. Since `ADR-024` a purge deletes a whole Game Account, so it reaches
-every item the Game Account owns, bound or not (§6). **The amendments are pending independent
-review.**
+every item the Game Account owns, bound or not (§6). **Review:** the first amendment was
+independently reviewed and validated with PR #13 head `fff6faf`. The second was recorded at
+`c74b845`, which the independent review accepted and returned for documentation and governance
+corrections only; the correcting head is **pending independent review**.
 **Extends:** [ADR-004](./ADR-004-item-single-custody.md) — one new custody scope, and a binding
 that is independent of custody; ADR-004 itself is unchanged.
 [ADR-020](./ADR-020-character-deletion-grace-and-purge.md) — the purge reaches a bound item

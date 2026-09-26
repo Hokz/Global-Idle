@@ -408,8 +408,9 @@ member does not exist (`ADR-022`). See
 [`docs/design/party/PARTY_SYSTEM_FOUNDATION.md`](design/party/PARTY_SYSTEM_FOUNDATION.md).
 
 ### Free
-- starts with its Main Character — the Origin Character, a vocationless Rookgaard character until
-  it proceeds to the Mainland;
+- starts with its Main Character — the Main from creation, vocationless in Rookgaard, which
+  selects its vocation on proceeding to the Mainland (*Origin Character* is only its legacy and
+  code name);
 - unlocks companions with Gold (costs OPEN);
 - navigates to services/NPCs;
 - standard storage;
@@ -616,15 +617,28 @@ a disconnected character.
 Phase 3.6 leaves the data shape ready: a tile definition already carries a kind and a ground
 speed, so the importer adds visual identity without the movement engine changing again.
 
-**There is no Phase 3.8** (2026-09-25). The sequence is:
+**There is no Phase 3.8** (2026-09-25). The canonical sequence is:
 
 ```text
-Phase 3.7 — VERIFIED  →  PRE-PHASE-4 GATE  →  Phase 4 — Party / vocations
+Phase 3.7 — VERIFIED
+  ↓
+PRE-PHASE-4 specification
+  ↓
+PRE-PHASE-4 implementation + independent validation
+  ↓
+Phase 4 foundation
+  ↓
+PHASE 4A — PLAYABLE BETA SLICE / CREATOR PREVIEW
+  ↓
+remainder of Phase 4
+  ↓
+Phase 5
 ```
 
 The product decisions the gate depends on are made. What remains of it is the **PRE-PHASE-4
 specification** — the next work product — and then the implementation of the decided rules and
-contracts.
+contracts, independently validated. **Phase 4A** is a mandatory playable milestone inside the
+Phase 4 program: it is not a replacement for Phase 4, and not a new pre-4 gate (below).
 
 ### PRE-PHASE-4 GATE
 
@@ -647,7 +661,7 @@ Full text: [`PHASE_GATES.md`](PHASE_GATES.md) § *Pre-Phase-4*.
   `baseLevel` its stored projection (schema + `progression.ts`), as the Product Owner confirmed on
   2026-09-25. The gate proves and enforces that contract on every write path, rollback, migration
   and backfill; it does not choose again, and it does not lock the curve;
-- **an Actor/Participant combat contract** that supports one vocationless single-player actor in
+- **an Actor/Participant combat contract** that supports the vocationless Main alone in
   Rookgaard, the Main and up to three companions in the Main game, and later exactly one actor per
   Game Account in co-op. No actor is assumed to be the Login, the Game Account or the Main, while
   settlement still knows the owning Game Account. Compatibility adapters keep previously VERIFIED
@@ -657,6 +671,12 @@ Full text: [`PHASE_GATES.md`](PHASE_GATES.md) § *Pre-Phase-4*.
   versioned, server-side place for PROVISIONAL and TUNABLE defaults, before Phase 4 adds its own.
 
 ### Phase 4 — Party / vocations
+
+Phase 4 is delivered as one program: the **Phase 4 foundation**, then **Phase 4A — Playable Beta
+Slice / Creator Preview** (below), then the **remainder of Phase 4**. Which of the deliverables
+below belong to the foundation and which to the remainder is for the Phase 4 specification to
+place. Phase 4A's acceptance journey sets the minimum: what it needs is built by the foundation or
+by 4A itself.
 
 - base Skills — the classic set, with no Fishing — training, and death loss;
 - all five vocations and their identities;
@@ -685,6 +705,44 @@ Full text: [`PHASE_GATES.md`](PHASE_GATES.md) § *Pre-Phase-4*.
   retained unchanged.
 
 Recorded in full: [`design/party/PARTY_SYSTEM_FOUNDATION.md`](design/party/PARTY_SYSTEM_FOUNDATION.md).
+
+### Phase 4A — Playable Beta Slice / Creator Preview
+
+> Approved by the Product Owner after the final 2026-09-25 synchronization decisions. **Not
+> started.** Status lives in [`PROJECT_STATE.json`](./PROJECT_STATE.json), not here.
+> Milestone: [`design/milestones/PHASE_4A_PLAYABLE_BETA_SLICE.md`](design/milestones/PHASE_4A_PLAYABLE_BETA_SLICE.md).
+
+A **mandatory playable milestone inside the Phase 4 program**, between the Phase 4 foundation and
+the remainder of Phase 4. It is **not** a replacement for Phase 4, and **not** a new pre-4 gate.
+
+- **the acceptance journey, at minimum:** launch the web client; development / staging
+  authentication; select or create a Game Account; start its Rookgaard **Main** — vocationless
+  there — and choose a globally unique Character name; enter a small Rookgaard Game Window; use a
+  small functional Atlas, whose entries show useful labels and details on hover, focus and click;
+  interact with at least one real, reusable NPC / dialogue flow; select and enter at least one
+  Hunt, preferably the Rookgaard Sewers and its Rats; complete a short combat rotation; gain XP;
+  progress at least one relevant Skill; receive loot; equip and unequip real ItemInstances; see
+  equipment and stats change combat; use at least one potion through the tactical action-slot
+  model; exit, reload or log out; and return to the authoritative persistent state, restored from
+  PostgreSQL and server state;
+- **the minimum Atlas:** Rookgaard available; the Temple, the Sewers and at least one useful
+  marker; Thais may appear locked or future; no invented geographic polygon or coordinate;
+- **creator tooling for development and staging:** administrative capability belongs to an
+  authenticated **privileged identity**, never to a fake ordinary *"God Character"*. Server-side
+  commands set or add XP, set Level only through the authoritative XP → Level invariant, set or
+  add Skill progress, restore HP, Mana and Stamina where applicable, grant, remove and equip test
+  items, grant and remove test Gold through valid ledger and domain paths, enter approved test
+  content, start or reset a test Hunt, set or reset safe test progression flags, and inspect the
+  server's combat calculations. **DEV tools must not bypass domain invariants**;
+- **a combat inspector** that shows, where implemented, the Attack, Armor and Defense values and
+  their rolls, the block / pass outcome, the spark / smoke mapping once locked, Max Base Damage,
+  the damage roll, Mitigation, the final HP damage, the Skill and equipment contributions, and the
+  deterministic seed and run identity. It reads the server's calculation and decides nothing;
+- it may be rough, visually incomplete and unbalanced, with `INITIAL/TUNABLE` values;
+- **non-goals:** all of Rookgaard, the full tutorial, final Atlas calibration, final UI, art or
+  balance, production public authentication, complete quests, dungeons or bosses, human
+  multiplayer, Market or economy expansion, Forge, Imbuements, the Wheel, full Skill Trees,
+  Premium, and scale hardening.
 
 ### Phase 5 — Quest / dungeon / boss framework
 
@@ -892,6 +950,7 @@ Current detailed design documents:
 - [`docs/design/party/PARTY_SYSTEM_FOUNDATION.md`](design/party/PARTY_SYSTEM_FOUNDATION.md) — the Main Character and its companions (`ADR-022`), unique vocations, Gold unlocks, the personal 1–4 Active Party, Frontline and Shared XP eligibility.
 - [`docs/design/world/ATLAS_NAVIGATION_AND_REGION_BOUNDARIES.md`](design/world/ATLAS_NAVIGATION_AND_REGION_BOUNDARIES.md) — the four navigation surfaces, region boundaries as data rather than pixels, calibration honesty and the deferred gold region highlight.
 - [`docs/design/multiplayer/COOPERATIVE_QUEST_STRATEGY.md`](design/multiplayer/COOPERATIVE_QUEST_STRATEGY.md) — the co-op lobby checklist as a player-authored conditional strategy, the frozen plan, spectators, and the Party / Expedition / Warzone distinction.
+- [`docs/design/milestones/PHASE_4A_PLAYABLE_BETA_SLICE.md`](design/milestones/PHASE_4A_PLAYABLE_BETA_SLICE.md) — the Phase 4A playable beta milestone: its acceptance journey, the minimum Atlas, creator tooling for development and staging, the combat inspector and the non-goals.
 
 Each design document carries its own status marker and its own list of open decisions. Those
 open items are not resolved by this roadmap.

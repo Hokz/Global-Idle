@@ -424,15 +424,18 @@ above).
 `LOCKED` by the Product Owner, 2026-09-25. **Supersedes** the roster of up to five equivalent
 Characters per account that this section described until 2026-09-24. Architecture:
 [`architecture/decisions/ADR-022-game-account-main-character-and-companions.md`](architecture/decisions/ADR-022-game-account-main-character-and-companions.md).
-**Not implemented** — every Character in code today is a Main before Rookgaard; companions,
-unlocks and the Active Party are Phase 4. **Extended** in the final synchronization of 2026-09-25
-(the Login, the Game Account's name, permanent companions).
+**Not implemented** — every Character in code today is a Main in its vocationless Rookgaard
+state; companions, unlocks and the Active Party are Phase 4. **Extended** in the final
+synchronization of 2026-09-25 (the Login, the Game Account's name, permanent companions).
 
 ```text
 LOGIN / AUTH IDENTITY  (email / authentication)
   └─ one or more GAME ACCOUNTS (campaigns), each with its own name
-       ├─ exactly one MAIN CHARACTER each, once it enters the Main game
-       └─ a COMPANION ROSTER of up to four permanent companions
+       ├─ MAIN CHARACTER — exactly one campaign character each, from creation
+       │    Rookgaard:           role = Main; vocation = none; companions = none
+       │    Mainland transition: the same Main Character; vocation = the selected vocation;
+       │                         the four other vocations become possible Companions
+       └─ a COMPANION ROSTER of up to four permanent companions — never in Rookgaard
 ```
 
 - a **Login** — based on email / authentication — may own **several Game Accounts**. Each is an
@@ -441,17 +444,18 @@ LOGIN / AUTH IDENTITY  (email / authentication)
 - each Game Account has its own Main, up to four Companions, and its own campaign, progression and
   quest state, one-time reward claims, and gameplay and economy state. Nothing of it is shared with
   another Game Account under the same Login;
-- the vocation chosen on entering the Main game becomes the **Main's** vocation, and the other four
-  vocations are the Game Account's possible Companions;
+- the Main selects its vocation on proceeding to the **Mainland**. That vocation is the **Main's**,
+  and the other four vocations become the Game Account's possible Companions;
 - an unlocked Companion is **permanent**. It can never be deleted, dismissed, removed, replaced,
   rerolled, converted into the Main or unlocked backward, and it disappears only with its whole
   Game Account (*Game Account deletion*, below);
 - the Main / Companion distinction creates **no hidden combat multiplier**;
 
-- a Game Account has exactly **one Main Character** — the player's primary created character and
-  the Game Account's campaign identity. *Origin Character* in older documents and in code is the
-  Main before it proceeds to the Mainland: the Game Account's vocationless Rookgaard character,
-  which becomes the Main on entering the Main game (*Rookgaard*, below);
+- a Game Account has exactly **one Main Character**, **from its creation** — the player's primary
+  created character and the Game Account's campaign identity. The character that begins in
+  Rookgaard **is** the Main, vocationless there, and the same Main selects its vocation on
+  proceeding to the Mainland (*Rookgaard*, below). *Origin Character*, in older documents and in
+  code, is only a legacy name for that same Main in its vocationless Rookgaard state;
 - further vocation actors are unlocked as **companions**, members of the Game Account's roster. A
   companion is **not** an account-lifecycle Character equivalent to the Main: it does not replace
   the Main, and it has no deletion or tutorial semantics of its own. Deletion is the whole Game
@@ -496,9 +500,9 @@ companion only once Phase 4 specifies it.
   Rookgaard;
 - Rookgaard has no vocation, no Companions, no Main-game Party and no Main-game multiplayer or
   co-op. It is **single-player**;
-- a Game Account's character begins there **vocationless**, and stays vocationless, with no
-  Companions, for as long as the player remains;
-- on proceeding to the **Mainland**, the player selects the **Main vocation** there, and the other
+- a Game Account's **Main** begins there — it is the Main from creation — **vocationless**, and
+  stays vocationless, with no Companions, for as long as the player remains;
+- on proceeding to the **Mainland**, the same Main selects its **vocation** there, and the other
   four vocations become the Game Account's possible Companions.
 
 OPEN: whether a player who has stayed may still leave later, what Rookgaard offers a Rookstayer
@@ -927,6 +931,48 @@ instances; and the final tutorial potion quantities — see
   identity of the Main and of each Companion; exactly-once claims; global name uniqueness; binding
   integrity; the atomic deletion and purge guarantees; transaction semantics; security and
   authority boundaries.
+
+## Phase 4A — Playable Beta Slice / Creator Preview
+
+Approved by the Product Owner after the final 2026-09-25 synchronization decisions. Milestone:
+[`design/milestones/PHASE_4A_PLAYABLE_BETA_SLICE.md`](design/milestones/PHASE_4A_PLAYABLE_BETA_SLICE.md).
+**Not started.** Recording it does not advance `PROJECT_STATE.json`.
+
+- the canonical sequence is Phase 3.7 (`VERIFIED`) → the PRE-PHASE-4 specification → its
+  implementation and independent validation → the Phase 4 foundation → **Phase 4A** → the
+  remainder of Phase 4 → Phase 5. There is **no Phase 3.8**;
+- Phase 4A is a **mandatory playable milestone inside the Phase 4 program**. It does not replace
+  Phase 4, and it is not a new pre-4 gate;
+- its minimum acceptance journey runs from the web client and development / staging sign-in,
+  through a Game Account and its Rookgaard Main with a globally unique name, a small Rookgaard Game
+  Window, a small functional Atlas, a real reusable NPC / dialogue flow, a Hunt — preferably the
+  Rookgaard Sewers and its Rats — XP, a Skill, loot, equipping real ItemInstances and seeing their
+  effect on combat, and a potion used through the tactical action slots, to a reload that
+  restores the authoritative state from PostgreSQL and server state;
+- the minimum Atlas: Rookgaard available; the Temple, the Sewers and at least one useful marker;
+  Thais may appear locked or future; **no invented geographic polygon or coordinate**;
+- the beta may be rough, visually incomplete and unbalanced, and `INITIAL/TUNABLE` values are
+  acceptable;
+- **administrative capability belongs at the authenticated authorization level**, not to a fake
+  ordinary *"God Character"*. Development and staging support a privileged identity whose
+  server-side commands cover XP — and Level only through the authoritative XP → Level invariant —
+  Skill progress, HP, Mana and Stamina, test items, test Gold through valid ledger and domain
+  paths, approved test content, test Hunts, safe test progression flags, and the inspection of the
+  server's combat calculations;
+- **DEV tools must NOT bypass domain invariants**;
+- a **combat inspector** shows the server's calculation where implemented: the Attack, Armor and
+  Defense values and their rolls, block or pass, the spark / smoke mapping once locked, Max Base
+  Damage, the damage roll, Mitigation, the final HP damage, Skill and equipment contributions, and
+  the deterministic seed and run identity. It decides nothing;
+- **non-goals:** all of Rookgaard, the full tutorial, final Atlas calibration, final UI, art and
+  balance, production public authentication, complete quests, dungeons and bosses, human
+  multiplayer, Market or economy expansion, Forge, Imbuements, the Wheel, full Skill Trees,
+  Premium, and scale hardening.
+
+OPEN, for the Phase 4 specification: the split between the Phase 4 foundation and the remainder,
+what staging is, the privileged identity's form, the NPC / dialogue flow's shape, and which potion
+4A's action slot uses — the milestone's §9, and
+[`OPEN_QUESTIONS.md`](OPEN_QUESTIONS.md) § *Phase 4A — Playable Beta Slice*.
 
 ## Engineering process
 

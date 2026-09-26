@@ -9,9 +9,9 @@
 > The Product Owner replaced the roster of up to five **equivalent** Characters with **one Main
 > Character per Game Account** plus **companions**:
 >
-> - a Game Account has exactly one Main Character — its campaign identity, this document's
->   *Origin Character* before Rookgaard — and unlocks further vocations as companions, at most one
->   per vocation, so at most four;
+> - a Game Account has exactly one Main Character, from its creation — its campaign identity,
+>   the character this document calls the *Origin Character*, vocationless in Rookgaard — and
+>   unlocks further vocations as companions, at most one per vocation, so at most four;
 > - the personal Active Party is the Main plus up to three companions — 1 to 4 actors,
 >   reorderable. The **Main is always present**, and need not hold Slot 1;
 > - in human multiplayer each Game Account selects exactly one actor — its Main or a companion —
@@ -29,11 +29,18 @@
 >
 > **Amended again 2026-09-25 — final synchronization.** An unlocked companion is **permanent**:
 > never deleted, dismissed, removed, replaced, rerolled, converted into the Main or unlocked
-> backward (GA11). The vocation chosen on proceeding to the Mainland is the Main's, and the other
-> four are possible companions (GA12). The Main / companion distinction adds no hidden combat
+> backward (GA11). The Main selects its vocation on proceeding to the Mainland, and the other four
+> are possible companions (GA12). The Main / companion distinction adds no hidden combat
 > multiplier (GA13). Rookgaard is single-player, with no Party and no companions (RK1–RK4).
 > Deletion takes the whole Game Account
 > ([`ADR-024`](../../architecture/decisions/ADR-024-game-account-deletion-grace-and-purge.md)).
+>
+> **Phase 4A** — the Playable Beta Slice
+> ([`PHASE_4A_PLAYABLE_BETA_SLICE.md`](../milestones/PHASE_4A_PLAYABLE_BETA_SLICE.md)) is a
+> milestone inside Phase 4 that plays in Rookgaard, so it shows the Main alone: no companion and
+> no Party (RK2). It changes nothing in this document. Which part of Phase 4 builds the companions
+> and the personal Active Party — the foundation before 4A or the remainder after it — is the
+> Phase 4 specification's to place.
 
 ---
 
@@ -221,9 +228,10 @@ Choose first vocation
 
 This first character is the account's initial/origin character.
 
-*Since 2026-09-25 the player may also stay in Rookgaard indefinitely, vocationless and alone:
-Rookgaard is single-player, with no Party (`ADR-022` RK1–RK3). The vocation chosen on proceeding to
-the Mainland becomes the Main's, and the other four become possible companions (GA12).*
+*Since 2026-09-25 this first character is the Game Account's **Main**, from its creation. The
+player may also stay in Rookgaard indefinitely, vocationless and alone: Rookgaard is
+single-player, with no Party (`ADR-022` RK1–RK3). On proceeding to the Mainland the same Main
+selects its vocation, and the other four become possible companions (GA12).*
 
 Example:
 
@@ -581,8 +589,8 @@ Current Frontline: Paladin
 
 Whether the final UI uses the exact label "Origin Character" is OPEN, but the underlying distinction is required.
 
-*Since 2026-09-25 the Origin Character is the Game Account's Main. It is always in the Active
-Party, and it need not be the Frontline (`ADR-022` PP2–PP3).*
+*Since 2026-09-25 the Origin Character is the Game Account's Main, from its creation. It is always
+in the Active Party, and it need not be the Frontline (`ADR-022` PP2–PP3).*
 
 ---
 
@@ -1102,9 +1110,10 @@ The following are LOCKED unless the Product Owner explicitly changes them. *Upda
 
 ## New Characters
 
-- the first character — the Main, the *Origin Character* before Rookgaard — begins in Rookgaard
-  at Level 1, and may stay there indefinitely (`ADR-022` RK1). The guided tutorial leads to the
-  Level 8 vocation choice;
+- the first character **is** the Main, from its creation — the *Origin Character* in older text
+  and in code. It begins in Rookgaard at Level 1, vocationless, and may stay there indefinitely
+  (`ADR-022` RK1–RK3). The guided tutorial leads to the Level 8 vocation choice, and the same Main
+  selects its vocation on proceeding to the Mainland;
 - companions do not perform Rookgaard;
 - companions start at Level 8;
 - companions receive Level 8-appropriate Skill progression according to the final Skill model;

@@ -208,7 +208,15 @@ and its 69 matrix cases pass.
 It remains the active phase only because **nothing after it has started. Phase 4 has NOT started.**
 **There is no Phase 3.8.** After Phase 3.7 comes the PRE-PHASE-4 gate in
 [`docs/PHASE_GATES.md`](docs/PHASE_GATES.md), which has **not** been passed, and then Phase 4. The
-product decisions the gate depends on were made on 2026-09-25. Its next work product is the
+canonical sequence (`docs/MASTER_DEVELOPMENT_ROADMAP.md` §20) is:
+
+```text
+Phase 3.7 — VERIFIED → PRE-PHASE-4 specification
+  → PRE-PHASE-4 implementation + independent validation → Phase 4 foundation
+  → PHASE 4A — PLAYABLE BETA SLICE / CREATOR PREVIEW → remainder of Phase 4 → Phase 5
+```
+
+The product decisions the gate depends on were made on 2026-09-25. Its next work product is the
 **PRE-PHASE-4 specification**, and then the implementation of the decided rules and contracts:
 
 - **G4.1, Game Account deletion** (`ADR-024`, which reuses `ADR-020`'s lifecycle and supersedes
@@ -219,23 +227,35 @@ product decisions the gate depends on were made on 2026-09-25. Its next work pro
   moderation included. An internal history record remains, and there is no public Deleted List.
   It is **not implemented** — the code still carries `retiredAt`;
 - **G4.2**, the `baseXp` → `baseLevel` projection on every write path, rollback and migration;
-- **G4.3**, the Actor/Participant contract — one vocationless actor in Rookgaard, the Main and up
-  to three companions, one actor per Game Account in co-op;
+- **G4.3**, the Actor/Participant contract — the vocationless Main alone in Rookgaard, the Main and
+  up to three companions, one actor per Game Account in co-op;
 - **G4.4**, globally unique Character names;
 - **G4.5**, the tunable configuration surface (`ADR-025`).
 
 Do not begin Phase 4 work, implement any of it, or mark the gate passed until the Product Owner
 says so.
 
+**Phase 4A — Playable Beta Slice / Creator Preview** is a mandatory playable milestone inside the
+Phase 4 program, after the Phase 4 foundation. It is not a replacement for Phase 4 and not a gate
+([`docs/design/milestones/PHASE_4A_PLAYABLE_BETA_SLICE.md`](docs/design/milestones/PHASE_4A_PLAYABLE_BETA_SLICE.md)).
+One person plays from development / staging sign-in to a restored session: a Game Account, its
+Rookgaard Main, the Atlas, an NPC, a Hunt, XP, a Skill, loot, equipment, a potion through an
+action slot, and state restored from the server. Creator tooling belongs to an authenticated
+privileged identity, never to a *"God Character"*, and never bypasses a domain invariant. It has
+**not** started.
+
 Since 2026-09-25 one **Login** may own several **Game Accounts**. Each has exactly **one Main
-Character** and up to four **permanent** companions, and its own name, claims and economy
-(`ADR-022`). The personal Active Party is the Main plus up to three companions, and human
+Character** — the Main from creation, vocationless in Rookgaard, which selects its vocation on
+proceeding to the Mainland — up to four **permanent** companions, and its own name, claims and
+economy (`ADR-022`). The personal Active Party is the Main plus up to three companions, and human
 multiplayer takes one selected actor per Game Account. **Rookgaard** is a permanent, single-player,
 vocationless region where a player may stay (RK1–RK4). Replaying a human multiplayer or co-op quest
 is separate from its one-time reward claim, which belongs to the Game Account — never the actor or
 the Login (`ADR-023`). The weapon attack and defence formulas are **locked**, and ranged Accuracy,
-the damage roll and the rounding stages stay open (`docs/DECISIONS.md`). These decisions are
-recorded and pending independent review. **The PRE-4 specification has not started.**
+the damage roll and the rounding stages stay open (`docs/DECISIONS.md`). These decisions were
+recorded at PR #13 head `c74b845`, which was independently reviewed, its decisions accepted, and
+returned for documentation corrections only. The correcting head is **pending independent
+review**. **The PRE-4 specification has not started.**
 
 **Character-bound consumables** (`ADR-021`, `LOCKED` by the Product Owner on 2026-09-24) are
 consumables bound permanently to one Character — XP Boosts, Store-bought Exercise Weapons, Daily

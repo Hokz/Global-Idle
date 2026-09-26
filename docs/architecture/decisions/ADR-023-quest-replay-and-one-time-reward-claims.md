@@ -7,7 +7,10 @@ Owner's replay rule covers **human multiplayer / co-op** quests, not every quest
 **Extended** in the final 2026-09-25 synchronization, after PR #13 head `fff6faf`: a claim belongs
 to the Game Account — never to the Login and never to the actor — and each Game Account of a Login
 keeps its own (QR9). Since `ADR-024`, a Game Account's claims are purged with it (§3).
-**The correction and the extension are pending independent review.**
+**Review:** the correction was independently reviewed and validated with PR #13 head `fff6faf`.
+The extension was recorded at `c74b845`, which the independent review accepted and returned for
+documentation and governance corrections only; the correcting head is **pending independent
+review**.
 **Relates to:** [ADR-022](./ADR-022-game-account-main-character-and-companions.md) — claim state
 belongs to the Game Account, never to the selected actor.
 [ADR-020](./ADR-020-character-deletion-grace-and-purge.md) — a one-time Tutorial Reward is the

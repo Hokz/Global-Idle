@@ -1,8 +1,10 @@
 # ADR-024 — Game Account deletion: a 720-hour frozen grace, then a hard purge
 
 **Status:** `ACCEPTED` — the product rules are `LOCKED` by the Product Owner (2026-09-25).
-Recorded in the final 2026-09-25 governance synchronization, which follows PR #13 head `fff6faf`.
-**Pending independent review.**
+Recorded at PR #13 head `c74b845`, in the final 2026-09-25 governance synchronization that
+followed the independently validated head `fff6faf`. **Review:** the independent review of
+`c74b845` accepted it and returned documentation and governance corrections only; the correcting
+head is **pending independent review**.
 **Supersedes, in part:** [ADR-020](./ADR-020-character-deletion-grace-and-purge.md). It replaces
 ADR-020's deletion target — a Character, rather than the Game Account — and every rule that
 existed because a Character could be purged while its Game Account lived on. That covers G4.1b
@@ -212,7 +214,7 @@ telemetry belongs to the phases that introduce what it measures, and is unchange
   put up for deletion, and the others keep their results after a purge.
 - **Economy** (Phase 6): live obligations refuse the request, and completed trades keep the
   counterparty's side.
-- **Rookgaard**: a Game Account that stays in Rookgaard — one vocationless character, no
+- **Rookgaard**: a Game Account that stays in Rookgaard — its Main, vocationless there, and no
   Companions (`ADR-022` RK3) — is deleted the same way.
 
 ### 8. What this does to `ADR-020`
