@@ -51,14 +51,15 @@ exists.
 
 Append-only. No updates, no deletes — enforced by **database permissions**, not convention.
 
-**One designed exception** (`ADR-024`, reusing `ADR-020`): a Game Account's final purge deletes
-that Game Account's ledger entries and balances, BANK and POUCH, 720 elapsed hours after a
-deletion request, and nothing else — unless the PRE-4 specification keeps the entries as immutable
-history outside live state, never a live balance (`ADR-024` §3). The value is destroyed with them
-— it is **not** moved to another Game Account or to the Login. Every other Game Account's ledger,
-balances and reconciliation are untouched. The purge runs under its own capability; the
-application role still cannot delete an entry. *Until 2026-09-25 a Character's purge deleted only
-its POUCH entries and never a BANK entry (`ADR-020` §6.1).*
+**One designed exception** (`ADR-024`, reusing `ADR-020`): a Game Account's final purge removes
+that Game Account's ledger entries and balances, BANK and POUCH, from live state 720 elapsed hours
+after a deletion request, and nothing else. The balances are deleted; the entries move into an
+append-only archive outside live state, never a live balance, as the Product Owner decided on
+2026-09-26 (`ADR-024` §3, PO-1). The value is destroyed with them — it is **not** moved to another
+Game Account or to the Login. Every other Game Account's ledger, balances and reconciliation are
+untouched. The purge runs under its own capability; the application role still cannot delete an
+entry. *Until 2026-09-25 a Character's purge deleted only its POUCH entries and never a BANK entry
+(`ADR-020` §6.1).*
 
 Each entry records: subject account, currency type, signed amount, reason code, operation id,
 counterparty where applicable, timestamp, resulting balance.
@@ -153,7 +154,7 @@ one.
 | API → Engine | the engine resolves rolls but **cannot create or move an item or currency** |
 | Engine → Persistence | none. The engine has no I/O (`ADR-010`) |
 | Application → Ledger | append only; no application path updates or deletes an entry |
-| Purge capability → Ledger | deletes **only** the entries of a Game Account whose purge it has itself verified — `PENDING_DELETION`, deadline passed — in the same transaction; never another Game Account's entry, never an update (`ADR-020` §7, `ADR-024` §3) |
+| Purge capability → Ledger | archives, then deletes from the live ledger, **only** the entries of a Game Account whose purge it has itself verified — `PENDING_DELETION`, deadline passed — in the same transaction; never another Game Account's entry, never an update (`ADR-020` §7, `ADR-024` §3, PO-1) |
 | Admin tooling | subject to the same transactional and audit rules as gameplay; it cannot purge early, bypass the grace or restore after a purge — moderation included (`ADR-024` GD9–GD10) |
 
 `DECIDED IN PHASE 0A` — **admin and support tooling is not a privileged bypass.** A grant, a

@@ -636,9 +636,11 @@ Phase 5
 ```
 
 The product decisions the gate depends on are made. What remains of it is the **PRE-PHASE-4
-specification** — the next work product — and then the implementation of the decided rules and
-contracts, independently validated. **Phase 4A** is a mandatory playable milestone inside the
-Phase 4 program: it is not a replacement for Phase 4, and not a new pre-4 gate (below).
+specification** — drafted at
+[`specs/pre-phase-4/PRE_PHASE_4_SPEC.md`](specs/pre-phase-4/PRE_PHASE_4_SPEC.md) and pending
+independent review — and then the implementation of the decided rules and contracts,
+independently validated. **Phase 4A** is a mandatory playable milestone inside the Phase 4
+program: it is not a replacement for Phase 4, and not a new pre-4 gate (below).
 
 ### PRE-PHASE-4 GATE
 
@@ -655,8 +657,9 @@ Full text: [`PHASE_GATES.md`](PHASE_GATES.md) § *Pre-Phase-4*.
   `retiredAt`. All of its product questions are **resolved**. What is left — moderation authority,
   and when the tutorial potions become bound — is narrow (`ADR-024` §9). **None of it is
   implemented**, and the gate has not passed;
-- **globally unique Character names** (G4.4) — enforced at persistence level over every existing
-  Character, a pending Game Account's names reserved until its purge;
+- **globally unique Character names** (G4.4), compared case-insensitively (PO-2, 2026-09-26) —
+  enforced at persistence level over every existing Character, a pending Game Account's names
+  reserved until its purge;
 - **enforce the `baseXp` → `baseLevel` projection** — `baseXp` is already the durable truth and
   `baseLevel` its stored projection (schema + `progression.ts`), as the Product Owner confirmed on
   2026-09-25. The gate proves and enforces that contract on every write path, rollback, migration

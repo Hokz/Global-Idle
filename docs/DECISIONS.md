@@ -624,6 +624,9 @@ Nothing further is inferred from how any other game handles deletion.
 
 - Character names are **globally unique** across the entire game and database. This supersedes
   the per-account uniqueness Phase 1 implemented;
+- the comparison is **case-insensitive**: `Rookie`, `rookie` and `ROOKIE` are one name, and the
+  first to hold it keeps it. Every Character keeps the capitalization it was created with. Decided
+  by the Product Owner on 2026-09-26 for the PRE-PHASE-4 specification (PO-2);
 - while a Game Account is `PENDING_DELETION`, all of its Character names — the Main's and every
   Companion's — stay **globally reserved**. Only a successful purge releases them;
 - historical records never reserve a name;
@@ -638,6 +641,12 @@ Nothing further is inferred from how any other game handles deletion.
   name, vocation and level, and a broad campaign summary;
 - it is **not** required to record Gold destroyed, Pouch value destroyed, destroyed item value or
   count, or economy-sink totals. The Pouches' live state is simply purged;
+- the Game Account's **ledger history** — every `LedgerEntry`, BANK and POUCH — and the audit rows
+  of its entitlements are **moved by the purge into append-only archives** outside live state. An
+  archive holds no foreign key and no balance, gameplay never reads it, and it is never live
+  ownership, custody, restoration, name, claim or uniqueness state. Its retention and access are
+  pre-launch questions, like the history record's. Decided by the Product Owner on 2026-09-26 for
+  the PRE-PHASE-4 specification (PO-1);
 - the record is never live ownership, custody, restoration state, name reservation, reward-claim
   state or uniqueness state;
 - balance telemetry — XP production, hunt efficiency, loot and drop generation, item creation and

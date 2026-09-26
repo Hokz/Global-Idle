@@ -878,7 +878,7 @@ my gold go" answerable and "there are two of this sword" detectable.
 |---|---|
 | Identity | opaque surrogate per entry; every entry also carries an **operation id** |
 | Owner | Economy context |
-| State | durable, **append-only, never updated**. Deleted only by a Game Account's final purge, and then only that Game Account's entries, BANK and POUCH — unless the PRE-4 specification keeps them as immutable history outside live state (`ADR-024` §3) |
+| State | durable, **append-only, never updated**. Removed from live state only by a Game Account's final purge, and then only that Game Account's entries, BANK and POUCH, which the purge moves into an append-only archive outside live state (`ADR-024` §3, PO-1) |
 | Lifecycle | written once, and retained until the purge of the Game Account they belong to, or kept as immutable history outside live state (`ADR-024` §3) |
 | Mutable during an Activity | appended by settlement |
 | Transaction / audit | it *is* the audit |
@@ -1058,7 +1058,7 @@ application-only check loses a race.
 | I3 | Active Party size 1–4, entries distinct, all **playable** and owned by the Game Account, and the Main always present (`ADR-022` PP2). The party is frozen and purged with its Game Account; a configured membership never blocks a deletion request (`ADR-024` §2) | transaction |
 | I4 | An ItemInstance is in exactly one custody scope | persistence constraint |
 | I5 | Balance projection reconciles to the ledger | transaction + reconciliation job |
-| I6 | Ledger entries are append-only — never updated; deleted only by a Game Account's final purge, and then only its own entries, BANK and POUCH — unless the PRE-4 specification keeps them as immutable history outside live state | persistence permission: the application role has no `UPDATE` or `DELETE`; only the purge capability may delete (`ADR-020` §7, `ADR-024` §3) |
+| I6 | Ledger entries are append-only — never updated; removed from the live ledger only by a Game Account's final purge, and then only its own entries, BANK and POUCH, which the purge moves into an append-only archive outside live state (PO-1) | persistence permission: the application role has no `UPDATE` or `DELETE`; only the purge capability may delete (`ADR-020` §7, `ADR-024` §3) |
 | I7 | Settlement is idempotent under its operation id | uniqueness constraint on operation id |
 | I8 | A paused Activity cannot advance | Activity state machine — no tick path exists from the paused state |
 | I9 | At most one Session holds an account's Activity claim | Activity ownership + atomic claim |
@@ -1071,7 +1071,7 @@ application-only check loses a race.
 | I16 | A referenced content bundle is never deleted | no automatic GC exists (`ADR-016`) |
 | I17 | A `PENDING_DELETION` Game Account is fully frozen: no command changes anything it or its Characters own, or makes one of them a participant, except restore and purge; nothing time-derived — Stamina included — accrues, and a restore credits nothing for the pending time | lifecycle state checked in every command's transaction, and no read settles a pending Game Account (`ADR-020` §4, FZ2–FZ3; `ADR-024` §2) |
 | I18 | A Character's name stays reserved while its row exists — its Game Account pending included — and only the successful purge releases it; a historical record never reserves it | global uniqueness over every existing row, I27 (`ADR-024` NM2–NM3) |
-| I19 | After a purge, no **live** product-persistence row names the purged Game Account, its Characters or their names, and the Login and every other Game Account are unchanged apart from documented scrubs. The internal history record is the one declared exception (I26) | schema-derived closure test + post-purge scan over live persistence (`ADR-020` §7, `ADR-024` §3) |
+| I19 | After a purge, no **live** product-persistence row names the purged Game Account, its Characters or their names, and the Login and every other Game Account are unchanged apart from documented scrubs. The internal history record (I26) and the ledger and entitlement-audit archives (`ADR-024` §3, PO-1) are the declared non-live locations | schema-derived closure test + post-purge scan over live persistence (`ADR-020` §7, `ADR-024` §3) |
 | I20 | ~~A Bootstrap Kit item never leaves its Character~~ — **retired 2026-09-25**: the starter gear is ordinary items, and the tutorial potions follow I22–I23 (`ADR-024` §8) | — |
 | I21 | A one-time Tutorial Reward is awarded at most once per Game Account | Game Account-owned claim state, checked in the awarding transaction; a case of I25 |
 | I22 | A Character-bound consumable's binding is immutable and independent of its custody: a move between its Store Container and the Depot never changes it | enforced, never by convention; the binding is a referentially safe relation to one Character that the purge closure test and reference inventory can enumerate — its physical form is the implementing phase's choice (`ADR-021` §6–§7) |
