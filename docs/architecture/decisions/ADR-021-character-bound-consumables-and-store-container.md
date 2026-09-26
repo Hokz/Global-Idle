@@ -6,8 +6,14 @@ Container's representation (§3) and the binding's representation (§6, §7) are
 Validated with those corrections at PR #13 head `86a7681`.
 **Amended 2026-09-25** by Product Owner decisions made after `86a7681`: tutorial utility
 consumables are Character-bound consumables under this record (S6), which opens a conflict with
-the tutorial's starter gear and a sequencing question against PRE-4 (§5, §7, §9). **The amendment
-is pending independent review.**
+the tutorial's starter gear and a sequencing question against PRE-4 (§5, §7, §9).
+**Amended again 2026-09-25**, in the final governance synchronization after PR #13 head `fff6faf`.
+A tutorial potion shares the ordinary potion's definition and is bound on its instance (S7). A
+configured action slot uses it straight from the Store Container (U5), which resolves U4 for
+potions. Canary's UNIQUEID and ACTIONID are not a binding (B6). The starter gear is ordinary items,
+so the conflict of §7 is gone. Since `ADR-024` a purge deletes a whole Game Account, so it reaches
+every item the Game Account owns, bound or not (§6). **The amendments are pending independent
+review.**
 **Extends:** [ADR-004](./ADR-004-item-single-custody.md) — one new custody scope, and a binding
 that is independent of custody; ADR-004 itself is unchanged.
 [ADR-020](./ADR-020-character-deletion-grace-and-purge.md) — the purge reaches a bound item
@@ -57,6 +63,7 @@ binding is such a reference.
 | S4 | Outfits and mounts are **outside** this model. They get their own cosmetic unlock or entitlement design and are never forced into Store Container semantics. |
 | S5 | Acquisition source and binding are separate dimensions. A Store, Daily Reward or Event source makes an item bound only when its item or reward definition says so. |
 | S6 | *2026-09-25.* **Tutorial utility consumables** — the tutorial's Health and Mana potions, for example — are Character-bound, and they use this record's Store Container model. The current tutorial direction is 20 Health and 20 Mana potions; neither quantity is final while combat balance is calibrated. |
+| S7 | *2026-09-25, final synchronization.* A tutorial Health or Mana potion uses the **same `ItemDefinition`** as the ordinary potion. The binding is on the **instance**, not on the definition or its effect. It is permanently bound to the Character that received it, and may live in that Character's Store Container. |
 
 **Binding**
 
@@ -67,6 +74,7 @@ binding is such a reference.
 | B3 | Moving the item to the Account's Depot neither removes nor changes the binding. |
 | B4 | No other Character — the same Account's included — can withdraw, use, receive, trade, consume or otherwise take ownership or control of it. |
 | B5 | The binding can never be removed, reassigned, sold, gifted or converted. |
+| B6 | *2026-09-25, final synchronization.* Canary's `UNIQUEID` and `ACTIONID` are **not** a Character-ownership or binding system, and a binding is never encoded through them. It is the durable relation or attribute on the instance (§7), whose physical schema is the implementing phase's choice. |
 
 **The Store Container**
 
@@ -92,7 +100,8 @@ binding is such a reference.
 | U1 | Only its bound Character may use it, according to the item's own use rule. |
 | U2 | Use is **not** a custody transfer. It is terminal, or it decrements the item — an XP Boost consumed or activated; an Exercise Weapon's charges spent by Skill Training. |
 | U3 | Every use enforces, on the server: the caller owns the Account; the target Character is `boundCharacterId`; that Character is `ACTIVE` and eligible; and no output turns the item into transferable Account value, unless a future Product Owner decision designs one explicitly. |
-| U4 | Where a use is started — from the Store Container, from the Depot, or from a dedicated panel — is **not** decided here (§10). It is specified with the first concrete item. |
+| U4 | Where a use is started — from the Store Container, from the Depot, or from a dedicated panel — is **not** decided here (§10). It is specified with the first concrete item. *For bound potions it is decided by U5 (2026-09-25).* |
+| U5 | *2026-09-25, final synchronization.* A bound potion is used through the **tactical action-slot system** — Health Potion, Mana Potion, Healing Spell and Attack Spell slots, and later Rune and other tactical slots. A configured slot may consume an eligible bound potion **directly from the Store Container**, by the slot's own rule or threshold. The potion never has to move to a Hunt Container. |
 
 **Forbidden economic and social interactions.** A Character-bound consumable:
 
@@ -123,6 +132,11 @@ binding is such a reference.
 | X4 | At the final purge the Store Container, which is Character-owned, is deleted. |
 | X5 | Every item whose `boundCharacterId` is that Character is deleted with it — **including bound items stored in the Depot**. |
 | X6 | Those items never transfer to another Character, never become unbound, never remain as orphaned Depot items, never move to the Stash, never refund Store Coin or premium currency, and never convert into Bank Gold or any other value. |
+
+*Since [`ADR-024`](./ADR-024-game-account-deletion-grace-and-purge.md) (2026-09-25)* the deletion
+unit is the **Game Account**. A Character is pending only because its Game Account is, and the
+purge deletes the whole Game Account — its Depot included. X1–X6 hold unchanged within that purge,
+and X5's Depot case is simply part of it.
 
 These rules are Global Idle's. Nothing further is inferred from how any other game treats bound
 items.
@@ -196,15 +210,26 @@ sites (F8).
   not wall-clock time (`DECISIONS.md` § *Active-use timers*, `ADR-015`). A `PENDING_DELETION`
   Character is never in a qualifying state, so the grace consumes none of an active effect, and a
   restore returns it exactly (X3).
-- **Tutorial potions (S6) — open.** A Hunt drinks potions automatically, and Phase 3 draws them
-  from what the Character carries in its Hunt containers (`broughtSupplies`). G3 keeps a bound item
-  out of every Hunt container, so how a Hunt uses a Character-bound potion held in the Store
-  Container is not decided. It is U4 for a concrete item, recorded as `ADR-020` DEL-O5 and settled
-  before the tutorial's bound potions ship.
+- **Tutorial potions (S6–S7) — resolved 2026-09-25 (U5).** A Hunt drinks potions automatically,
+  and Phase 3 draws them from what the Character carries in its Hunt containers
+  (`broughtSupplies`). G3 keeps a bound item out of every Hunt container, and until the final
+  synchronization how a Hunt could use one was open (`ADR-020` DEL-O5). The Product Owner settled
+  it: the tactical action slots consume an eligible bound potion straight from the Store Container,
+  by each slot's rule or threshold (U5). Ordinary potions remain carried supplies. The phase that
+  builds the slots specifies them, including which source a slot draws from first when both hold
+  an eligible potion, and how a running Activity reads and settles Store Container consumption
+  under its custody freeze. Which phase first issues the tutorial potions as bound instances is
+  `ADR-024` DEL-O5.
 - **No hidden conversion.** No use, and no by-product of a use, yields Gold, premium currency, a
   transferable item, or any other transferable value (U3).
 
 ### 6. Character deletion and the purge — reconciliation with `ADR-020`
+
+> *Since `ADR-024` (2026-09-25)* a purge deletes a whole **Game Account**, so it deletes every
+> item the Game Account owns, bound or unbound. The KEEP row below no longer arises at a purge: an
+> unbound Depot item goes with its Game Account. The binding still decides who may **use or move**
+> a bound item — a Companion never uses the Main's (B4) — and it must still be referentially safe,
+> enumerable by the closure test and impossible to orphan.
 
 **During the grace.** `ADR-020` §4 freezes every Character-owned thing. A bound item is
 Character-owned by its binding wherever it is stored, so the freeze covers the Store Container and
@@ -288,6 +313,18 @@ model, and no path is chosen here: it is open, as `ADR-020` DEL-O4, for the PRE-
 with Product Owner confirmation. A quest reward is never bound merely because it came from a quest
 (`ADR-023` QR8): the Doublet is an ordinary item.
 
+**Resolved 2026-09-25, final synchronization.** The starter gear — the Rookgaard armour, dagger
+and backpack — is **ordinary, low-value items**. It has no Character-bound model and no special
+anti-duplication custody. It becomes obsolete and may be discarded, and a player who stays in
+Rookgaard may keep using it. The Bootstrap Kit and its binding are retired (`ADR-024` §8). The only
+tutorial items this record governs are the Character-bound potions of S6–S7. The table above is
+history.
+
+**Not a binding: Canary's `UNIQUEID` and `ACTIONID`** (B6). In Canary these are map and script
+identifiers that scripts react to. They say nothing about which Character owns an item, and a
+binding is never encoded through them. It is the durable, referentially safe relation or attribute
+on the instance described above.
+
 ### 8. Relation to other records
 
 - **`ADR-004`** — unchanged: one custody at any instant. `STORE_CONTAINER` is the deliberate new
@@ -309,11 +346,12 @@ this record is compatibility: its purge closure must stay extensible to a bindin
 independent of custody. Nothing in the PRE-4 design may assume that Character-owned `ItemInstance`
 rows are found by `characterId` alone (`PHASE_GATES.md` § *G4.1*).
 
-**Since 2026-09-25 that is an open question.** The tutorial's utility consumables are
-Character-bound (S6), and G4.1c ships the Bootstrap Kit with the purge. Either PRE-4 builds this
-record's foundation — and passes GBC.1 — for the tutorial consumables, or the starting grant
-changes shape until the phase that does. Which one is `ADR-020` DEL-O5, decided in the PRE-4
-specification with Product Owner confirmation. Until then this record does not claim PRE-4, and
+**Since 2026-09-25 that is an open question**, narrowed by the final synchronization. The
+tutorial's potions are Character-bound (S6–S7) and are used through the action slots (U5). The
+Bootstrap Kit no longer ships with the purge, because it is retired (`ADR-024` §8). What remains
+open is `ADR-024` DEL-O5: which phase first issues the tutorial potions as bound instances. It is
+either PRE-4, building this record's foundation behind GBC.1, or the phase that builds the action
+slots. The PRE-PHASE-4 specification decides. Until then this record does not claim PRE-4, and
 PRE-4 does not ship a bound item without GBC.1.
 
 **The first phase that introduces a Character-bound consumable** implements this foundation first.
@@ -334,9 +372,11 @@ BOUND-CONSUMABLE gate passes** (`PHASE_GATES.md` § *GBC.1*). That implementatio
 - a restore preserves every bound item exactly;
 - the purge deletes the Store Container's contents;
 - the purge also deletes bound items stored in the Depot;
-- ordinary unbound Depot items survive that same purge;
+- ~~ordinary unbound Depot items survive that same purge~~ — *superseded 2026-09-25: a purge deletes
+  its whole Game Account, Depot included (`ADR-024`)*. A purge of one Game Account deletes nothing
+  of another Game Account's, bound or unbound;
 - no orphaned `boundCharacterId` remains after a purge;
-- a repeated or retried purge cannot delete another Character's items;
+- a repeated or retried purge cannot delete another Game Account's items;
 - a concurrent Depot move and a deletion request or purge are safely serialised;
 - if bound items are stackable, a split or merge never changes the binding.
 
@@ -351,9 +391,12 @@ BOUND-CONSUMABLE gate passes** (`PHASE_GATES.md` § *GBC.1*). That implementatio
 - Exercise Weapon Store pricing and charge counts;
 - the use UI, and whether a use starts from the Store Container, the Depot or a dedicated panel;
 - the outfit and mount storage and unlock model;
-- *2026-09-25:* how a Hunt uses a bound tutorial potion held in the Store Container, and whether
-  PRE-4 or a later phase builds this foundation for the tutorial consumables (`ADR-020` DEL-O5);
-- *2026-09-25:* how the tutorial's starter gear is represented (`ADR-020` DEL-O4);
+- *2026-09-25:* which phase first issues the tutorial potions as bound instances (`ADR-024`
+  DEL-O5). How a Hunt uses them is decided (U5). How the starter gear is represented is decided as
+  well: ordinary items (§7);
+- *2026-09-25:* the action slots' own design — each slot's rule and threshold, and which source a
+  slot draws from first when both the Store Container and carried supplies hold an eligible
+  potion — for the phase that builds them;
 - *2026-09-25:* the final tutorial Health and Mana potion quantities.
 
 Left to the implementing phase, within §1 and §6–§7: how the Store Container is represented,
@@ -418,4 +461,6 @@ turn premium-currency purchases into Gold.
   `MASTER_DEVELOPMENT_ROADMAP.md` §16
 - The purge removes all Character-owned state, value and data from live persistence — `ADR-020`
   L6, L8. (L10 and L12, which also required that no surviving record keep the Character's
-  identity, are superseded by `ADR-020` DH1–DH5 since 2026-09-25.)
+  identity, are superseded by `ADR-020` DH1–DH5 since 2026-09-25.) Since `ADR-024` the purge
+  removes the whole Game Account.
+- S7, B6 and U5 — Product Owner, 2026-09-25, final synchronization.

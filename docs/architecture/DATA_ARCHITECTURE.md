@@ -71,9 +71,9 @@ These are each exactly one transaction, all-or-nothing:
 | **Market listing** | item custody → escrow, listing row, fee, ledger |
 | **Forge attempt** | cost debit, ledger, two sacrifices → consumed, target tier on success |
 | **Roster slot unlock** — a companion unlock, `ADR-022` | Gold debit, ledger, capacity increment |
-| **Character deletion request** | lifecycle `ACTIVE` → `PENDING_DELETION` and its two timestamps, after the quiescence check — no occupancy claim, no Active Party membership (restated for the Main by the PRE-4 specification, DEL-O1), no live obligation (`ADR-020` §3). Stamina and every other time-derived value are settled up to the accepted request, and nothing accrues after it (FZ2) |
-| **Character restore** | lifecycle back to `ACTIVE`, timestamps cleared — decided against the deadline after the Character's lock is held (`ADR-020` §2, §7). Time-derived state resumes from the restore instant; nothing is credited for the grace (FZ3) |
-| **Character purge** | the Character's whole closure — its items (and, once `ADR-021` ships, its Store Container and every item bound to it wherever it is stored, the Depot included), POUCH ledger entries and balance, Stamina, slots, policies, activity history, derived settlement and idempotency records — **then** the Character row. One transaction, under the purge capability; nothing Account-owned changes (`ADR-020` §6–§7). The same boundary writes the immutable historical deletion record — the purge manifest, its deletion-specific facts and the Deleted List entry (DH1–DH3) — and builds no general telemetry (DH6) |
+| **Game Account deletion request** | the Game Account's lifecycle `ACTIVE` → `PENDING_DELETION` and its two timestamps, after the quiescence check — no occupancy claim or non-terminal Activity for any of its actors, no live obligation; configured Active Party membership does not block (`ADR-024` §2). Stamina and every other time-derived value of every Character are settled up to the accepted request, and nothing accrues after it (FZ2) |
+| **Game Account restore** | lifecycle back to `ACTIVE`, timestamps cleared — decided against the deadline after the Game Account's lock is held (`ADR-020` §2, §7; `ADR-024` §2). Time-derived state resumes from the restore instant; nothing is credited for the grace (FZ3) |
+| **Game Account purge** | the Game Account's whole closure — every Character and everything each owns, its items in every custody (Store Containers and bound items included), its Bank, Depot and Stash, its ledger entries and balances, entitlements, activity history, derived settlement and idempotency records — **then** the Game Account row, releasing its Characters' names in the same commit. One transaction, under the purge capability; the Login and every other Game Account are unchanged (`ADR-024` §3). The same boundary writes the internal history record (HR2–HR5) — no Deleted List entry, no destroyed-value inventory — and builds no general telemetry (DH6) |
 | **Activity start** | activity row, account activity claim, **one occupancy claim per participating Character** |
 | **Activity end / retirement of claims** | activity state, **release of every occupancy claim**, in the same transaction as the lifecycle transition |
 | **Skill training claim** | charges, skill progression, activity state |
@@ -149,27 +149,28 @@ response cannot double-apply.
 - A reconciliation job verifies ledger sums against balance projections. A discrepancy is a P1
   incident (`ECONOMY_INTEGRITY.md`).
 
-**The one designed exception — a Character's final purge** (`ADR-020`, `LOCKED BY PRODUCT`).
-Thirty days — exactly 720 elapsed hours — after a deletion request, the purge removes the live
-Character and everything it owned, its POUCH ledger entries included unless the PRE-4
-specification keeps them as immutable history outside live custody (`ADR-020` §6.1). ~~No record
-of it survives~~ — **superseded 2026-09-25**: an immutable historical deletion record survives,
-outside live persistence, and never takes part in ownership, custody or uniqueness (DH1–DH5). The
-exception is narrow by construction:
+**The one designed exception — a Game Account's final purge** (`ADR-024`, reusing `ADR-020`;
+`LOCKED BY PRODUCT`). Exactly 720 elapsed hours after a deletion request, the purge removes the
+whole Game Account and everything it owned — its ledger entries, BANK and POUCH, included, unless
+the PRE-4 specification keeps them as immutable history outside live state (`ADR-024` §3). An
+internal history record for support survives, outside live persistence, and never takes part in
+ownership, custody, claims or uniqueness (HR2–HR5). The exception is narrow by construction:
 
-- it applies **only** to rows whose sole owner or subject is the purged Character — ownership
-  following the binding as well as custody, so an item bound to it is its own even in the Depot
-  (`ADR-021`). BANK entries name no Character and are never deleted, so the Account's ledger, its
-  reconciliation and its balances are unchanged by any purge;
+- it applies **only** to rows that belong to the purged Game Account or to one of its Characters.
+  The Login and every other Game Account — of the same Login included — are unchanged, and every
+  surviving custody scope still reconciles;
 - it is performed **only** by the purge capability. The application role still has no `UPDATE`
   or `DELETE` on the ledger;
-- a record that is Account-owned or shared survives rather than being deleted. Since 2026-09-25
-  the owning phase either removes the Character's identity from it or keeps it as immutable
-  history within DH5 (`ADR-020` §6).
+- a record shared with another Game Account — a completed co-op run, a completed trade — survives
+  for the other side. The owning phase either removes the purged Game Account's identity from it
+  or keeps it as immutable history within HR5 (`ADR-024` §3).
 
-Everything above holds for ordinary play. After a purge, *"which Character earned this Gold?"* is
-no longer answerable from the live ledger — the historical deletion record may answer it for audit
-(DH3–DH4); *"what did the Account's Bank receive, when and why?"* still is.
+*Until the final synchronization* the purge took one Character, and the Account's BANK entries
+survived it (`ADR-020` §6.1). Since `ADR-024` the Bank goes with its Game Account.
+
+Everything above holds for ordinary play. After a purge, nothing about the purged Game Account's
+economy is answerable from the live ledger. The internal history record keeps what support needs
+(HR3); it is not an economy record (HR4).
 
 ---
 
@@ -235,17 +236,17 @@ cleanup of genuinely **un**referenced versions.
 `DECIDED IN PHASE 0A` — after any restore, **reconciliation runs before the economy reopens**.
 Serving a balance that disagrees with the ledger is worse than a few minutes of downtime.
 
-**`OPEN` — restores and Character deletion** (`ADR-020`, operational gate). A restore from backup
-brings back every Character that was purged after the backup point, and loses every deletion
-request or restore made after it. A `PENDING_DELETION` Character whose deadline has passed would
-be purged again at once — including one whose owner restored it inside the lost window.
-Recommended until decided: after any restore the purge job stays **paused** until operators have
-reconciled the lifecycle transitions lost in the restore window. The pause is disaster recovery,
-not a deferral: every Character that falls due during it is an overdue purge — the monitored,
-degraded condition of `ADR-020` §7. How long backups and logs may keep a purged Character is also
-open, and so is how long historical deletion records, purge manifests and deletion analytics are
-kept, and who may read them. All are tracked in
-[`../OPEN_QUESTIONS.md`](../OPEN_QUESTIONS.md) § *Character deletion*.
+**`OPEN` — restores and Game Account deletion** (`ADR-024`, operational gate). A restore from
+backup brings back every Game Account that was purged after the backup point, and loses every
+deletion request or restore made after it. A `PENDING_DELETION` Game Account whose deadline has
+passed would be purged again at once — including one whose owner restored it inside the lost
+window. Recommended until decided: after any restore the purge job stays **paused** until
+operators have reconciled the lifecycle transitions lost in the restore window. The pause is
+disaster recovery, not a deferral: every Game Account that falls due during it is an overdue purge
+— the monitored, degraded condition of `ADR-020` §7. How long backups and logs may keep a purged
+Game Account is also open, and so is how long internal history records are kept, and who in
+support may read them. All are tracked in [`../OPEN_QUESTIONS.md`](../OPEN_QUESTIONS.md)
+§ *Game Account deletion*.
 
 ---
 

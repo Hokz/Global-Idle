@@ -41,32 +41,32 @@ The client sends **intents**, never outcomes. `startHunt(huntId, partyConfig)` i
 | Command | Server validates |
 |---|---|
 | `authenticate` | credentials, rate limits, account status |
-| `setActiveParty(orderedCharacterIds)` | ownership, size 1–4, distinct, the Game Account's Main present (`ADR-022` PP2), all `ACTIVE` — none pending deletion — **no running activity** (`ADR-005`, `ADR-020`) |
+| `setActiveParty(orderedCharacterIds)` | ownership, size 1–4, distinct, the Game Account's Main present (`ADR-022` PP2), the Game Account `ACTIVE` — not pending deletion — **no running activity** (`ADR-005`, `ADR-024`) |
 | `unlockRosterSlot` | capacity < 5, sufficient Gold, transactional spend. Under `ADR-022` this is a companion unlock; its shape is Phase 4's |
-| `createCharacter(vocation)` | slot available, vocation not owned, Origin slot free, name not reserved — each counted over every existing Character on the account, `PENDING_DELETION` included (`ADR-020` §5, G4.1b); the creation path from the Account's tutorial completion, never from a Character count — before completion a new Level-1 Origin with a fresh Bootstrap Kit, after it the later-character path — and no one-time reward awarded twice (`ADR-020` §5.1–§5.2, G4.1c); level rules. Under `ADR-022` it creates the Game Account's Main — a companion is unlocked, not created this way — and whether a replacement Main may be created after a purge is `ADR-020` DEL-O1 |
-| `requestCharacterDeletion(characterId)` | ownership; `ACTIVE`; no occupancy claim or non-terminal Activity, not in the Active Party — which the Main always is, so the PRE-4 specification restates this for it (`ADR-020` §3, DEL-O1) — no live obligation (`ADR-020` §3, `ADR-013`). A repeat while pending returns the existing deadline |
-| `restoreCharacter(characterId)` | ownership; `PENDING_DELETION`; server time strictly before `purgeAt` (`ADR-020` §2). The Character returns exactly as it was, and nothing is credited for the pending time (FZ3) |
+| `createCharacter(vocation)` | the Game Account `ACTIVE`, with no character yet — creation makes its one character, vocationless and in Rookgaard, which becomes the Main on entering the Main game (`ADR-022` GA1, RK3–RK4; the Origin slot, I1b); the name **not taken or reserved anywhere in the game**, counted over every existing Character of every Game Account, pending ones included (`ADR-024` NM1–NM2, I27); level rules. A companion is unlocked, not created this way. No replacement Main is ever created in a Game Account (`ADR-024` GD7). *Until 2026-09-25 this validated per-account names, G4.1b's holds and G4.1c's tutorial routing and Bootstrap Kit (`ADR-020` §5–§5.2) — superseded* |
+| `requestGameAccountDeletion(gameAccountId)` | the Login owns the Game Account; `ACTIVE`; no occupancy claim or non-terminal Activity for any of its actors, no lobby or frozen plan, no live obligation; configured Active Party membership does not block (`ADR-024` §2, `ADR-013`). A repeat while pending returns the existing deadline. Every deletion source — a moderation tool included — goes through the same lifecycle (GD9–GD10) |
+| `restoreGameAccount(gameAccountId)` | the Login owns the Game Account; `PENDING_DELETION`; server time strictly before `purgeAt` (`ADR-020` §2). The whole Game Account returns exactly as it was, and nothing is credited for the pending time (FZ3). Who may restore a moderation-started deletion is `ADR-024` DEL-O3 |
 | `startActivity(activityDefinitionId)` | ownership, prerequisites, unlocks, party validity, no existing **account** activity claim, and — in the same transaction — **atomic acquisition of the occupancy claim for every participating Character**; fails if any participant already holds one (`ADR-013`) |
 | `stopActivity` | ownership of the running activity; releases every participant's occupancy claim in the same transaction as the lifecycle transition |
 | `equipItem(characterId, itemInstanceId, slot)` | custody, ownership, equip requirements, **character not participating in a running activity** (`DOMAIN_MODEL.md` §5.12) |
-| `sellItem` / `listItem` / `buyListing` | custody, ownership, funds, escrow, fees; never a Bootstrap Kit item (`ADR-020` §5.2) or a Character-bound consumable (`ADR-021`) |
-| `forgeAttempt(target, sacrificeA, sacrificeB)` | custody of all three, classification and rarity match, the sacrifices at the required prior tier (2026-09-25), costs; none of them a Bootstrap Kit item or a Character-bound consumable |
+| `sellItem` / `listItem` / `buyListing` | custody, ownership, funds, escrow, fees; never a Character-bound consumable (`ADR-021`). The starter gear is ordinary items (2026-09-25) |
+| `forgeAttempt(target, sacrificeA, sacrificeB)` | custody of all three, classification and rarity match, the sacrifices at the required prior tier (2026-09-25), costs; none of them a Character-bound consumable |
 | `moveBoundConsumable(itemInstanceId, to)` | Account ownership; `to` is the bound Character's Store Container or the Account's Depot, and nothing else; the bound Character is `ACTIVE`; the binding is unchanged (`ADR-021` §4) |
-| `useBoundConsumable(characterId, itemInstanceId)` | Account ownership; `characterId` is the item's bound Character, `ACTIVE` and eligible; the item's own use rule; no output convertible into transferable value (`ADR-021` §5) |
+| `useBoundConsumable(characterId, itemInstanceId)` | Account ownership; `characterId` is the item's bound Character, `ACTIVE` and eligible; the item's own use rule; no output convertible into transferable value (`ADR-021` §5). A bound potion in a Hunt is used by its configured action slot, straight from the Store Container, as part of settlement — not by a client command (`ADR-021` U5) |
 | `startSkillTraining(characterId, exerciseItemId)` | custody, charges remaining — for a Character-bound Exercise Weapon, only its bound Character, spending charges where it is stored (`ADR-021` §5) — and — in the same transaction — **atomic acquisition of that Character's occupancy claim**; fails if the Character is hunting, in a dungeon, or already training (`ADR-013`) |
 | `claimSkillTraining(characterId)` | ownership; server computes elapsed time |
 | `claimQuestReward(rewardId)` (future, Phase 5) | Game Account ownership and eligibility, decided on the server; a claim already recorded for this Game Account and reward grants nothing, and a new claim commits with its grant exactly once, whichever actor the Game Account used (`ADR-023` §2) |
 
-The two deletion commands are illustrative names; the PRE-4 implementation specification fixes them.
-**A Bootstrap Kit item is refused by every command that would move it to the Depot, the Stash or
-another Character, or sell, list, trade or convert it** — checked on the instance, in the domain,
-whatever the client shows (`ADR-020` §5.2, `DOMAIN_MODEL.md` I20). **A Character-bound consumable is
-refused by every command except a move between its bound Character's Store Container and the Depot,
-and a use by that Character** (`ADR-021`, `DOMAIN_MODEL.md` I23). The two bound-consumable commands
-above are illustrative names; the phase that ships the first bound item fixes them. The **purge**
-that follows a deletion's deadline is **not a command**: the client can neither trigger it, bring it
-forward nor undo it, and every command that names a `PENDING_DELETION` Character — other than
-restore — is refused (`ADR-020` §4, §7).
+The two deletion commands are illustrative names; the PRE-4 implementation specification fixes
+them. Since `ADR-024` they name the **Game Account**, never a single Character: no command deletes
+a Main or a companion on its own. *The Bootstrap Kit refusal that stood here until 2026-09-25 is
+retired with the kit.* **A Character-bound consumable is refused by every command except a move
+between its bound Character's Store Container and the Depot, and a use by that Character**
+(`ADR-021`, `DOMAIN_MODEL.md` I23). The two bound-consumable commands above are illustrative names;
+the phase that ships the first bound item fixes them. The **purge** that follows a deletion's
+deadline is **not a command**: the client can neither trigger it, bring it forward nor undo it, and
+every command that names a `PENDING_DELETION` Game Account or one of its Characters — other than
+restore — is refused (`ADR-020` §4, §7; `ADR-024` §2).
 
 **Every command is authorized against the Account.** A command naming a character the account
 does not own is rejected before any domain logic runs — not filtered afterwards.

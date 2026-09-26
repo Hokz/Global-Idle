@@ -112,14 +112,22 @@ there is no Fishing. Level is not the sole power source: power and build also co
 Skills, the vocation's Skill Tree, the Wheel, equipment, affixes, the Forge, Imbuements and
 Charms, and Hunts reward matching a build to the Hunt (`DECISIONS.md`, 2026-09-25). Damage origin
 and damage type are separate, and ordinary Hunts use resistances rather than absolute immunities.
-The combat formula revision discussed after PR #13 head `86a7681` is **open** and handled
-separately; nothing here decides a formula or a number.
+The weapon attack and defence formulas are **locked** (2026-09-25, final synchronization):
+the exact Attack Value, Max Base Damage, Defense Value and Armor Value. Armor and Defense decide
+pass or block and never reduce damage that passes, Mitigation is a percentage of the damage that
+passed, and there is no hidden vocation multiplier (`DECISIONS.md` § *Combat formulas — weapon
+attack and defence*). Ranged Accuracy, the damage-roll distribution and minimum damage, the
+rounding stages and the tie/order/visual-mapping rules stay open. Nothing is implemented yet; the
+engine Phases 2–3.6 verified stays as built until a phase implements them.
 
 ## 6. Vocation roles
 
 ### Knight
 Primary: Tank  
 Secondary: Physical melee damage
+
+Its tankiness comes from visible build and progression systems — equipment, Skills, its Skill
+Tree, the Wheel — never from a hidden vocation Armor or Defense multiplier (2026-09-25).
 
 - highest durability;
 - aggro/control;
@@ -211,9 +219,9 @@ Quest completion can unlock:
 **Replay and one-time rewards are separate** (`ADR-023`, 2026-09-25). A **human multiplayer /
 co-op** quest can be run again: its boss rooms repeated, its areas reused, other groups helped, a
 different actor selected. Its final or primary reward chest is claimed **once per Game Account**,
-whichever actor opens it, and replay never re-enables it. Whether solo, tutorial, story or dungeon
-content can be replayed is decided per content. A quest reward item is ordinary unless its
-definition binds it.
+whichever actor opens it — never per actor or per Login — and replay never re-enables it.
+Whether solo, tutorial, story or dungeon content can be replayed is decided per content. A quest
+reward item is ordinary unless its definition binds it.
 
 ## 9. Bosses
 
@@ -400,7 +408,8 @@ member does not exist (`ADR-022`). See
 [`docs/design/party/PARTY_SYSTEM_FOUNDATION.md`](design/party/PARTY_SYSTEM_FOUNDATION.md).
 
 ### Free
-- starts with its Main Character — the Origin Character, before Rookgaard;
+- starts with its Main Character — the Origin Character, a vocationless Rookgaard character until
+  it proceeds to the Mainland;
 - unlocks companions with Gold (costs OPEN);
 - navigates to services/NPCs;
 - standard storage;
@@ -607,34 +616,45 @@ a disconnected character.
 Phase 3.6 leaves the data shape ready: a tile definition already carries a kind and a ground
 speed, so the importer adds visual identity without the movement engine changing again.
 
+**There is no Phase 3.8** (2026-09-25). The sequence is:
+
+```text
+Phase 3.7 — VERIFIED  →  PRE-PHASE-4 GATE  →  Phase 4 — Party / vocations
+```
+
+The product decisions the gate depends on are made. What remains of it is the **PRE-PHASE-4
+specification** — the next work product — and then the implementation of the decided rules and
+contracts.
+
 ### PRE-PHASE-4 GATE
 
 Full text: [`PHASE_GATES.md`](PHASE_GATES.md) § *Pre-Phase-4*.
 
-- **the Character deletion lifecycle** (`ADR-020`, which supersedes `ADR-007`'s retirement) — a
-  30-day reversible grace of exactly 720 elapsed hours, during which the Character is fully frozen
-  and after which a restore returns it exactly with nothing credited; then an atomic, idempotent,
-  race-safe hard purge of the live Character and everything it owns, proven by a schema-derived
-  closure inventory and a post-purge scan, leaving an immutable historical deletion record and a
-  public Deleted List entry — deletion-specific facts only, never a general telemetry platform —
-  and replacing `retiredAt`. Its three product questions are **resolved** by the Product Owner: the
-  Gold Pouch is kept during the grace and destroyed at the purge, never moved to the Bank (G4.1a);
-  a pending Character keeps its vocation, the Origin slot and its roster place until the purge, so
-  a restore never conflicts with a replacement (G4.1b); tutorial completion belongs to the Account
-  and survives the purge, no one-time Tutorial Reward is awarded twice, and an Origin Character
-  purged before Rookgaard is complete is replaced by a new Level-1 Origin with a fresh Bootstrap
-  Kit that can never leave it or become Account value (G4.1c). Since 2026-09-25 the Character it
-  deletes is the Game Account's Main (`ADR-022`), and the PRE-4 specification settles DEL-O1 to
-  DEL-O6 — the sole Main and its companions, companion lifecycle, moderation deletion, the starter
-  gear, the tutorial consumables' sequencing and the Deleted List's presentation — before the
-  purge is built. **None of it is implemented**, and the gate has not passed;
+- **the Game Account deletion lifecycle** (`ADR-024`, reusing `ADR-020`'s mechanics; `ADR-020`
+  superseded `ADR-007`'s retirement). A request puts the **whole Game Account** into a reversible
+  grace of exactly 720 elapsed hours, fully frozen. A restore returns it exactly, with nothing
+  credited. Otherwise an atomic, idempotent, race-safe hard purge removes all live Game Account
+  state — the Main, every Companion, the Bank, Depot and Stash — proven by a schema-derived closure
+  inventory and a post-purge scan. The Login survives, nothing transfers, no replacement Main is
+  ever created, and one lifecycle serves every deletion source, moderation included. An internal
+  history record for support remains; there is **no public Deleted List**. It replaces
+  `retiredAt`. All of its product questions are **resolved**. What is left — moderation authority,
+  and when the tutorial potions become bound — is narrow (`ADR-024` §9). **None of it is
+  implemented**, and the gate has not passed;
+- **globally unique Character names** (G4.4) — enforced at persistence level over every existing
+  Character, a pending Game Account's names reserved until its purge;
 - **enforce the `baseXp` → `baseLevel` projection** — `baseXp` is already the durable truth and
-  `baseLevel` its stored projection (schema + `progression.ts`). The gate proves and enforces that
-  contract on every write path, migration and rollback; it does not choose again;
-- **an Actor/Participant combat contract** that supports the Main and up to three companions now
-  and, later, one selected actor per Game Account from several accounts. Compatibility adapters
-  keep previously VERIFIED Hunt behaviour and fixtures intact. **Do not implement a generic
-  multiplayer platform yet.**
+  `baseLevel` its stored projection (schema + `progression.ts`), as the Product Owner confirmed on
+  2026-09-25. The gate proves and enforces that contract on every write path, rollback, migration
+  and backfill; it does not choose again, and it does not lock the curve;
+- **an Actor/Participant combat contract** that supports one vocationless single-player actor in
+  Rookgaard, the Main and up to three companions in the Main game, and later exactly one actor per
+  Game Account in co-op. No actor is assumed to be the Login, the Game Account or the Main, while
+  settlement still knows the owning Game Account. Compatibility adapters keep previously VERIFIED
+  Hunt behaviour and fixtures intact. **Do not implement a generic multiplayer platform yet** — no
+  networking and no lobby;
+- **the tunable configuration surface** (G4.5, `ADR-025`) — one authoritative, validated,
+  versioned, server-side place for PROVISIONAL and TUNABLE defaults, before Phase 4 adds its own.
 
 ### Phase 4 — Party / vocations
 
@@ -642,8 +662,18 @@ Full text: [`PHASE_GATES.md`](PHASE_GATES.md) § *Pre-Phase-4*.
 - all five vocations and their identities;
 - occupancy integration with dedicated Skill Training, and Stamina recovery while training;
 - **companions** (`ADR-022`): the Main Character plus up to four Gold-unlocked companions, one per
-  vocation. The companion questions `ADR-022` §4 leaves open — lifecycle, custody, Stamina,
-  occupancy, levelling, names — are settled by this phase's specification;
+  vocation. An unlocked companion is **permanent** — never deleted, dismissed, replaced, rerolled,
+  converted or re-locked — and goes only with its whole Game Account (GA11, `ADR-024`). The
+  companion questions `ADR-022` §4 still leaves open — custody, Stamina, occupancy, levelling and
+  whether names are player-chosen — are settled by this phase's specification. Companion names are
+  globally unique Character names (`ADR-024` NM1);
+- **the tactical action slots** — Health Potion, Mana Potion, Healing Spell and Attack Spell, with
+  Rune and other slots later. A configured slot acts by its rule or threshold, and may consume an
+  eligible Character-bound potion straight from the Store Container (`DECISIONS.md` § *Tactical
+  action slots*, `ADR-021` U5);
+- **the locked weapon attack and defence formulas** need Skills and Shielding, which this phase
+  builds. Where they are implemented is placed by the PRE-PHASE-4 specification, and the verified
+  Phase 2–3.6 engine is superseded only through explicit matrix amendments;
 - the **personal Active Party**: the Main plus up to three companions, 1–4 actors, reorderable,
   with the Frontline in Slot 1;
 - Shared XP eligibility;
@@ -668,8 +698,9 @@ The **generic** engine. Solo and one-account Party only; no networking, no lobby
 - **no boss implemented as bespoke code**, and **no lobby in Phase 5**;
 - the Requirement / Cost / Reward primitive, built when the first content slice needs it;
 - **the reward-claim primitive** (`ADR-023`): each one-time reward is a typed, exactly-once claim
-  per Game Account, kept apart from completion and progression state. Which content can be
-  replayed is each content's own definition; co-op quests (Phase 5B) can be;
+  per Game Account — never per actor or per Login — kept apart from completion and progression
+  state. Which content can be replayed is each content's own definition; co-op quests (Phase 5B)
+  can be;
 - Reward Chest — persistent and safe from Hunt death — and blessing acquisition, where this is
   the natural owning slice;
 - travel and access foundations; unlock framework; first-completion rules; boss daily limits and
@@ -732,7 +763,10 @@ obligation is only neutrality of the Actor / Target / Side concepts.
 ### Phase 6 — Economy
 
 - Bank services and history; player-to-player transfer; Market, escrow, fees, price history;
-- gold sinks; premium-currency market; transaction ledger; anti-duplication tests; audit.
+- gold sinks; premium-currency market; transaction ledger; anti-duplication tests; audit;
+- **multi-account farming** — one-time reward claims are per Game Account, and one Login may own
+  several. Whether a tradeable one-time reward farmed across Game Accounts is limited is decided
+  before player trade ships (OPEN, `PHASE_GATES.md` § *G6.4*).
 
 **Ordering note:** the *minimum* multi-account reward and penalty settlement is a **Phase 5B
 prerequisite**, proven before the first shared quest — it does not wait for the full Market.
@@ -780,7 +814,8 @@ Recorded in full: [`design/FUTURE_DIRECTIONS.md`](design/FUTURE_DIRECTIONS.md) �
   phase ships the first one implements the binding and the Store Container first**, behind the
   BOUND-CONSUMABLE gate ([`PHASE_GATES.md`](PHASE_GATES.md) § *GBC.1*). No bound item ships
   before it passes. Since 2026-09-25 the tutorial's Health and Mana potions are bound consumables
-  too, and whether PRE-4 builds the foundation for them is open (`ADR-020` DEL-O5).
+  too, used through the action slots straight from the Store Container. Which phase first issues
+  them as bound instances is open (`ADR-024` DEL-O5).
 
 **Not paywalled:** foundational tactical strategy (Phase 4) and the quest mechanic checklist and
 plan authoring (Phases 5 / 5B) are **baseline gameplay**.
@@ -814,8 +849,9 @@ Recorded in full: [`design/FUTURE_DIRECTIONS.md`](design/FUTURE_DIRECTIONS.md) �
 XP production, hunt efficiency, loot and drop generation, item creation and destruction, deletion
 history and balance analysis are preserved or collected (`ADR-020` DH6, 2026-09-25). No single
 phase owns it: each gameplay or economy phase records the telemetry it introduces, and later
-balance and analytics work — Phase 9's economy rebalance among it — consumes it. PRE-4 records only
-the deletion-specific facts.
+balance and analytics work — Phase 9's economy rebalance among it — consumes it. The deletion
+lifecycle records only its internal history record, which need not count destroyed value
+(`ADR-024` HR4).
 
 ### Operational gate
 
@@ -851,7 +887,7 @@ This roadmap stays at product level. Detailed, domain-specific game design lives
 
 Current detailed design documents:
 
-- [`docs/design/tutorial/TUTORIAL_ROOKGAARD_ROADMAP.md`](design/tutorial/TUTORIAL_ROOKGAARD_ROADMAP.md) — Level 1–8 Rookgaard onboarding through vocation selection.
+- [`docs/design/tutorial/TUTORIAL_ROOKGAARD_ROADMAP.md`](design/tutorial/TUTORIAL_ROOKGAARD_ROADMAP.md) — Rookgaard onboarding from Level 1, the Level 8 vocation choice and the journey to the Mainland; Rookgaard itself is a permanent, single-player region where a player may stay.
 - [`docs/design/combat/COMBAT_LEVEL_SKILLS_FOUNDATION.md`](design/combat/COMBAT_LEVEL_SKILLS_FOUNDATION.md) — Base Level, Skills, training systems and the layered Combat System architecture.
 - [`docs/design/party/PARTY_SYSTEM_FOUNDATION.md`](design/party/PARTY_SYSTEM_FOUNDATION.md) — the Main Character and its companions (`ADR-022`), unique vocations, Gold unlocks, the personal 1–4 Active Party, Frontline and Shared XP eligibility.
 - [`docs/design/world/ATLAS_NAVIGATION_AND_REGION_BOUNDARIES.md`](design/world/ATLAS_NAVIGATION_AND_REGION_BOUNDARIES.md) — the four navigation surfaces, region boundaries as data rather than pixels, calibration honesty and the deferred gold region highlight.

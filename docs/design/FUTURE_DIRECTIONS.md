@@ -15,7 +15,9 @@ Phase 2 at all, beyond a tiny primitive Phase 2 genuinely cannot avoid.
 **Owner: Phase 9 — Content Expansion** (the primitive it leans on is Phase 5's Requirement /
 Cost / Reward).
 
-Rookgaard is the **first mandatory progression area**. Everything after it branches.
+Rookgaard is the **first mandatory progression area**. Everything after it branches. *Since
+2026-09-25 it is also a permanent, single-player region where a player may stay indefinitely
+([`../DECISIONS.md`](../DECISIONS.md) § *Rookgaard*).*
 
 - on reaching Mainland/Thais, regional objectives and tasks award **progression points**;
 - points are spent to unlock **player-chosen** cities and routes;
@@ -81,25 +83,23 @@ forgotten OPEN notes.
 
 ### Before Phase 4 (roster)
 
-- **Character deletion lifecycle** (`LOCKED`, `ADR-020` — it supersedes the retirement this item
-  used to describe; amended 2026-09-25). A deletion request starts a 30-day reversible grace —
-  exactly 720 elapsed hours — in which the Character is fully frozen and restorable; then a hard
-  purge removes the live Character and everything it owns — items, the Gold Pouch, progression —
-  with nothing moved to the Bank or to a recovery custody. ~~No record of the Character left
-  behind~~ — **superseded 2026-09-25**: an immutable historical deletion record and a public
-  Deleted List entry remain, never live state. The work is the purge's closure inventory
-  and its atomic, idempotent, race-safe execution, the replacement of `retiredAt`, and what stops
-  *delete → purge → recreate* from accumulating Account value: Account-level tutorial completion
-  and one-time reward state, and a Bootstrap Kit bound to its Character. Phase 3's `RET1` and
-  `RET2` were a retirement filter, not a flow, and are superseded rather than extended. All three
-  product questions are **resolved** by the Product Owner: the Gold Pouch is destroyed at the
-  purge (G4.1a); a pending Character keeps its vocation, the Origin slot and its roster place
-  until the purge (G4.1b); tutorial completion belongs to the Account and survives the purge, no
-  one-time Tutorial Reward is awarded twice, and an Origin Character purged before Rookgaard is
-  complete is replaced by a new Level-1 Origin with a fresh, Character-bound Bootstrap Kit
-  (G4.1c) — see [`../PHASE_GATES.md`](../PHASE_GATES.md) § *G4.1*. Since 2026-09-25 the deleted
-  Character is the Game Account's Main (`ADR-022`), and the PRE-4 specification settles what that
-  means for its companions and its Game Account, with the other items of `ADR-020` §5.3.
+- **Game Account deletion lifecycle** (`LOCKED`, `ADR-024`, reusing `ADR-020`'s mechanics;
+  `ADR-020` superseded the retirement this item used to describe). A deletion request puts the
+  **whole Game Account** into a reversible grace of exactly 720 elapsed hours, fully frozen; then
+  a hard purge removes all live Game Account state — the Main, every companion, items, Pouches,
+  Bank, Depot, Stash, progression and claims. Nothing transfers to another Game Account or the
+  Login, which survives, and nothing creates a replacement Main. One lifecycle serves every
+  deletion source, moderation included, and an internal history record for support remains — no
+  public Deleted List. The work is the purge's closure inventory and its atomic, idempotent,
+  race-safe execution, the replacement of `retiredAt`, and a Login represented apart from its Game
+  Accounts. Phase 3's `RET1` and `RET2` were a retirement filter, not a flow, and are superseded
+  rather than extended. The Character-scoped rules of 2026-09-24 — G4.1b's holds, G4.1c's tutorial
+  survival and the Bootstrap Kit — are superseded; G4.1a's destroyed Gold Pouch stands — see
+  [`../PHASE_GATES.md`](../PHASE_GATES.md) § *G4.1*.
+- **Globally unique Character names**, enforced at persistence level, with a pending Game
+  Account's names reserved until its purge — [`../PHASE_GATES.md`](../PHASE_GATES.md) § *G4.4*.
+- **One authoritative tunable configuration surface** (`ADR-025`) before Phase 4 adds its tunable
+  values — [`../PHASE_GATES.md`](../PHASE_GATES.md) § *G4.5*.
 - **Enforce the `baseXp` → `baseLevel` projection.** Not a question of which is authoritative:
   `baseXp` is the durable truth and `baseLevel` its stored projection, already decided and
   implemented (`schema.prisma`, `contexts/hunt/progression.ts`). What is missing is enforcement on
@@ -120,11 +120,12 @@ forgotten OPEN notes.
   bound permanently to one Character — an XP Boost, a Store-bought Exercise Weapon, a Daily Reward
   or Event consumable — moves only between that Character's Store Container and the Account's
   Depot, is used only by that Character, is never sold, traded, listed, stashed, forged or
-  converted, and is purged with the Character wherever it is stored. It belongs to no fixed phase:
-  Phase 8 is the obvious consumer, but whichever phase ships the first bound item builds this first
-  — [`../PHASE_GATES.md`](../PHASE_GATES.md) § *GBC.1*. The Store sells consumables, never combat
-  equipment. Since 2026-09-25 the tutorial's Health and Mana potions are bound consumables too,
-  and whether PRE-4 builds this foundation for them is open (`ADR-020` DEL-O5).
+  converted, and is purged with its Game Account wherever it is stored. It belongs to no fixed
+  phase: Phase 8 is the obvious consumer, but whichever phase ships the first bound item builds
+  this first — [`../PHASE_GATES.md`](../PHASE_GATES.md) § *GBC.1*. The Store sells consumables,
+  never combat equipment. Since 2026-09-25 the tutorial's Health and Mana potions are bound
+  consumables too, used straight from the Store Container through the action slots. Which phase
+  first issues them bound is open (`ADR-024` DEL-O5).
 
 ### Before Phase 5B (multiplayer)
 

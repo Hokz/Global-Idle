@@ -2,8 +2,12 @@
 
 **Status:** `ACCEPTED` — the product rules are `LOCKED` by the Product Owner (2026-09-25), who
 also delegated, and then approved, the login-identity / Game Account separation in §2. Recorded
-in the governance synchronization that follows PR #13 head `86a7681`. **Pending independent
-review.**
+in the governance synchronization that follows PR #13 head `86a7681`. **Extended** in the final
+2026-09-25 synchronization, after PR #13 head `fff6faf`. The Product Owner locked one Login owning
+several Game Accounts, each with its own name (GA8–GA10). Companions are permanent, and the Main's
+vocation is the one chosen on entering the Main game (GA11–GA13). Rookgaard is a single-player,
+vocationless region where a player may stay indefinitely (RK1–RK4). Deletion targets the whole
+Game Account (`ADR-024`). **Pending independent review.**
 **Supersedes:** the roster of up to five equivalent Characters per Account —
 [`DECISIONS.md`](../../DECISIONS.md) § *Party and character roster* as it stood until 2026-09-24,
 and [`PARTY_SYSTEM_FOUNDATION.md`](../../design/party/PARTY_SYSTEM_FOUNDATION.md) §2–§8 and §28 as
@@ -12,7 +16,9 @@ written then.
 Active Party. [ADR-013](./ADR-013-character-activity-occupancy.md) and
 [ADR-014](./ADR-014-per-character-stamina.md) — which of their per-Character rules reach a
 companion is open (§4). [ADR-020](./ADR-020-character-deletion-grace-and-purge.md) — its
-replacement flows assumed a new full Character could follow a purge (§5).
+replacement flows assumed a new full Character could follow a purge (§5). Its deletion target is
+superseded since the final synchronization by
+[ADR-024](./ADR-024-game-account-deletion-grace-and-purge.md): the whole Game Account is deleted.
 **Owning phases:** Phase 4 builds companions and the personal Active Party. PRE-4 must not build
 against the five-Character model (§5). **Nothing in this record is implemented.**
 **Date:** 2026-09-25
@@ -50,6 +56,31 @@ What exists in code today:
 | GA6 | Companion progression details that were not explicitly reconfirmed are not invented. Approved facts that remain compatible carry over (§3); details the change makes ambiguous are open (§4). |
 | GA7 | A player who wants a different Main vocation may use another Game Account under the same login identity, subject to later UX and account-management design. |
 
+**The Login and its Game Accounts** — `LOCKED`, final synchronization (2026-09-25)
+
+| # | Rule |
+|---|---|
+| GA8 | A **Login Identity** is based on email / authentication. One Login may own **several Game Accounts**, and each Game Account is an independent campaign and session identity. |
+| GA9 | Each Game Account has its **own name and display identity**. A Game Account name is not a Character name: the two are separate namespaces (`ADR-024` NM4). |
+| GA10 | Each Game Account has its own Main — exactly one, once it enters the Main game — up to four Companions, its own campaign, progression and quest state, its own one-time reward claims, and its own gameplay and economy state. Nothing of it is shared with another Game Account of the same Login. |
+
+**Vocation, the Main and Companions** — `LOCKED`, final synchronization (2026-09-25)
+
+| # | Rule |
+|---|---|
+| GA11 | An unlocked Companion is **permanent**. It can never be deleted, dismissed, removed, replaced, rerolled, converted into the Main or unlocked backward. It disappears only with its whole Game Account (`ADR-024` GD8). |
+| GA12 | The vocation chosen on entering the Main game becomes the **Main's** vocation. The other four vocations are the Game Account's possible Companions. |
+| GA13 | The Main / Companion distinction creates **no hidden combat multiplier**. |
+
+**Rookgaard** — `LOCKED`, final synchronization (2026-09-25)
+
+| # | Rule |
+|---|---|
+| RK1 | Rookgaard is a **full playable region**, and a player may stay there indefinitely. Reaching Level 8 does not end it. |
+| RK2 | Rookgaard has no vocation, no Companions, no Main-game Party and no Main-game multiplayer or co-op. It is **single-player**. |
+| RK3 | A Game Account's character begins in Rookgaard **vocationless**, and stays vocationless, with no Companions, for as long as the player remains there. |
+| RK4 | On proceeding to the Mainland the player selects the **Main vocation** there, and the other four vocations become the Game Account's possible Companions (GA12). |
+
 **The personal Active Party**
 
 | # | Rule |
@@ -83,11 +114,15 @@ The Product Owner delegated the question of one sign-in holding several Game Acc
 approved this direction:
 
 ```text
-LOGIN / AUTH IDENTITY        who signs in (credentials)
-  └─ GAME ACCOUNT            one campaign; one or more per login identity
-       ├─ MAIN CHARACTER     exactly one per Game Account
-       └─ COMPANION ROSTER   the Game Account's unlocked companions
+LOGIN / AUTH IDENTITY        who signs in — email / authentication (GA8)
+  └─ GAME ACCOUNT            one campaign, with its own name; one or more per Login
+       ├─ MAIN CHARACTER     exactly one per Game Account, once it enters the Main game
+       └─ COMPANION ROSTER   up to four permanent companions, one per remaining vocation
 ```
+
+*Final synchronization (2026-09-25):* the Login → several Game Accounts direction is `LOCKED`
+(GA8). A Game Account is deleted as a whole, and its Login survives (`ADR-024` GD1–GD2). The Login
+must therefore be represented apart from the Game Account before the purge ships (`ADR-024` §5).
 
 - **The Account is the Game Account.** Every document that says *Account* or *account-level* —
   the Bank, the Depot, the Stash, entitlements as implemented today, tutorial completion,
@@ -100,7 +135,10 @@ LOGIN / AUTH IDENTITY        who signs in (credentials)
 - **The Main Character is today's `Character`.** Every Character that exists is an Origin
   Character, which is a Main. *Origin Character* is the name Phases 1–3, their specifications and
   the code use (`originCharacter`, `character-baseline.origin`, `starting-grant.origin.rookgaard`);
-  it now means the Main before it completes Rookgaard.
+  it now means the Main before it completes Rookgaard. *Since the final synchronization:* it is
+  the Game Account's vocationless Rookgaard character, which becomes the Main — with its chosen
+  vocation — on entering the Main game (RK3–RK4). A player who stays in Rookgaard keeps it
+  vocationless, with no Companions.
 - **A companion has no representation yet.** Whether it is a `Character` row with a role, a
   separate entity, or something else is Phase 4's choice. This record fixes the semantics, not
   the tables.
@@ -127,23 +165,25 @@ Each of these was locked before 2026-09-25, and nothing in §1 contradicts it:
 
 | # | Open item | Decided by |
 |---|---|---|
-| GA-O1 | **Companion lifecycle.** Whether a companion can be dismissed or deleted, with what grace, and what happens to what it holds. | Phase 4, or PRE-4 if the purge needs it |
-| GA-O2 | **The Main's deletion and the Game Account.** What happens to the companions while the Main is `PENDING_DELETION` and at its purge; whether the Game Account ends with its Main, or may create a replacement Main — and if it may, whether `ADR-020` §5.1–§5.2's replacement flows apply. | **the PRE-4 specification**, with Product Owner confirmation, before the purge is built |
+| GA-O1 | ~~**Companion lifecycle.** Whether a companion can be dismissed or deleted, with what grace, and what happens to what it holds.~~ | **Resolved 2026-09-25** by GA11: a companion is permanent, and goes only with its whole Game Account (`ADR-024` GD8) |
+| GA-O2 | ~~**The Main's deletion and the Game Account.** What happens to the companions while the Main is `PENDING_DELETION` and at its purge; whether the Game Account ends with its Main, or may create a replacement Main — and if it may, whether `ADR-020` §5.1–§5.2's replacement flows apply.~~ | **Resolved 2026-09-25** by `ADR-024`: the Game Account is deleted as a whole; there is no replacement Main, and a new campaign is a new Game Account (GD1, GD7) |
 | GA-O3 | **Companion custody.** Whether each companion has its own equipment, Hunt Container Slots, Loot Pouch, Gold Pouch and Store Container, or shares the Main's. | Phase 4 |
 | GA-O4 | **Companion Stamina.** Every roster Character had its own Stamina (`ADR-014`). Whether a companion does, or shares the Main's. | Phase 4 |
 | GA-O5 | **Companion occupancy.** Whether a companion outside the Active Party may act on its own — Skill Training, for example — while the Main hunts. Different Characters of one account could act concurrently before. | Phase 4 |
 | GA-O6 | **How a low-level companion progresses.** The Main is always present, so a Level-250 Main with a new Level-8 companion fails Shared XP eligibility, and XP allocation for a non-eligible formation is already open. Being selected for multiplayer (MP3) is one path; whether there are others is not decided. | Phase 4 |
-| GA-O7 | **Companion names.** Whether companions carry player-chosen names, and under what uniqueness. | Phase 4 |
+| GA-O7 | **Companion names.** Whether companions carry player-chosen names, and under what uniqueness. *Narrowed 2026-09-25:* companions carry Character names, globally unique and reserved while their Game Account is pending (`ADR-024` NM1–NM2). Whether a companion's name is chosen by the player, and when it is set, stays open. | Phase 4 |
 | GA-O8 | **Which level owns what.** Whether Premium and other entitlements attach to the login identity or to each Game Account, and at which level sessions, the newest-connection rule (`ADR-008`) and the one activity claim sit. Today all of them are per Account, that is per Game Account. | the phase that builds multiple Game Accounts per login |
-| GA-O9 | **A second Game Account under the same login.** Whether its Main must play Rookgaard or may skip it, and whether any progress or benefit is shared across one login's Game Accounts. | the tutorial and account-management design |
-| GA-O10 | **Owning phase and UX** for creating, listing and switching Game Accounts under one login. | not assigned |
+| GA-O9 | **A second Game Account under the same login.** Whether its Main must play Rookgaard or may skip it, and whether any progress or benefit is shared across one login's Game Accounts. *Resolved in part 2026-09-25:* every Game Account's character begins in Rookgaard, vocationless (RK3), and no campaign, progression, quest, reward-claim, gameplay or economy state is shared (GA10). Still open: whether a later Game Account may skip the guided tutorial — the PLAY / SKIP offer of `TUTORIAL_ROOKGAARD_ROADMAP.md` §2. Whether entitlements are shared is GA-O8. | the tutorial and account-management design |
+| GA-O10 | **Owning phase and UX** for creating, listing and switching Game Accounts under one login. *Since 2026-09-25* PRE-4 needs a minimum of it: the Login represented apart from the Game Account, and a way for a Login whose only Game Account was purged to start a new one (`ADR-024` §5). | the PRE-PHASE-4 specification for that minimum; otherwise not assigned |
+| GA-O11 | **Game Account names** (GA9). Whether they must be unique, in what scope, and whether a pending Game Account's name is reserved. They are a separate namespace from Character names (`ADR-024` NM4). | with GA-O10 |
 
 ## Consequences
 
 **Benefits.**
 
-- One campaign identity. The Main is the character a Game Account is about, and the tutorial,
-  the Main slot and the deletion lifecycle attach to one thing instead of five.
+- One campaign identity. The Main is the character a Game Account is about, and the tutorial and
+  the Main slot attach to one thing instead of five. Since the final synchronization the deletion
+  lifecycle attaches to the Game Account itself (`ADR-024`).
 - Human multiplayer takes one actor per Game Account, so a four-actor personal party can never be
   carried into a shared run as a bloc.
 - A change of Main vocation has a clean path — another Game Account — instead of a delete,
@@ -164,8 +204,13 @@ Each of these was locked before 2026-09-25, and nothing in §1 contradicts it:
 - A Game Account has at most one Main at any instant, and nothing may create a second.
 - The personal Active Party always contains its Game Account's Main.
 - A multiplayer Activity takes exactly one actor per participating Game Account.
-- No document or code may treat a companion as a second Main, or give it the Main's deletion or
-  tutorial semantics, without a new Product Owner decision.
+- No document or code may treat a companion as a second Main, or give it deletion or tutorial
+  semantics of its own, without a new Product Owner decision.
+- No path deletes, dismisses, removes, replaces, rerolls or converts an unlocked companion, and
+  none unlocks one backward (GA11).
+- Nothing gives the Main or a companion a hidden combat multiplier for being one (GA13).
+- Rookgaard is single-player and vocationless: no companion, Main-game Party or co-op reaches it
+  (RK2).
 - *Account* keeps meaning the Game Account until a phase that builds several Game Accounts per
   login says otherwise.
 
@@ -186,6 +231,7 @@ immutable through ordinary play (`DOMAIN_MODEL.md` §5.3).
 ## Product constraints requiring this architecture
 
 - GA1–GA7, PP1–PP3 and MP1–MP5 — Product Owner, 2026-09-25.
+- GA8–GA13 and RK1–RK4 — Product Owner, 2026-09-25, final synchronization.
 - The login identity / Game Account separation — delegated by the Product Owner and approved,
   2026-09-25.
 - *"A personal Party is never re-labelled as a large Party."* —

@@ -47,8 +47,8 @@ whether a companion has its own is open (`ADR-022` GA-O4).
   Premium recovers 1:1, Free 1:2, capped at 42:00;
 - **reconnect grace is neutral**: a paused Hunt neither consumes nor recovers, so a deliberate
   disconnect cycle cannot be used to regenerate Stamina;
-- a Character **pending deletion** recovers nothing: the grace is a full freeze, and a restore
-  credits nothing for the pending time (2026-09-25).
+- a Character whose **Game Account is pending deletion** recovers nothing: the grace is a full
+  freeze, and a restore credits nothing for the pending time (2026-09-25).
 
 ## Supplies
 
@@ -90,7 +90,15 @@ Separate from character level.
 The classic Skills are retained — Magic Level, Sword, Axe, Club, Shielding, Distance and Fist — and
 there is no Fishing. Level is not the sole power source, and Hunts reward matching a build to the
 Hunt. Damage origin — spell, weapon, rune — and damage type — physical, fire, ice — are separate,
-and defences follow the type (`docs/DECISIONS.md`, 2026-09-25). The combat formulas are open.
+and defences follow the type (`docs/DECISIONS.md`, 2026-09-25). The weapon attack and defence
+formulas are locked: Attack Value, Max Base Damage, Defense Value — Attack's shape at 0.50 scale
+plus flat Weapon Defense and Armor Value — and Armor Value. Armor and Defense decide pass or block
+and never reduce damage that passes, Mitigation is a percentage of the damage that passed, and no
+vocation gets a hidden multiplier (`docs/DECISIONS.md` § *Combat formulas — weapon attack and
+defence*). Ranged Accuracy, the damage roll and the rounding stages stay open.
+
+`baseXp` is the truth and Base Level its stored projection. The curve Phase 2 implemented is
+Canary's, and is not locked as Global Idle's (`docs/DECISIONS.md` § *Base XP and Base Level*).
 
 Preferred design:
 - Skill XP gained from combat/content;
@@ -106,27 +114,40 @@ Game Account controls every actor in its personal party. There is no multi-human
 
 ### Main Character and companions
 
+- one **Login** (email / authentication) may own several **Game Accounts**. Each is its own
+  campaign, with its own name, Main, companions, progression, quests, reward claims and economy;
+  none of it is shared;
 - a Game Account has exactly **one Main Character**, its campaign identity. *Origin Character* is
-  the Main before it completes Rookgaard;
+  the Main before it proceeds to the Mainland — the Game Account's vocationless Rookgaard
+  character, which takes its vocation there;
 - further vocations are unlocked as **companions** — at most one per vocation, so at most four. A
   companion is not an account-lifecycle Character equivalent to the Main;
 - a vocation the Main or a companion holds is removed from future unlock choices;
 - companions are unlocked with in-game Gold (costs OPEN);
 - a newly unlocked companion starts at Base Level 8, skips Rookgaard, gets no catch-up levels;
+- an unlocked companion is **permanent**: never deleted, dismissed, removed, replaced, rerolled,
+  converted into the Main or unlocked backward;
+- the Main / companion distinction adds no hidden combat multiplier;
 - a different Main vocation means another Game Account under the same login;
-- a companion's lifecycle, and what it holds for itself — custody, Stamina, occupancy, a name —
-  are OPEN (`ADR-022` §4);
-- **deleting the Main Character** (`LOCKED`, `ADR-020`, amended 2026-09-25): it stays intact,
-  **fully frozen** and restorable for **30 days** — exactly 720 elapsed hours — and a restore
-  returns it exactly, with nothing credited for the pending time. Then it is **permanently
-  purged** with everything it owns — items, Gold Pouch, progression — and an immutable historical
-  record and a public **Deleted List** entry remain. Nothing moves to the Bank. Until the purge it
-  keeps its name, its vocation, its roster place and its Main slot — the Origin slot — so no
-  replacement can take them and a restore always succeeds. Deleting it never resets the account's
-  tutorial completion and never earns a one-time reward twice. What happens to its companions,
-  and whether the Game Account may then create a replacement Main — such as the new Level-1
-  Origin Character with a fresh **Bootstrap Kit** that the pre-completion rule describes — is OPEN
-  for the PRE-4 specification — `docs/DECISIONS.md` § *Character deletion*.
+- what a companion holds for itself — custody, Stamina, occupancy — and whether its name is
+  player-chosen are OPEN (`ADR-022` §4). Its name is a Character name, unique across the game;
+- **deleting a Game Account** (`LOCKED`, `ADR-024`, 2026-09-25): the **whole Game Account** stays
+  intact, **fully frozen** and restorable for exactly 720 elapsed hours, and a restore returns it
+  exactly, with nothing credited for the pending time. Then it is **permanently purged**: the Main,
+  every companion and everything the Game Account owns — items, Pouches, Bank, Depot, Stash,
+  progression, claims. The Login and its other Game Accounts are untouched, and nothing transfers
+  to them. Until the purge every Character name of the Game Account stays reserved across the
+  whole game. There is no replacement Main, no public Deleted List — only an internal history
+  record for support — and one lifecycle for every deletion source, moderation included —
+  `docs/DECISIONS.md` § *Game Account deletion*.
+
+### Rookgaard
+
+`LOCKED` 2026-09-25: Rookgaard is a full playable, **single-player** region — no vocation, no
+companions, no Main-game Party, no co-op. A Game Account's character begins there vocationless and
+may stay indefinitely. Reaching Level 8 offers the vocation and the Mainland; it does not end
+Rookgaard. On the Mainland the chosen vocation becomes the Main's, and the other four become
+possible companions — `docs/DECISIONS.md` § *Rookgaard*.
 
 ### Active Party
 
@@ -211,8 +232,9 @@ Translated into dungeons:
 - puzzles;
 - unlock rewards;
 - **human multiplayer / co-op quests are replayable**: completion never locks them, and their
-  final or primary reward chest is claimed once per Game Account, whichever actor opens it.
-  Whether other quest content can be replayed is decided per content (`ADR-023`).
+  final or primary reward chest is claimed once per Game Account, whichever actor opens it —
+  never per Login, so each Game Account of a Login claims its own. Whether other quest content can
+  be replayed is decided per content (`ADR-023`).
 
 Long term:
 - first completion should require meaningful interaction.
@@ -353,7 +375,11 @@ one.
 - **Never:** either Market, player trade, gift or mail, NPC sale, the Stash, a Forge input, another
   Character, or any conversion into Gold, premium currency or other value.
 - **Death:** never at risk — it is not in the Loot Pouch.
-- **Deletion:** frozen and restorable during the 30-day grace; at the purge, deleted with the
-  Character wherever it is stored, the Depot included — never refunded, unbound or left behind.
-- **Not decided:** how a Hunt uses a bound tutorial potion held in the Store Container, and
-  whether PRE-4 builds this for the tutorial (`ADR-020` DEL-O5).
+- **Use in a Hunt:** a configured action slot — Health Potion, Mana Potion — drinks an eligible
+  bound potion straight from the Store Container by its own threshold, never via a Hunt Container.
+  A tutorial potion shares the ordinary potion's definition and is bound on the instance; Canary's
+  `UNIQUEID` / `ACTIONID` never encode a binding.
+- **Deletion:** frozen and restorable during the 720-hour grace of its Game Account; at the purge,
+  deleted with the Game Account wherever it is stored — never refunded, unbound or transferred.
+- **Not decided:** which phase first issues the tutorial potions as bound instances (`ADR-024`
+  DEL-O5).

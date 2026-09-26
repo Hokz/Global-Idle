@@ -9,7 +9,8 @@
 > two-stage lifecycle: a 30-day reversible grace, then a hard purge that removes the Character and
 > everything it owned, with nothing moved to the Bank or to a recovery custody.
 > [ADR-020](./ADR-020-character-deletion-grace-and-purge.md) records the new rule and lists, point
-> by point, which assumptions below no longer apply.
+> by point, which assumptions below no longer apply. Since 2026-09-25 the deletion unit is the
+> whole Game Account ([ADR-024](./ADR-024-game-account-deletion-grace-and-purge.md)).
 >
 > The text below is kept unchanged because it is what Phase 0B implemented and verified —
 > `retiredAt`, I1's partial unique index over non-retired rows, and `retireCharacter` with no

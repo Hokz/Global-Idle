@@ -78,6 +78,12 @@ explicit `characterId`, and:
 > to the Bank. The foreign key may still refuse every other deletion path; how the purge removes
 > the rows it guards is ADR-020 §7's to define. Every other guarantee in this table stands — in
 > particular, a BANK row still names no Character, which is why the purge never has to touch one.
+>
+> **Superseded in part by [ADR-024](./ADR-024-game-account-deletion-grace-and-purge.md),
+> 2026-09-25.** The deletion unit is now the whole Game Account, and its purge removes the Game
+> Account's BANK scope along with its POUCH scopes (`ADR-024` §3). A BANK row still names no
+> Character; what keeps a purge from touching another Game Account's BANK rows is that they belong
+> to another Game Account.
 
 Three details make this work rather than merely look right:
 

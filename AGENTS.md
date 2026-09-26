@@ -206,40 +206,47 @@ open and stacked on PR #11). Its specification is
 and its 69 matrix cases pass.
 
 It remains the active phase only because **nothing after it has started. Phase 4 has NOT started.**
-Phase 4 is gated by the PRE-PHASE-4 gate in [`docs/PHASE_GATES.md`](docs/PHASE_GATES.md), which has
-**not** been passed. Its first item, G4.1, is now the **Character deletion lifecycle** (`ADR-020`,
-`LOCKED` by the Product Owner on 2026-09-24, superseding `ADR-007`'s retirement, and amended on
-2026-09-25): a 30-day reversible grace — exactly 720 elapsed hours, fully frozen — then a hard
-purge of the live Character and everything it owns, leaving an immutable historical deletion record
-and a public Deleted List entry. It is **not implemented** — the code still carries `retiredAt`.
-Its three product questions are resolved by the
-Product Owner: G4.1a, the Gold Pouch is destroyed at the purge; G4.1b, a pending Character keeps its
-vocation, the Origin slot and its roster place until the purge; G4.1c, tutorial completion belongs
-to the Account and survives the purge, no one-time Tutorial Reward is awarded twice, and an Origin
-Character purged before Rookgaard is complete is replaced by a new Level-1 Origin with a fresh,
-Character-bound Bootstrap Kit. Resolved is not implemented. Do not begin Phase 4 work, implement the
-deletion lifecycle, or mark the gate passed until the Product Owner says so.
+**There is no Phase 3.8.** After Phase 3.7 comes the PRE-PHASE-4 gate in
+[`docs/PHASE_GATES.md`](docs/PHASE_GATES.md), which has **not** been passed, and then Phase 4. The
+product decisions the gate depends on were made on 2026-09-25. Its next work product is the
+**PRE-PHASE-4 specification**, and then the implementation of the decided rules and contracts:
 
-Since 2026-09-25 a Game Account has exactly **one Main Character**, and further vocations are
-**companions**; the personal Active Party is the Main plus up to three companions, and human
-multiplayer takes one selected actor per Game Account (`ADR-022`). Replaying a human multiplayer
-or co-op quest is separate from its one-time reward claim, which belongs to the Game Account;
-whether other content can be replayed is that content's own decision (`ADR-023`). The Character
-that G4.1 deletes is the Main, and what that means for its companions and its Game Account — with
-the other items of `ADR-020` §5.3, DEL-O1 to DEL-O6 — is settled by the PRE-4 specification. These
-decisions are recorded and pending independent review. **The PRE-4 specification has not
-started.**
+- **G4.1, Game Account deletion** (`ADR-024`, which reuses `ADR-020`'s lifecycle and supersedes
+  its Character target; `ADR-020` superseded `ADR-007`'s retirement). A request puts the **whole
+  Game Account** into a 720-hour grace, fully frozen and exactly restorable. Then a hard purge
+  removes the Main, every companion and everything the Game Account owns. The Login survives,
+  nothing transfers, no replacement Main is created, and one lifecycle serves every source,
+  moderation included. An internal history record remains, and there is no public Deleted List.
+  It is **not implemented** — the code still carries `retiredAt`;
+- **G4.2**, the `baseXp` → `baseLevel` projection on every write path, rollback and migration;
+- **G4.3**, the Actor/Participant contract — one vocationless actor in Rookgaard, the Main and up
+  to three companions, one actor per Game Account in co-op;
+- **G4.4**, globally unique Character names;
+- **G4.5**, the tunable configuration surface (`ADR-025`).
+
+Do not begin Phase 4 work, implement any of it, or mark the gate passed until the Product Owner
+says so.
+
+Since 2026-09-25 one **Login** may own several **Game Accounts**. Each has exactly **one Main
+Character** and up to four **permanent** companions, and its own name, claims and economy
+(`ADR-022`). The personal Active Party is the Main plus up to three companions, and human
+multiplayer takes one selected actor per Game Account. **Rookgaard** is a permanent, single-player,
+vocationless region where a player may stay (RK1–RK4). Replaying a human multiplayer or co-op quest
+is separate from its one-time reward claim, which belongs to the Game Account — never the actor or
+the Login (`ADR-023`). The weapon attack and defence formulas are **locked**, and ranged Accuracy,
+the damage roll and the rounding stages stay open (`docs/DECISIONS.md`). These decisions are
+recorded and pending independent review. **The PRE-4 specification has not started.**
 
 **Character-bound consumables** (`ADR-021`, `LOCKED` by the Product Owner on 2026-09-24) are
 consumables bound permanently to one Character — XP Boosts, Store-bought Exercise Weapons, Daily
-Reward and Event consumables. The binding is separate from custody. They move only between the
-Character's Store Container and the Account's Depot, are never sold, traded, listed, stashed,
-forged or converted, and are purged with the Character even when they are stored in the Depot. The
-Store does not sell combat equipment. **Nothing of it is implemented.** Since 2026-09-25 the
-tutorial's Health and Mana potions are Character-bound consumables too (S6), and whether PRE-4
-builds this foundation for them is open (`ADR-020` DEL-O5); the tutorial's starter gear is not in
-this model, and its representation is open (DEL-O4). The first phase that ships a bound item —
-Store, Daily Reward, Event or tutorial — implements it first, behind gate GBC.1 in
+Reward and Event consumables, and since 2026-09-25 the tutorial's Health and Mana potions. The
+binding is separate from custody and lives on the instance, never in Canary's `UNIQUEID`. They move
+only between the Character's Store Container and the Account's Depot, a configured action slot may
+drink a bound potion straight from the Store Container, and they are never sold, traded, listed,
+stashed, forged or converted. They are purged with their Game Account. The Store does not sell
+combat equipment. The tutorial's starter gear is ordinary items. **Nothing of it is implemented.**
+Which phase first issues the tutorial potions bound is open (`ADR-024` DEL-O5). The first phase
+that ships a bound item implements it first, behind gate GBC.1 in
 [`docs/PHASE_GATES.md`](docs/PHASE_GATES.md).
 
 User-supplied client assets are a PRIVATE reference and must never be committed — see the Phase

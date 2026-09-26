@@ -146,8 +146,10 @@ A cooperative quest is **not** one-time content (`ADR-023`):
 - its final or primary reward chest is claimed **once per Game Account**, whichever actor that
   Game Account selected. Replay never re-enables it, and choosing the Main or a companion never
   resets it;
-- the claim is Game Account state, kept apart from completion and progression, and a retried or
-  concurrent claim grants at most once (`PHASE_GATES.md` § *G5B.3*);
+- the claim is Game Account state — never the actor's, never the Login's — kept apart from
+  completion and progression. A companion that takes the reward takes it for its own Game Account
+  only, and every other Game Account of the same Login keeps its own claim (`ADR-023` QR9). A
+  retried or concurrent claim grants at most once (`PHASE_GATES.md` § *G5B.3*);
 - what a replay yields once the chest is claimed, and whether a helper gains anything, are open
   (§9).
 

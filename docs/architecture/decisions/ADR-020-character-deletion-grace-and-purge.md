@@ -10,6 +10,8 @@ governance synchronization that follows it: the grace is locked at exactly 720 e
 by an immutable historical deletion record and a public Deleted List (§1b, §6, §7); and the Main
 Character model (`ADR-022`) leaves named items open (§5.3). The independent review of `e2d0e04`
 returned DH6 for a scope correction: game-wide telemetry is not a deletion deliverable (§1b, §7).
+**Superseded in part, 2026-09-25,** by
+[ADR-024](./ADR-024-game-account-deletion-grace-and-purge.md) — see the note below.
 **Those amendments are pending independent review.**
 **Supersedes:** [ADR-007](./ADR-007-character-retirement.md), in full.
 **Amends:** [ADR-019](./ADR-019-currency-custody-scopes.md) — one guarantee row (§8); the rest of
@@ -23,6 +25,28 @@ this record was written for (§5.3).
 **Owning gate:** PRE-PHASE-4 — [`PHASE_GATES.md`](../../PHASE_GATES.md) § *G4.1*. **Nothing in
 this record is implemented.**
 **Date:** 2026-09-24
+
+> **Superseded in part — 2026-09-25, by
+> [`ADR-024`](./ADR-024-game-account-deletion-grace-and-purge.md).** The Product Owner moved the
+> deletion target from a Character to the **Game Account**. The whole campaign is deleted, its
+> Login survives, and nothing creates a replacement Main. `ADR-024` **reuses** this record's
+> lifecycle mechanics, applied to the Game Account:
+>
+> - the 720-hour grace (T1), and the full freeze and exact restore (FZ1–FZ6);
+> - the state machine, the quiescence rule and the freeze (§2–§4);
+> - the purge actions and the closure test (§6), and how the purge runs (§7).
+>
+> Everything here that exists because a Character could be purged while its Game Account lived on
+> is **superseded**:
+>
+> - G4.1b (B1–B7) and G4.1c (C1–C8);
+> - the pre-completion case and its Bootstrap Kit (P1–P9);
+> - the per-Game-Account name scope (§5) — names are now global;
+> - the public Deleted List (DH2) and the purge manifest's content (DH3);
+> - DEL-O1 to DEL-O6 (§5.3).
+>
+> `ADR-024` §8 gives each item's status. Nothing below is rewritten. Read it as the record of what
+> was decided on 2026-09-24 and 2026-09-25, and read `ADR-024` for the rule in force.
 
 ## Context
 
@@ -111,14 +135,16 @@ L10 and L12 required the purge to leave no identity behind. The Product Owner su
 | # | Rule |
 |---|---|
 | DH1 | A successful purge removes the **live, restorable** gameplay Character. An **immutable historical deletion record** survives it, for audit, moderation and analytics, and can never restore gameplay. |
-| DH2 | A **public Deleted List** shows the former Character's name, its vocation, its level at the deletion/purge snapshot, the deletion/purge date, and a **broad reason category** that tells a voluntary deletion from a rules or moderation deletion. Detailed internal moderation reason codes and details are **not** automatically public. |
-| DH3 | The internal deletion audit keeps enough immutable history to answer *what was deleted*, and to support anti-duplication, operations and balance analytics — preferably a **purge manifest** (a deletion snapshot) plus analytics facts, never old live gameplay rows left restorable. |
+| DH2 | ~~A **public Deleted List** shows the former Character's name, its vocation, its level at the deletion/purge snapshot, the deletion/purge date, and a **broad reason category** that tells a voluntary deletion from a rules or moderation deletion. Detailed internal moderation reason codes and details are **not** automatically public.~~ **SUPERSEDED 2026-09-25** by `ADR-024` HR1: there is no public Deleted List. |
+| DH3 | ~~The internal deletion audit keeps enough immutable history to answer *what was deleted*, and to support anti-duplication, operations and balance analytics — preferably a **purge manifest** (a deletion snapshot) plus analytics facts, never old live gameplay rows left restorable.~~ **SUPERSEDED 2026-09-25** by `ADR-024` HR2–HR4: an internal history record for support, which need not record destroyed value. |
 | DH4 | Historical records **may keep identifying fields** internally: the Product Owner asked for named history. |
 | DH5 | Historical records **never** take part in live ownership or custody, or in any gameplay uniqueness constraint. |
 | DH6 | Analytics are preserved or collected for XP production, hunt efficiency, loot and drop generation, item creation and destruction, deleted Characters, and balance analysis. *Scope, clarified after the independent review of `e2d0e04`:* this is a **game-wide direction**, not a deletion deliverable. Each gameplay or economy phase records the telemetry it introduces, and later balance and analytics work consumes it. The deletion lifecycle owns only its own facts — the historical record, the purge manifest and the Deleted List (DH1–DH3) — and a purge must not corrupt durable audit or analytics data that already exists (§6, §7). |
 
 Because the grace is a full freeze (FZ2), a Character's level cannot change between the deletion
 request and the purge, so the Deleted List's *level at the deletion/purge snapshot* is one number.
+*Since `ADR-024` there is no Deleted List. The same holds for the levels its internal history
+record keeps (HR3).*
 
 ### 2. States, transitions and time — architecture
 
@@ -234,6 +260,11 @@ is purged with it (`ADR-021`).
 
 ### 5. Name, vocation and roster place
 
+> *Superseded 2026-09-25 by `ADR-024`:* Character names are **globally unique** (NM1–NM5), and a
+> pending Game Account's names stay reserved across the whole game until its purge. B1–B7 have
+> nothing left to protect, because the whole Game Account is frozen (GD4) and nothing inside it can
+> be created or replaced. The text below is the 2026-09-24 record.
+
 **Name — `LOCKED BY PRODUCT` (L4, L9).** A name stays reserved while its Character row exists, in
 either state. Only the purge's successful, atomic deletion of the row releases it — in the same
 commit that removes the Character and its closure, and never earlier. If a due purge has not yet
@@ -292,6 +323,10 @@ part of `ADR-007` survives, because it never depended on retirement.
 
 #### 5.1 Tutorial completion and one-time grants — `LOCKED BY PRODUCT` (G4.1c, 2026-09-24)
 
+> *Superseded 2026-09-25 by `ADR-024` §8.* No Character is purged while its Game Account lives on.
+> Tutorial completion and reward claims are Game Account state and are purged with it, and a new
+> campaign is a new Game Account with its own (GD5, GD7). §5.1 and §5.2 are the 2026-09-24 record.
+
 Tutorial completion belongs to the **Account**, not to the lifetime of the Origin Character:
 
 | # | Rule |
@@ -324,6 +359,12 @@ Bootstrap Kit, which a new pre-completion Origin Character receives again, bound
 Character.
 
 #### 5.2 Before Rookgaard is complete — the Bootstrap Kit — `LOCKED BY PRODUCT` (G4.1c, 2026-09-24)
+
+> *Superseded 2026-09-25.* There is no replacement Origin Character (`ADR-024` GD7). The starter
+> gear is ordinary low-value items, with no binding and no special custody. The tutorial potions
+> are Character-bound consumables under `ADR-021` (S6–S7), used from the Store Container through
+> the action slots (U5). The Bootstrap Kit and its binding (P1–P9) are therefore retired, and the
+> classification table below is history (`DECISIONS.md` § *Tutorial starting items*).
 
 The one case C1–C8 did not state — an Origin Character permanently purged **before** the account
 has ever completed Rookgaard — is decided:
@@ -438,6 +479,10 @@ flags the ones that cannot be.
 
 #### 5.3 The Main Character model (`ADR-022`) — what it changes here, and what is open
 
+> *Resolved 2026-09-25 by `ADR-024` §8.* DEL-O1, DEL-O2, DEL-O4 and DEL-O6 are resolved or
+> obsolete. DEL-O3 narrows to moderation authority and DEL-O5 to when the tutorial potions become
+> bound (`ADR-024` §9). The rest of §5.3 is the record of the question as it stood.
+
 Everything above §5.3 was written for a roster of up to five equivalent Characters. Since
 2026-09-25 a Game Account has exactly one **Main Character**, and further vocations are
 **companions**, which are not account-lifecycle Characters of the Main's kind (`ADR-022`). *Origin
@@ -476,6 +521,11 @@ is built:**
 | DEL-O6 | **The public Deleted List's presentation**: which of the deletion or purge date it shows, and the reason categories' wording. |
 
 ### 6. What the purge removes, keeps and scrubs — architecture
+
+> *Since `ADR-024` (2026-09-25)* the unit of purge is the **Game Account**. The actions below and
+> the closure test are reused unchanged, but nothing the Game Account owns is KEEP: its Bank, Depot,
+> Stash, entitlements and BANK ledger go with it (`ADR-024` §3). The rows below that KEEP Account
+> state describe a Character purge, which no longer exists.
 
 **Since 2026-09-25 (DH1–DH5).** The actions below say what leaves **live** product persistence. What
 leaves it is not forgotten: the purge also records the immutable historical deletion record — a
@@ -608,10 +658,11 @@ the BANK legs, which are the Account's own record that it paid or received value
   deletion-specific facts (DH3), and the Deleted List entry (DH2) — as part of the same boundary.
   Its shape is the PRE-4 specification's; that it matches exactly what was purged is a test. The
   manifest may reference durable facts that earlier phases already keep, and the purge builds no
-  telemetry beyond its own deletion facts (DH6).
+  telemetry beyond its own deletion facts (DH6). *Since `ADR-024` the purge writes its internal
+  history record instead (HR2–HR5): no manifest of destroyed value and no Deleted List entry.*
 - **No damage to existing audit or analytics data.** The purge changes no durable audit or
   analytics record that it does not own. What it removes from live history (§6) stays answerable
-  through the manifest (DH3).
+  through the manifest (DH3). *Since `ADR-024`, through the internal history record, within HR3.*
 - **Due at the deadline — never early, never deferred.** `purgeAt` is the instant the Character
   becomes **due for immediate final purge**. The purge job attempts it promptly at or after that
   instant; a schedule that routinely leaves due Characters waiting is a defect, not a policy. No
@@ -632,7 +683,8 @@ the BANK legs, which are the Account's own record that it paid or received value
 - **One final boundary.** Deleting the data and releasing the name happen in one successful
   commit. Atomicity is never weakened to release a name at the deadline while the Character or any
   part of its closure still exists; once the purge commits, the row and closure are gone and the
-  name is immediately reusable within the normal uniqueness scope (§5).
+  name is immediately reusable within the normal uniqueness scope (§5) — global since `ADR-024`
+  NM1.
 - **Overdue purges are observable.** Operations can always see how many Characters are due but
   not yet purged, and how late the oldest one is (`OPERATIONS_ARCHITECTURE.md` §6). A measurable
   lateness target — how long after `purgeAt` a purge may take before it counts as a breach — is
@@ -661,6 +713,13 @@ the BANK legs, which are the Account's own record that it paid or received value
   lifecycle-aware: `ACTIVE` for play, every existing row for uniqueness.
 
 ### 9. Migrating from what is implemented
+
+> *Read with `ADR-024` (2026-09-25).* The lifecycle state and both timestamps live on the Game
+> Account. The creation routing of §5.1–§5.2 and the Bootstrap Kit binding are retired. The Login
+> is represented apart from the Game Account before the purge ships, and names become globally
+> unique (`ADR-024` §5–§6). Steps 3 and 5 to 8 stand as written. Step 4's recommended conversion
+> makes a retired Character `PENDING_DELETION`, a state a Character no longer has on its own, so
+> the PRE-4 specification restates it.
 
 For the PRE-4 implementation, forward-only and additive first (`DATA_ARCHITECTURE.md` §8):
 

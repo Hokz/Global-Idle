@@ -27,7 +27,9 @@
 > ([`ADR-022`](../../architecture/decisions/ADR-022-game-account-main-character-and-companions.md)).
 > Nothing below is rewritten; it remains the record of what Phase 0B built and verified. Where it
 > describes the roster as equivalent Characters, read it as history; the current rules are in
-> [`DOMAIN_MODEL.md`](../../architecture/DOMAIN_MODEL.md) §5.1–§5.5 and §7.
+> [`DOMAIN_MODEL.md`](../../architecture/DOMAIN_MODEL.md) §5.1–§5.5 and §7. Since the final
+> synchronization of 2026-09-25 the deletion unit is the whole Game Account
+> ([`ADR-024`](../../architecture/decisions/ADR-024-game-account-deletion-grace-and-purge.md)).
 
 > This document is a **specification**. It contains no implementation. Its job is to make the
 > implementing phase unambiguous: exact tooling, exact boundaries, exact contracts, exact tests,

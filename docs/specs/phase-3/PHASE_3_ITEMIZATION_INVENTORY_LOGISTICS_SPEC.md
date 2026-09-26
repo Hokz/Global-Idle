@@ -13,7 +13,10 @@ below traces to a file and a symbol in `Hokz/canary` at `f6b81a8`.
 > (Character deletion and the purge) and
 > [`ADR-021`](../../architecture/decisions/ADR-021-character-bound-consumables-and-store-container.md)
 > (Character-bound consumables, a per-Character Store Container, and a binding separate from
-> custody — so a Depot row will no longer always be the Account's). For current rules, read those.
+> custody — so a Depot row will no longer always be the Account's). For current rules, read those,
+> and [`ADR-024`](../../architecture/decisions/ADR-024-game-account-deletion-grace-and-purge.md):
+> since 2026-09-25 the deletion unit is the whole Game Account, whose purge takes its Depot and
+> Stash too.
 
 > This document removes implementation ambiguity. Where a value could have been invented, the
 > source map says where it came from; where Global Idle deliberately differs, it is labelled a

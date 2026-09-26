@@ -195,10 +195,11 @@ Any state in which the Character is **not reserved in a Stamina-consuming Hunt l
 - menus, hubs, Market, Atlas while the Character is not hunting;
 - any future activity explicitly configured as non-consuming.
 
-**Never a Character pending deletion** (`ADR-020`, 2026-09-25). The deletion grace is a full
-freeze: a `PENDING_DELETION` Character neither consumes nor recovers, offline or not. Its Stamina
-is settled up to the accepted request, no read settles it while it is pending, and a restore
-credits nothing for the pending time — recovery resumes from the restore instant (FZ2–FZ3).
+**Never a Character of a Game Account pending deletion** (`ADR-020`, `ADR-024`, 2026-09-25). The
+deletion grace is a full freeze of the whole Game Account: none of its Characters consumes or
+recovers, offline or not. Each one's Stamina is settled up to the accepted request, no read
+settles it while it is pending, and a restore credits nothing for the pending time — recovery
+resumes from the restore instant (FZ2–FZ3).
 
 The qualifier matters. **"Offline recovers" does not extend to reconnect grace.** A Hunt paused
 in the 5-minute grace is a *reserved* Hunt state — the activity still exists and the Character's
@@ -232,8 +233,8 @@ CHARACTER STAMINA MODE (exactly one, derived from authoritative state)
   RECOVERING   everything else
 ```
 
-*Since 2026-09-25 a `PENDING_DELETION` Character is in none of the three: it is frozen, and nothing
-accrues (§3.2, `ADR-020` §4).*
+*Since 2026-09-25 a Character of a `PENDING_DELETION` Game Account is in none of the three: it is
+frozen, and nothing accrues (§3.2, `ADR-020` §4, `ADR-024` §2).*
 
 ---
 
@@ -381,9 +382,9 @@ Recorded here and in the roadmaps so the implementing phase cannot quietly skip 
 | 23 | The boundary at exactly 39:00 is deterministic |
 | 24 | The boundary at exactly 0:00 is deterministic |
 
-*Since 2026-09-25 the PRE-4 gate adds one more for Stamina: a `PENDING_DELETION` Character recovers
-nothing, and a restore credits nothing for the grace (`PHASE_GATES.md` § *G4.1*, the full freeze
-and no catch-up).*
+*Since 2026-09-25 the PRE-4 gate adds one more for Stamina: a Character of a `PENDING_DELETION`
+Game Account recovers nothing, and a restore credits nothing for the grace (`PHASE_GATES.md`
+§ *G4.1*, the full freeze and no catch-up).*
 
 ### Active-use timers
 

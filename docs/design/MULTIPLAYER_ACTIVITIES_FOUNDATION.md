@@ -54,8 +54,10 @@ Direction only:
 - rewards based on the current Tibia/Canary Warzone content — Warzones 1–9 are the recognisable
   candidates;
 - co-op content stays replayable, and each Game Account claims its one-time final reward once,
-  whichever actor it selected (`ADR-023`, 2026-09-25). This replay rule is for human multiplayer
-  and co-op content; other content defines its own.
+  whichever actor it selected (`ADR-023`, 2026-09-25). The claim is never the Login's: every Game
+  Account of one Login claims its own (QR9). This replay rule is for human multiplayer and co-op
+  content; other content defines its own. Rookgaard has no multiplayer or co-op at all: it is
+  single-player (`ADR-022` RK2).
 
 ### Participant scale — `TENTATIVE`
 

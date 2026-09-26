@@ -25,289 +25,213 @@ specification.
 
 ## PRE-PHASE-4 GATE — before Party and vocations
 
-### G4.1 — Character deletion lifecycle (`ADR-020`)
+**There is no Phase 3.8.** Phase 3.7 is the last VERIFIED phase, and this gate comes next, then
+Phase 4. Its next work product is the **PRE-PHASE-4 specification**, and the product decisions it
+depends on are made (2026-09-25). What remains is to specify and implement the decided rules and
+contracts: G4.1 to G4.5 below.
 
-The rule is `LOCKED` by the Product Owner (2026-09-24, amended 2026-09-25) and recorded in
-[`architecture/decisions/ADR-020-character-deletion-grace-and-purge.md`](architecture/decisions/ADR-020-character-deletion-grace-and-purge.md),
-which **supersedes** `ADR-007`'s retirement. A deletion request starts a 30-day reversible grace —
-exactly 720 elapsed hours, during which the Character is fully frozen. When it expires, a hard
-purge removes the live Character and everything it owned, nothing moves to the Bank or to a
-recovery custody, and an immutable historical deletion record survives.
+### G4.1 — Game Account deletion lifecycle (`ADR-024`, reusing `ADR-020`)
 
-**Read under `ADR-022` (2026-09-25).** The Character this gate deletes is a Game Account's **Main
-Character**, and every Character in code today is one. Before the purge is built, the PRE-4
-specification settles the open items of `ADR-020` §5.3, with Product Owner confirmation: DEL-O1
-(the sole Main, its companions and its Game Account — whether a replacement Main may exist, and how
-configured Active Party membership counts in the quiescence rule), DEL-O2 (companion lifecycle),
-DEL-O3 (rules and moderation deletion), DEL-O4 (the starter gear's representation), DEL-O5 (the
-tutorial consumables' sequencing against GBC.1) and DEL-O6 (the Deleted List's presentation). A
-requirement below that creates a Character after a purge, or a replacement, applies only as
-DEL-O1 decides. PRE-4 builds nothing against the superseded roster of five equivalent Characters.
+The rule is `LOCKED` by the Product Owner — on 2026-09-24, amended on 2026-09-25, and given its
+current target in the final 2026-09-25 synchronization. It is recorded in
+[`architecture/decisions/ADR-024-game-account-deletion-grace-and-purge.md`](architecture/decisions/ADR-024-game-account-deletion-grace-and-purge.md).
+That record reuses the lifecycle mechanics of
+[`ADR-020`](architecture/decisions/ADR-020-character-deletion-grace-and-purge.md), which
+superseded `ADR-007`'s retirement. A deletion request puts the **whole Game Account** into a
+reversible grace of exactly 720 elapsed hours, fully frozen. When it expires, a hard purge removes
+all live Game Account state: the Main, every Companion, and everything the Game Account owns,
+its Bank, Depot and Stash included. Nothing moves to another Game Account or to the Login, and the
+Login survives. An internal history record remains; there is no public Deleted List. One lifecycle
+serves every deletion source.
 
 **Nothing of it is implemented.** The code still carries retirement: `retiredAt`, unique indexes
 partial over non-retired rows, name and capacity checks over `retiredAt IS NULL`,
 `retireCharacter` (reachable from no route), `ON DELETE RESTRICT` from every Character-owned
-table, and a ledger the application role cannot delete from. Phase 3's `RET1`–`RET2` filter is
-retirement-specific; it is replaced here, not extended.
+table, a ledger the application role cannot delete from, and an `AuthIdentity` that cannot outlive
+its Account row. Phase 3's `RET1`–`RET2` filter is retirement-specific; it is replaced here, not
+extended.
 
 Before Phase 4 adds companions and the Active Party, all of the following hold, each proven by a
 test:
 
 **The lifecycle**
 
-- the 30-day reversible lifecycle — `ACTIVE` → `PENDING_DELETION` → restored or purged — with the
-  deadline fixed when the request is accepted, on the server's clock: `purgeAt` is stored, exactly
-  720 elapsed hours after the accepted request, with no time-zone or calendar-day semantics (T1).
-  No command shortens the grace, and a repeated request neither extends nor restarts it;
-- a request enters the grace only from a quiescent Character — refused while it holds an occupancy
-  claim or is in a non-terminal Activity, and, as each system arrives, while it is in the Active
-  Party, a lobby or any live escrow or obligation (`ADR-020` §3);
-- a `PENDING_DELETION` Character cannot take part in gameplay: every command that would start an
-  Activity with it, or move, equip, use, sell or buy its items, touch its Pouch, unlock its slots
-  or change its policies, is refused — tested **per command**, not by sample;
-- **the full freeze** (FZ1–FZ2): the request copies nothing — the same persisted Character is
-  marked `PENDING_DELETION` — and nothing time-derived accrues to it. Its Stamina is settled up to
-  the accepted request and then recovers nothing; no read or view settles a pending Character; and
-  no other elapsed-time recovery runs — tested by letting time pass across the grace and comparing
-  every Character-owned value, derived ones included.
+- the reversible lifecycle — `ACTIVE` → `PENDING_DELETION` → restored or purged — on the **Game
+  Account**, with the deadline fixed when the request is accepted, on the server's clock:
+  `purgeAt` is stored, exactly 720 elapsed hours after the accepted request, with no time-zone or
+  calendar-day semantics (T1). No command shortens the grace, and a repeated request neither
+  extends nor restarts it;
+- **one lifecycle for every deletion source**: no command — the player's, an operator's or a
+  moderation tool's — purges early, skips the grace or bypasses the purge (GD9–GD10);
+- a request enters the grace only from a quiescent Game Account. It is refused while any of its
+  actors holds an occupancy claim or is in a non-terminal Activity. As each system arrives, it is
+  also refused while an actor is in a lobby or a frozen plan, or while the Game Account is party to
+  any live escrow or obligation. Configured Active Party membership does not block it (`ADR-024`
+  §2);
+- **the whole Game Account is frozen.** Every command that would start an Activity with any of its
+  actors, move, equip, use, sell or buy an item, touch a Pouch or the Bank, unlock a slot or a
+  companion, create a Character or change a policy is refused — tested **per command**, not by
+  sample. No command names the Game Account or one of its actors as a destination or counterparty;
+- **the freeze includes time** (FZ1–FZ2): the request copies nothing — the same persisted Game
+  Account is marked `PENDING_DELETION` — and nothing time-derived accrues to it. Each Character's
+  Stamina is settled up to the accepted request and then recovers nothing; no read or view settles
+  a pending Game Account; and no other elapsed-time recovery runs — tested by letting time pass
+  across the grace and comparing every Game-Account-owned value, derived ones included;
+- **other Game Accounts are untouched**: another Game Account of the same Login keeps playing
+  throughout, and its state is identical before and after the first one's request, restore or
+  purge.
 
 **Restoration**
 
-- restoration **before** the deadline returns every Character-owned row exactly as it was —
-  progression, Stamina, items and container trees, slots, loot policy, POUCH entries and balance
-  — shown by comparing the whole closure before the request and after the restore;
-- **no catch-up** (FZ3): a restore credits nothing for the pending time. Immediately after it, the
-  Character's Stamina and every other time-derived value equal their values at the accepted
-  request, and recovery resumes from the restore instant;
+- restoration **before** the deadline returns every Game-Account-owned row exactly as it was —
+  its Characters, progression, Stamina, items and container trees, slots, loot policies, Pouches,
+  Bank, Depot, Stash and ledger — shown by comparing the whole closure before the request and
+  after the restore;
+- **no catch-up** (FZ3): a restore credits nothing for the pending time. Immediately after it,
+  Stamina and every other time-derived value equal their values at the accepted request, and
+  recovery resumes from the restore instant;
 - restoration **at or after** the deadline is refused, whether or not the purge has run, and
   restoration after the purge finds nothing to restore;
 - **race tests at the deadline**: restore and purge run concurrently around `purgeAt`, exactly one
-  wins, and the result is either the whole Character restored or the whole Character purged.
+  wins, and the result is either the whole Game Account restored or the whole Game Account purged.
 
-**The name**
+**Names** — with G4.4
 
-- the name stays reserved throughout `PENDING_DELETION`, and is released **only** by the
-  successful atomic purge, in the same commit that removes the Character and its closure. If a
-  due purge fails to commit, the name stays reserved until it succeeds — the degraded condition
-  below, never a normal state;
-- name reuse is tested **only after** a successful purge: a same-name creation is refused before
-  it and accepted immediately after it — with the historical deletion record present, because a
-  historical record never reserves a name (FZ6, DH5).
+- every Character name of a pending Game Account stays **globally** reserved throughout
+  `PENDING_DELETION`, and is released **only** by the successful atomic purge, in the same commit
+  that removes the Game Account. If a due purge fails to commit, the names stay reserved until it
+  succeeds — the degraded condition below, never a normal state (NM2);
+- name reuse is tested **only after** a successful purge: a same-name creation in **another** Game
+  Account is refused before it and accepted immediately after it — with the internal history
+  record present, because a historical record never reserves a name (NM3).
 
-**What a pending Character holds — G4.1b, `LOCKED`**
+**The Login** (`ADR-024` §5)
 
-- `PENDING_DELETION` Characters are counted for roster capacity (I2);
-- they reserve their vocation (I1);
-- a pending Main reserves its Game Account's Main slot — the Origin slot of I1b before Rookgaard
-  (`ADR-022`, I24);
-- creating a replacement is **rejected** while those resources are held — tested for each of the
-  three, including an account at roster capacity 1;
-- the final purge releases all three **atomically with the Character's deletion**, in the same
-  commit that releases the name: a creation that needs one of them is refused before the purge
-  commits and accepted immediately after it;
-- a restore before `purgeAt` succeeds with no uniqueness or capacity conflict, after every refused
-  replacement attempt.
+- the Login is represented apart from the Game Account before the purge ships. After a purge the
+  Login still signs in, its credentials are intact, and its other Game Accounts are identical;
+- the PRE-4 specification states how a Login left with no Game Account starts a new one (`ADR-022`
+  GA-O10), and that path is tested.
 
-**Tutorial completion, one-time rewards and the Bootstrap Kit — G4.1c, `LOCKED`**
+**No replacement and no carry-over**
 
-Settled in the design before implementation (`ADR-020` §5.1–§5.2):
-
-- a Game Account-owned tutorial-completion fact, and Game Account-owned state for one-time
-  Tutorial Rewards wherever a reward is defined as one-time — a typed claim, never an untyped flag
-  (`ADR-023` §2);
-- the current starting grant classified item by item, with nothing left flagged. Its potions are
-  decided: tutorial utility consumables, Character-bound under `ADR-021` (S6), with 20 Health and
-  20 Mana potions as the direction and neither quantity final. The **starter gear's**
-  representation is open (`ADR-020` DEL-O4) and is decided first — never forced into `ADR-021`'s
-  consumable model;
-- Character creation routed on the Account's tutorial completion, never on a count of Characters;
-- the Bootstrap Kit binding enforced server-side on every item path — never in the UI only — in
-  whatever representation DEL-O4 decides for the gear. The tutorial consumables' binding is
-  `ADR-021`'s, and whether PRE-4 builds that foundation for them is DEL-O5.
-
-Proven by tests:
-
-- the Account's tutorial completion survives the purge of its Origin Character, and of any other
-  Character;
-- an Account that has completed Rookgaard never returns to it automatically: a Character created
-  after a purge takes the later-character path — Base Level 8, no Rookgaard, the post-Rookgaard
-  state;
-- a replacement pre-completion Origin Character starts at Base Level 1, in the mandatory
-  Rookgaard journey, with a fresh Bootstrap Kit;
-- the purge destroys the Bootstrap Kit with its Origin Character;
-- the Bootstrap Kit cannot escape into Account custody or value: moving a kit item to the Stash or
-  another Character, and selling, listing, trading or converting it, are each refused server-side —
-  tested per path and per instance, including a kit stack beside a bought stack of the same item.
-  A move to the Depot is refused for the kit's gear, however DEL-O4 represents it; the tutorial
-  consumables may rest in the Depot, still bound (`ADR-021` G1–G2);
-- one-time Tutorial Rewards and account grants are **not** reissued after a purge and a
-  recreation. Character-specific starting state of the normal Level-8 flow is not a one-time
-  grant, and the tests keep the two apart (`ADR-020` §5.1, C7);
-- repeated *delete → purge → recreate* cycles cannot accumulate Account value: with no play between
-  them, the Account's Bank, entitlements, reward state and the unbound contents of its Depot and
-  Stash are identical after any number of cycles, and no one-time reward is awarded twice.
+- nothing creates a replacement Main, or any Character, inside a pending or purged Game Account
+  (GD7);
+- nothing of a purged Game Account reaches another Game Account or the Login — tested with a Login
+  that holds two Game Accounts (GD6);
+- a Companion leaves only with its Game Account. PRE-4 adds no command that deletes, dismisses,
+  removes, replaces, rerolls or converts one, and Phase 4 adds none when companions arrive (GD8,
+  `ADR-022` GA11).
 
 **The purge**
 
 - a **purge dependency graph** — a referential-closure inventory of **every** foreign key and
-  **every** table that references `Character`, derived from the schema by a test that fails on any
-  reference without a declared action (`ADR-020` §6). String-keyed records that embed a Character
-  or its Activities' ids — settlement operation ids, idempotency records — are in the same
-  inventory;
+  **every** table that references the Game Account row or one of its Characters, derived from the
+  schema by a test that fails on any reference without a declared action (`ADR-024` §3).
+  String-keyed records that embed their ids or their Activities' ids — settlement operation ids,
+  idempotency records — are in the same inventory;
 - an explicit policy for each current `ON DELETE RESTRICT` relation: kept as the guard against
-  every path but the purge, which deletes in dependency order, or redesigned. `CASCADE` only
-  where everything it can reach is Character-owned;
+  every path but the purge, which deletes in dependency order, or redesigned. `CASCADE` only where
+  everything it can reach belongs to the Game Account being purged;
 - **idempotent**: a retry after a crash completes the purge or does nothing. It never destroys
-  twice, and never touches another Character or Account;
-- **crash-safe**: interrupted at any point, it leaves either the whole Character or none of it —
-  never a half-purged Character;
-- **no duplication**: nothing Character-owned reaches the Bank, the Depot, the Stash or another
-  Character;
-- **no collateral deletion**: the Bank balance and every BANK entry, the Depot — every unbound item
-  in it — the Stash, entitlements, roster capacity and every other Character are identical before
-  and after;
+  twice, and never touches another Game Account;
+- **crash-safe**: interrupted at any point, it leaves either the whole Game Account or none of it —
+  never a half-purged one;
+- **no duplication**: nothing the Game Account owned reaches another Game Account or the Login;
+- **no collateral deletion**: the Login and every other Game Account — the same Login's included —
+  are identical before and after;
 - **post-purge proof**: a scan of **live** product persistence — PostgreSQL and Redis — finds the
-  Character's id and name in no row, JSON and text columns included. The historical deletion
-  record is the one declared exception: the scan knows where it is, and proves that nothing else
-  names the Character (DH1–DH5);
-- **the historical deletion record** (DH1–DH4): the purge writes an immutable record — the purge
-  manifest (a deletion snapshot) and its deletion-specific facts — within the same final boundary,
+  Game Account's id, its Characters' ids and their names in no row, JSON and text columns included.
+  The internal history record is the one declared exception: the scan knows where it is, and
+  proves that nothing else names them (HR5);
+- **the internal history record** (HR2–HR5): the purge writes it within the same final boundary,
   so that no purge commits without its record and no record exists for a purge that did not
-  commit. Tests show that it matches exactly what was purged, is written once under retry, cannot
-  be updated or deleted by the application role, restores nothing, and holds no ownership, custody
-  or uniqueness (DH5);
-- **the public Deleted List** (DH2): an entry shows the former Character's name, vocation, level at
-  the deletion snapshot, the date and a broad reason category — tested for exactly those fields —
-  and no internal moderation detail reaches it. Which date it shows and the categories' wording are
-  DEL-O6;
-- **deletion-specific facts only** (DH3): the manifest records what the purge removed — the
-  Character, and the value and items it destroyed — enough to answer *what was deleted* and to
-  serve as anti-duplication evidence, and a test shows it matches the purge exactly. It may
-  reference durable facts that Phases 2–3 already keep. **PRE-4 builds no general telemetry**: XP,
-  Hunt, loot and item-flow analytics are a game-wide direction that each gameplay or economy phase
-  records for what it introduces (DH6);
+  commit. Tests show that it holds at most HR3's fields, is written once under retry, cannot be
+  updated or deleted by the application role, restores nothing, reserves no name and holds no
+  ownership, custody, claim or uniqueness state;
+- **no public Deleted List** (HR1): no route, view or export shows the record outside support;
+- **no destroyed-value inventory is required** (HR4). Completeness is proven by the closure test
+  and the post-purge scan. **PRE-4 builds no general telemetry**: XP, Hunt, loot and item-flow
+  analytics are a game-wide direction that each gameplay or economy phase records for what it
+  introduces (`ADR-020` DH6);
 - **no damage to existing audit or analytics data**: a purge changes no durable audit or analytics
   record that it does not own — tested beside *no collateral deletion*, above;
 - **a closure that can follow a binding**: nothing in the purge assumes that Character-owned
-  `ItemInstance` rows are found by `characterId` alone. A future binding that is independent of
-  custody — `ADR-021`'s Character-bound consumables, stored in the Depot with `characterId` null —
-  must be able to join the closure test and the purge without a redesign. PRE-4 does **not**
-  implement bound items;
+  `ItemInstance` rows are found by `characterId` alone, so a future bound item stored in the Depot
+  joins the closure test without a redesign. PRE-4 implements no bound item unless the PRE-PHASE-4
+  specification schedules the tutorial potions there (`ADR-024` DEL-O5), behind GBC.1;
 - the purge runs under its own capability. The application role keeps no `UPDATE` or `DELETE` on
-  the ledger;
-- **due at the deadline**: at `purgeAt` the Character is due for immediate final purge, and the
+  the ledger. Whether the Game Account's ledger entries leave the ledger or stay as immutable
+  history outside live state is the PRE-4 specification's choice (`ADR-024` §3);
+- **due at the deadline**: at `purgeAt` the Game Account is due for immediate final purge, and the
   purge job attempts it promptly. No command purges early or postpones a due purge;
-- **a failed purge is a monitored, degraded condition** (`ADR-020` §7), proven by a test that makes
-  the purge fail after the deadline and shows that the Character stays non-playable,
-  non-restorable and name-reserved, that the purge is retried automatically, that the overdue
-  Character is visible and alerts, and that the retry then purges it completely and releases the
-  name in the same commit;
-- **overdue purges are observable**: how many Characters are due but not purged, and how late the
-  oldest is. The numeric lateness target is **not** chosen here — it is a pre-launch obligation,
-  below.
+- **a failed purge is a monitored, degraded condition** (`ADR-020` §7), proven by a test that
+  makes the purge fail after the deadline. The Game Account stays non-playable, non-restorable and
+  name-reserving; the purge is retried automatically; the overdue Game Account is visible and
+  alerts; and the retry then purges it completely and releases the names in the same commit;
+- **overdue purges are observable**: how many Game Accounts are due but not purged, and how late
+  the oldest is. The numeric lateness target is **not** chosen here — it is a pre-launch
+  obligation, below.
 
 **Migration**
 
-- `retiredAt`, and every partial-uniqueness assumption derived from it, removed: I1, I1b and the
-  name and capacity checks rebuilt over every existing Character, `PENDING_DELETION` included
-  (G4.1b), and the `retiredAt: null` access filters made lifecycle-aware;
-- a migration strategy from the implemented retirement schema: forward-only and additive first,
-  with any row that has `retiredAt` set counted, reported and converted as `ADR-020` §9 describes;
+- `retiredAt`, and every partial-uniqueness assumption derived from it, removed: I1 and I1b and
+  the capacity check rebuilt over every existing Character, and the `retiredAt: null` access
+  filters made lifecycle-aware on the Game Account's lifecycle. Names move to G4.4's global rule;
+- a migration strategy from the implemented retirement schema: forward-only and additive first.
+  Any row that has `retiredAt` set is counted and reported, and the PRE-4 specification restates
+  its conversion, because a Character no longer has a deletion state of its own (`ADR-020` §9);
 - the VERIFIED tests that encode retirement — Phase 0B `D5` and `D6`, Phase 1 `D22`'s retirement
   step and `D24`'s filter, Phase 3 `RET1`–`RET2`, and the `retiredAt` assertion in
   `tests/integration/characters.test.ts` — superseded through explicit matrix amendments, never
   deleted quietly.
 
-**Owner:** Phase 4 builder, before Party formation work. The product questions this gate names —
-G4.1a to G4.1c, below — are all decided, and so are the 2026-09-25 amendments: 720 hours, the full
-freeze, the historical record and the public Deleted List. What still awaits a decision is listed
-in [`OPEN_QUESTIONS.md`](OPEN_QUESTIONS.md) § *Character deletion*: DEL-O1 to DEL-O6, which the
-PRE-4 specification settles with Product Owner confirmation before the purge is built. The two
-points this paragraph named until 2026-09-25 are settled or replaced: the 20 small health potions
-are tutorial consumables, Character-bound under `ADR-021` (S6), and whether the kit's binding ends
-with Rookgaard became the starter gear's representation (DEL-O4).
+**Owner:** Phase 4 builder, before Party formation work, against the PRE-PHASE-4 specification.
+The product questions this gate once named are all decided. What still awaits a decision is small
+and listed in [`OPEN_QUESTIONS.md`](OPEN_QUESTIONS.md) § *Game Account deletion*. The moderation
+authority (DEL-O3) belongs to the phase that builds moderation tooling. The PRE-PHASE-4
+specification decides when the tutorial potions become bound (DEL-O5) and the history record's
+exact fields.
 **Acceptance:** invariant, race and closure tests, not a manual audit.
 
 #### G4.1a — the Gold Pouch at deletion — **RESOLVED** by the Product Owner, 2026-09-24
 
-**No longer open.** The Product Owner decided it as part of the lifecycle:
+**No longer open**, and carried into the Game Account purge. During the grace the Pouch — its
+entries and its balance — stays intact, so a restore returns it exactly. At the purge its live
+state is **destroyed**. It is never transferred to a bank or placed in a recovery custody. Since
+2026-09-25 the purge takes the whole Game Account, so the Bank goes with it, and nothing reaches
+another Game Account or the Login (`ADR-024` GD5–GD6). The candidates this gate once listed — a
+transfer to `BANK`, an audited restricted `POUCH`, another custody shape — stay rejected. What
+survives of the old requirement is its integrity half: destruction happens inside the atomic
+purge and is proven under retry and rollback. `ADR-020` §6.3's surviving BANK legs are
+superseded: both legs of an operation within one Game Account go together.
 
-- during the 30-day grace, the Pouch — its POUCH entries and its balance — stays with the
-  Character, intact, so a restore returns it exactly;
-- at the final purge, the Character-scoped POUCH value and state are **destroyed** with the
-  Character;
-- it is **not** transferred to the Bank, and **not** placed in any recovery custody.
+#### G4.1b — what a pending Character still holds — **SUPERSEDED** 2026-09-25
 
-The candidates this gate used to list — a transfer to `BANK` with paired entries, an audited
-restricted `POUCH`, another custody shape — are all rejected by that decision. What survives of
-the old requirement is its integrity half: the destruction happens inside the atomic purge, never
-duplicates value into the Bank, and is proven under retry and rollback. Every BANK entry is
-untouched; `ADR-020` §6.3 covers the operations that had both a BANK and a POUCH leg.
+Decided by the Product Owner on 2026-09-24: a `PENDING_DELETION` Character kept its vocation, its
+roster place and — as the Origin Character — the Origin slot until its purge, so that no
+replacement could take them and a restore could never conflict. Recorded in `ADR-020` §5.
 
-#### G4.1b — what a pending Character still holds — **RESOLVED** by the Product Owner, 2026-09-24
+**Superseded by `ADR-024`.** The whole Game Account is frozen, and nothing inside it can be created
+or replaced (GD4, GD7). Its Character names are reserved across the whole game until the purge
+(NM2). A restore therefore cannot conflict, and these holds have nothing left to protect.
 
-**No longer open.** A `PENDING_DELETION` Character keeps every uniqueness and capacity resource
-its guaranteed restoration needs until the final purge successfully commits:
+#### G4.1c — tutorial completion and one-time grants after a purge — **SUPERSEDED** 2026-09-25
 
-- it continues to count against `rosterCapacity`;
-- its vocation remains reserved;
-- if it is the Origin Character, the Origin slot (I1b) remains reserved;
-- the player cannot create a replacement that would consume any of those held resources;
-- they are released **only** by the successful final purge;
-- a restore before the deadline therefore never depends on freeing or reclaiming a resource, and
-  cannot fail because the player created a replacement;
-- the name stays as already locked: released only by the successful final purge.
+Decided by the Product Owner on 2026-09-24, recorded in `ADR-020` §5.1–§5.2. Tutorial completion
+belonged to the Account and survived the purge of its Origin Character. A Character created after
+that purge followed the later-character flow, and no one-time grant was awarded twice. An Origin
+Character purged before Rookgaard was complete was replaced by a new Level-1 Origin Character with
+a fresh, non-exploitable **Bootstrap Kit**.
 
-An account at roster capacity 1 that deletes its only Character therefore cannot create another
-during the grace, and can restore the pending one. Roster capacity itself stays Account-owned and
-is neither reduced nor refunded. Recorded in `ADR-020` §5 and `DECISIONS.md` § *Character
-deletion*; **implementation pending** — proven by the tests under *What a pending Character
-holds*, above.
-
-*Read under `ADR-022` (2026-09-25):* the pending Character is its Game Account's Main. These rules
-hold for it unchanged — its Main slot, the Origin slot above, stays reserved and nothing can
-replace it. Whether anything may take them after the purge is DEL-O1.
-
-#### G4.1c — tutorial completion and one-time grants after a purge — **RESOLVED** by the Product Owner, 2026-09-24
-
-**No longer open.** Tutorial completion belongs to the **Account**, not to the lifetime of the
-Origin Character:
-
-- completing the initial Rookgaard tutorial journey marks the account as having completed it, and
-  deleting or purging the Origin Character does not reset that;
-- once the account has completed Rookgaard, a Character created after a purge does not restart the
-  first-character tutorial automatically. It follows the normal later-character flow: Base Level
-  8, no Rookgaard, the post-Rookgaard game state;
-- one-time account or tutorial starting grants are not awarded again because the Origin Character
-  was deleted or purged and another was created, so *delete → purge → recreate* cannot farm
-  starting items, Gold, containers, entitlements, tutorial rewards or any other one-time grant.
-  The Bootstrap Kit, below, is not such a grant, and cannot be farmed either;
-- Character-specific starting state of the normal Level-8 flow may still be granted by that flow;
-- after its purge no Origin Character record remains. The account-level tutorial-completion fact
-  is the only thing that survives for this purpose. *Since 2026-09-25 that means no **live**
-  record: the historical deletion record plays no part in tutorial routing (`ADR-020` C8).*
-
-**Its pre-completion case is decided too**, the same day. If the Origin Character is purged
-before the account completes Rookgaard, the next Character is a new Origin Character at Base Level
-1 that must complete Rookgaard, and it receives a fresh **Bootstrap Kit**. The kit is not a
-one-time Account reward and may be issued again. Its items can never reach the Depot, the Stash,
-another Character, a trade, a listing, a sale or any other Account-wide value, and they are
-destroyed with their Character — so issuing a kit again is not the farming the rule above forbids.
-*Since 2026-09-25 the kit's potions follow `ADR-021` instead: they may rest in the Depot, still
-bound, and reach nothing else (S6).*
-**Tutorial Rewards** are separate: Account-governed, one-time where defined as one-time, and never
-reissued because a Character was purged.
-
-Recorded in `ADR-020` §5.1–§5.2 and `DECISIONS.md` § *Character deletion*; **implementation
-pending** — the design items and tests under *Tutorial completion, one-time rewards and the
-Bootstrap Kit*, above. Nothing of it exists yet: the Account has no tutorial-completion or reward
-state, and today's code gives every Character the same starting grant, with nothing to stop its
-items reaching the Depot or the Stash. The creation routing and the kit binding ship **with** the
-purge, never after it. *Since 2026-09-25 the kit binding depends on DEL-O4 for the gear, and the
-tutorial consumables' sequencing is DEL-O5. The rules about a Character created after a purge
-describe a replacement Main, and apply only as DEL-O1 decides.*
-
-**Owner:** Phase 4 builder, as part of G4.1.
+**Superseded by `ADR-024`.** No Character is purged while its Game Account lives on. Tutorial
+completion and one-time reward claims are Game Account state, and go with it (GD5). A new campaign
+is a new Game Account, which starts in Rookgaard with claims of its own (GD7, `ADR-022` RK3). There
+is no replacement Origin Character. The Bootstrap Kit is retired: the starter gear is ordinary
+items, and the tutorial potions are Character-bound consumables under `ADR-021`
+([`DECISIONS.md`](DECISIONS.md) § *Tutorial starting items*). They are no longer deletion
+requirements. The Game Account's tutorial-completion state is built by the phase that builds the
+tutorial state, and one-time claims by the reward-claim primitive (Phase 5, `ADR-023`). The purge
+removes both with the rest.
 
 ### G4.2 — enforce the `baseXp` → `baseLevel` projection everywhere
 
@@ -328,10 +252,24 @@ to choose again:
 - every write path that touches `baseXp` also writes `baseLevel = levelForXp(baseXp)` — reward
   settlement, death loss, any future XP source, and any migration or backfill;
 - the deletion lifecycle (G4.1) writes neither number: a restore returns both exactly as stored,
-  and the purge removes both with the Character. The historical deletion record's level is a copy
-  taken from the frozen pair — history, never a second live projection;
+  and the purge removes both with the Character. The internal history record's levels are copies
+  taken from the frozen pairs — history, never a second live projection;
 - a settlement that rolls back rolls back **both**, so no partial write can leave them disagreeing;
 - the projection holds across the curve including its boundaries, in both directions.
+
+**Confirmed by the Product Owner, 2026-09-25** (`DECISIONS.md` § *Base XP and Base Level*):
+`baseXp` is the truth and `baseLevel` its deterministic stored projection. PRE-4 must prove:
+
+- XP is authoritative;
+- the level is a deterministic projection of it;
+- every XP write path syncs the level atomically;
+- a rollback updates both or neither;
+- migrations and backfills preserve the invariant.
+
+The curve is Canary's reference, `getExpForLevel(level) = (((level - 6) * level + 17) * level - 12)
+/ 6 * 100`, which Phase 2 implemented. Global Idle need not adopt that exact curve unless it is
+separately locked. If a later decision changes the curve, the change is a migration that
+recomputes every stored `baseLevel` from its `baseXp` — the invariant above, applied once more.
 
 If any legacy or migrated row is found contradicting the contract, **document that row and its
 origin explicitly** and reconcile it to the contract. Do not infer a different rule from it.
@@ -347,9 +285,20 @@ PP2). Phase 5B introduces participants from several accounts — **one selected 
 Account**, its Main or any unlocked companion (MP2–MP4). The contract written now must support
 both **without** building a multiplayer platform yet.
 
-- combat actor identity is its **own** concept. It is not the account id, it is not one
-  hard-coded Character, and it is not *"the Main"*: a companion is an actor too, and in
-  multiplayer the Main is not mandatory (MP3);
+**Confirmed by the Product Owner, 2026-09-25.** The contract supports three shapes:
+
+| Where | Actors |
+|---|---|
+| Rookgaard | **one** vocationless, single-player actor (`ADR-022` RK2–RK3) |
+| the Main game | the Main plus up to three Companions |
+| later co-op | **exactly one** actor per Game Account — its Main or any Companion |
+
+- combat actor identity is its **own** concept. The engine must not assume that an actor is the
+  Login, the Game Account or the Main. It is not the account id, it is not one hard-coded
+  Character, and it is not *"the Main"*: a companion is an actor too, and in multiplayer the Main
+  is not mandatory (MP3);
+- **settlement still knows the owning Game Account** of every actor, because rewards, claims and
+  custody are Game Account state (`ADR-023` QR9);
 - the contract admits several actors per side, and admits participants whose owning accounts
   differ, even though nothing yet creates that case;
 - **compatibility adapters** keep previously VERIFIED Hunt behaviour and its fixtures intact. A
@@ -357,11 +306,56 @@ both **without** building a multiplayer platform yet.
 - `Actor`, `Target` and `Side` stay neutral — the guardrail already recorded in
   [`design/MULTIPLAYER_ACTIVITIES_FOUNDATION.md`](design/MULTIPLAYER_ACTIVITIES_FOUNDATION.md) §4.
 
-**Explicitly not in scope:** lobbies, invitations, cross-account anything.
+**Explicitly not in scope:** lobbies, invitations, cross-account anything — no multiplayer
+networking or lobby in PRE-4.
 
 **Owner:** Phase 4 architect.
 **Acceptance:** existing Hunt fixtures pass unchanged through the adapter, plus a contract test
 showing a multi-actor side is representable.
+
+### G4.4 — Globally unique Character names (`ADR-024` NM1–NM5)
+
+`LOCKED` by the Product Owner, 2026-09-25. Character names are unique across the **entire game
+and database**. This supersedes the per-Game-Account uniqueness Phase 1 implemented, which
+`createCharacter` checks in application code, among one Account's playable Characters only.
+
+- uniqueness is enforced at persistence level over **every existing Character**, a pending Game
+  Account's included — a uniqueness guarantee, never a read-then-check alone — and two concurrent
+  creations of the same name in two Game Accounts cannot both succeed;
+- a pending Game Account's Character names stay reserved until its purge commits (G4.1), and the
+  internal history record never reserves one;
+- the PRE-4 specification states the comparison the rule uses — today names are trimmed and
+  compared exactly — and how rows that already collide across Game Accounts are found and resolved
+  before the constraint is added;
+- Game Account display names are a separate namespace, untouched by this rule. Whether they must
+  be unique is `ADR-022` GA-O11.
+
+**Owner:** the PRE-PHASE-4 specification and implementation.
+**Acceptance:** a persistence-level constraint, a concurrent-creation race test, and the
+reservation tests of G4.1.
+
+### G4.5 — The tunable configuration surface (`ADR-025`)
+
+`LOCKED` direction, Product Owner, 2026-09-25. PROVISIONAL and TUNABLE defaults live in one
+authoritative server-side configuration surface — the purpose Canary's `config.lua` and its stages
+serve, though not necessarily Lua. Before Phase 4 adds its tunable values — companion unlock prices
+and Shared XP bonuses among them — the surface exists, with:
+
+- validated types and ranges, refused on load rather than clamped at use;
+- versioned and traceable values, pinned for a running Activity as its content version is, so that
+  no change alters a run in flight;
+- server authority: no client input sets or overrides a value;
+- safe defaults;
+- test fixtures that pin the defaults they rely on.
+
+Never configuration: ownership, the Login–Game Account relation, Main and Companion identity,
+exactly-once claims, global name uniqueness, binding integrity, the atomic deletion and purge
+guarantees, transaction semantics and security or authority boundaries (`ADR-025` NC1–NC9).
+
+**Owner:** the PRE-PHASE-4 specification, which defines the surface's first form and what happens
+to the values already marked `INITIAL/TUNABLE` in code and content.
+**Acceptance:** validation, versioning and pinning tests, and a test that no NC item is reachable
+as configuration.
 
 ---
 
@@ -381,11 +375,11 @@ the invariants are the gate.
   Phase 4 specifies it (`ADR-022` GA-O5);
 - one shared run identity, and membership that cannot silently fork;
 - liveness rules stated per participant;
-- Character deletion across accounts (`ADR-020` §6.2): a Character in a lobby or a frozen plan
-  cannot be put up for deletion, and when a participant is later purged, the other accounts keep
-  their own results while no **live** shared record names the purged Character. Whether the
-  completed run's history keeps its name is the phase's declaration: SCRUB, or immutable history
-  within DH5.
+- Game Account deletion across accounts (`ADR-024` §3): a Game Account with an actor in a lobby
+  or a frozen plan cannot be put up for deletion. When a participating Game Account is later
+  purged, the others keep their own results, and no **live** shared record names the purged Game
+  Account or its Characters. Whether the completed run's history keeps a name is the phase's
+  declaration: SCRUB, or immutable history within HR5.
 
 ### G5B.2 — Cross-account disconnect, decided separately
 
@@ -403,8 +397,9 @@ A shared run pays several accounts. Before the first one runs:
 - no double-pay and no lost payout under retry, rollback or partial failure;
 - settlement is per Game Account and auditable;
 - a **one-time reward** is claimed at most once per Game Account, whichever actor it selected, and
-  replaying the quest never re-enables it (`ADR-023` QR3–QR6); a retried or concurrent claim
-  grants at most once;
+  replaying the quest never re-enables it (`ADR-023` QR3–QR6). The claim is the Game Account's —
+  never the actor's or the Login's — and each Game Account of one Login claims for itself (QR9). A
+  retried or concurrent claim grants at most once;
 - spectator-only reads cannot claim, influence or alter any of it.
 
 **Owner:** Phase 5B slice 1.
@@ -433,16 +428,22 @@ the domain writes and trusts; a market lets someone else's row reach your invent
 
 ### G6.4 — Deletion meets escrow
 
-Every Market, Forge and Imbuement table that references a Character declares its purge action
-before it ships (`ADR-020` §6.2): a live listing, escrow, trade or forge input **refuses** a
-deletion request, and completed trades keep the counterparty's facts — price, item definition,
-time, its own side. Whether the purged Character stays named there is the phase's declaration:
-SCRUB, or immutable history within `ADR-020` DH5, which never lets it own or hold anything.
+Every Market, Forge and Imbuement table that references a Game Account or a Character declares
+its purge action before it ships (`ADR-024` §3): a live listing, escrow, trade or forge input
+**refuses** a deletion request, and completed trades keep the counterparty's facts — price, item
+definition, time, its own side. Whether the purged Game Account stays named there is the phase's
+declaration: SCRUB, or immutable history within `ADR-024` HR5, which never lets it own or hold
+anything. An operation that spans two Game Accounts keeps the survivor's leg, and this phase
+restates the leg-balance check for it.
 
-A Bootstrap Kit item is never listed, escrowed, traded, or used as a Forge or imbuement input, and
-nothing any of these systems produces from one becomes Account value (`ADR-020` §5.2). A
-Character-bound consumable is never listed on either Market, escrowed, traded, gifted, mailed,
-sold to an NPC or used as a Forge input (`ADR-021`, gate GBC.1 below).
+A Character-bound consumable is never listed on either Market, escrowed, traded, gifted, mailed,
+sold to an NPC or used as a Forge input (`ADR-021`, gate GBC.1 below). The tutorial's starter gear
+is ordinary items (`DECISIONS.md` § *Tutorial starting items*); the Bootstrap Kit restriction that
+stood here until 2026-09-25 is retired with the kit.
+
+**Multi-account farming.** One-time reward claims are per Game Account, and one Login may own
+several. Whether, and how, a tradeable one-time reward farmed across several Game Accounts is
+limited is **open** for this phase, before player trade ships (`OPEN_QUESTIONS.md` § *Market*).
 
 **Owner:** Phase 6, before any market, forge or imbuement surface exists.
 
@@ -459,14 +460,16 @@ The rule is `LOCKED` by the Product Owner (2026-09-24) and recorded in
 This gate belongs to **no fixed phase**. Phase 8 (Premium) is the obvious first consumer, but a
 Daily Reward or an Event may introduce a Character-bound consumable earlier — and since 2026-09-25
 so may the tutorial, whose Health and Mana potions are Character-bound consumables (`ADR-021`
-S6). Whether PRE-4 builds this foundation for them, or the starting grant changes shape until this
-gate's phase, is open (`ADR-020` DEL-O5), and so is how a Hunt drinks a bound potion held in the
-Store Container (`ADR-021` U4). Whichever phase ships the first bound item implements this
-foundation **first**. No bound item — Store, Daily Reward, Event or tutorial — ships before all of
-the following hold, each proven by a test:
+S6–S7). How a Hunt uses them is decided: a configured action slot consumes an eligible bound potion
+straight from the Store Container (`ADR-021` U5). Which phase first issues them as bound instances
+— PRE-4, or the phase that builds the action slots — is open (`ADR-024` DEL-O5), for the
+PRE-PHASE-4 specification. Whichever phase ships the first bound item implements this foundation
+**first**. No bound item — Store, Daily Reward, Event or tutorial — ships before all of the
+following hold, each proven by a test:
 
 - the binding survives `STORE_CONTAINER` → `DEPOT` → `STORE_CONTAINER`;
-- another Character on the same Account cannot use or move the bound item;
+- another Character on the same Account — a Companion of the same Game Account included — cannot
+  use or move the bound item;
 - a Market listing fails, on either Market;
 - player trade, gift and mail fail;
 - an NPC sale fails;
@@ -474,13 +477,17 @@ the following hold, each proven by a test:
 - a move into a Forge input fails;
 - no currency or value conversion path exists;
 - a bound item can be used only by its own Character;
-- a `PENDING_DELETION` Character cannot move, use or receive bound items;
+- a Character of a `PENDING_DELETION` Game Account cannot move, use or receive bound items;
 - a restore preserves every bound item exactly;
 - the purge deletes the Store Container's contents;
 - the purge also deletes bound items stored in the Depot;
-- ordinary unbound Depot items survive that same purge;
+- a purge of one Game Account deletes nothing of another Game Account's, bound or unbound. *(Until
+  2026-09-25 this read "ordinary unbound Depot items survive that same purge". Since `ADR-024` the
+  purge takes the whole Game Account, its Depot included);*
 - no orphaned `boundCharacterId` remains after a purge;
-- a repeated or retried purge cannot delete another Character's items;
+- a repeated or retried purge cannot delete another Game Account's items;
+- a binding is never encoded through Canary's `UNIQUEID` or `ACTIONID` (`ADR-021` B6);
+- an action slot consumes only an eligible potion bound to its own Character (`ADR-021` U5);
 - a concurrent Depot move and a deletion request or purge are safely serialised;
 - if bound items are stackable, a split or merge never changes the binding.
 
@@ -511,22 +518,21 @@ Carried from [`design/FUTURE_DIRECTIONS.md`](design/FUTURE_DIRECTIONS.md) § *Be
 scale*: `IdempotencyRecord` retention, `SettlementOperation` retention with a compaction proof,
 content bundle archival, an object-storage provider, production rate limiting and auth hardening.
 
-Character deletion (`ADR-020`) adds one obligation and three `OPEN` operational questions here,
-tracked in [`OPEN_QUESTIONS.md`](OPEN_QUESTIONS.md) § *Character deletion*:
+Game Account deletion (`ADR-024`) adds one obligation and three `OPEN` operational questions
+here, tracked in [`OPEN_QUESTIONS.md`](OPEN_QUESTIONS.md) § *Game Account deletion*:
 
 - **before production**, choose a measurable **purge lateness target** — how long after `purgeAt`
   a due purge may take before it counts as a breach — and alert on it. G4.1 requires overdue
   purges to be retried and observable; only the number is left to this gate, and nothing earlier
   invents it;
-- how long **backups and logs** may keep a purged Character;
-- how long the **historical deletion records**, the purge manifests and the deletion analytics
-  are retained, and who may read them — they may keep identifying fields (DH4) — and how long a
-  public Deleted List entry stays listed;
-- what the purge job does after a **restore from backup**, which brings back Characters purged
+- how long **backups and logs** may keep a purged Game Account;
+- how long the **internal history records** are retained, and who in support may read them — they
+  keep names (HR3). There is no public list to retain (HR1);
+- what the purge job does after a **restore from backup**, which brings back Game Accounts purged
   after the backup point and loses deletion requests and restores made after it.
 
-The purge's own obligations — idempotency and settlement records that name the Character
-included — are **not** deferred to this gate: they belong to G4.1.
+The purge's own obligations — idempotency and settlement records that name the Game Account or its
+Characters included — are **not** deferred to this gate: they belong to G4.1.
 
 ---
 

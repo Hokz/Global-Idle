@@ -4,11 +4,15 @@
 in the governance synchronization that follows PR #13 head `86a7681`. The independent review of
 head `e2d0e04` found its replay rule over-generalized, and it is corrected here: the Product
 Owner's replay rule covers **human multiplayer / co-op** quests, not every quest (§1, *Scope*).
-**The correction is pending independent review.**
+**Extended** in the final 2026-09-25 synchronization, after PR #13 head `fff6faf`: a claim belongs
+to the Game Account — never to the Login and never to the actor — and each Game Account of a Login
+keeps its own (QR9). Since `ADR-024`, a Game Account's claims are purged with it (§3).
+**The correction and the extension are pending independent review.**
 **Relates to:** [ADR-022](./ADR-022-game-account-main-character-and-companions.md) — claim state
 belongs to the Game Account, never to the selected actor.
 [ADR-020](./ADR-020-character-deletion-grace-and-purge.md) — a one-time Tutorial Reward is the
-same concept, and no purge resets it.
+same concept. [ADR-024](./ADR-024-game-account-deletion-grace-and-purge.md) — a Game Account's
+claims go with it at its purge, and no surviving Game Account's claim is touched.
 **Owning phases:** Phase 5 builds the quest, dungeon and boss engine and its reward-claim
 primitive; Phase 5B's cooperative quests are the first content that QR2 makes replayable.
 **Nothing in this record is implemented.**
@@ -39,6 +43,7 @@ reward-like state is the Hunt's creature loot and Gold.
 | QR6 | The claim state belongs to the **Game Account**, not to the selected actor. Choosing the Main or a companion never resets it. |
 | QR7 | Wherever content is replayable, quest completion and progression state and reward-claim state are never conflated. |
 | QR8 | An ordinary quest reward item is a normal item unless its definition says otherwise: movable, sellable, tradeable and discardable under the normal item rules. Coming from a quest never makes equipment Character-bound — the Doublet included. |
+| QR9 | *Final synchronization, 2026-09-25.* One-time reward claims belong to the **Game Account** — not to the Login and not to the actor. A Companion that takes a co-op one-time reward takes it for its own Game Account only, and every other Game Account under the same Login keeps its own claim. |
 
 **Scope.** QR2 and QR4 are the Product Owner's rules for **human multiplayer / co-op** quests.
 Whether any other content — solo, tutorial, story or dungeon — can be replayed is **defined by that
@@ -78,14 +83,17 @@ cooperative quest stays playable after completion; what is one-time is its final
   some rewards are *stored* — a custody safe from Hunt death. A quest's final reward chest is
   *content* that grants a reward. They are different things with similar names.
 - **Tutorial Rewards** (`ADR-020` §5.1) are one-time rewards in this sense wherever they are
-  defined as one-time: Game-Account-owned claim state that no deletion or purge resets. The
-  tutorial's Doublet Quest ends in its guaranteed Treasure Chest
-  (`TUTORIAL_ROOKGAARD_ROADMAP.md` §18–§19). Whether that chest is a one-time Tutorial Reward, and
-  whether the Doublet Quest can be replayed at all, are open (§43 of that document). If the chest
-  is one-time, it uses this primitive and is claimed once per Game Account. The Doublet itself is
-  an ordinary item (QR8).
-- **Character deletion** (`ADR-020`) — reward-claim state is Game Account state. A purge never
-  resets it, whichever actor claimed the reward.
+  defined as one-time: Game-Account-owned claim state, which nothing re-enables. It goes only
+  with its whole Game Account (`ADR-024`). The tutorial's Doublet Quest ends in its guaranteed
+  Treasure Chest (`TUTORIAL_ROOKGAARD_ROADMAP.md` §18–§19). Whether that chest is a one-time
+  Tutorial Reward, and whether the Doublet Quest can be replayed at all, are open (§43 of that
+  document). If the chest is one-time, it uses this primitive and is claimed once per Game
+  Account. The Doublet itself is an ordinary item (QR8).
+- **Deletion** — reward-claim state is Game Account state. Since `ADR-024` the deletion unit is
+  the Game Account, so its claims are purged with it (GD5). No purge ever re-enables a claim for a
+  Game Account that survives, and a new Game Account starts with claims of its own (QR9). Under
+  `ADR-020`'s superseded Character purge, the rule read: *"a purge never resets it, whichever actor
+  claimed the reward"*.
 - **Cooperative quests** (Phase 5B) — each participating Game Account has its own claim, whichever
   actor it selected (`ADR-022` MP3–MP5), and cross-account settlement stays per Game Account
   (`PHASE_GATES.md` § *G5B.3*).
@@ -126,7 +134,7 @@ cooperative quest stays playable after completion; what is one-time is its final
 - No document calls a co-op quest one-time when it means its reward.
 - No document makes a quest replayable, or not, without that content's own definition or a Product
   Owner decision.
-- A one-time claim is keyed by Game Account, never by actor.
+- A one-time claim is keyed by Game Account, never by actor and never by Login.
 - A claim commits with its grant, exactly once, under retry and concurrency.
 - A quest reward item is ordinary unless its definition binds it.
 
@@ -149,6 +157,8 @@ reuse one by accident, and none of them is auditable.
 
 - QR1–QR8 — Product Owner, 2026-09-25; QR2 and QR4 for human multiplayer / co-op quests, as the
   independent review of `e2d0e04` confirmed.
-- *"Tutorial Rewards … stay one-time where defined as one-time, are never reissued merely because a
-  Character was deleted or purged"* — `DECISIONS.md` § *Character deletion* (G4.1c).
+- QR9 — Product Owner, 2026-09-25, final synchronization.
+- One-time Tutorial Rewards are never reissued because a Character was deleted or purged — G4.1c,
+  2026-09-24 (`ADR-020` §5.1–§5.2). Its deletion scenario is superseded by `ADR-024`, and the
+  claims stay Game Account state (QR9).
 - Per-account settlement of shared runs — `PHASE_GATES.md` § *G5B.3*.

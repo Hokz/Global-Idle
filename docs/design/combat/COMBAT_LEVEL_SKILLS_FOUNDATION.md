@@ -4,16 +4,22 @@
 **Scope:** Base Level, Skills, skill training, vocation aptitudes, baseline combat power, and how later systems modify combat.  
 **Purpose:** Establish a clean technical model before exact formulas are implemented.
 
-> **Amended 2026-09-25 — non-formula decisions only.** The Product Owner locked the classic Skill
+> **Amended 2026-09-25 — non-formula decisions.** The Product Owner locked the classic Skill
 > set (Magic Level, Sword, Axe, Club, Shielding, Distance and Fist; no Fishing), the build
 > philosophy, damage origin versus damage type, resistances instead of absolute immunities,
 > vocation-specific Skill Trees with a no-refund respec, and equipment rules without hidden
-> per-vocation multipliers — [`DECISIONS.md`](../../DECISIONS.md). **The combat formula revision
-> discussed after PR #13 head `86a7681` is not decided:** attack coefficients, the minimum and
-> maximum auto-attack formulas, whether Canary's coefficient is adopted, the starting Skill value,
-> the Defense score and its roll, the Armor roll, the rounding stages, skill scaling and balance
-> targets stay open (§45). Nothing here changes a formula that Phases 2–3.6 implemented and
-> verified.
+> per-vocation multipliers — [`DECISIONS.md`](../../DECISIONS.md).
+>
+> **Amended again 2026-09-25 — the weapon attack and defence formulas are `LOCKED`** (final
+> synchronization, after PR #13 head `fff6faf`). The exact expressions are Attack Value, Max
+> Base Damage, Defense Value at a 0.50 scale plus flat Weapon Defense and Armor Value, and Armor
+> Value. Armor and Defense decide pass or block only. Mitigation is a percentage of the damage
+> that passed. There is no hidden vocation multiplier. They are recorded in `DECISIONS.md`
+> § *Combat formulas — weapon attack and defence* and summarised in §29 and §33 below. Ranged
+> Accuracy, the damage-roll distribution and minimum damage, the rounding stages and the
+> tie/order/visual-mapping rules stay open (§45). **Not implemented:** the engine Phases 2–3.6
+> verified still follows Canary, and stays as built until the phase that implements the locked
+> formulas replaces it through explicit matrix amendments.
 
 ---
 
@@ -869,6 +875,20 @@ Then apply modifier layers.
 
 Exact Canary formula is not yet imported/approved.
 
+*`LOCKED` 2026-09-25 — the weapon attack formulas* (`DECISIONS.md` § *Combat formulas — weapon
+attack and defence*, where the exact expressions are recorded):
+
+```text
+E = Skill + Level / 100
+w = (WeaponAttack - 7) / 55
+s = (E - 1.01) / 263.99
+AttackValue   = 5 + 85 * w^2 + 350 * s^1.5 + 685 * (w * s)^3     the pass/block score
+MaxBaseDamage = 0.085 * WeaponAttack * Skill + Level / 5         the maximum base damage
+```
+
+Attack Value decides pass or block, and is separate from the damage dealt. Open: the exact ranged
+Accuracy system, the damage-roll distribution and minimum damage, and the rounding stages (§45).
+
 ---
 
 # 30. Spell Damage
@@ -965,8 +985,32 @@ Later systems can modify:
 
 Canary should be studied before the exact Global Idle model is locked.
 
-*2026-09-25:* whatever the model, it holds no hidden per-vocation Armor or Defense multiplier. The
-Defense score, its roll and the Armor roll belong to the open formula revision (§45).
+*2026-09-25:* whatever the model, it holds no hidden per-vocation Armor or Defense multiplier.
+
+*`LOCKED` 2026-09-25, final synchronization — Defense Value and Armor Value* (`DECISIONS.md`
+§ *Combat formulas — weapon attack and defence*):
+
+```text
+E_def = Shielding + Level / 100
+w_def = (ShieldDefense - 7) / 55
+s_def = (E_def - 1.01) / 263.99
+DefenseCoreRaw    = 5 + 85 * w_def^2 + 350 * s_def^1.5 + 685 * (w_def * s_def)^3
+ScaledDefenseCore = DefenseCoreRaw * 0.50
+DefenseValue      = ScaledDefenseCore + WeaponDefense + ArmorValue
+
+ArmorValue = sum of Armor from all equipped armor-bearing slots, excluding weapon and shield
+```
+
+- Defense uses Attack Value's core shape and weights at a 0.50 scale, then adds flat Weapon Defense
+  and the whole ArmorValue at the end;
+- ArmorValue is also its own, independent defensive check;
+- Armor and Defense decide **pass or block** only. They never reduce damage that passes;
+- **Mitigation** is a percentage reduction of damage that passed:
+  `FinalDamage = PassedDamage * (1 - MitigationPercent)`;
+- no hidden vocation multiplier. A Knight's tankiness comes from visible build and progression
+  systems.
+
+Open: the exact tie, order and visual-mapping rules, and how the scores are compared (§45).
 
 ---
 
@@ -1071,11 +1115,20 @@ Advanced build development begins in Mainland after vocation selection.
 
 Exact timing for first Skill Point allocation is still to be finalized.
 
+*2026-09-25, final synchronization:* Rookgaard is a full, single-player region, and a player may
+stay there indefinitely, vocationless (`DECISIONS.md` § *Rookgaard*). Its constraints above hold
+for as long as the player stays.
+
 ---
 
 # 39. Vocation Selection and Skills
 
 Vocation is chosen at Base Level 8.
+
+*2026-09-25, final synchronization:* more precisely, the vocation is chosen on proceeding to the
+Mainland, which the Level 8 event offers. It becomes the Main's vocation, and the other four become
+the Game Account's possible Companions (`ADR-022` GA12, RK4). A player who stays in Rookgaard stays
+vocationless.
 
 This matters because vocation influences Skill aptitude/cost.
 
@@ -1327,7 +1380,11 @@ The following are established product directions:
   Fist, with no Fishing; Level is not the sole power source; damage origin and damage type are
   separate; ordinary Hunts use resistances, not absolute immunities; each vocation has its own
   Skill Tree, with a respec that refunds nothing; no hidden per-vocation Armor or Defense
-  multiplier.
+  multiplier;
+- *2026-09-25, final synchronization:* the exact Attack Value, Max Base Damage, Defense Value and
+  Armor Value formulas (§29, §33); Armor and Defense decide pass or block and never reduce damage
+  that passes; Mitigation is a percentage of the damage that passed; `baseXp` is the truth and
+  `baseLevel` its stored projection.
 
 ---
 
@@ -1335,13 +1392,16 @@ The following are established product directions:
 
 Must still be designed explicitly:
 
-- **the combat formula revision discussed after PR #13 head `86a7681`** — attack coefficients, the
-  minimum and maximum auto-attack formulas, whether Canary's coefficient is adopted, the starting
-  Skill value, the Defense score and its roll, the Armor roll, the rounding stages, skill scaling
-  and balance targets. It is handled separately, and nothing is decided by this document;
+- ~~the combat formula revision discussed after PR #13 head `86a7681`~~ — **decided 2026-09-25**
+  for weapon attack and defence (§29, §33). What stays open of it: the exact ranged Accuracy
+  system; the damage-roll distribution and minimum damage; the rounding stages, where not already
+  specified; the tie, order and visual-mapping rules; and, not stated with the formulas, how the
+  scores are compared, whether Skill and Shielding are base or effective values, and ShieldDefense
+  without a shield or below the 7 offset;
 - exact Skill Point award trigger;
 - exact starting Skill values;
-- exact Base Level XP curve;
+- exact Base Level XP curve — Phase 2 implemented Canary's `getExpForLevel`, and the Product Owner
+  has not locked it as Global Idle's curve (2026-09-25). It stands until a decision replaces it;
 - exact Skill XP/progress mechanics from hunting;
 - exact Skill cost curve;
 - exact Level 1000 → Skill 100 calibration formula;
@@ -1423,10 +1483,9 @@ Buffs / Debuffs
              ↓
 
 TARGET DEFENSE
-Armor
-Shielding
+Defense Value · Armor Value   pass or block (2026-09-25)
 Resistances
-Mitigation
+Mitigation                    % of the damage that passed
              ↓
 
 FINAL COMBAT RESULT

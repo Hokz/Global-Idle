@@ -154,20 +154,21 @@ The ones that would actually reveal a problem:
 | Idempotent replay hits | client retry patterns, and whether retries are safe in practice |
 | Job queue depth and age | worker starvation |
 | Content version in use | whether a deployment actually rolled out |
-| Overdue Character purges — how many are due and not yet purged, and how late the oldest is past `purgeAt` | the deletion lifecycle degrading. A due purge that has not committed is a **failure condition**, never a normal state; it alerts against a lateness target chosen before production (`ADR-020` §7, pre-launch gate). **PRE-4 — not implemented** |
-| Historical deletion records written vs purges committed | **must match** — a purge without its record, or a record without its purge, is an integrity alarm (`ADR-020` §7, DH1–DH3). **PRE-4 — not implemented** |
+| Overdue Game Account purges — how many are due and not yet purged, and how late the oldest is past `purgeAt` | the deletion lifecycle degrading. A due purge that has not committed is a **failure condition**, never a normal state; it alerts against a lateness target chosen before production (`ADR-020` §7, `ADR-024` §2, pre-launch gate). **PRE-4 — not implemented** |
+| Internal history records written vs purges committed | **must match** — a purge without its record, or a record without its purge, is an integrity alarm (`ADR-024` HR2–HR5). **PRE-4 — not implemented** |
 
 ### Balance telemetry — a game-wide direction (2026-09-25)
 
 XP production, hunt efficiency, loot and drop generation, item creation and destruction, deletion
 history and balance analysis are preserved or collected (`ADR-020` DH6). This is a **cross-phase
 direction, not one phase's deliverable**. Each gameplay or economy phase records the telemetry it
-introduces, and later balance and analytics work consumes it. PRE-4 records only the
-deletion-specific facts — the historical record, the purge manifest and the Deleted List
-(DH1–DH3) — and must not corrupt durable audit or analytics data that already exists; it builds no
-general telemetry platform. What each phase collects, where it lives and how it is produced are
-that phase's decisions, and retention is the pre-launch gate's. Analytics may keep identifying
-fields internally (DH4); they never become live ownership, custody or a uniqueness input (DH5).
+introduces, and later balance and analytics work consumes it. The deletion lifecycle records only
+its internal history record for support (`ADR-024` HR2–HR5) — no purge manifest of destroyed value
+and no Deleted List — and must not corrupt durable audit or analytics data that already exists; it
+builds no general telemetry platform. What each phase collects, where it lives and how it is
+produced are that phase's decisions, and retention is the pre-launch gate's. Analytics may keep
+identifying fields internally (DH4); they never become live ownership, custody or a uniqueness
+input (DH5).
 
 ### Tracing
 
@@ -205,7 +206,7 @@ Shared codebase, separate entry point (`ADR-012`).
 | Ledger reconciliation | scheduled; halts economy writes for a mismatched subject |
 | Listing expiry | returns escrowed items to inventory, transactionally |
 | Skill training settlement | on claim, or swept for long-idle accounts |
-| Character purge (**PRE-4 — not implemented**) | attempts every Character whose `purgeAt` has arrived **promptly**, one atomic transaction each, writing the historical deletion record in the same boundary; a purge that cannot commit is retried automatically and alerts while overdue. It never purges early and never defers a due purge (`ADR-020` §7) |
+| Game Account purge (**PRE-4 — not implemented**) | attempts every Game Account whose `purgeAt` has arrived **promptly**, one atomic transaction each, writing the internal history record in the same boundary; a purge that cannot commit is retried automatically and alerts while overdue. It never purges early and never defers a due purge, whatever started the deletion (`ADR-020` §7, `ADR-024` GD9–GD10) |
 
 `DECIDED IN PHASE 0A` — **every job is idempotent and safe to run twice.** Job systems deliver
 at-least-once under failure; designing for exactly-once is designing for a guarantee that does
@@ -241,16 +242,16 @@ absence of one, because it produces false confidence.
 `DEFERRED` — RPO/RTO targets and backup cadence. They are commercial and operational choices,
 not architectural ones.
 
-`OPEN` — **restores and Character deletion** (`ADR-020`). A restore brings back Characters purged
-after the target point and loses deletion requests and restores made after it; a pending Character
-whose deadline has passed would then be purged again at once, even one its owner restored inside
-the lost window. Recommended until decided: the purge job stays paused after a restore until the
-lifecycle transitions lost in the window are reconciled, as a step alongside 2 and 3 above. That
-pause is part of disaster recovery, not a way to defer purges: every Character that falls due
-while it lasts is an **overdue purge**, visible and alerting like any other (`ADR-020` §7). How
-long backups and logs may keep a purged Character is open as well, and so is how long historical
-deletion records, purge manifests and deletion analytics are retained.
-See [`../OPEN_QUESTIONS.md`](../OPEN_QUESTIONS.md) § *Character deletion*.
+`OPEN` — **restores and Game Account deletion** (`ADR-024`). A restore brings back Game Accounts
+purged after the target point and loses deletion requests and restores made after it; a pending
+Game Account whose deadline has passed would then be purged again at once, even one its owner
+restored inside the lost window. Recommended until decided: the purge job stays paused after a
+restore until the lifecycle transitions lost in the window are reconciled, as a step alongside 2
+and 3 above. That pause is part of disaster recovery, not a way to defer purges: every Game
+Account that falls due while it lasts is an **overdue purge**, visible and alerting like any other
+(`ADR-020` §7). How long backups and logs may keep a purged Game Account is open as well, and so
+is how long internal history records are retained and who in support may read them.
+See [`../OPEN_QUESTIONS.md`](../OPEN_QUESTIONS.md) § *Game Account deletion*.
 
 ---
 

@@ -26,6 +26,14 @@
 > What the change leaves open is `ADR-022` §4. The current rules are in
 > [`DECISIONS.md`](../../DECISIONS.md) § *Game Account, Main Character and companions* and
 > § *Personal Active Party*.
+>
+> **Amended again 2026-09-25 — final synchronization.** An unlocked companion is **permanent**:
+> never deleted, dismissed, removed, replaced, rerolled, converted into the Main or unlocked
+> backward (GA11). The vocation chosen on proceeding to the Mainland is the Main's, and the other
+> four are possible companions (GA12). The Main / companion distinction adds no hidden combat
+> multiplier (GA13). Rookgaard is single-player, with no Party and no companions (RK1–RK4).
+> Deletion takes the whole Game Account
+> ([`ADR-024`](../../architecture/decisions/ADR-024-game-account-deletion-grace-and-purge.md)).
 
 ---
 
@@ -128,9 +136,11 @@ Duplicate vocations are prohibited.
 > it still holds its vocation, its roster place and, as the Origin Character, the Origin slot, so
 > no replacement can make the promised restore impossible; only the purge frees them (G4.1b,
 > `LOCKED` by the Product Owner).
-> See `docs/DECISIONS.md` § *Character deletion*. *Since 2026-09-25 the grace is exactly 720
-> elapsed hours and a full freeze, a historical record survives the purge, and the Character
-> deleted is the Main; what happens to its companions is open (`ADR-020` §5.3).*
+> See `docs/DECISIONS.md` § *Game Account deletion*. *Since 2026-09-25 the grace is exactly 720
+> elapsed hours and a full freeze. Since the final synchronization the deletion target is the
+> **whole Game Account** (`ADR-024`): the Main and every companion go together at its purge, a
+> companion is **permanent** and never deleted or dismissed on its own (`ADR-022` GA11), and no
+> replacement Main exists. The per-Character holds above are superseded.*
 
 Examples:
 
@@ -177,9 +187,9 @@ Monk
 ```
 
 A vocation already held by a Character on the account cannot be purchased or unlocked again, even
-if roster slots are free. A Character pending deletion still holds it throughout its 30-day
-grace; only the **final purge** of that Character releases the vocation, and it becomes selectable
-once more (`ADR-020` §5, G4.1b).
+if roster slots are free. *Since 2026-09-25 companions are permanent and the Main is never
+replaced, so a vocation once held stays held for the life of the Game Account; only the Game
+Account's own purge ends it (`ADR-022` GA11, `ADR-024`).*
 
 This uniqueness rule spans the whole **roster**, not merely the Active Party. *Carried over by
 `ADR-022` §3: it spans the Main and every companion.*
@@ -210,6 +220,10 @@ Choose first vocation
 ```
 
 This first character is the account's initial/origin character.
+
+*Since 2026-09-25 the player may also stay in Rookgaard indefinitely, vocationless and alone:
+Rookgaard is single-player, with no Party (`ADR-022` RK1–RK3). The vocation chosen on proceeding to
+the Mainland becomes the Main's, and the other four become possible companions (GA12).*
 
 Example:
 
@@ -1066,11 +1080,13 @@ The following are LOCKED unless the Product Owner explicitly changes them. *Upda
 - maximum roster = 5: the Main and up to four companions;
 - the roster supports the five vocations: Knight, Druid, Sorcerer, Paladin, Monk;
 - maximum one roster member per vocation per Game Account;
-- duplicate vocation characters are prohibited. A deleted Character is restorable for 30 days —
-  exactly 720 elapsed hours, fully frozen — and then permanently purged; it holds its vocation and
-  its roster place until the purge, and only the purge frees them (`ADR-020` §5, G4.1b — which
-  supersedes `ADR-007`'s retirement). The deleted Character is the Main; what happens to its
-  companions is open (`ADR-020` DEL-O1);
+- duplicate vocation characters are prohibited;
+- an unlocked companion is **permanent** — never deleted, dismissed, removed, replaced, rerolled,
+  converted into the Main or unlocked backward (`ADR-022` GA11);
+- deletion takes the **whole Game Account**: restorable for exactly 720 elapsed hours, fully
+  frozen, then permanently purged with the Main and every companion (`ADR-024`, which supersedes
+  `ADR-020`'s Character target; `ADR-020` superseded `ADR-007`'s retirement);
+- the Main / companion distinction adds no hidden combat multiplier (`ADR-022` GA13);
 - companions are unlocked with in-game Gold;
 - exact unlock costs remain OPEN.
 
@@ -1086,8 +1102,9 @@ The following are LOCKED unless the Product Owner explicitly changes them. *Upda
 
 ## New Characters
 
-- the first character — the Main, the *Origin Character* before Rookgaard — performs Rookgaard
-  Level 1–8;
+- the first character — the Main, the *Origin Character* before Rookgaard — begins in Rookgaard
+  at Level 1, and may stay there indefinitely (`ADR-022` RK1). The guided tutorial leads to the
+  Level 8 vocation choice;
 - companions do not perform Rookgaard;
 - companions start at Level 8;
 - companions receive Level 8-appropriate Skill progression according to the final Skill model;
@@ -1142,9 +1159,11 @@ The following remain OPEN and must not be silently decided by a builder:
   Activity is running - see `docs/architecture/DOMAIN_MODEL.md` §5.5 and §5.12)
 - final Skill Point state granted to a newly unlocked Level 8 character;
 - Premium/convenience benefits related to Party management now that there is no fifth active Party slot;
-- *since 2026-09-25* (`ADR-022` §4): a companion's lifecycle (GA-O1); what happens to the
-  companions when the Main is deleted (GA-O2); companion custody, Stamina, occupancy and names
-  (GA-O3–GA-O5, GA-O7); and how a low-level companion levels with the Main always present (GA-O6).
+- *since 2026-09-25* (`ADR-022` §4): companion custody, Stamina and occupancy (GA-O3–GA-O5);
+  whether a companion's name is player-chosen (GA-O7 — it is a globally unique Character name);
+  and how a low-level companion levels with the Main always present (GA-O6). A companion's
+  lifecycle (GA-O1) and what deleting the Main does to its companions (GA-O2) are **resolved**:
+  companions are permanent, and deletion takes the whole Game Account (`ADR-024`).
 
 ---
 

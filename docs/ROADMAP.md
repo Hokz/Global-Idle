@@ -56,6 +56,10 @@ Detail for every entry is in the master roadmap; nothing below adds to it.
     later: PvP arena, matchmaking, ranking — after the combat foundations
 ```
 
+There is **no Phase 3.8** (2026-09-25). After Phase 3.7 comes the PRE-PHASE-4 gate, and its next
+work product is the PRE-PHASE-4 specification — the master roadmap §20 says so, and this line only
+repeats it.
+
 ---
 
 ## Historical note — superseded phrasing

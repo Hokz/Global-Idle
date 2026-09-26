@@ -38,12 +38,12 @@ per-Character **Store Container** for Character-bound consumables — and with i
 stays that Character's even when it is stored in the Depot.
 
 **There is no `account_recovery` scope.** Phase 0A listed one here, to hold a retired Character's
-items (`ADR-007`). It was never built, and `ADR-020` removes it: a Character pending deletion keeps
-its items where they are for 30 days, and its final purge **destroys** every item it still owns.
-Nothing moves to the Account at purge. Unbound items the player moved into Account custody — the
-Depot or the Stash — before requesting deletion are the Account's, and the purge does not touch
-them. A Character-bound consumable is not: it is the Character's in the Depot too, and the purge
-deletes it (`ADR-021` §6).
+items (`ADR-007`). It was never built, and `ADR-020` removed it. Since `ADR-024` (2026-09-25) the
+deletion unit is the **Game Account**: during its 720-hour grace everything stays where it is,
+frozen, and its final purge **destroys** everything the Game Account owns — every Character's
+items, the Depot, the Stash and the Bank. Nothing moves to another Game Account or to the Login.
+*Until then* a Character's purge left the Account's Depot and Stash untouched; that case no longer
+exists.
 
 ---
 
@@ -51,13 +51,14 @@ deletes it (`ADR-021` §6).
 
 Append-only. No updates, no deletes — enforced by **database permissions**, not convention.
 
-**One designed exception** (`ADR-020`): a Character's final purge deletes that Character's POUCH
-entries and POUCH balance, 30 days after a deletion request, and nothing else — unless the PRE-4
-specification keeps the entries as immutable history outside live custody, never a live balance
-(`ADR-020` §6.1). The value still in the Pouch is destroyed with them — it is **not** moved to the
-Bank. The purge never deletes or
-changes a BANK entry, so every Account's ledger, balances and reconciliation are untouched by it.
-The purge runs under its own capability; the application role still cannot delete an entry.
+**One designed exception** (`ADR-024`, reusing `ADR-020`): a Game Account's final purge deletes
+that Game Account's ledger entries and balances, BANK and POUCH, 720 elapsed hours after a
+deletion request, and nothing else — unless the PRE-4 specification keeps the entries as immutable
+history outside live state, never a live balance (`ADR-024` §3). The value is destroyed with them
+— it is **not** moved to another Game Account or to the Login. Every other Game Account's ledger,
+balances and reconciliation are untouched. The purge runs under its own capability; the
+application role still cannot delete an entry. *Until 2026-09-25 a Character's purge deleted only
+its POUCH entries and never a BANK entry (`ADR-020` §6.1).*
 
 Each entry records: subject account, currency type, signed amount, reason code, operation id,
 counterparty where applicable, timestamp, resulting balance.
@@ -152,8 +153,8 @@ one.
 | API → Engine | the engine resolves rolls but **cannot create or move an item or currency** |
 | Engine → Persistence | none. The engine has no I/O (`ADR-010`) |
 | Application → Ledger | append only; no application path updates or deletes an entry |
-| Purge capability → Ledger | deletes **only** the POUCH entries of a Character whose purge it has itself verified — `PENDING_DELETION`, deadline passed — in the same transaction; never a BANK entry, never an update (`ADR-020` §7) |
-| Admin tooling | subject to the same transactional and audit rules as gameplay; it cannot purge early or restore after a purge |
+| Purge capability → Ledger | deletes **only** the entries of a Game Account whose purge it has itself verified — `PENDING_DELETION`, deadline passed — in the same transaction; never another Game Account's entry, never an update (`ADR-020` §7, `ADR-024` §3) |
+| Admin tooling | subject to the same transactional and audit rules as gameplay; it cannot purge early, bypass the grace or restore after a purge — moderation included (`ADR-024` GD9–GD10) |
 
 `DECIDED IN PHASE 0A` — **admin and support tooling is not a privileged bypass.** A grant, a
 refund or a correction is an ordinary ledgered operation with an operation id and an actor
@@ -175,18 +176,21 @@ audit trail decorative.
 | Market self-dealing / wash trading | buyer ≠ seller enforced; fees make round-trips lossy; price history retained for analysis |
 | Listing spam | listing fees, rate limits |
 | Enumeration of accounts or items | ownership-scoped queries and rate limiting are the control; non-sequential UUIDv7 ids raise the cost but are **not** the security boundary (`DATA_ARCHITECTURE.md` §2) |
-| Race on roster vocation uniqueness | persistence-level constraint over every existing Character, `PENDING_DELETION` included (`ADR-020` §5, G4.1b) |
-| Deletion used to bank carried value | impossible by rule: nothing Character-owned moves to the Bank or to any recovery custody at purge — it is destroyed (`ADR-020`, L7–L8) |
-| Restore/purge race at the deadline | both lock the Character and decide against the authoritative clock after the lock; exactly one wins (`ADR-020` §7) |
-| Farming through delete → purge → recreate | forbidden by rule (G4.1c, `LOCKED`). One-time Tutorial Rewards are Account-governed and never reissued. A new pre-completion Origin Character does receive a fresh Bootstrap Kit, but a kit can never leave its Character or become value and is destroyed with it, so cycles accumulate nothing (`ADR-020` §5.1–§5.2). Under `ADR-022` a recreation is a replacement Main, whose existence is DEL-O1 |
-| Deletion used to regenerate time-derived value — Stamina recovered while pending, then restored | the grace is a full freeze: nothing time-derived accrues to a pending Character, and a restore credits nothing (`ADR-020` FZ2–FZ3, `DOMAIN_MODEL.md` I17). **Not implemented** — PRE-4 |
-| A historical deletion record used to hold a name, an item or a balance | it takes part in no ownership, custody or uniqueness rule, and restores nothing (`ADR-020` DH5, FZ6, `DOMAIN_MODEL.md` I26). **Not implemented** — PRE-4 |
-| A one-time reward claimed twice — by replaying the quest, switching between the Main and a companion, or racing two claims | the claim belongs to the Game Account, never to the actor, and a uniqueness guarantee over the Game Account and the reward commits with the grant (`ADR-023`, `DOMAIN_MODEL.md` I25). **Not implemented** — Phase 5 |
+| Race on roster vocation uniqueness | persistence-level constraint over every existing Character, a pending Game Account's included (`ADR-024`) |
+| Race on a Character name across Game Accounts | global, persistence-level uniqueness over every existing Character (`ADR-024` NM1, `DOMAIN_MODEL.md` I27). **Not implemented** — PRE-4 (G4.4) |
+| Deletion used to move carried value | impossible by rule: nothing of a purged Game Account moves to another Game Account, to the Login or to any recovery custody — it is destroyed (`ADR-024` GD6) |
+| Restore/purge race at the deadline | both lock the Game Account and decide against the authoritative clock after the lock; exactly one wins (`ADR-020` §7, `ADR-024` §2) |
+| Farming through delete → purge → recreate | nothing to farm: a purge carries nothing into another Game Account or the Login, and no replacement Main is ever created (`ADR-024` GD6–GD7). A new campaign is a new Game Account with its own claims — the same as any other Game Account, which the multi-account item below covers. *Until 2026-09-25 this row relied on G4.1c's tutorial routing and a Bootstrap Kit, both superseded* |
+| One-time rewards farmed across several Game Accounts of one Login and traded out | **OPEN** for Phase 6, before player trade ships: claims are per Game Account by rule (`ADR-023` QR9), so the limit, if any, is on transfer (`PHASE_GATES.md` § *G6.4*) |
+| Moderation used to destroy a campaign instantly | impossible by rule: every deletion source goes through the same 720-hour grace and purge (`ADR-024` GD9–GD10). Who may start and restore one is DEL-O3 |
+| Deletion used to regenerate time-derived value — Stamina recovered while pending, then restored | the grace is a full freeze: nothing time-derived accrues to a pending Game Account, and a restore credits nothing (`ADR-020` FZ2–FZ3, `DOMAIN_MODEL.md` I17). **Not implemented** — PRE-4 |
+| A historical deletion record used to hold a name, an item, a balance or a claim | it takes part in no ownership, custody, claim or uniqueness rule, and restores nothing (`ADR-024` HR5, `DOMAIN_MODEL.md` I26). **Not implemented** — PRE-4 |
+| A one-time reward claimed twice — by replaying the quest, switching between the Main and a companion, or racing two claims | the claim belongs to the Game Account, never to the actor or the Login, and a uniqueness guarantee over the Game Account and the reward commits with the grant (`ADR-023`, `DOMAIN_MODEL.md` I25). **Not implemented** — Phase 5 |
 | A personal party carried into a shared run as a block | each participating Game Account selects exactly one actor (`ADR-022` MP2–MP4). **Not implemented** — Phase 5B |
 | Premium-currency value turned into tradeable value through a Character-bound consumable | never listed on either Market, traded, gifted, mailed, sold to an NPC, stashed, forged, converted or moved to another Character — each refused server-side on the instance (`ADR-021`, `DOMAIN_MODEL.md` I23). **Not implemented** — gate GBC.1, before the first bound item ships |
-| A bound item parked in the Depot to outlive its Character | the purge selects by binding, not by custody, and deletes it; unbound Depot items are untouched (`ADR-021` §6) |
+| A bound item parked in the Depot to outlive its Character | the purge deletes the whole Game Account, Depot included, so nothing outlives it there. The closure still selects by binding, so no binding is orphaned (`ADR-021` §6, `ADR-024` §3) |
 | Combat power sold for real money | the Store never sells combat equipment for real-money or premium-currency value; its Character-bound items are consumables (`ADR-021` S1–S2) |
-| A Bootstrap Kit item escaping into Account value | refused server-side on the instance by every move, Stash, transfer, sale, listing, trade and conversion path (`DOMAIN_MODEL.md` I20). **Not implemented** — today a kit item can be moved to the Depot and its potions stowed in the Stash, and a counter sale pays the Bank directly; the PRE-4 gate closes these before any purge exists (`PHASE_GATES.md` § *G4.1*). Since 2026-09-25 the kit's potions follow `ADR-021` — the Depot allowed, still bound — and the gear's representation is DEL-O4 |
+| ~~A Bootstrap Kit item escaping into Account value~~ | **retired 2026-09-25**: the starter gear is ordinary, low-value items, and the tutorial potions are Character-bound consumables governed by the row above that covers them (`DECISIONS.md` § *Tutorial starting items*). Today the tutorial's 20 small health potions are still unbound, and which phase first issues them bound is `ADR-024` DEL-O5 |
 
 `DEFERRED PARAMETER` — fee percentages, listing limits, rate-limit thresholds. They are tuning
 values; the mechanisms are architectural.
