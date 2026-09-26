@@ -26,9 +26,11 @@ specification.
 ## PRE-PHASE-4 GATE — before Party and vocations
 
 **There is no Phase 3.8.** Phase 3.7 is the last VERIFIED phase, and this gate comes next, then
-Phase 4. Its next work product is the **PRE-PHASE-4 specification**, and the product decisions it
-depends on are made (2026-09-25). What remains is to specify and implement the decided rules and
-contracts, with independent validation: G4.1 to G4.5 below.
+Phase 4. Its specification is
+[`specs/pre-phase-4/PRE_PHASE_4_SPEC.md`](specs/pre-phase-4/PRE_PHASE_4_SPEC.md) — a draft until
+it is independently reviewed and approved — and the product decisions it depends on are made
+(2026-09-25; PO-1 and PO-2 on 2026-09-26). What remains is to review that specification, then to
+implement the decided rules and contracts with independent validation: G4.1 to G4.5 below.
 
 **Phase 4A — Playable Beta Slice / Creator Preview is not a gate.** It is a mandatory playable
 milestone inside the Phase 4 program, after the Phase 4 foundation
@@ -146,8 +148,9 @@ test:
   are identical before and after;
 - **post-purge proof**: a scan of **live** product persistence — PostgreSQL and Redis — finds the
   Game Account's id, its Characters' ids and their names in no row, JSON and text columns included.
-  The internal history record is the one declared exception: the scan knows where it is, and
-  proves that nothing else names them (HR5);
+  The internal history record and the ledger and entitlement-audit archives (PO-1) are the
+  declared non-live locations: the scan knows where they are, and proves that nothing else names
+  them (HR5);
 - **the internal history record** (HR2–HR5): the purge writes it within the same final boundary,
   so that no purge commits without its record and no record exists for a purge that did not
   commit. Tests show that it holds at most HR3's fields, is written once under retry, cannot be
@@ -165,8 +168,9 @@ test:
   joins the closure test without a redesign. PRE-4 implements no bound item unless the PRE-PHASE-4
   specification schedules the tutorial potions there (`ADR-024` DEL-O5), behind GBC.1;
 - the purge runs under its own capability. The application role keeps no `UPDATE` or `DELETE` on
-  the ledger. Whether the Game Account's ledger entries leave the ledger or stay as immutable
-  history outside live state is the PRE-4 specification's choice (`ADR-024` §3);
+  the ledger. The Game Account's ledger entries, BANK and POUCH, and its entitlement-audit rows are
+  moved into append-only archives outside live state, with no foreign key and no balance — decided
+  by the Product Owner on 2026-09-26 (`ADR-024` §3, PO-1);
 - **due at the deadline**: at `purgeAt` the Game Account is due for immediate final purge, and the
   purge job attempts it promptly. No command purges early or postpones a due purge;
 - **a failed purge is a monitored, degraded condition** (`ADR-020` §7), proven by a test that
@@ -329,9 +333,10 @@ and database**. This supersedes the per-Game-Account uniqueness Phase 1 implemen
   creations of the same name in two Game Accounts cannot both succeed;
 - a pending Game Account's Character names stay reserved until its purge commits (G4.1), and the
   internal history record never reserves one;
-- the PRE-4 specification states the comparison the rule uses — today names are trimmed and
-  compared exactly — and how rows that already collide across Game Accounts are found and resolved
-  before the constraint is added;
+- the comparison is **case-insensitive**, decided by the Product Owner on 2026-09-26 (PO-2); today
+  names are trimmed and compared exactly. Each Character keeps the capitalization it was created
+  with. The PRE-4 specification states how rows that already collide across Game Accounts are
+  found and resolved before the constraint is added;
 - Game Account display names are a separate namespace, untouched by this rule. Whether they must
   be unique is `ADR-022` GA-O11.
 

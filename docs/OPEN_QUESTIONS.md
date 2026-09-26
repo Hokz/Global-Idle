@@ -163,10 +163,14 @@ synchronization), architecture in `ADR-024` reusing `ADR-020`, work in the PRE-4
   (`ADR-021` U5). For the PRE-PHASE-4 specification.
 
 **2. For the PRE-PHASE-4 specification:** the internal history record's exact fields and its
-*broad campaign summary*; whether the Game Account's ledger entries leave the ledger or stay as
-immutable history outside live state; how a Login left with no Game Account starts a new one
-(GA-O10); the comparison global name uniqueness uses, and how names that already collide are
-resolved (G4.4); and how a Character that carries `retiredAt` today is converted.
+*broad campaign summary*; how a Login left with no Game Account starts a new one (GA-O10); how
+names that already collide are resolved (G4.4); and how a Character that carries `retiredAt` today
+is converted. The draft specification,
+[`specs/pre-phase-4/PRE_PHASE_4_SPEC.md`](specs/pre-phase-4/PRE_PHASE_4_SPEC.md), proposes an
+answer to each, and to DEL-O5 (its SD-3, SD-13 to SD-15 and SD-19). They stay open until it is
+independently reviewed and approved. **No longer open**, decided by the Product Owner on
+2026-09-26: the ledger entries and entitlement-audit rows move at the purge into append-only
+archives outside live state (PO-1), and global name uniqueness is case-insensitive (PO-2).
 
 **3. With `ADR-022` GA-O8:** whether an entitlement's time keeps running while its Game Account is
 pending, decided with the level entitlements attach to.
@@ -224,9 +228,10 @@ gate).**
 
 **Names — not open** (`ADR-024` NM1–NM5, 2026-09-25): Character names are **globally unique**
 across the whole game and database, which supersedes the per-account uniqueness Phase 1
-implemented. A pending Game Account's Character names stay reserved everywhere until its purge
-commits, and a historical record never reserves one. Game Account names are a separate namespace;
-whether they must be unique is `ADR-022` GA-O11.
+implemented. Since 2026-09-26 the comparison is case-insensitive, and each Character keeps the
+capitalization it was created with (PO-2). A pending Game Account's Character names stay reserved
+everywhere until its purge commits, and a historical record never reserves one. Game Account names
+are a separate namespace; whether they must be unique is `ADR-022` GA-O11.
 
 ## Balance telemetry
 
@@ -338,7 +343,8 @@ ownership, identity, claims, names, bindings, deletion guarantees, transactions 
 never configuration — `docs/DECISIONS.md` § *Tunable configuration*, `ADR-025`. Left to the
 PRE-PHASE-4 specification (`PHASE_GATES.md` § *G4.5*): the surface's physical form, how its
 version relates to the content version, and which existing `INITIAL/TUNABLE` values move into it
-first.
+first. The draft specification proposes all three (§9 and SD-18 there); they stay open until it is
+approved.
 
 ## Character-bound consumables
 
@@ -451,19 +457,23 @@ a cooperative quest stays replayable, and its final reward chest is claimed once
 ## Pre-phase gates
 
 Stated in full in [`PHASE_GATES.md`](PHASE_GATES.md). There is no Phase 3.8: after the VERIFIED
-Phase 3.7 comes the PRE-4 gate, and its next work product is the PRE-PHASE-4 specification. Its
-product decisions are made (2026-09-25). Phase 4A, inside Phase 4, is not a gate (*Phase 4A*,
-below). Open where the answer is not yet written:
+Phase 3.7 comes the PRE-4 gate. Its specification is drafted —
+[`specs/pre-phase-4/PRE_PHASE_4_SPEC.md`](specs/pre-phase-4/PRE_PHASE_4_SPEC.md) — and pending
+independent review, and its product decisions are made (2026-09-25; PO-1 and PO-2 on 2026-09-26).
+Phase 4A, inside Phase 4, is not a gate (*Phase 4A*, below). Open until that review approves an
+answer:
 
 - the narrowed deletion items — DEL-O3, moderation authority, for the phase that builds
   moderation tooling, and DEL-O5, when the tutorial potions become bound — and the specification
   details listed under *Game Account deletion*, above (**PRE-4 gate**);
 - the shape of the Actor/Participant combat contract — the vocationless Main alone in Rookgaard,
   the Main and up to three companions in the Main game, one actor per Game Account in later co-op —
-  and which compatibility adapters keep the verified Hunt fixtures intact (**PRE-4 gate**, G4.3);
-- the comparison global name uniqueness uses, and how names that already collide are resolved
-  (**PRE-4 gate**, G4.4);
-- the configuration surface's physical form and first contents (**PRE-4 gate**, G4.5);
+  and which compatibility adapters keep the verified Hunt fixtures intact (**PRE-4 gate**, G4.3;
+  proposed in the draft's §7);
+- how names that already collide are resolved (**PRE-4 gate**, G4.4; proposed in the draft's
+  SD-15). The comparison itself is decided: case-insensitive (PO-2);
+- the configuration surface's physical form and first contents (**PRE-4 gate**, G4.5; proposed in
+  the draft's §9);
 - `ItemDefinition` version semantics for live `ItemInstance` rows (**PRE-MARKET gate**).
 
 **Not open:** which of `baseXp` and `baseLevel` is authoritative. `baseXp` is the durable truth and
@@ -478,6 +488,9 @@ source, global names and the internal history record (`ADR-024`, 2026-09-25). Th
 Owner decided the Gold Pouch's fate (G4.1a) on 2026-09-24, and it stands. G4.1b and G4.1c were
 decided the same day and are superseded. On 2026-09-25 the grace's length, the full freeze and the
 tutorial potions' binding were decided, and so were the starter gear and how the potions are used.
+On 2026-09-26 the Product Owner decided, for the PRE-PHASE-4 specification, that the ledger and
+entitlement-audit history is archived outside live state at the purge (PO-1) and that name
+uniqueness is case-insensitive (PO-2).
 
 ## Phase 4A — Playable Beta Slice
 

@@ -5,6 +5,9 @@ Recorded at PR #13 head `c74b845`, in the final 2026-09-25 governance synchroniz
 followed the independently validated head `fff6faf`. **Review:** the independent review of
 `c74b845` accepted it and returned documentation and governance corrections only; the correcting
 head is **pending independent review**.
+**Amended 2026-09-26** by two Product Owner decisions taken for the PRE-PHASE-4 specification: the
+purge moves the Game Account's ledger and entitlement-audit history into append-only archives
+outside live state (§3, PO-1), and global name uniqueness is case-insensitive (§6, PO-2).
 **Supersedes, in part:** [ADR-020](./ADR-020-character-deletion-grace-and-purge.md). It replaces
 ADR-020's deletion target — a Character, rather than the Game Account — and every rule that
 existed because a Character could be purged while its Game Account lived on. That covers G4.1b
@@ -116,7 +119,7 @@ The lifecycle machinery of `ADR-020` is unchanged. What changes is its subject.
 | restore, purge and creation serialised by locks (§7) | restore and purge lock the Game Account first, in the order `DATA_ARCHITECTURE.md` §4 fixes. A creation in **any** Game Account must observe a reserved name until the purge that frees it commits (§6) |
 | the purge capability; the application role keeps no ledger `UPDATE` or `DELETE` (§7) | unchanged |
 | the closure test derived from the schema (§7) | every relation that references the Game Account row or one of its Characters, string-keyed ids included |
-| the post-purge scan of live persistence (§7) | finds no live row naming the Game Account, any of its Characters or their names. The internal history record is the one declared exception (HR5) |
+| the post-purge scan of live persistence (§7) | finds no live row naming the Game Account, any of its Characters or their names. The internal history record and the ledger and entitlement-audit archives (§3, PO-1) are the declared non-live locations (HR5) |
 | overdue purges observable; the lateness target chosen before production (§7) | unchanged, counted per Game Account |
 | migrating from retirement (§9) | still applies, together with §5 and §6 below |
 
@@ -132,12 +135,12 @@ actions. Nothing the Game Account owns is KEEP.
 | what `ADR-020` §6.1 lists as Character-owned — `CharacterStamina`, `CharacterLootPolicy`, `CharacterContainerSlot`, `ItemInstance` in every Character custody, the POUCH `CurrencyBalance` | DELETE-OWNED |
 | `ItemInstance` in the `DEPOT`, `StashEntry` | DELETE-OWNED. They are Game Account custody, and a bound item goes the same way as an unbound one |
 | the BANK `CurrencyBalance` | DELETE-OWNED |
-| `LedgerEntry`, BANK and POUCH | DELETE-HISTORY. Whether the entries leave the ledger or stay as immutable history outside live state is the PRE-4 specification's choice — the choice `ADR-020` §6.1 gave POUCH entries, now for all of them. Either way no live balance remains, and every surviving custody scope still reconciles |
+| `LedgerEntry`, BANK and POUCH | DELETE-HISTORY, as **immutable history outside live state**: the purge moves the entries into an append-only archive (PO-1, below). `ADR-020` §6.1 left the same choice open for POUCH entries; the decision now covers BANK and POUCH alike. No live balance remains, and every surviving custody scope still reconciles |
 | `Activity`, `SessionBoundActivity`, `SkillTrainingActivity`, `HuntRun`, `ActivityParticipant`, and the `SettlementOperation` rows that derive from them | DELETE-HISTORY |
 | `OccupancyClaim` | cannot exist (quiescence). A purge that finds one REFUSES and raises an alarm |
 | `IdempotencyRecord` of the Game Account | DELETE-HISTORY, or kept from ever reaching a purge by a retention window shorter than the grace — the PRE-4 specification's choice, as in `ADR-020` §6.3 |
 | `Entitlement` of the Game Account | DELETE-OWNED. Nothing is refunded, and nothing moves to the Login (GD6). An entitlement a later phase attaches to the Login instead (GA-O8) is the Login's, and no Game Account purge touches it |
-| `EntitlementAudit` of the Game Account | DELETE-HISTORY, or immutable history outside live state — decided with the ledger's choice above |
+| `EntitlementAudit` of the Game Account | DELETE-HISTORY, as immutable history outside live state, like the ledger above (PO-1) |
 | the Login and its `AuthIdentity` rows | **KEEP** (GD2). Today `AuthIdentity` references the Game Account row — §5 |
 | `ContentBundle` | KEEP. Removing an unreferenced bundle stays `ADR-016`'s explicit path |
 | Redis keys that name the Game Account or one of its Characters | evicted (`ADR-009`) |
@@ -149,6 +152,16 @@ actions. Nothing the Game Account owns is KEEP.
 Account: both legs are its own and go together. An operation that spans two Game Accounts — a
 trade, from Phase 6 — keeps the other Game Account's leg, and that phase restates the leg-balance
 check for it.
+
+**PO-1 — decided by the Product Owner, 2026-09-26.** This record left the ledger's fate to the
+PRE-4 specification. Because the choice fixes irreversible deletion behaviour, it went to the
+Product Owner instead, with physical deletion as the alternative. The purge moves the Game
+Account's `LedgerEntry` rows, BANK and POUCH, and its `EntitlementAudit` rows into append-only
+archive tables outside live state. They hold no foreign key and no balance, and gameplay never
+reads them. Like the history record, they are never live ownership, custody, restoration, name,
+claim or uniqueness state (HR5), and their retention and access are pre-launch questions. The
+PRE-PHASE-4 specification builds them
+([`PRE_PHASE_4_SPEC.md`](../../specs/pre-phase-4/PRE_PHASE_4_SPEC.md) §5.7, §5.9).
 
 ### 4. The internal history record — architecture
 
@@ -192,8 +205,12 @@ telemetry belongs to the phases that introduce what it measures, and is unchange
   internal history record keeps names without reserving them (NM3).
 - **Migration**: today a name is unique only within its Game Account, among playable rows,
   trimmed and compared exactly, and nothing in the database stops two Game Accounts from holding
-  the same name. The PRE-4 specification states the comparison the global rule uses, and how rows
-  that already collide are found and resolved before the constraint is added.
+  the same name. The PRE-4 specification states how rows that already collide are found and
+  resolved before the constraint is added.
+- **Comparison — PO-2, decided by the Product Owner, 2026-09-26**: global uniqueness is
+  **case-insensitive**. `Rookie`, `rookie` and `ROOKIE` are one name; the first to hold it keeps
+  it, and every Character keeps the capitalization it was created with. It went to the Product
+  Owner because it is user-visible, with exact comparison as the alternative.
 - **Companions** carry Character names under NM1: they are among the names NM2 reserves. Whether
   a companion's name is chosen by the player, and when it is set, stays Phase 4's (`ADR-022`
   GA-O7).

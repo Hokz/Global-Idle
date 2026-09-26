@@ -151,10 +151,12 @@ response cannot double-apply.
 
 **The one designed exception — a Game Account's final purge** (`ADR-024`, reusing `ADR-020`;
 `LOCKED BY PRODUCT`). Exactly 720 elapsed hours after a deletion request, the purge removes the
-whole Game Account and everything it owned — its ledger entries, BANK and POUCH, included, unless
-the PRE-4 specification keeps them as immutable history outside live state (`ADR-024` §3). An
-internal history record for support survives, outside live persistence, and never takes part in
-ownership, custody, claims or uniqueness (HR2–HR5). The exception is narrow by construction:
+whole Game Account and everything it owned. Its ledger entries, BANK and POUCH, and its
+entitlement-audit rows leave the live tables: the purge moves them into append-only archives
+outside live state, with no foreign key and no balance (`ADR-024` §3, PO-1, decided by the Product
+Owner on 2026-09-26). An internal history record for support survives, outside live persistence.
+Neither it nor the archives ever take part in ownership, custody, claims or uniqueness (HR2–HR5).
+The exception is narrow by construction:
 
 - it applies **only** to rows that belong to the purged Game Account or to one of its Characters.
   The Login and every other Game Account — of the same Login included — are unchanged, and every

@@ -216,8 +216,11 @@ Phase 3.7 — VERIFIED → PRE-PHASE-4 specification
   → PHASE 4A — PLAYABLE BETA SLICE / CREATOR PREVIEW → remainder of Phase 4 → Phase 5
 ```
 
-The product decisions the gate depends on were made on 2026-09-25. Its next work product is the
-**PRE-PHASE-4 specification**, and then the implementation of the decided rules and contracts:
+The product decisions the gate depends on were made on 2026-09-25, and two more for its
+specification on 2026-09-26 (PO-1, PO-2). The **PRE-PHASE-4 specification** is drafted at
+[`docs/specs/pre-phase-4/PRE_PHASE_4_SPEC.md`](docs/specs/pre-phase-4/PRE_PHASE_4_SPEC.md) and is
+**pending independent review**. After its approval comes the implementation of the decided rules
+and contracts:
 
 - **G4.1, Game Account deletion** (`ADR-024`, which reuses `ADR-020`'s lifecycle and supersedes
   its Character target; `ADR-020` superseded `ADR-007`'s retirement). A request puts the **whole
@@ -254,8 +257,9 @@ is separate from its one-time reward claim, which belongs to the Game Account �
 the Login (`ADR-023`). The weapon attack and defence formulas are **locked**, and ranged Accuracy,
 the damage roll and the rounding stages stay open (`docs/DECISIONS.md`). These decisions were
 recorded at PR #13 head `c74b845`, which was independently reviewed, its decisions accepted, and
-returned for documentation corrections only. The correcting head is **pending independent
-review**. **The PRE-4 specification has not started.**
+returned for documentation corrections only. The review of the correcting head, `23e1c60`, is
+recorded in PR #13's description rather than in these files. **The PRE-4 specification is drafted
+and pending independent review; nothing of it is implemented.**
 
 **Character-bound consumables** (`ADR-021`, `LOCKED` by the Product Owner on 2026-09-24) are
 consumables bound permanently to one Character — XP Boosts, Store-bought Exercise Weapons, Daily

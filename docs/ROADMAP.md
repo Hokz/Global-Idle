@@ -61,10 +61,11 @@ Detail for every entry is in the master roadmap; nothing below adds to it.
 ```
 
 There is **no Phase 3.8** (2026-09-25). After Phase 3.7 comes the PRE-PHASE-4 gate: its
-specification — the next work product — then its implementation and independent validation. Then
-the Phase 4 foundation, **Phase 4A — Playable Beta Slice / Creator Preview**, and the remainder of
-Phase 4, before Phase 5. Phase 4A is a mandatory playable milestone inside Phase 4, not a
-replacement for it and not a gate. The master roadmap §20 says so, and these lines only repeat it.
+specification — drafted and pending independent review — then its implementation and independent
+validation. Then the Phase 4 foundation, **Phase 4A — Playable Beta Slice / Creator Preview**, and
+the remainder of Phase 4, before Phase 5. Phase 4A is a mandatory playable milestone inside
+Phase 4, not a replacement for it and not a gate. The master roadmap §20 says so, and these lines
+only repeat it.
 
 ---
 
